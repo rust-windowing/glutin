@@ -57,6 +57,8 @@ pub fn new_window(builder: WindowBuilder) -> Result<Window, String> {
             class_name
         };
 
+        println!("class ok");
+
         // building a RECT object with coordinates
         let mut rect = ffi::RECT {
             left: 0, right: builder.dimensions.unwrap_or((1024, 768)).val0() as ffi::LONG,
@@ -129,6 +131,9 @@ pub fn new_window(builder: WindowBuilder) -> Result<Window, String> {
                 handle
             };
 
+
+        println!("dummy window ok");
+
             // getting the HDC of the dummy window
             let dummy_hdc = {
                 let hdc = unsafe { ffi::GetDC(dummy_window) };
@@ -175,6 +180,8 @@ pub fn new_window(builder: WindowBuilder) -> Result<Window, String> {
                 output
             };
 
+        println!("dummy pf ok");
+
             // calling SetPixelFormat
             unsafe {
                 if ffi::SetPixelFormat(dummy_hdc, 1, &pixel_format) == 0 {
@@ -183,6 +190,7 @@ pub fn new_window(builder: WindowBuilder) -> Result<Window, String> {
                     return;
                 }
             }
+        println!("set dummy pf ok");
 
             // creating the dummy OpenGL context
             let dummy_context = {
@@ -197,6 +205,7 @@ pub fn new_window(builder: WindowBuilder) -> Result<Window, String> {
 
             // making context current
             unsafe { ffi::wglMakeCurrent(dummy_hdc, dummy_context); }
+        println!("dummy context ok");
 
             // getting the pointer to wglCreateContextAttribs
             let mut addr = unsafe { ffi::wglGetProcAddress(b"wglCreateContextAttribs".as_ptr()
@@ -206,6 +215,7 @@ pub fn new_window(builder: WindowBuilder) -> Result<Window, String> {
                 addr = unsafe { ffi::wglGetProcAddress(b"wglCreateContextAttribsARB".as_ptr()
                     as *const i8) } as *const ();
             }
+        println!("createcontext ptr: {}", addr);
 
             // removing current context
             unsafe { ffi::wglMakeCurrent(ptr::mut_null(), ptr::mut_null()); }
@@ -245,6 +255,7 @@ pub fn new_window(builder: WindowBuilder) -> Result<Window, String> {
 
             handle
         };
+        println!("real window ok: {}", real_window);
 
         // getting the HDC of the window
         let hdc = {
@@ -265,6 +276,7 @@ pub fn new_window(builder: WindowBuilder) -> Result<Window, String> {
                 return;
             }
         }
+        println!("set pf ok");
 
         // creating the OpenGL context
         let context = {
@@ -288,6 +300,7 @@ pub fn new_window(builder: WindowBuilder) -> Result<Window, String> {
                     Some(ptr) => ptr(hdc, ptr::mut_null(), attributes.as_slice().as_ptr())
                 }
             };
+        println!("context ok {}", ctxt);
 
             if ctxt.is_null() {
                 tx.send(Err(format!("OpenGL context creation failed: {}",
@@ -307,6 +320,7 @@ pub fn new_window(builder: WindowBuilder) -> Result<Window, String> {
         let events_receiver = {
             let (tx, rx) = channel();
             WINDOW.replace(Some((real_window, tx)));
+        println!("tls: {}", WINDOW.get().unwrap().ref0());
             rx
         };
 
@@ -332,14 +346,18 @@ pub fn new_window(builder: WindowBuilder) -> Result<Window, String> {
             is_closed: AtomicBool::new(false),
         }));
 
+        println!("event loop start");
         // now that the `Window` struct is initialized, the main `Window::new()` function will
         //  return and this events loop will run in parallel
         loop {
             let mut msg = unsafe { mem::uninitialized() };
 
             if unsafe { ffi::GetMessageW(&mut msg, ptr::mut_null(), 0, 0) } == 0 {
+        println!("quit msg");
                 break;
             }
+
+        println!("processing message");
 
             unsafe { ffi::TranslateMessage(&msg) };
             unsafe { ffi::DispatchMessageW(&msg) };     // calls `callback` (see below)
@@ -371,6 +389,9 @@ fn send_event(window: ffi::HWND, event: Event) {
 extern "stdcall" fn callback(window: ffi::HWND, msg: ffi::UINT,
     wparam: ffi::WPARAM, lparam: ffi::LPARAM) -> ffi::LRESULT
 {
+        println!("callback called {}", msg);
+        match WINDOW.get() { None => println!("tls empty"), Some(v) => println!("tls: {}", v.ref0()) }
+
     match msg {
         ffi::WM_DESTROY => {
             use Closed;
