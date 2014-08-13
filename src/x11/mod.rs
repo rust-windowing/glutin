@@ -381,11 +381,11 @@ impl Window {
                     let event: &ffi::XButtonEvent = unsafe { mem::transmute(&xev) };
 
                     let elem = match event.button {
-                        ffi::Button1 => Some(events::Button1),
-                        ffi::Button2 => Some(events::Button2),
-                        ffi::Button3 => Some(events::Button3),
-                        ffi::Button4 => Some(events::Button4),
-                        ffi::Button5 => Some(events::Button5),
+                        ffi::Button1 => Some(events::Button(1)),
+                        ffi::Button2 => Some(events::Button(2)),
+                        ffi::Button3 => Some(events::Button(3)),
+                        ffi::Button4 => Some(events::Button(4)),
+                        ffi::Button5 => Some(events::Button(5)),
                         _ => None
                     };
 
