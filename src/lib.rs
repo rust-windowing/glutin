@@ -7,9 +7,9 @@
 //!  platforms as possible.
 //!
 //! # Building a window
-//! 
+//!
 //! There are two ways to create a window:
-//! 
+//!
 //!  - Calling `Window::new()`.
 //!  - Calling `let builder = WindowBuilder::new()` then `builder.build()`.
 //!
@@ -56,6 +56,7 @@ pub struct WindowBuilder {
     title: String,
     monitor: Option<winimpl::MonitorID>,
     gl_version: Option<(uint, uint)>,
+    is_fullscreen: bool,
 }
 
 impl WindowBuilder {
@@ -66,6 +67,7 @@ impl WindowBuilder {
             title: "gl-init-rs window".to_string(),
             monitor: None,
             gl_version: None,
+            is_fullscreen: false,
         }
     }
 
@@ -89,6 +91,7 @@ impl WindowBuilder {
     pub fn with_fullscreen(mut self, monitor: MonitorID) -> WindowBuilder {
         let MonitorID(monitor) = monitor;
         self.monitor = Some(monitor);
+        self.is_fullscreen = true;
         self
     }
 
@@ -102,7 +105,7 @@ impl WindowBuilder {
     }
 
     /// Builds the window.
-    /// 
+    ///
     /// Error should be very rare and only occur in case of permission denied, incompatible system,
     ///  out of memory, etc.
     pub fn build(mut self) -> Result<Window, String> {
@@ -127,16 +130,16 @@ impl WindowBuilder {
 ///
 /// ```ignore
 /// let window = Window::new().unwrap();
-/// 
+///
 /// unsafe { window.make_current() };
-/// 
+///
 /// loop {
 ///     for event in window.poll_events() {
 ///             // process events here
 ///             _ => ()
 ///         }
 ///     }
-///     
+///
 ///     // draw everything here
 ///
 ///     window.swap_buffers();
@@ -157,7 +160,7 @@ impl Window {
     /// Creates a new OpenGL context, and a Window for platforms where this is appropriate.
     ///
     /// This function is equivalent to `WindowBuilder::new().build()`.
-    /// 
+    ///
     /// Error should be very rare and only occur in case of permission denied, incompatible system,
     ///  out of memory, etc.
     #[inline]
@@ -247,7 +250,7 @@ impl Window {
     }
 
     /// Returns an iterator to all the events that are currently in the window's events queue.
-    /// 
+    ///
     /// Contrary to `wait_events`, this function never blocks.
     #[inline]
     pub fn poll_events(&self) -> PollEventsIterator {
@@ -256,7 +259,7 @@ impl Window {
 
     /// Waits for an event, then returns an iterator to all the events that are currently
     ///  in the window's events queue.
-    /// 
+    ///
     /// If there are no events in queue when you call the function,
     ///  this function will block until there is one.
     #[inline]
