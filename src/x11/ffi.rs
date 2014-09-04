@@ -1433,6 +1433,13 @@ extern "C" {
     pub fn XF86VidModeGetAllModeLines(dpy: *mut Display, screen: libc::c_int,
         modecount_return: *mut libc::c_int, modesinfo: *mut *mut *mut XF86VidModeModeInfo) -> Bool;
     pub fn XkbSetDetectableAutoRepeat(dpy: *mut Display, detectable: bool, supported_rtm: *mut bool) -> bool;
+
+    pub fn XF86VidModeSwitchToMode(dpy: *mut Display, screen: libc::c_int,
+        modeline: *mut XF86VidModeModeInfo) -> Bool;
+    pub fn XF86VidModeSetViewPort(dpy: *mut Display, screen: libc::c_int,
+        x: libc::c_int, y: libc::c_int) -> Bool;
+    pub fn XF86VidModeGetAllModeLines(dpy: *mut Display, screen: libc::c_int,
+        modecount_return: *mut libc::c_int, modesinfo: *mut *mut *mut XF86VidModeModeInfo) -> Bool;
 }
 
 /*
