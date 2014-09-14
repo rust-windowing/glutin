@@ -1,6 +1,7 @@
 #![feature(unsafe_destructor)]
 #![feature(globs)]
 #![feature(phase)]
+#![feature(struct_variant)]
 #![unstable]
 
 //! The purpose of this library is to provide an OpenGL context on as many

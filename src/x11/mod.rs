@@ -347,7 +347,7 @@ impl Window {
                 },
 
                 ffi::KeyPress | ffi::KeyRelease => {
-                    use {KeyboardInput, Pressed, Released, ReceivedCharacter, KeyModifiers};
+                    use {KeyboardInput, Pressed, Released, Input, KeyModifiers};
                     let event: &mut ffi::XKeyEvent = unsafe { mem::transmute(&xev) };
 
                     if event.type_ == ffi::KeyPress {
@@ -370,9 +370,7 @@ impl Window {
                             .unwrap_or("").to_string()
                     };
 
-                    for chr in written.as_slice().chars() {
-                        events.push(ReceivedCharacter(chr));
-                    }
+                    events.push(Input { data: written, is_composing: false });
 
                     let keysym = unsafe {
                         ffi::XKeycodeToKeysym(self.display, event.keycode as ffi::KeyCode, 0)

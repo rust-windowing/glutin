@@ -428,9 +428,9 @@ extern "stdcall" fn callback(window: ffi::HWND, msg: ffi::UINT,
 
         ffi::WM_CHAR => {
             use std::mem;
-            use events::ReceivedCharacter;
+            use events::Input;
             let chr: char = unsafe { mem::transmute(wparam) };
-            send_event(window, ReceivedCharacter(chr));
+            send_event(window, Input { data: chr.to_string(), is_composing: false });
             0
         },
 

@@ -10,7 +10,10 @@ pub enum Event {
     Closed,
 
     /// The window received a unicode character.
-    ReceivedCharacter(char),
+    Input {
+        pub data: String,
+        pub is_composing: bool
+    },
 
     /// The window gained or lost focus.
     /// 
