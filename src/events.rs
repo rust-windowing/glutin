@@ -43,16 +43,51 @@ pub enum Event {
     KeyboardInput(ElementState, ScanCode, Option<VirtualKeyCode>, KeyModifiers),
 
     /// The cursor has moved on the window.
-    /// 
-    /// The parameter are the (x,y) coords in pixels relative to the top-left corner of the window.
-    MouseMoved((int, int)),
+    MouseMove {
+        /// X coordinate in pixels relative to the top-left hand corner of the window.
+        pub x: int,
+        /// Y coordinate in pixels relative to the top-left hand corner of the window.
+        pub y: int,
+    },
 
-    /// A positive value indicates that the wheel was rotated forward, away from the user;
+    /// The mouse has entered the window.
+    MouseEnter,
+    
+    /// The mouse has left the window.
+    MouseLeave,
+
+    /// A positive value indicates that the wheel was rotated forward, away from the user ;
     ///  a negative value indicates that the wheel was rotated backward, toward the user.
-    MouseWheel(i32),
+    MouseWheel {
+        /// 
+        pub delta_x: i32,
+        /// 
+        pub delta_y: i32,
+    },
 
-    /// An event from the mouse has been received.
-    MouseInput(ElementState, MouseButton),
+    /// A mouse button is down.
+    MouseDown {
+        /// 
+        pub button: MouseButton,
+        /// 
+        pub buttons: Vec<MouseButton>,
+        /// X coordinate in pixels relative to the top-left hand corner of the window.
+        pub x: int,
+        /// Y coordinate in pixels relative to the top-left hand corner of the window.
+        pub y: int,
+    },
+
+    /// A mouse button is down.
+    MouseUp {
+        /// 
+        pub button: MouseButton,
+        /// 
+        pub buttons: Vec<MouseButton>,
+        /// X coordinate in pixels relative to the top-left hand corner of the window.
+        pub x: int,
+        /// Y coordinate in pixels relative to the top-left hand corner of the window.
+        pub y: int,
+    }
 }
 
 pub type ScanCode = u8;
@@ -72,17 +107,17 @@ bitflags!(
 )
 
 #[deriving(Show, Hash, PartialEq, Eq, Clone)]
-pub enum ElementState {
-    Pressed,
-    Released,
-}
-
-#[deriving(Show, Hash, PartialEq, Eq, Clone)]
 pub enum MouseButton {
     LeftMouseButton,
     RightMouseButton,
     MiddleMouseButton,
     OtherMouseButton(u8),
+}
+
+#[deriving(Show, Hash, PartialEq, Eq, Clone)]
+pub enum ElementState {
+    Pressed,
+    Released,
 }
 
 #[deriving(Show, Hash, PartialEq, Eq, Clone)]
