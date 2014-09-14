@@ -15,6 +15,25 @@ pub enum Event {
         pub is_composing: bool
     },
 
+    /// Fired when a  text composition system is enabled and a new composition session is about to
+    ///  begin (or has begun, depending on the text composition system) in preparation for
+    ///  composing a passage of text.
+    CompositionStart {
+        pub data: String
+    },
+
+    /// Dispatched during a composition session when a text composition system updates its active
+    ///  text passage with a new character.
+    CompositionUpdate {
+        pub data: String
+    },
+
+    /// Dispatched when a text composition system completes or cancels the current composition
+    ///  session.
+    CompositionEnd {
+        pub data: String
+    },
+
     /// The window gained or lost focus.
     /// 
     /// The parameter is true if the window has gained focus, and false if it has lost focus.
