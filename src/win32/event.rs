@@ -6,11 +6,24 @@ pub fn keyboardevent_to_event(wparam: ffi::WPARAM, lparam: ffi::LPARAM) -> event
     let scancode = scancode_to_code(scancode as u16);       // FIXME: value > 0xff never reached
     let vkey = vkeycode_to_element(wparam);
 
+    // TODO: cache this somehow
+    let locale = unsafe {
+        use libc;
+        use std::mem;
+
+        let mut buffer: [libc::wchar_t, ..ffi::KL_NAMELENGTH] = mem::uninitialized();
+        if ffi::GetKeyboardLayoutNameW(buffer.as_mut_slice().as_mut_ptr()) == 0 {
+            None
+        } else {
+            String::from_utf16(buffer.as_slice().init())
+        }
+    };
+
     events::KeyboardEvent {
         code: scancode,
         key: vkey,
         location: events::StandardLocation,     // FIXME
-        local: None,     // FIXME
+        local: locale,
         repeat: false,     // FIXME
         alt_key: false,     // FIXME
         ctrl_key: false,     // FIXME
