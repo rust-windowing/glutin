@@ -23,7 +23,7 @@ pub fn keyboardevent_to_event(wparam: ffi::WPARAM, lparam: ffi::LPARAM) -> event
         code: scancode,
         key: vkey,
         location: events::StandardLocation,     // FIXME
-        local: locale,
+        locale: locale,
         repeat: false,     // FIXME
         alt_key: false,     // FIXME
         ctrl_key: false,     // FIXME

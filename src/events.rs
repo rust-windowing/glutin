@@ -113,7 +113,7 @@ pub struct KeyboardEvent {
     /// The location of the key on the keyboard or other input device.
     pub location: KeyLocation,
     /// A locale string indicating the locale the keyboard is configured for.
-    pub local: Option<String>,
+    pub locale: Option<String>,
     /// True if the key is being held down such that it is automatically repeating.
     pub repeat: bool,
     /// True if the Alt key (or Option, on Mac) was active when the event was generated.

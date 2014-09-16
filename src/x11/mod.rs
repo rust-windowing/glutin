@@ -376,7 +376,7 @@ impl Window {
                             ffi::XKeycodeToKeysym(self.display, event.keycode as ffi::KeyCode, 0)
                         } as libc::c_uint),
                         location: StandardLocation,
-                        local: None,            // FIXME
+                        locale: None,            // FIXME
                         repeat: false,          // FIXME
                         alt_key: false,         // FIXME
                         ctrl_key: false,        // FIXME
