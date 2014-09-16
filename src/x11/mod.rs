@@ -341,21 +341,19 @@ impl Window {
                 },
 
                 ffi::MotionNotify => {
-                    use MouseMoved;
+                    use MouseMove;
                     let event: &ffi::XMotionEvent = unsafe { mem::transmute(&xev) };
-                    events.push(MouseMoved((event.x as int, event.y as int)));
+                    events.push(MouseMove { x: event.x as int, y: event.y as int });
                 },
 
                 ffi::KeyPress | ffi::KeyRelease => {
-                    use {KeyboardInput, Pressed, Released, ReceivedCharacter, KeyModifiers};
+                    use {KeyboardEvent, KeyDown, KeyUp, StandardLocation, Input};
                     let event: &mut ffi::XKeyEvent = unsafe { mem::transmute(&xev) };
 
                     if event.type_ == ffi::KeyPress {
                         let raw_ev: *mut ffi::XKeyEvent = event;
                         unsafe { ffi::XFilterEvent(mem::transmute(raw_ev), self.window) };
                     }
-
-                    let state = if xev.type_ == ffi::KeyPress { Pressed } else { Released };
 
                     let written = unsafe {
                         use std::str;
@@ -370,27 +368,34 @@ impl Window {
                             .unwrap_or("").to_string()
                     };
 
-                    for chr in written.as_slice().chars() {
-                        events.push(ReceivedCharacter(chr));
-                    }
+                    events.push(Input { data: written, is_composing: false });
 
-                    let keysym = unsafe {
-                        ffi::XKeycodeToKeysym(self.display, event.keycode as ffi::KeyCode, 0)
+                    let keyboard_event = KeyboardEvent {
+                        code: events::scancode_to_code(event.keycode as ffi::KeyCode),
+                        key: events::keycode_to_element(unsafe {
+                            ffi::XKeycodeToKeysym(self.display, event.keycode as ffi::KeyCode, 0)
+                        } as libc::c_uint),
+                        location: StandardLocation,
+                        locale: None,            // FIXME
+                        repeat: false,          // FIXME
+                        alt_key: false,         // FIXME
+                        ctrl_key: false,        // FIXME
+                        meta_key: false,        // FIXME
+                        shift_key: false,       // FIXME
+                        is_composing: false,
                     };
 
-                    let vkey =  events::keycode_to_element(keysym as libc::c_uint);
-
-                    events.push(KeyboardInput(state, event.keycode as u8,
-                        vkey, KeyModifiers::empty()));
-                    //
+                    if xev.type_ == ffi::KeyPress {
+                        events.push(KeyDown(keyboard_event));
+                    } else {
+                        events.push(KeyUp(keyboard_event));
+                    };
                 },
 
                 ffi::ButtonPress | ffi::ButtonRelease => {
-                    use {MouseInput, Pressed, Released};
+                    use {MouseDown, MouseUp};
                     use {LeftMouseButton, RightMouseButton, MiddleMouseButton, OtherMouseButton};
                     let event: &ffi::XButtonEvent = unsafe { mem::transmute(&xev) };
-
-                    let state = if xev.type_ == ffi::ButtonPress { Pressed } else { Released };
 
                     let button = match event.button {
                         ffi::Button1 => Some(LeftMouseButton),
@@ -402,8 +407,24 @@ impl Window {
                     };
 
                     match button {
-                        Some(button) => 
-                            events.push(MouseInput(state, button)),
+                        Some(button) => {
+                            if xev.type_ == ffi::ButtonPress {
+                                events.push(MouseDown {
+                                    button: button,
+                                    buttons: vec![button],
+                                    x: event.x as int,
+                                    y: event.y as int
+                                });
+
+                            } else {
+                                events.push(MouseUp {
+                                    button: button,
+                                    buttons: vec![button],
+                                    x: event.x as int,
+                                    y: event.y as int
+                                });
+                            }
+                        },
                         None => ()
                     };
                 },

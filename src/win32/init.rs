@@ -428,19 +428,19 @@ extern "stdcall" fn callback(window: ffi::HWND, msg: ffi::UINT,
 
         ffi::WM_CHAR => {
             use std::mem;
-            use events::ReceivedCharacter;
+            use events::Input;
             let chr: char = unsafe { mem::transmute(wparam) };
-            send_event(window, ReceivedCharacter(chr));
+            send_event(window, Input { data: chr.to_string(), is_composing: false });
             0
         },
 
         ffi::WM_MOUSEMOVE => {
-            use MouseMoved;
+            use MouseMove;
 
             let x = ffi::GET_X_LPARAM(lparam) as int;
             let y = ffi::GET_Y_LPARAM(lparam) as int;
 
-            send_event(window, MouseMoved((x, y)));
+            send_event(window, MouseMove { x: x, y: y });
 
             0
         },
@@ -451,60 +451,98 @@ extern "stdcall" fn callback(window: ffi::HWND, msg: ffi::UINT,
             let value = (wparam >> 16) as i16;
             let value = value as i32;
 
-            send_event(window, MouseWheel(value));
+            send_event(window, MouseWheel { delta_x: value, delta_y: value });
 
             0
         },
 
         ffi::WM_KEYDOWN => {
-            use events::{KeyboardInput, KeyModifiers, Pressed};
-            let scancode = ((lparam >> 16) & 0xff) as u8;
-            let vkey = event::vkeycode_to_element(wparam);
-            send_event(window, KeyboardInput(Pressed, scancode, vkey, KeyModifiers::empty()));
+            use events::KeyDown;
+            send_event(window, KeyDown(event::keyboardevent_to_event(wparam, lparam)));
             0
         },
 
         ffi::WM_KEYUP => {
-            use events::{KeyboardInput, KeyModifiers, Released};
-            let scancode = ((lparam >> 16) & 0xff) as u8;
-            let vkey = event::vkeycode_to_element(wparam);
-            send_event(window, KeyboardInput(Released, scancode, vkey, KeyModifiers::empty()));
+            use events::KeyUp;
+            send_event(window, KeyUp(event::keyboardevent_to_event(wparam, lparam)));
             0
         },
 
         ffi::WM_LBUTTONDOWN => {
-            use events::{Pressed, MouseInput, LeftMouseButton};
-            send_event(window, MouseInput(Pressed, LeftMouseButton));
+            use events::{MouseDown, LeftMouseButton};
+            let x = ffi::GET_X_LPARAM(lparam) as int;
+            let y = ffi::GET_Y_LPARAM(lparam) as int;
+            send_event(window, MouseDown {
+                button: LeftMouseButton,
+                buttons: vec![LeftMouseButton],
+                x: x,
+                y: y,
+            });
             0
         },
 
         ffi::WM_LBUTTONUP => {
-            use events::{Released, MouseInput, LeftMouseButton};
-            send_event(window, MouseInput(Released, LeftMouseButton));
+            use events::{MouseUp, LeftMouseButton};
+            let x = ffi::GET_X_LPARAM(lparam) as int;
+            let y = ffi::GET_Y_LPARAM(lparam) as int;
+            send_event(window, MouseUp {
+                button: LeftMouseButton,
+                buttons: vec![LeftMouseButton],
+                x: x,
+                y: y,
+            });
             0
         },
 
         ffi::WM_RBUTTONDOWN => {
-            use events::{Pressed, MouseInput, RightMouseButton};
-            send_event(window, MouseInput(Pressed, RightMouseButton));
+            use events::{MouseDown, RightMouseButton};
+            let x = ffi::GET_X_LPARAM(lparam) as int;
+            let y = ffi::GET_Y_LPARAM(lparam) as int;
+            send_event(window, MouseDown {
+                button: RightMouseButton,
+                buttons: vec![RightMouseButton],
+                x: x,
+                y: y,
+            });
             0
         },
 
         ffi::WM_RBUTTONUP => {
-            use events::{Released, MouseInput, RightMouseButton};
-            send_event(window, MouseInput(Released, RightMouseButton));
+            use events::{MouseUp, RightMouseButton};
+            let x = ffi::GET_X_LPARAM(lparam) as int;
+            let y = ffi::GET_Y_LPARAM(lparam) as int;
+            send_event(window, MouseUp {
+                button: RightMouseButton,
+                buttons: vec![RightMouseButton],
+                x: x,
+                y: y,
+            });
             0
         },
 
         ffi::WM_MBUTTONDOWN => {
-            use events::{Pressed, MouseInput, MiddleMouseButton};
-            send_event(window, MouseInput(Pressed, MiddleMouseButton));
+            use events::{MouseDown, MiddleMouseButton};
+            let x = ffi::GET_X_LPARAM(lparam) as int;
+            let y = ffi::GET_Y_LPARAM(lparam) as int;
+            send_event(window, MouseDown {
+                button: MiddleMouseButton,
+                buttons: vec![MiddleMouseButton],
+                x: x,
+                y: y,
+            });
             0
         },
 
         ffi::WM_MBUTTONUP => {
-            use events::{Released, MouseInput, MiddleMouseButton};
-            send_event(window, MouseInput(Released, MiddleMouseButton));
+            use events::{MouseUp, MiddleMouseButton};
+            let x = ffi::GET_X_LPARAM(lparam) as int;
+            let y = ffi::GET_Y_LPARAM(lparam) as int;
+            send_event(window, MouseUp {
+                button: MiddleMouseButton,
+                buttons: vec![MiddleMouseButton],
+                x: x,
+                y: y,
+            });
             0
         },
 

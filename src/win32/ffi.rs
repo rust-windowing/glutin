@@ -200,6 +200,9 @@ pub static FORMAT_MESSAGE_FROM_SYSTEM: DWORD = 0x00001000;
 pub static FORMAT_MESSAGE_IGNORE_INSERTS: DWORD = 0x00000200;
 
 // ?
+pub static KL_NAMELENGTH: uint = 9;
+
+// ?
 pub static PFD_TYPE_RGBA: BYTE = 0;
 pub static PFD_TYPE_COLORINDEX: BYTE = 1;
 pub static PFD_MAIN_PLANE: BYTE = 0;
@@ -686,6 +689,9 @@ extern "system" {
 
     // http://msdn.microsoft.com/en-us/library/dd144871(v=vs.85).aspx
     pub fn GetDC(hWnd: HWND) -> HDC;
+
+    // http://msdn.microsoft.com/en-us/library/windows/desktop/ms646298(v=vs.85).aspx
+    pub fn GetKeyboardLayoutNameW(pwszKLID: LPWSTR) -> BOOL;
 
     // http://msdn.microsoft.com/en-us/library/windows/desktop/ms679360(v=vs.85).aspx
     pub fn GetLastError() -> DWORD;
