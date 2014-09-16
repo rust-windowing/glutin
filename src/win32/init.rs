@@ -457,18 +457,14 @@ extern "stdcall" fn callback(window: ffi::HWND, msg: ffi::UINT,
         },
 
         ffi::WM_KEYDOWN => {
-            use events::{KeyboardInput, KeyModifiers, Pressed};
-            let scancode = ((lparam >> 16) & 0xff) as u8;
-            let vkey = event::vkeycode_to_element(wparam);
-            send_event(window, KeyboardInput(Pressed, scancode, vkey, KeyModifiers::empty()));
+            use events::KeyDown;
+            send_event(window, KeyDown(event::keyboardevent_to_event(wparam, lparam)));
             0
         },
 
         ffi::WM_KEYUP => {
-            use events::{KeyboardInput, KeyModifiers, Released};
-            let scancode = ((lparam >> 16) & 0xff) as u8;
-            let vkey = event::vkeycode_to_element(wparam);
-            send_event(window, KeyboardInput(Released, scancode, vkey, KeyModifiers::empty()));
+            use events::KeyUp;
+            send_event(window, KeyUp(event::keyboardevent_to_event(wparam, lparam)));
             0
         },
 

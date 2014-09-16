@@ -347,15 +347,13 @@ impl Window {
                 },
 
                 ffi::KeyPress | ffi::KeyRelease => {
-                    use {KeyboardInput, Pressed, Released, Input, KeyModifiers};
+                    use {KeyboardEvent, KeyDown, KeyUp, StandardLocation, Input};
                     let event: &mut ffi::XKeyEvent = unsafe { mem::transmute(&xev) };
 
                     if event.type_ == ffi::KeyPress {
                         let raw_ev: *mut ffi::XKeyEvent = event;
                         unsafe { ffi::XFilterEvent(mem::transmute(raw_ev), self.window) };
                     }
-
-                    let state = if xev.type_ == ffi::KeyPress { Pressed } else { Released };
 
                     let written = unsafe {
                         use std::str;
@@ -372,15 +370,26 @@ impl Window {
 
                     events.push(Input { data: written, is_composing: false });
 
-                    let keysym = unsafe {
-                        ffi::XKeycodeToKeysym(self.display, event.keycode as ffi::KeyCode, 0)
+                    let keyboard_event = KeyboardEvent {
+                        code: events::scancode_to_code(event.keycode as ffi::KeyCode),
+                        key: events::keycode_to_element(unsafe {
+                            ffi::XKeycodeToKeysym(self.display, event.keycode as ffi::KeyCode, 0)
+                        } as libc::c_uint),
+                        location: StandardLocation,
+                        local: None,            // FIXME
+                        repeat: false,          // FIXME
+                        alt_key: false,         // FIXME
+                        ctrl_key: false,        // FIXME
+                        meta_key: false,        // FIXME
+                        shift_key: false,       // FIXME
+                        is_composing: false,
                     };
 
-                    let vkey =  events::keycode_to_element(keysym as libc::c_uint);
-
-                    events.push(KeyboardInput(state, event.keycode as u8,
-                        vkey, KeyModifiers::empty()));
-                    //
+                    if xev.type_ == ffi::KeyPress {
+                        events.push(KeyDown(keyboard_event));
+                    } else {
+                        events.push(KeyUp(keyboard_event));
+                    };
                 },
 
                 ffi::ButtonPress | ffi::ButtonRelease => {
