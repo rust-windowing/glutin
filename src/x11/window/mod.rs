@@ -455,11 +455,11 @@ impl Window {
                         ffi::Button2 => Some(MiddleMouseButton),
                         ffi::Button3 => Some(RightMouseButton),
                         ffi::Button4 => {
-                            events.push(MouseWheel(1));
+                            events.push(MouseWheel(1, self.current_modifiers.get()));
                             None
                         }
                         ffi::Button5 => {
-                            events.push(MouseWheel(-1));
+                            events.push(MouseWheel(-1, self.current_modifiers.get()));
                             None
                         }
                         _ => None

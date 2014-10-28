@@ -474,12 +474,12 @@ extern "stdcall" fn callback(window: ffi::HWND, msg: ffi::UINT,
         },
 
         ffi::WM_MOUSEWHEEL => {
-            use events::MouseWheel;
+            use events::{KeyModifiers, MouseWheel};
 
             let value = (wparam >> 16) as i16;
             let value = value as i32;
 
-            send_event(window, MouseWheel(value));
+            send_event(window, MouseWheel(value, KeyModifiers::empty()));
 
             0
         },

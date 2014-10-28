@@ -27,7 +27,7 @@ pub enum Event {
 
     /// A positive value indicates that the wheel was rotated forward, away from the user;
     ///  a negative value indicates that the wheel was rotated backward, toward the user.
-    MouseWheel(i32),
+    MouseWheel(i32, KeyModifiers),
 
     /// An event from the mouse has been received.
     MouseInput(ElementState, MouseButton),
