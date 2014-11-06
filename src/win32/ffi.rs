@@ -644,8 +644,6 @@ pub struct DISPLAY_DEVICEW {
 
 pub type LPMSG = *mut MSG;
 
-#[link(name = "gdi32")]
-#[link(name = "Opengl32")]
 extern "system" {
     // http://msdn.microsoft.com/en-us/library/windows/desktop/ms632667(v=vs.85).aspx
     pub fn AdjustWindowRectEx(lpRect: *mut RECT, dwStyle: DWORD, bMenu: BOOL,
