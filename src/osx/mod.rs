@@ -212,7 +212,6 @@ impl Window {
             if view == nil {
                 None
             } else {
-                view.setWantsBestResolutionOpenGLSurface_(true);
                 window.setContentView_(view);
                 Some(view)
             }
