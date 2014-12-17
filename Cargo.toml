@@ -22,6 +22,7 @@ git = "https://github.com/bjz/gl-rs"
 
 [target.arm-linux-androideabi.dependencies.android_glue]
 git = "https://github.com/servo/android-rs-glue"
+branch = "servo"
 
 [target.i686-apple-darwin.dependencies.cocoa]
 git = "https://github.com/servo/rust-cocoa"
