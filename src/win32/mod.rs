@@ -41,6 +41,14 @@ impl HeadlessContext {
     pub fn get_proc_address(&self, addr: &str) -> *const () {
         self.0.get_proc_address(addr)
     }
+
+    /// See the docs in the crate root file.
+    pub fn get_api(&self) -> ::Api {
+        ::Api::OpenGl
+    }
+
+    pub fn set_window_resize_callback(&mut self, _: Option<fn(uint, uint)>) {
+    }
 }
 
 /// The Win32 implementation of the main `Window` object.
@@ -75,6 +83,16 @@ impl Window {
                             gl_debug, vsync, visible, sharing, multisampling } = builder;
         init::new_window(dimensions, title, monitor, gl_version, gl_debug, vsync,
                          !visible, sharing.map(|w| w.window.context), multisampling)
+    }
+}
+
+#[cfg(feature = "window")]
+#[deriving(Clone)]
+pub struct WindowProxy;
+
+impl WindowProxy {
+    pub fn wakeup_event_loop(&self) {
+        unimplemented!()
     }
 }
 
@@ -175,6 +193,10 @@ impl Window {
         }
     }
 
+    pub fn create_window_proxy(&self) -> WindowProxy {
+        WindowProxy
+    }
+
     /// See the docs in the crate root file.
     // TODO: return iterator
     pub fn poll_events(&self) -> Vec<Event> {
@@ -251,6 +273,14 @@ impl Window {
 
     pub fn platform_display(&self) -> *mut libc::c_void {
         unimplemented!()
+    }
+
+    /// See the docs in the crate root file.
+    pub fn get_api(&self) -> ::Api {
+        ::Api::OpenGl
+    }
+
+    pub fn set_window_resize_callback(&mut self, _: Option<fn(uint, uint)>) {
     }
 }
 

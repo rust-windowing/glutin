@@ -18,12 +18,12 @@ use core_foundation::base::TCFType;
 use core_foundation::string::CFString;
 use core_foundation::bundle::{CFBundleGetBundleWithIdentifier, CFBundleGetFunctionPointerForName};
 
+use std::cell::Cell;
 use std::c_str::CString;
 use std::mem;
 use std::ptr;
-use std::sync::atomic::{AtomicBool, Relaxed};
 
-use events::Event::{MouseInput, MouseMoved, ReceivedCharacter, KeyboardInput};
+use events::Event::{MouseInput, MouseMoved, ReceivedCharacter, KeyboardInput, Resized, MouseWheel};
 use events::ElementState::{Pressed, Released};
 use events::MouseButton::{LeftMouseButton, RightMouseButton};
 use events;
@@ -42,25 +42,23 @@ static mut win_pressed: bool = false;
 static mut alt_pressed: bool = false;
 
 static DELEGATE_NAME: &'static [u8] = b"glutin_window_delegate\0";
-static DELEGATE_THIS_IVAR: &'static [u8] = b"glutin_this";
+static DELEGATE_STATE_IVAR: &'static [u8] = b"glutin_state";
 
-struct InternalState {
-    is_closed: AtomicBool,
-}
-
-impl InternalState {
-    fn new() -> InternalState {
-        InternalState {
-            is_closed: AtomicBool::new(false),
-        }
-    }
+struct DelegateState<'a> {
+    is_closed: bool,
+    context: id,
+    view: id,
+    handler: Option<fn(uint, uint)>,
 }
 
 pub struct Window {
     view: id,
     window: id,
     context: id,
-    state: Box<InternalState>,
+    delegate: id,
+    resize: Option<fn(uint, uint)>,
+
+    is_closed: Cell<bool>,
 }
 
 #[cfg(feature = "window")]
@@ -74,19 +72,65 @@ impl Window {
     }
 }
 
+#[cfg(feature = "window")]
+#[deriving(Clone)]
+pub struct WindowProxy;
+
+impl WindowProxy {
+    pub fn wakeup_event_loop(&self) {
+        unsafe {
+            let pool = NSAutoreleasePool::new(nil);
+            let event =
+                NSEvent::otherEventWithType_location_modifierFlags_timestamp_windowNumber_context_subtype_data1_data2(
+                nil,
+                NSApplicationDefined,
+                NSPoint::new(0.0, 0.0),
+                0,
+                0.0,
+                0,
+                ptr::null_mut(),
+                0,
+                0,
+                0);
+            NSApp().postEvent_atStart_(event, true);
+            pool.drain();
+        }
+    }
+}
+
 extern fn window_should_close(this: id, _: id) -> id {
     unsafe {
         let mut stored_value = ptr::null_mut();
-        object_getInstanceVariable(this, DELEGATE_THIS_IVAR.as_ptr() as *const i8, &mut stored_value);
-        let state = stored_value as *mut InternalState;
-        (*state).is_closed.store(true, Relaxed);
+        object_getInstanceVariable(this, DELEGATE_STATE_IVAR.as_ptr() as *const i8, &mut stored_value);
+        let state = stored_value as *mut DelegateState;
+
+        (*state).is_closed = true;
+    }
+    0
+}
+
+extern fn window_did_resize(this: id, _: id) -> id {
+    unsafe {
+        let mut stored_value = ptr::null_mut();
+        object_getInstanceVariable(this, DELEGATE_STATE_IVAR.as_ptr() as *const i8, &mut stored_value);
+        let state = &mut *(stored_value as *mut DelegateState);
+
+        let _: id = msg_send()(state.context, selector("update"));
+
+        match state.handler {
+            Some(handler) => {
+                let rect = NSView::frame(state.view);
+                (handler)(rect.size.width as uint, rect.size.height as uint);
+            }
+            None => {}
+        }
     }
     0
 }
 
 impl Window {
     fn new_impl(dimensions: Option<(uint, uint)>, title: &str, monitor: Option<MonitorID>,
-                vsync: bool, visible: bool) -> Result<Window, CreationError> {
+                vsync: bool, _visible: bool) -> Result<Window, CreationError> {
         let app = match Window::create_app() {
             Some(app) => app,
             None      => { return Err(OsError(format!("Couldn't create NSApplication"))); },
@@ -110,30 +154,33 @@ impl Window {
             window.makeKeyAndOrderFront_(nil);
         }
 
-        let window = Window {
-            view: view,
-            window: window,
-            context: context,
-            state: box InternalState::new(),
-        };
-
         // Set up the window delegate to receive events
         let ptr_size = mem::size_of::<libc::intptr_t>() as u64;
         let ns_object = class("NSObject");
 
-        unsafe {
+        let delegate = unsafe {
             // Create a delegate class, add callback methods and store InternalState as user data.
             let delegate = objc_allocateClassPair(ns_object, DELEGATE_NAME.as_ptr() as *const i8, 0);
             class_addMethod(delegate, selector("windowShouldClose:"), window_should_close, "B@:@".to_c_str().as_ptr());
-            class_addIvar(delegate, DELEGATE_THIS_IVAR.as_ptr() as *const i8, ptr_size, 3, "?".to_c_str().as_ptr());
+            class_addMethod(delegate, selector("windowDidResize:"), window_did_resize, "V@:@".to_c_str().as_ptr());
+            class_addIvar(delegate, DELEGATE_STATE_IVAR.as_ptr() as *const i8, ptr_size, 3, "?".to_c_str().as_ptr());
             objc_registerClassPair(delegate);
 
             let del_obj = msg_send()(delegate, selector("alloc"));
             let del_obj: id = msg_send()(del_obj, selector("init"));
-            object_setInstanceVariable(del_obj, DELEGATE_THIS_IVAR.as_ptr() as *const i8,
-                                        &*window.state as *const InternalState as *mut libc::c_void);
-            let _: id = msg_send()(window.window, selector("setDelegate:"), del_obj);
-        }
+            let _: id = msg_send()(window, selector("setDelegate:"), del_obj);
+            del_obj
+        };
+
+        let window = Window {
+            view: view,
+            window: window,
+            context: context,
+            delegate: delegate,
+            resize: None,
+
+            is_closed: Cell::new(false),
+        };
 
         Ok(window)
     }
@@ -241,7 +288,7 @@ impl Window {
     }
 
     pub fn is_closed(&self) -> bool {
-        self.state.is_closed.load(Relaxed)
+        self.is_closed.get()
     }
 
     pub fn set_title(&self, title: &str) {
@@ -278,6 +325,10 @@ impl Window {
         unimplemented!()
     }
 
+    pub fn create_window_proxy(&self) -> WindowProxy {
+        WindowProxy
+    }
+
     pub fn poll_events(&self) -> Vec<Event> {
         let mut events = Vec::new();
 
@@ -289,7 +340,26 @@ impl Window {
                     NSDefaultRunLoopMode,
                     true);
                 if event == nil { break; }
-                NSApp().sendEvent_(event);
+                {
+                    // Create a temporary structure with state that delegates called internally
+                    // by sendEvent can read and modify. When that returns, update window state.
+                    // This allows the synchronous resize loop to continue issuing callbacks
+                    // to the user application, by passing handler through to the delegate state.
+                    let mut ds = DelegateState {
+                        is_closed: self.is_closed.get(),
+                        context: self.context,
+                        view: self.view,
+                        handler: self.resize,
+                    };
+                    object_setInstanceVariable(self.delegate,
+                        DELEGATE_STATE_IVAR.as_ptr() as *const i8,
+                        &mut ds as *mut DelegateState as *mut libc::c_void);
+                    NSApp().sendEvent_(event);
+                    object_setInstanceVariable(self.delegate,
+                        DELEGATE_STATE_IVAR.as_ptr() as *const i8,
+                        ptr::null_mut());
+                    self.is_closed.set(ds.is_closed);
+}
 
                 match event.get_type() {
                     NSLeftMouseDown         => { events.push(MouseInput(Pressed, LeftMouseButton)); },
@@ -338,7 +408,7 @@ impl Window {
                             events.push(alt_modifier.unwrap());
                         }
                     },
-                    NSScrollWheel           => { },
+                    NSScrollWheel           => { events.push(MouseWheel(-event.scrollingDeltaY() as i32)); },
                     NSOtherMouseDown        => { },
                     NSOtherMouseUp          => { },
                     NSOtherMouseDragged     => { },
@@ -399,5 +469,13 @@ impl Window {
 
     pub fn platform_display(&self) -> *mut libc::c_void {
         unimplemented!()
+    }
+
+    pub fn get_api(&self) -> ::Api {
+        ::Api::OpenGl
+    }
+
+    pub fn set_window_resize_callback(&mut self, callback: Option<fn(uint, uint)>) {
+        self.resize = callback;
     }
 }
