@@ -58,6 +58,10 @@ impl HeadlessContext {
     pub fn get_proc_address(&self, _addr: &str) -> *const () {
         unimplemented!()
     }
+
+    pub fn get_api(&self) -> ::Api {
+        ::Api::OpenGl
+    }
 }
 
 impl Window {
