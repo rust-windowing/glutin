@@ -84,6 +84,15 @@ impl std::error::Error for CreationError {
     }
 }
 
+/// All APIs related to OpenGL that you can possibly get while using glutin.
+#[deriving(Show, Clone, Copy, PartialEq, Eq)]
+pub enum Api {
+    /// The classical OpenGL. Available on Windows, Linux, OS/X.
+    OpenGl,
+    /// OpenGL embedded system. Available on Linux, Android.
+    OpenGlEs,
+}
+
 /// Object that allows you to build windows.
 #[cfg(feature = "window")]
 pub struct WindowBuilder<'a> {
@@ -457,12 +466,60 @@ impl Window {
     pub unsafe fn platform_display(&self) -> *mut libc::c_void {
         self.window.platform_display()
     }
+
+    /// Returns the API that is currently provided by this window.
+    ///
+    /// - On Windows and OS/X, this always returns `OpenGl`.
+    /// - On Android, this always returns `OpenGlEs`.
+    /// - On Linux, it must be checked at runtime.
+    pub fn get_api(&self) -> Api {
+        self.window.get_api()
+    }
+
+    /// Create a window proxy for this window, that can be freely
+    /// passed to different threads.
+    #[inline]
+    pub fn create_window_proxy(&self) -> WindowProxy {
+        WindowProxy {
+            proxy: self.window.create_window_proxy()
+        }
+    }
+
+    /// Sets a resize callback that is called by Mac (and potentially other
+    /// operating systems) during resize operations. This can be used to repaint
+    /// during window resizing.
+    #[experimental]
+    pub fn set_window_resize_callback(&mut self, callback: Option<fn(uint, uint)>) {
+        self.window.set_window_resize_callback(callback);
+    }
 }
 
 #[cfg(feature = "window")]
 impl gl_common::GlFunctionsSource for Window {
     fn get_proc_addr(&self, addr: &str) -> *const libc::c_void {
         self.get_proc_address(addr)
+    }
+}
+
+/// Represents a thread safe subset of operations that can be called
+/// on a window. This structure can be safely cloned and sent between
+/// threads.
+///
+#[cfg(feature = "window")]
+#[deriving(Clone)]
+pub struct WindowProxy {
+    proxy: winimpl::WindowProxy,
+}
+
+#[cfg(feature = "window")]
+impl WindowProxy {
+
+    /// Triggers a blocked event loop to wake up. This is
+    /// typically called when another thread wants to wake
+    /// up the blocked rendering thread to cause a refresh.
+    #[inline]
+    pub fn wakeup_event_loop(&self) {
+        self.proxy.wakeup_event_loop();
     }
 }
 
@@ -487,6 +544,17 @@ impl HeadlessContext {
     #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const libc::c_void {
         self.context.get_proc_address(addr) as *const libc::c_void
+    }
+
+    /// Returns the API that is currently provided by this window.
+    ///
+    /// See `Window::get_api` for more infos.
+    pub fn get_api(&self) -> Api {
+        self.context.get_api()
+    }
+
+    #[experimental]
+    pub fn set_window_resize_callback(&mut self, _: Option<fn(uint, uint)>) {
     }
 }
 
