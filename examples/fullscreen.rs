@@ -1,4 +1,5 @@
 #![feature(phase)]
+#![feature(tuple_indexing)]
 
 #[cfg(target_os = "android")]
 #[phase(plugin, link)]
