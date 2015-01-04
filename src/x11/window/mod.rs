@@ -494,7 +494,7 @@ impl Window {
                     let written = unsafe {
                         use std::str;
 
-                        let mut buffer: [u8, ..16] = [mem::uninitialized(), ..16];
+                        let mut buffer: [u8; 16] = [mem::uninitialized(); 16];
                         let raw_ev: *mut ffi::XKeyEvent = event;
                         let count = ffi::Xutf8LookupString(self.x.ic, mem::transmute(raw_ev),
                             mem::transmute(buffer.as_mut_ptr()),
