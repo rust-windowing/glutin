@@ -223,7 +223,7 @@ impl Window {
     /// See the docs in the crate root file.
     // TODO: return iterator
     pub fn wait_events(&self) -> RingBuf<Event> {
-        match self.events_receiver.try_recv() {
+        match self.events_receiver.recv() {
             Ok(ev) => {
                 // if the received event is `Closed`, setting `is_closed` to true
                 match ev {
