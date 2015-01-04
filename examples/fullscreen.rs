@@ -7,6 +7,7 @@ extern crate android_glue;
 extern crate glutin;
 
 use std::io::stdio::stdin;
+use std::str::from_str;
 
 mod support;
 
