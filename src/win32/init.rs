@@ -223,7 +223,6 @@ pub fn new_window(builder_dimensions: Option<(uint, uint)>, builder_title: Strin
 
             // loading the extra WGL functions
             let extra_functions = gl::wgl_extra::Wgl::load_with(|addr| {
-                    use std::c_str::ToCStr;
                 use libc;
                 use std::c_str::ToCStr;
 
