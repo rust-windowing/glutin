@@ -372,8 +372,13 @@ impl Window {
                     NSRightMouseUp          => { events.push(MouseInput(Released, RightMouseButton)); },
                     NSMouseMoved            => {
                         let window_point = event.locationInWindow();
-                        let window_rect = self.window.convertRectFromScreen_(NSRect::new(window_point, NSSize::new(0.0, 0.0)));
-                        let view_point = self.view.convertPoint_fromView_(window_rect.origin, self.view);
+                        let window: id = msg_send()(event, selector("window"));
+                        let view_point = if window == 0 {
+                            let window_rect = self.window.convertRectFromScreen_(NSRect::new(window_point, NSSize::new(0.0, 0.0)));
+                            self.view.convertPoint_fromView_(window_rect.origin, nil)
+                        } else {
+                            self.view.convertPoint_fromView_(window_point, nil)
+                        };
                         let view_rect = NSView::frame(self.view);
                         events.push(MouseMoved((view_point.x as int, (view_rect.size.height - view_point.y) as int)));
                     },
