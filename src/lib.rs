@@ -492,6 +492,13 @@ impl Window {
     pub fn set_window_resize_callback(&mut self, callback: Option<fn(uint, uint)>) {
         self.window.set_window_resize_callback(callback);
     }
+
+    /// Returns the ratio between the backing framebuffer resolution and the
+    /// window size in screen pixels. This is typically one for a normal display
+    /// and two for a retina display.
+    pub fn hidpi_factor(&self) -> f32 {
+        self.window.hidpi_factor()
+    }
 }
 
 #[cfg(feature = "window")]

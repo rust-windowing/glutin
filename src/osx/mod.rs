@@ -48,6 +48,7 @@ struct DelegateState<'a> {
     is_closed: bool,
     context: id,
     view: id,
+    window: id,
     handler: Option<fn(uint, uint)>,
 }
 
@@ -120,7 +121,8 @@ extern fn window_did_resize(this: id, _: id) -> id {
         match state.handler {
             Some(handler) => {
                 let rect = NSView::frame(state.view);
-                (handler)(rect.size.width as uint, rect.size.height as uint);
+                let scale_factor = state.window.backingScaleFactor() as uint;
+                (handler)(scale_factor * rect.size.width as uint, scale_factor * rect.size.height as uint);
             }
             None => {}
         }
@@ -352,6 +354,7 @@ impl Window {
                     let mut ds = DelegateState {
                         is_closed: self.is_closed.get(),
                         context: self.context,
+                        window: self.window,
                         view: self.view,
                         handler: self.resize,
                     };
@@ -380,7 +383,8 @@ impl Window {
                             self.view.convertPoint_fromView_(window_point, nil)
                         };
                         let view_rect = NSView::frame(self.view);
-                        events.push(MouseMoved((view_point.x as int, (view_rect.size.height - view_point.y) as int)));
+                        let scale_factor = self.hidpi_factor() as int;
+                        events.push(MouseMoved((scale_factor * view_point.x as int, scale_factor * (view_rect.size.height - view_point.y) as int)));
                     },
                     NSKeyDown               => {
                         let received_str = CString::new(event.characters().UTF8String(), false);
@@ -488,5 +492,11 @@ impl Window {
 
     pub fn set_window_resize_callback(&mut self, callback: Option<fn(uint, uint)>) {
         self.resize = callback;
+    }
+
+    pub fn hidpi_factor(&self) -> f32 {
+        unsafe {
+            self.window.backingScaleFactor() as f32
+        }
     }
 }
