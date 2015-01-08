@@ -280,6 +280,10 @@ impl Window {
 
     pub fn set_window_resize_callback(&mut self, _: Option<fn(uint, uint)>) {
     }
+
+    pub fn hidpi_factor(&self) -> f32 {
+        1.0
+    }
 }
 
 #[cfg(feature = "window")]
