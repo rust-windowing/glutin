@@ -4,6 +4,7 @@ pub use self::headless::HeadlessContext;
 use {CreationError, Event};
 use CreationError::OsError;
 use libc;
+use std::ascii::AsciiExt;
 
 use BuilderAttribs;
 
@@ -68,7 +69,7 @@ impl Window {
             unimplemented!()
         }
 
-        Window::new_impl(builder.dimensions, builder.title.as_slice(), builder.monitor, builder.vsync, builder.visible)
+        Window::new_impl(builder.dimensions, builder.title.as_slice(), builder.monitor, builder.vsync, builder.visible, builder.gl_version)
     }
 }
 
@@ -135,7 +136,7 @@ extern fn window_did_resize(this: id, _: id) -> id {
 
 impl Window {
     fn new_impl(dimensions: Option<(uint, uint)>, title: &str, monitor: Option<MonitorID>,
-                vsync: bool, visible: bool) -> Result<Window, CreationError> {
+                vsync: bool, visible: bool, gl_version: Option<(uint, uint)>) -> Result<Window, CreationError> {
         let app = match Window::create_app() {
             Some(app) => app,
             None      => { return Err(OsError(format!("Couldn't create NSApplication"))); },
@@ -149,7 +150,7 @@ impl Window {
             None       => { return Err(OsError(format!("Couldn't create NSView"))); },
         };
 
-        let context = match Window::create_context(view, vsync) {
+        let context = match Window::create_context(view, vsync, gl_version) {
             Some(context) => context,
             None          => { return Err(OsError(format!("Couldn't create OpenGL context"))); },
         };
@@ -265,7 +266,12 @@ impl Window {
         }
     }
 
-    fn create_context(view: id, vsync: bool) -> Option<id> {
+    fn create_context(view: id, vsync: bool, gl_version: Option<(uint, uint)>) -> Option<id> {
+        let profile = match gl_version {
+            None | Some((0...2, _)) | Some((3, 0)) => NSOpenGLProfileVersionLegacy as uint,
+            Some((3, 1...2)) => NSOpenGLProfileVersion3_2Core as uint,
+            Some((_, _)) => NSOpenGLProfileVersion4_1Core as uint,
+        };
         unsafe {
             let attributes = [
                 NSOpenGLPFADoubleBuffer as uint,
@@ -274,6 +280,7 @@ impl Window {
                 NSOpenGLPFAAlphaSize as uint, 8,
                 NSOpenGLPFADepthSize as uint, 24,
                 NSOpenGLPFAStencilSize as uint, 8,
+                NSOpenGLPFAOpenGLProfile as uint, profile,
                 0
             ];
 
@@ -461,8 +468,8 @@ impl Window {
     }
 
     pub fn get_proc_address(&self, _addr: &str) -> *const () {
-        let symbol_name: CFString = from_str(_addr).unwrap();
-        let framework_name: CFString = from_str("com.apple.opengl").unwrap();
+        let symbol_name = _addr.parse::<CFString>().unwrap();
+        let framework_name = "com.apple.opengl".parse::<CFString>().unwrap();
         let framework = unsafe {
             CFBundleGetBundleWithIdentifier(framework_name.as_concrete_TypeRef())
         };
