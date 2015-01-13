@@ -463,6 +463,7 @@ impl Window {
     }
 
     pub unsafe fn make_current(&self) {
+        let _: id = msg_send()(self.context, selector("update"));
         self.context.makeCurrentContext();
     }
 
