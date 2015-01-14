@@ -325,6 +325,13 @@ pub fn new_window(builder: BuilderAttribs<'static>, builder_sharelists: Option<C
                 attribs_list.push(1);
             }
 
+            if let Some(samples) = builder.multisampling {
+                attribs_list.push(gl::wgl_extra::SAMPLE_BUFFERS_ARB as libc::c_int);
+                attribs_list.push(1);
+                attribs_list.push(gl::wgl_extra::SAMPLES_ARB as libc::c_int);
+                attribs_list.push(samples as libc::c_int);
+            }
+
             attribs_list.push(0);
 
             let mut format = mem::uninitialized();
