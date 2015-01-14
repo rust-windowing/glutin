@@ -121,9 +121,8 @@ pub fn new_window(builder: BuilderAttribs<'static>, builder_sharelists: Option<C
         // adjusting the window coordinates using the style
         unsafe { winapi::AdjustWindowRectEx(&mut rect, style, 0, ex_style) };
 
-        // getting the address of wglCreateContextAttribsARB and the pixel format
-        //  that we will use
-        let (extra_functions, pixel_format) = {
+        // getting the address of wglCreateContextAttribsARB
+        let extra_functions = {
             // creating a dummy invisible window for GL initialization
             let dummy_window = unsafe {
                 let handle = winapi::CreateWindowExW(ex_style, class_name.as_ptr(),
@@ -156,21 +155,19 @@ pub fn new_window(builder: BuilderAttribs<'static>, builder_sharelists: Option<C
                 hdc
             };
 
-            // getting the pixel format that we will use
+            // getting a dummy hardware-accelerated pixel format to get the extensions
             let pixel_format = {
                 // initializing a PIXELFORMATDESCRIPTOR that indicates what we want
                 let mut output: winapi::PIXELFORMATDESCRIPTOR = unsafe { mem::zeroed() };
                 output.nSize = mem::size_of::<winapi::PIXELFORMATDESCRIPTOR>() as winapi::WORD;
                 output.nVersion = 1;
                 output.dwFlags = winapi::PFD_DRAW_TO_WINDOW | winapi::PFD_DOUBLEBUFFER |
-                    winapi::PFD_SUPPORT_OPENGL | winapi::PFD_GENERIC_ACCELERATED;
+                                 winapi::PFD_SUPPORT_OPENGL | winapi::PFD_GENERIC_ACCELERATED;
                 output.iPixelType = winapi::PFD_TYPE_RGBA;
                 output.cColorBits = 24;
                 output.cAlphaBits = 8;
-                output.cAccumBits = 0;
                 output.cDepthBits = 24;
                 output.cStencilBits = 8;
-                output.cAuxBuffers = 0;
                 output.iLayerType = winapi::PFD_MAIN_PLANE;
 
                 let pf_index = unsafe { winapi::ChoosePixelFormat(dummy_hdc, &output) };
@@ -239,7 +236,7 @@ pub fn new_window(builder: BuilderAttribs<'static>, builder_sharelists: Option<C
             unsafe { winapi::DestroyWindow(dummy_window); }
 
             // returning the address
-            (extra_functions, pixel_format)
+            extra_functions
         };
 
         // creating the real window this time
@@ -287,9 +284,71 @@ pub fn new_window(builder: BuilderAttribs<'static>, builder_sharelists: Option<C
             hdc
         };
 
-        // calling SetPixelFormat
+        // setting the pixel format
         unsafe {
-            if winapi::SetPixelFormat(hdc, 1, &pixel_format) == 0 {
+            if !extra_functions.ChoosePixelFormatARB.is_loaded() {
+                tx.send(Err(OsError(format!("wglChoosePixelFormatARB not loaded"))));
+                winapi::DestroyWindow(real_window);
+                return;
+            }
+
+            let mut attribs_list: Vec<libc::c_int> = vec![
+                gl::wgl_extra::DRAW_TO_WINDOW_ARB as libc::c_int, 1,
+                gl::wgl_extra::SUPPORT_OPENGL_ARB as libc::c_int, 1,
+                gl::wgl_extra::DOUBLE_BUFFER_ARB as libc::c_int, 1,
+                gl::wgl_extra::PIXEL_TYPE_ARB as libc::c_int,
+                gl::wgl_extra::TYPE_RGBA_ARB as libc::c_int,
+            ];
+
+            if let Some(color) = builder.color_bits {
+                attribs_list.push(gl::wgl_extra::COLOR_BITS_ARB as libc::c_int);
+                attribs_list.push(color as libc::c_int);
+            }
+
+            if let Some(alpha) = builder.alpha_bits {
+                attribs_list.push(gl::wgl_extra::ALPHA_BITS_ARB as libc::c_int);
+                attribs_list.push(alpha as libc::c_int);
+            }
+
+            if let Some(depth) = builder.depth_bits {
+                attribs_list.push(gl::wgl_extra::DEPTH_BITS_ARB as libc::c_int);
+                attribs_list.push(depth as libc::c_int);
+            }
+
+            if let Some(stencil) = builder.stencil_bits {
+                attribs_list.push(gl::wgl_extra::STENCIL_BITS_ARB as libc::c_int);
+                attribs_list.push(stencil as libc::c_int);
+            }
+
+            if builder.stereoscopy {
+                attribs_list.push(gl::wgl_extra::STEREO_ARB as libc::c_int);
+                attribs_list.push(1);
+            }
+
+            attribs_list.push(0);
+
+            let mut format = mem::uninitialized();
+            let mut num_formats = mem::uninitialized();
+            if extra_functions.ChoosePixelFormatARB(hdc as *const libc::c_void,
+                                                    attribs_list.as_ptr(), ptr::null(),
+                                                    1, &mut format, &mut num_formats) == 0
+            {
+                tx.send(Err(OsError(format!("wglChoosePixelFormatARB function failed"))));
+                winapi::DestroyWindow(real_window);
+                return;
+            }
+
+            let mut output = mem::uninitialized();
+            if winapi::DescribePixelFormat(hdc, format,
+                mem::size_of::<winapi::PIXELFORMATDESCRIPTOR>() as winapi::UINT, &mut output) == 0
+            {
+                tx.send(Err(OsError(format!("DescribePixelFormat function failed: {}",
+                    os::error_string(os::errno() as usize)))));
+                unsafe { winapi::DestroyWindow(real_window); }
+                return;
+            }
+
+            if winapi::SetPixelFormat(hdc, 1, &output) == 0 {
                 tx.send(Err(OsError(format!("SetPixelFormat function failed: {}",
                     os::error_string(os::errno() as usize)))));
                 winapi::DestroyWindow(real_window);
@@ -599,44 +658,3 @@ extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
         }
     }
 }
-
-/*fn hints_to_pixelformat(hints: &Hints) -> winapi::PIXELFORMATDESCRIPTOR {
-    use std::mem;
-
-    winapi::PIXELFORMATDESCRIPTOR {
-        nSize: size_of::<winapi::PIXELFORMATDESCRIPTOR>(),
-        nVersion: 1,
-        dwFlags:
-            if hints.stereo { PFD_STEREO } else { 0 },
-        iPixelType: PFD_TYPE_RGBA,
-        cColorBits: hints.red_bits + hints.green_bits + hints.blue_bits,
-        cRedBits: 
-
-    pub nSize: WORD,
-    pub nVersion: WORD,
-    pub dwFlags: DWORD,
-    pub iPixelType: BYTE,
-    pub cColorBits: BYTE,
-    pub cRedBits: BYTE,
-    pub cRedShift: BYTE,
-    pub cGreenBits: BYTE,
-    pub cGreenShift: BYTE,
-    pub cBlueBits: BYTE,
-    pub cBlueShift: BYTE,
-    pub cAlphaBits: BYTE,
-    pub cAlphaShift: BYTE,
-    pub cAccumBits: BYTE,
-    pub cAccumRedBits: BYTE,
-    pub cAccumGreenBits: BYTE,
-    pub cAccumBlueBits: BYTE,
-    pub cAccumAlphaBits: BYTE,
-    pub cDepthBits: BYTE,
-    pub cStencilBits: BYTE,
-    pub cAuxBuffers: BYTE,
-    pub iLayerType: BYTE,
-    pub bReserved: BYTE,
-    pub dwLayerMask: DWORD,
-    pub dwVisibleMask: DWORD,
-    pub dwDamageMask: DWORD,
-    }
-}*/
