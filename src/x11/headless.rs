@@ -1,23 +1,32 @@
-use HeadlessRendererBuilder;
+use BuilderAttribs;
 use CreationError;
 use CreationError::OsError;
 use libc;
 use std::{mem, ptr};
 use super::ffi;
 
+fn with_c_str<F, T>(s: &str, f: F) -> T where F: FnOnce(*const i8) -> T {
+    use std::ffi::CString;
+    let c_str = CString::from_slice(s.as_bytes());
+    f(c_str.as_slice_with_nul().as_ptr())    
+}
+
 pub struct HeadlessContext {
     context: ffi::OSMesaContext,
     buffer: Vec<u32>,
-    width: uint,
-    height: uint,
+    width: u32,
+    height: u32,
 }
 
 impl HeadlessContext {
-    pub fn new(builder: HeadlessRendererBuilder) -> Result<HeadlessContext, CreationError> {
+    pub fn new(builder: BuilderAttribs) -> Result<HeadlessContext, CreationError> {
+        let dimensions = builder.dimensions.unwrap();
+
         Ok(HeadlessContext {
-            width: builder.dimensions.0,
-            height: builder.dimensions.1,
-            buffer: Vec::from_elem(builder.dimensions.0 * builder.dimensions.1, unsafe { mem::uninitialized() }),
+            width: dimensions.0,
+            height: dimensions.1,
+            buffer: ::std::iter::repeat(unsafe { mem::uninitialized() })
+                .take((dimensions.0 * dimensions.1) as usize).collect(),
             context: unsafe {
                 let ctxt = ffi::OSMesaCreateContext(0x1908, ptr::null());
                 if ctxt.is_null() {
@@ -39,10 +48,8 @@ impl HeadlessContext {
     }
 
     pub fn get_proc_address(&self, addr: &str) -> *const () {
-        use std::c_str::ToCStr;
-
         unsafe {
-            addr.with_c_str(|s| {
+            with_c_str(addr, |s| {
                 ffi::OSMesaGetProcAddress(mem::transmute(s)) as *const ()
             })
         }
@@ -53,7 +60,7 @@ impl HeadlessContext {
         ::Api::OpenGl
     }
 
-    pub fn set_window_resize_callback(&mut self, _: Option<fn(uint, uint)>) {
+    pub fn set_window_resize_callback(&mut self, _: Option<fn(u32, u32)>) {
     }
 }
 
@@ -62,3 +69,6 @@ impl Drop for HeadlessContext {
         unsafe { ffi::OSMesaDestroyContext(self.context) }
     }
 }
+
+unsafe impl Send for HeadlessContext {}
+unsafe impl Sync for HeadlessContext {}

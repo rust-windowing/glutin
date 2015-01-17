@@ -4,6 +4,7 @@
 Alternative to GLFW in pure Rust.
 
 [![Build Status](https://travis-ci.org/tomaka/glutin.png?branch=master)](https://travis-ci.org/tomaka/glutin)
+[![Build status](https://ci.appveyor.com/api/projects/status/cv5xewg3uchb3854/branch/master?svg=true)](https://ci.appveyor.com/project/tomaka/glutin/branch/master)
 
 ## [Documentation](http://tomaka.github.io/glutin/)
 
@@ -58,14 +59,16 @@ fn main() {
  - Some events are not implemented
  - Implementation is still work-in-progress
  - Vsync not implemented
-
+ - Changing the cursor (set_cursor) is not implemented 
 ### Win32
 
  - You must call `glFlush` before `swap_buffers`, or else on Windows 8 nothing will be visible on the window
  - Pixel formats are not implemented
+ - Changing the cursor (set_cursor) is not implemented
 
 ### X11
 
  - Some input events are not implemented
  - Pixel formats not implemented
  - Vsync not implemented
+ - Not all mouse cursors are implemented (ContextMenu, ...)

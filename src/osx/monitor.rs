@@ -1,18 +1,19 @@
 use core_graphics::display;
+use std::collections::RingBuf;
 
 pub struct MonitorID(u32);
 
-pub fn get_available_monitors() -> Vec<MonitorID> {
-    let mut monitors = Vec::new();
+pub fn get_available_monitors() -> RingBuf<MonitorID> {
+    let mut monitors = RingBuf::new();
     unsafe {
         let max_displays = 10u32;
-        let mut active_displays = [0u32, ..10];
+        let mut active_displays = [0u32; 10];
         let mut display_count = 0;
         display::CGGetActiveDisplayList(max_displays,
                                                         &mut active_displays[0],
                                                         &mut display_count);
-        for i in range(0u, display_count as uint) {
-            monitors.push(MonitorID(active_displays[i]));
+        for i in range(0us, display_count as usize) {
+            monitors.push_back(MonitorID(active_displays[i]));
         }
     }
     monitors
@@ -34,12 +35,12 @@ impl MonitorID {
         Some(format!("Monitor #{}", screen_num))
     }
 
-    pub fn get_dimensions(&self) -> (uint, uint) {
+    pub fn get_dimensions(&self) -> (u32, u32) {
         let MonitorID(display_id) = *self;
         let dimension = unsafe {
             let height = display::CGDisplayPixelsHigh(display_id);
             let width = display::CGDisplayPixelsWide(display_id);
-            (width as uint, height as uint)
+            (width as u32, height as u32)
         };
         dimension
     }

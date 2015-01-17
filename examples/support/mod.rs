@@ -1,29 +1,16 @@
 #![cfg(feature = "window")]
 
-#[phase(plugin)]
-extern crate gl_generator;
-
 use glutin;
 
 #[cfg(not(target_os = "android"))]
 mod gl {
-    generate_gl_bindings! {
-        api: "gl",
-        profile: "core",
-        version: "1.1",
-        generator: "struct"
-    }
+    include!(concat!(env!("OUT_DIR"), "/test_gl_bindings.rs"));
 }
 
 #[cfg(target_os = "android")]
 mod gl {
     pub use self::Gles1 as Gl;
-    generate_gl_bindings! {
-        api: "gles1",
-        profile: "core",
-        version: "1.1",
-        generator: "struct"
-    }
+    include!(concat!(env!("OUT_DIR"), "/test_gles1_bindings.rs"));
 }
 
 pub struct Context {
@@ -33,12 +20,12 @@ pub struct Context {
 pub fn load(window: &glutin::Window) -> Context {
     let gl = gl::Gl::load(window);
 
-    let version = {
-        use std::c_str::CString;
-        unsafe { CString::new(gl.GetString(gl::VERSION) as *const i8, false) }
+    let version = unsafe {
+        use std::ffi;
+        String::from_utf8(ffi::c_str_to_bytes(&(gl.GetString(gl::VERSION) as *const i8)).to_vec()).unwrap()
     };
 
-    println!("OpenGL version {}", version.as_str().unwrap());
+    println!("OpenGL version {}", version);
 
     Context { gl: gl }
 }
@@ -90,7 +77,7 @@ impl Context {
 }
 
 #[cfg(target_os = "android")]
-static VERTEX_DATA: [f32, ..15] = [
+static VERTEX_DATA: [f32; 15] = [
     -0.5, -0.5, 1.0, 0.0, 0.0,
     0.0, 0.5, 0.0, 1.0, 0.0,
     0.5, -0.5, 0.0, 0.0, 1.0

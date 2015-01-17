@@ -1,14 +1,17 @@
 extern crate android_glue;
 
 use libc;
-use {CreationError, Event, WindowBuilder};
+use std::ffi::{CString};
+use std::sync::mpsc::{Receiver, channel};
+use {CreationError, Event, MouseCursor};
 use CreationError::OsError;
 use events::ElementState::{Pressed, Released};
 use events::Event::{MouseInput, MouseMoved};
 use events::MouseButton::LeftMouseButton;
 
-#[cfg(feature = "headless")]
-use HeadlessRendererBuilder;
+use std::collections::RingBuf;
+
+use BuilderAttribs;
 
 pub struct Window {
     display: ffi::egl::types::EGLDisplay,
@@ -21,8 +24,10 @@ pub struct MonitorID;
 
 mod ffi;
 
-pub fn get_available_monitors() -> Vec<MonitorID> {
-    vec![ MonitorID ]
+pub fn get_available_monitors() -> RingBuf <MonitorID> {
+    let mut rb = RingBuf::new();
+    rb.push_back(MonitorID);
+    rb
 }
 
 pub fn get_primary_monitor() -> MonitorID {
@@ -34,18 +39,18 @@ impl MonitorID {
         Some("Primary".to_string())
     }
 
-    pub fn get_dimensions(&self) -> (uint, uint) {
+    pub fn get_dimensions(&self) -> (u32, u32) {
         unimplemented!()
     }
 }
 
 #[cfg(feature = "headless")]
-pub struct HeadlessContext(int);
+pub struct HeadlessContext(i32);
 
 #[cfg(feature = "headless")]
 impl HeadlessContext {
     /// See the docs in the crate root file.
-    pub fn new(_builder: HeadlessRendererBuilder) -> Result<HeadlessContext, CreationError> {
+    pub fn new(_builder: BuilderAttribs) -> Result<HeadlessContext, CreationError> {
         unimplemented!()
     }
 
@@ -64,8 +69,13 @@ impl HeadlessContext {
     }
 }
 
+#[cfg(feature = "headless")]
+unsafe impl Send for HeadlessContext {}
+#[cfg(feature = "headless")]
+unsafe impl Sync for HeadlessContext {}
+
 impl Window {
-    pub fn new(builder: WindowBuilder) -> Result<Window, CreationError> {
+    pub fn new(builder: BuilderAttribs) -> Result<Window, CreationError> {
         use std::{mem, ptr};
 
         if builder.sharing.is_some() {
@@ -114,6 +124,7 @@ impl Window {
             attribute_list.push_all(&[ffi::egl::RED_SIZE as i32, 1]);
             attribute_list.push_all(&[ffi::egl::GREEN_SIZE as i32, 1]);
             attribute_list.push_all(&[ffi::egl::BLUE_SIZE as i32, 1]);
+            attribute_list.push_all(&[ffi::egl::DEPTH_SIZE as i32, 1]);
             attribute_list.push(ffi::egl::NONE as i32);
 
             let mut num_config: ffi::egl::types::EGLint = mem::uninitialized();
@@ -184,60 +195,50 @@ impl Window {
     pub fn hide(&self) {
     }
 
-    pub fn get_position(&self) -> Option<(int, int)> {
+    pub fn get_position(&self) -> Option<(i32, i32)> {
         None
     }
 
-    pub fn set_position(&self, _x: int, _y: int) {
+    pub fn set_position(&self, _x: i32, _y: i32) {
     }
 
-    pub fn get_inner_size(&self) -> Option<(uint, uint)> {
+    pub fn get_inner_size(&self) -> Option<(u32, u32)> {
         let native_window = unsafe { android_glue::get_native_window() };
 
         if native_window.is_null() {
             None
         } else {
             Some((
-                unsafe { ffi::ANativeWindow_getWidth(native_window) } as uint,
-                unsafe { ffi::ANativeWindow_getHeight(native_window) } as uint
+                unsafe { ffi::ANativeWindow_getWidth(native_window) } as u32,
+                unsafe { ffi::ANativeWindow_getHeight(native_window) } as u32
             ))
         }
     }
 
-    pub fn get_outer_size(&self) -> Option<(uint, uint)> {
+    pub fn get_outer_size(&self) -> Option<(u32, u32)> {
         self.get_inner_size()
     }
 
-    pub fn set_inner_size(&self, _x: uint, _y: uint) {
+    pub fn set_inner_size(&self, _x: u32, _y: u32) {
     }
 
     pub fn create_window_proxy(&self) -> WindowProxy {
         WindowProxy
     }
 
-    pub fn poll_events(&self) -> Vec<Event> {
-        use std::time::Duration;
-        use std::io::timer;
-        timer::sleep(Duration::milliseconds(16));
-        Vec::new()
-    }
-
-    pub fn wait_events(&self) -> Vec<Event> {
-        use std::time::Duration;
-        use std::io::timer;
-        timer::sleep(Duration::milliseconds(16));
-        let mut events = Vec::new();
+    pub fn poll_events(&self) -> RingBuf<Event> {
+        let mut events = RingBuf::new();
         loop {
             match self.event_rx.try_recv() {
                 Ok(event) => match event {
                     android_glue::Event::EventDown => {
-                        events.push(MouseInput(Pressed, LeftMouseButton));
+                        events.push_back(MouseInput(Pressed, LeftMouseButton));
                     },
                     android_glue::Event::EventUp => {
-                        events.push(MouseInput(Released, LeftMouseButton));
+                        events.push_back(MouseInput(Released, LeftMouseButton));
                     },
                     android_glue::Event::EventMove(x, y) => {
-                        events.push(MouseMoved((x as int, y as int)));
+                        events.push_back(MouseMoved((x as i32, y as i32)));
                     },
                 },
                 Err(_) => {
@@ -248,6 +249,13 @@ impl Window {
         events
     }
 
+    pub fn wait_events(&self) -> RingBuf<Event> {
+        use std::time::Duration;
+        use std::io::timer;
+        timer::sleep(Duration::milliseconds(16));
+        self.poll_events()
+    }
+
     pub fn make_current(&self) {
         unsafe {
             ffi::egl::MakeCurrent(self.display, self.surface, self.surface, self.context);
@@ -255,12 +263,9 @@ impl Window {
     }
 
     pub fn get_proc_address(&self, addr: &str) -> *const () {
-        use std::c_str::ToCStr;
-
+        let addr = CString::from_slice(addr.as_bytes()).as_slice_with_nul().as_ptr();
         unsafe {
-            addr.with_c_str(|s| {
-                ffi::egl::GetProcAddress(s) as *const ()
-            })
+            ffi::egl::GetProcAddress(addr) as *const ()
         }
     }
 
@@ -278,7 +283,10 @@ impl Window {
         ::Api::OpenGlEs
     }
 
-    pub fn set_window_resize_callback(&mut self, _: Option<fn(uint, uint)>) {
+    pub fn set_window_resize_callback(&mut self, _: Option<fn(u32, u32)>) {
+    }
+
+    pub fn set_cursor(&self, _: MouseCursor) {
     }
 
     pub fn hidpi_factor(&self) -> f32 {
@@ -286,8 +294,11 @@ impl Window {
     }
 }
 
+unsafe impl Send for Window {}
+unsafe impl Sync for Window {}
+
 #[cfg(feature = "window")]
-#[deriving(Clone)]
+#[derive(Clone)]
 pub struct WindowProxy;
 
 impl WindowProxy {

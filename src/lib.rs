@@ -1,8 +1,5 @@
 #![feature(tuple_indexing)]
 #![feature(unsafe_destructor)]
-#![feature(globs)]
-#![feature(phase)]
-#![feature(if_let)]
 #![unstable]
 
 //! The purpose of this library is to provide an OpenGL context on as many
@@ -30,8 +27,6 @@
 //!
 //! By default only `window` is enabled.
 
-#[phase(plugin)] extern crate gl_generator;
-
 extern crate gl_common;
 extern crate libc;
 
@@ -47,6 +42,7 @@ extern crate core_graphics;
 pub use events::*;
 
 use std::default::Default;
+use std::collections::ring_buf::IntoIter as RingBufIter;
 
 #[cfg(all(not(target_os = "windows"), not(target_os = "linux"), not(target_os = "macos"), not(target_os = "android")))]
 use this_platform_is_not_supported;
@@ -71,21 +67,23 @@ mod events;
 pub struct MonitorID(winimpl::MonitorID);
 
 /// Error that can happen while creating a window or a headless renderer.
-#[deriving(Clone, Show, PartialEq, Eq)]
+#[derive(Clone, Show, PartialEq, Eq)]
 pub enum CreationError {
     OsError(String),
+    NotSupported,
 }
 
 impl std::error::Error for CreationError {
     fn description(&self) -> &str {
         match self {
             &CreationError::OsError(ref text) => text.as_slice(),
+            &CreationError::NotSupported => "Some of the requested attributes are not supported",
         }
     }
 }
 
 /// All APIs related to OpenGL that you can possibly get while using glutin.
-#[deriving(Show, Clone, Copy, PartialEq, Eq)]
+#[derive(Show, Clone, Copy, PartialEq, Eq)]
 pub enum Api {
     /// The classical OpenGL. Available on Windows, Linux, OS/X.
     OpenGl,
@@ -93,25 +91,93 @@ pub enum Api {
     OpenGlEs,
 }
 
+#[derive(Show, Copy)]
+pub enum MouseCursor {
+    /// The platform-dependent default cursor.
+    Default,
+    /// A simple crosshair.
+    Crosshair,
+    /// A hand (often used to indicate links in web browsers).
+    Hand,
+    /// Self explanatory.
+    Arrow,
+    /// Indicates something is to be moved.
+    Move,
+    /// Indicates text that may be selected or edited.
+    Text,
+    /// Program busy indicator.
+    Wait,
+    /// Help indicator (often rendered as a "?")
+    Help,
+    /// Progress indicator. Shows that processing is being done. But in contrast
+    /// with "Wait" the user may still interact with the program. Often rendered
+    /// as a spinning beach ball, or an arrow with a watch or hourglass. 
+    Progress,
+
+    /// Cursor showing that something cannot be done.
+    NotAllowed,
+    ContextMenu,
+    NoneCursor,
+    Cell,
+    VerticalText,
+    Alias,
+    Copy,
+    NoDrop,
+    Grab,
+    Grabbing,
+    AllScroll,
+    ZoomIn,
+    ZoomOut,
+
+    /// Indicate that some edge is to be moved. For example, the 'SeResize' cursor
+    /// is used when the movement starts from the south-east corner of the box.
+    EResize,
+    NResize,
+    NeResize,
+    NwResize,
+    SResize,
+    SeResize,
+    SwResize,
+    WResize,
+    EwResize,
+    NsResize,
+    NeswResize,
+    NwseResize,
+    ColResize,
+    RowResize,
+}
+
 /// Object that allows you to build windows.
 #[cfg(feature = "window")]
 pub struct WindowBuilder<'a> {
-    sharing: Option<&'a Window>,
-    dimensions: Option<(uint, uint)>,
+    attribs: BuilderAttribs<'a>
+}
+
+/// Attributes
+struct BuilderAttribs<'a> {
+    headless: bool,
+    strict: bool,
+    sharing: Option<&'a winimpl::Window>,
+    dimensions: Option<(u32, u32)>,
     title: String,
     monitor: Option<winimpl::MonitorID>,
-    gl_version: Option<(uint, uint)>,
+    gl_version: Option<(u32, u32)>,
     gl_debug: bool,
     vsync: bool,
     visible: bool,
     multisampling: Option<u16>,
+    depth_bits: Option<u8>,
+    stencil_bits: Option<u8>,
+    color_bits: Option<u8>,
+    alpha_bits: Option<u8>,
+    stereoscopy: bool,
 }
 
-#[cfg(feature = "window")]
-impl<'a> WindowBuilder<'a> {
-    /// Initializes a new `WindowBuilder` with default values.
-    pub fn new() -> WindowBuilder<'a> {
-        WindowBuilder {
+impl BuilderAttribs<'static> {
+    fn new() -> BuilderAttribs<'static> {
+        BuilderAttribs {
+            headless: false,
+            strict: false,
             sharing: None,
             dimensions: None,
             title: "glutin window".to_string(),
@@ -121,20 +187,35 @@ impl<'a> WindowBuilder<'a> {
             vsync: false,
             visible: true,
             multisampling: None,
+            depth_bits: None,
+            stencil_bits: None,
+            color_bits: None,
+            alpha_bits: None,
+            stereoscopy: false,
+        }
+    }
+}
+
+#[cfg(feature = "window")]
+impl<'a> WindowBuilder<'a> {
+    /// Initializes a new `WindowBuilder` with default values.
+    pub fn new() -> WindowBuilder<'a> {
+        WindowBuilder {
+            attribs: BuilderAttribs::new(),
         }
     }
 
     /// Requests the window to be of specific dimensions.
     ///
     /// Width and height are in pixels.
-    pub fn with_dimensions(mut self, width: uint, height: uint) -> WindowBuilder<'a> {
-        self.dimensions = Some((width, height));
+    pub fn with_dimensions(mut self, width: u32, height: u32) -> WindowBuilder<'a> {
+        self.attribs.dimensions = Some((width, height));
         self
     }
 
     /// Requests a specific title for the window.
     pub fn with_title(mut self, title: String) -> WindowBuilder<'a> {
-        self.title = title;
+        self.attribs.title = title;
         self
     }
 
@@ -143,7 +224,7 @@ impl<'a> WindowBuilder<'a> {
     /// If you don't specify dimensions for the window, it will match the monitor's.
     pub fn with_fullscreen(mut self, monitor: MonitorID) -> WindowBuilder<'a> {
         let MonitorID(monitor) = monitor;
-        self.monitor = Some(monitor);
+        self.attribs.monitor = Some(monitor);
         self
     }
 
@@ -151,7 +232,7 @@ impl<'a> WindowBuilder<'a> {
     ///
     /// There are some exceptions, like FBOs or VAOs. See the OpenGL documentation.
     pub fn with_shared_lists(mut self, other: &'a Window) -> WindowBuilder<'a> {
-        self.sharing = Some(other);
+        self.attribs.sharing = Some(&other.window);
         self
     }
 
@@ -159,8 +240,8 @@ impl<'a> WindowBuilder<'a> {
     ///
     /// Version is a (major, minor) pair. For example to request OpenGL 3.3
     ///  you would pass `(3, 3)`.
-    pub fn with_gl_version(mut self, version: (uint, uint)) -> WindowBuilder<'a> {
-        self.gl_version = Some(version);
+    pub fn with_gl_version(mut self, version: (u32, u32)) -> WindowBuilder<'a> {
+        self.attribs.gl_version = Some(version);
         self
     }
 
@@ -169,19 +250,19 @@ impl<'a> WindowBuilder<'a> {
     /// The default value for this flag is `cfg!(ndebug)`, which means that it's enabled
     /// when you run `cargo build` and disabled when you run `cargo build --release`.
     pub fn with_gl_debug_flag(mut self, flag: bool) -> WindowBuilder<'a> {
-        self.gl_debug = flag;
+        self.attribs.gl_debug = flag;
         self
     }
 
     /// Requests that the window has vsync enabled.
     pub fn with_vsync(mut self) -> WindowBuilder<'a> {
-        self.vsync = true;
+        self.attribs.vsync = true;
         self
     }
 
     /// Sets whether the window will be initially hidden or visible.
     pub fn with_visibility(mut self, visible: bool) -> WindowBuilder<'a> {
-        self.visible = visible;
+        self.attribs.visible = visible;
         self
     }
 
@@ -193,7 +274,32 @@ impl<'a> WindowBuilder<'a> {
     pub fn with_multisampling(mut self, samples: u16) -> WindowBuilder<'a> {
         use std::num::UnsignedInt;
         assert!(samples.is_power_of_two());
-        self.multisampling = Some(samples);
+        self.attribs.multisampling = Some(samples);
+        self
+    }
+
+    /// Sets the number of bits in the depth buffer.
+    pub fn with_depth_buffer(mut self, bits: u8) -> WindowBuilder<'a> {
+        self.attribs.depth_bits = Some(bits);
+        self
+    }
+
+    /// Sets the number of bits in the stencil buffer.
+    pub fn with_stencil_buffer(mut self, bits: u8) -> WindowBuilder<'a> {
+        self.attribs.stencil_bits = Some(bits);
+        self
+    }
+
+    /// Sets the number of bits in the color buffer.
+    pub fn with_pixel_format(mut self, color_bits: u8, alpha_bits: u8) -> WindowBuilder<'a> {
+        self.attribs.color_bits = Some(color_bits);
+        self.attribs.alpha_bits = Some(alpha_bits);
+        self
+    }
+
+    /// Request the backend to be stereoscopic.
+    pub fn with_stereoscopy(mut self) -> WindowBuilder<'a> {
+        self.attribs.stereoscopy = true;
         self
     }
 
@@ -203,36 +309,45 @@ impl<'a> WindowBuilder<'a> {
     ///  out of memory, etc.
     pub fn build(mut self) -> Result<Window, CreationError> {
         // resizing the window to the dimensions of the monitor when fullscreen
-        if self.dimensions.is_none() && self.monitor.is_some() {
-            self.dimensions = Some(self.monitor.as_ref().unwrap().get_dimensions())
+        if self.attribs.dimensions.is_none() && self.attribs.monitor.is_some() {
+            self.attribs.dimensions = Some(self.attribs.monitor.as_ref().unwrap().get_dimensions())
         }
 
         // default dimensions
-        if self.dimensions.is_none() {
-            self.dimensions = Some((1024, 768));
+        if self.attribs.dimensions.is_none() {
+            self.attribs.dimensions = Some((1024, 768));
         }
 
         // building
-        winimpl::Window::new(self).map(|w| Window { window: w })
+        winimpl::Window::new(self.attribs).map(|w| Window { window: w })
+    }
+
+    /// Builds the window.
+    ///
+    /// The context is build in a *strict* way. That means that if the backend couldn't give
+    /// you what you requested, an `Err` will be returned.
+    pub fn build_strict(mut self) -> Result<Window, CreationError> {
+        self.attribs.strict = true;
+        self.build()
     }
 }
 
 /// Object that allows you to build headless contexts.
 #[cfg(feature = "headless")]
 pub struct HeadlessRendererBuilder {
-    dimensions: (uint, uint),
-    gl_version: Option<(uint, uint)>,
-    gl_debug: bool,
+    attribs: BuilderAttribs<'static>,
 }
 
 #[cfg(feature = "headless")]
 impl HeadlessRendererBuilder {
     /// Initializes a new `HeadlessRendererBuilder` with default values.
-    pub fn new(width: uint, height: uint) -> HeadlessRendererBuilder {
+    pub fn new(width: u32, height: u32) -> HeadlessRendererBuilder {
         HeadlessRendererBuilder {
-            dimensions: (width, height),
-            gl_version: None,
-            gl_debug: cfg!(ndebug),
+            attribs: BuilderAttribs {
+                headless: true,
+                dimensions: Some((width, height)),
+                .. BuilderAttribs::new()
+            },
         }
     }
 
@@ -240,8 +355,8 @@ impl HeadlessRendererBuilder {
     ///
     /// Version is a (major, minor) pair. For example to request OpenGL 3.3
     ///  you would pass `(3, 3)`.
-    pub fn with_gl_version(mut self, version: (uint, uint)) -> HeadlessRendererBuilder {
-        self.gl_version = Some(version);
+    pub fn with_gl_version(mut self, version: (u32, u32)) -> HeadlessRendererBuilder {
+        self.attribs.gl_version = Some(version);
         self
     }
 
@@ -250,7 +365,7 @@ impl HeadlessRendererBuilder {
     /// The default value for this flag is `cfg!(ndebug)`, which means that it's enabled
     /// when you run `cargo build` and disabled when you run `cargo build --release`.
     pub fn with_gl_debug_flag(mut self, flag: bool) -> HeadlessRendererBuilder {
-        self.gl_debug = flag;
+        self.attribs.gl_debug = flag;
         self
     }
 
@@ -259,7 +374,16 @@ impl HeadlessRendererBuilder {
     /// Error should be very rare and only occur in case of permission denied, incompatible system,
     ///  out of memory, etc.
     pub fn build(self) -> Result<HeadlessContext, CreationError> {
-        winimpl::HeadlessContext::new(self).map(|w| HeadlessContext { context: w })
+        winimpl::HeadlessContext::new(self.attribs).map(|w| HeadlessContext { context: w })
+    }
+
+    /// Builds the headless context.
+    ///
+    /// The context is build in a *strict* way. That means that if the backend couldn't give
+    /// you what you requested, an `Err` will be returned.
+    pub fn build_strict(mut self) -> Result<HeadlessContext, CreationError> {
+        self.attribs.strict = true;
+        self.build()
     }
 }
 
@@ -367,7 +491,7 @@ impl Window {
     ///
     /// Returns `None` if the window no longer exists.
     #[inline]
-    pub fn get_position(&self) -> Option<(int, int)> {
+    pub fn get_position(&self) -> Option<(i32, i32)> {
         self.window.get_position()
     }
 
@@ -377,7 +501,7 @@ impl Window {
     ///
     /// This is a no-op if the window has already been closed.
     #[inline]
-    pub fn set_position(&self, x: int, y: int) {
+    pub fn set_position(&self, x: i32, y: i32) {
         self.window.set_position(x, y)
     }
 
@@ -389,7 +513,7 @@ impl Window {
     ///
     /// Returns `None` if the window no longer exists.
     #[inline]
-    pub fn get_inner_size(&self) -> Option<(uint, uint)> {
+    pub fn get_inner_size(&self) -> Option<(u32, u32)> {
         self.window.get_inner_size()
     }
 
@@ -400,7 +524,7 @@ impl Window {
     ///
     /// Returns `None` if the window no longer exists.
     #[inline]
-    pub fn get_outer_size(&self) -> Option<(uint, uint)> {
+    pub fn get_outer_size(&self) -> Option<(u32, u32)> {
         self.window.get_outer_size()
     }
 
@@ -410,7 +534,7 @@ impl Window {
     ///
     /// This is a no-op if the window has already been closed.
     #[inline]
-    pub fn set_inner_size(&self, x: uint, y: uint) {
+    pub fn set_inner_size(&self, x: u32, y: u32) {
         self.window.set_inner_size(x, y)
     }
 
@@ -419,7 +543,7 @@ impl Window {
     /// Contrary to `wait_events`, this function never blocks.
     #[inline]
     pub fn poll_events(&self) -> PollEventsIterator {
-        PollEventsIterator { data: self.window.poll_events() }
+        PollEventsIterator { data: self.window.poll_events().into_iter() }
     }
 
     /// Waits for an event, then returns an iterator to all the events that are currently
@@ -429,7 +553,7 @@ impl Window {
     ///  this function will block until there is one.
     #[inline]
     pub fn wait_events(&self) -> WaitEventsIterator {
-        WaitEventsIterator { data: self.window.wait_events() }
+        WaitEventsIterator { data: self.window.wait_events().into_iter() }
     }
 
     /// Sets the context as the current context.
@@ -489,15 +613,14 @@ impl Window {
     /// operating systems) during resize operations. This can be used to repaint
     /// during window resizing.
     #[experimental]
-    pub fn set_window_resize_callback(&mut self, callback: Option<fn(uint, uint)>) {
+    pub fn set_window_resize_callback(&mut self, callback: Option<fn(u32, u32)>) {
         self.window.set_window_resize_callback(callback);
     }
 
-    /// Returns the ratio between the backing framebuffer resolution and the
-    /// window size in screen pixels. This is typically one for a normal display
-    /// and two for a retina display.
-    pub fn hidpi_factor(&self) -> f32 {
-        self.window.hidpi_factor()
+    /// Modifies the mouse cursor of the window.
+    /// Has no effect on Android.
+    pub fn set_cursor(&mut self, cursor: MouseCursor) {
+        self.window.set_cursor(cursor);
     }
 }
 
@@ -513,7 +636,7 @@ impl gl_common::GlFunctionsSource for Window {
 /// threads.
 ///
 #[cfg(feature = "window")]
-#[deriving(Clone)]
+#[derive(Clone)]
 pub struct WindowProxy {
     proxy: winimpl::WindowProxy,
 }
@@ -561,7 +684,7 @@ impl HeadlessContext {
     }
 
     #[experimental]
-    pub fn set_window_resize_callback(&mut self, _: Option<fn(uint, uint)>) {
+    pub fn set_window_resize_callback(&mut self, _: Option<fn(u32, u32)>) {
     }
 }
 
@@ -576,12 +699,13 @@ impl gl_common::GlFunctionsSource for HeadlessContext {
 // Implementation note: we retreive the list once, then serve each element by one by one.
 // This may change in the future.
 pub struct PollEventsIterator<'a> {
-    data: Vec<Event>,
+    data: RingBufIter<Event>,
 }
 
-impl<'a> Iterator<Event> for PollEventsIterator<'a> {
+impl<'a> Iterator for PollEventsIterator<'a> {
+    type Item = Event;
     fn next(&mut self) -> Option<Event> {
-        self.data.remove(0)
+        self.data.next()
     }
 }
 
@@ -589,12 +713,13 @@ impl<'a> Iterator<Event> for PollEventsIterator<'a> {
 // Implementation note: we retreive the list once, then serve each element by one by one.
 // This may change in the future.
 pub struct WaitEventsIterator<'a> {
-    data: Vec<Event>,
+    data: RingBufIter<Event>,
 }
 
-impl<'a> Iterator<Event> for WaitEventsIterator<'a> {
+impl<'a> Iterator for WaitEventsIterator<'a> {
+    type Item = Event;
     fn next(&mut self) -> Option<Event> {
-        self.data.remove(0)
+        self.data.next()
     }
 }
 
@@ -603,13 +728,14 @@ impl<'a> Iterator<Event> for WaitEventsIterator<'a> {
 // This may change in the future.
 #[cfg(feature = "window")]
 pub struct AvailableMonitorsIter {
-    data: Vec<winimpl::MonitorID>,
+    data: RingBufIter<winimpl::MonitorID>,
 }
 
 #[cfg(feature = "window")]
-impl Iterator<MonitorID> for AvailableMonitorsIter {
+impl Iterator for AvailableMonitorsIter {
+    type Item = MonitorID;
     fn next(&mut self) -> Option<MonitorID> {
-        self.data.remove(0).map(|id| MonitorID(id))
+        self.data.next().map(|id| MonitorID(id))
     }
 }
 
@@ -617,7 +743,7 @@ impl Iterator<MonitorID> for AvailableMonitorsIter {
 #[cfg(feature = "window")]
 pub fn get_available_monitors() -> AvailableMonitorsIter {
     let data = winimpl::get_available_monitors();
-    AvailableMonitorsIter{ data: data }
+    AvailableMonitorsIter{ data: data.into_iter() }
 }
 
 /// Returns the primary monitor of the system.
@@ -635,7 +761,7 @@ impl MonitorID {
     }
 
     /// Returns the number of pixels currently displayed on the monitor.
-    pub fn get_dimensions(&self) -> (uint, uint) {
+    pub fn get_dimensions(&self) -> (u32, u32) {
         let &MonitorID(ref id) = self;
         id.get_dimensions()
     }

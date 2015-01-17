@@ -1,9 +1,11 @@
 use winapi;
 
+use std::collections::RingBuf;
+
 /// Win32 implementation of the main `MonitorID` object.
 pub struct MonitorID {
     /// The system name of the monitor.
-    name: [winapi::WCHAR, ..32],
+    name: [winapi::WCHAR; 32],
 
     /// Name to give to the user.
     readable_name: String,
@@ -15,22 +17,22 @@ pub struct MonitorID {
     /// The position of the monitor in pixels on the desktop.
     ///
     /// A window that is positionned at these coordinates will overlap the monitor.
-    position: (uint, uint),
+    position: (u32, u32),
 
     /// The current resolution in pixels on the monitor.
-    dimensions: (uint, uint),
+    dimensions: (u32, u32),
 }
 
 /// Win32 implementation of the main `get_available_monitors` function.
-pub fn get_available_monitors() -> Vec<MonitorID> {
+pub fn get_available_monitors() -> RingBuf<MonitorID> {
     use std::{iter, mem, ptr};
 
     // return value
-    let mut result = Vec::new();
+    let mut result = RingBuf::new();
 
     // enumerating the devices is done by querying device 0, then device 1, then device 2, etc.
     //  until the query function returns null
-    for id in iter::count(0u, 1) {
+    for id in iter::count(0u32, 1) {
         // getting the DISPLAY_DEVICEW object of the current device
         let output = {
             let mut output: winapi::DISPLAY_DEVICEW = unsafe { mem::zeroed() };
@@ -56,7 +58,7 @@ pub fn get_available_monitors() -> Vec<MonitorID> {
 
         // computing the human-friendly name
         let readable_name = String::from_utf16_lossy(output.DeviceString.as_slice());
-        let readable_name = readable_name.as_slice().trim_right_chars(0 as char).to_string();
+        let readable_name = readable_name.as_slice().trim_right_matches(0 as char).to_string();
 
         // getting the position
         let (position, dimensions) = unsafe {
@@ -70,15 +72,15 @@ pub fn get_available_monitors() -> Vec<MonitorID> {
             }
 
             let point: &winapi::POINTL = mem::transmute(&dev.union1);
-            let position = (point.x as uint, point.y as uint);
+            let position = (point.x as u32, point.y as u32);
 
-            let dimensions = (dev.dmPelsWidth as uint, dev.dmPelsHeight as uint);
+            let dimensions = (dev.dmPelsWidth as u32, dev.dmPelsHeight as u32);
 
             (position, dimensions)
         };
 
         // adding to the resulting list
-        result.push(MonitorID {
+        result.push_back(MonitorID {
             name: output.DeviceName,
             readable_name: readable_name,
             flags: output.StateFlags,
@@ -111,7 +113,7 @@ impl MonitorID {
     }
 
     /// See the docs if the crate root file.
-    pub fn get_dimensions(&self) -> (uint, uint) {
+    pub fn get_dimensions(&self) -> (u32, u32) {
         // TODO: retreive the dimensions every time this is called
         self.dimensions
     }
@@ -123,9 +125,9 @@ impl MonitorID {
     }
 
     /// This is a Win32-only function for `MonitorID` that returns the position of the
-    ///  monitor on the desktop. 
+    ///  monitor on the desktop.
     /// A window that is positionned at these coordinates will overlap the monitor.
-    pub fn get_position(&self) -> (uint, uint) {
+    pub fn get_position(&self) -> (u32, u32) {
         self.position
     }
 }

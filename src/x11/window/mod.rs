@@ -1,10 +1,11 @@
-use {Event, WindowBuilder};
+use {Event, BuilderAttribs, MouseCursor};
 use CreationError;
 use CreationError::OsError;
 use libc;
 use std::{mem, ptr};
 use std::cell::Cell;
 use std::sync::atomic::AtomicBool;
+use std::collections::RingBuf;
 use super::ffi;
 use std::sync::{Arc, Once, ONCE_INIT};
 
@@ -16,11 +17,17 @@ mod monitor;
 static THREAD_INIT: Once = ONCE_INIT;
 
 fn ensure_thread_init() {
-    THREAD_INIT.doit(|| {
+    THREAD_INIT.call_once(|| {
         unsafe {
             ffi::XInitThreads();
         }
     });
+}
+
+fn with_c_str<F, T>(s: &str, f: F) -> T where F: FnOnce(*const i8) -> T {
+    use std::ffi::CString;
+    let c_str = CString::from_slice(s.as_bytes());
+    f(c_str.as_slice_with_nul().as_ptr())    
 }
 
 struct XWindow {
@@ -33,6 +40,9 @@ struct XWindow {
     ic: ffi::XIC,
     im: ffi::XIM,
 }
+
+unsafe impl Send for Window {}
+unsafe impl Sync for Window {}
 
 impl Drop for XWindow {
     fn drop(&mut self) {
@@ -53,7 +63,7 @@ impl Drop for XWindow {
     }
 }
 
-#[deriving(Clone)]
+#[derive(Clone)]
 pub struct WindowProxy {
     x: Arc<XWindow>,
 }
@@ -86,7 +96,7 @@ pub struct Window {
 }
 
 impl Window {
-    pub fn new(builder: WindowBuilder) -> Result<Window, CreationError> {
+    pub fn new(builder: BuilderAttribs) -> Result<Window, CreationError> {
         ensure_thread_init();
         let dimensions = builder.dimensions.unwrap_or((800, 600));
 
@@ -150,7 +160,7 @@ impl Window {
             }
 
             for i in range(0, mode_num) {
-                let mode: ffi::XF86VidModeModeInfo = ptr::read(*modes.offset(i as int) as *const _);
+                let mode: ffi::XF86VidModeModeInfo = ptr::read(*modes.offset(i as isize) as *const _);
                 if mode.hdisplay == dimensions.0 as u16 && mode.vdisplay == dimensions.1 as u16 {
                     best_mode = i;
                 }
@@ -159,7 +169,7 @@ impl Window {
                 return Err(OsError(format!("Could not find a suitable graphics mode")));
             }
 
-           modes
+            modes
         };
 
         let xf86_desk_mode = unsafe {
@@ -205,7 +215,7 @@ impl Window {
         if builder.monitor.is_some() {
             window_attributes |= ffi::CWOverrideRedirect;
             unsafe {
-                ffi::XF86VidModeSwitchToMode(display, screen_id, *modes.offset(best_mode as int));
+                ffi::XF86VidModeSwitchToMode(display, screen_id, *modes.offset(best_mode as isize));
                 ffi::XF86VidModeSetViewPort(display, screen_id, 0, 0);
                 set_win_attr.override_redirect = 1;
             }
@@ -230,13 +240,13 @@ impl Window {
 
         // creating window, step 2
         let wm_delete_window = unsafe {
-            use std::c_str::ToCStr;
-
-            let delete_window = "WM_DELETE_WINDOW".to_c_str();
-            let mut wm_delete_window = ffi::XInternAtom(display, delete_window.as_ptr(), 0);
+            let mut wm_delete_window = with_c_str("WM_DELETE_WINDOW", |delete_window| 
+                ffi::XInternAtom(display, delete_window, 0)
+            );
             ffi::XSetWMProtocols(display, window, &mut wm_delete_window, 1);
-            let c_title = builder.title.to_c_str();
-            ffi::XStoreName(display, window, c_title.as_ptr());
+            with_c_str(&*builder.title, |title| {;
+                ffi::XStoreName(display, window, title);
+            });
             ffi::XFlush(display);
 
             wm_delete_window
@@ -253,13 +263,15 @@ impl Window {
 
         // creating input context
         let ic = unsafe {
-            use std::c_str::ToCStr;
-
-            let input_style = "inputStyle".to_c_str();
-            let client_window = "clientWindow".to_c_str();
-            let ic = ffi::XCreateIC(im, input_style.as_ptr(),
-                ffi::XIMPreeditNothing | ffi::XIMStatusNothing, client_window.as_ptr(),
-                window, ptr::null());
+            let ic = with_c_str("inputStyle", |input_style|
+                with_c_str("clientWindow", |client_window|
+                    ffi::XCreateIC(
+                        im, input_style,
+                        ffi::XIMPreeditNothing | ffi::XIMStatusNothing, client_window,
+                        window, ptr::null()
+                    )
+                )
+            );
             if ic.is_null() {
                 return Err(OsError(format!("XCreateIC failed")));
             }
@@ -298,14 +310,14 @@ impl Window {
 
             // loading the extra GLX functions
             let extra_functions = ffi::glx_extra::Glx::load_with(|addr| {
-                addr.with_c_str(|s| {
+                with_c_str(addr, |s| {
                     use libc;
                     ffi::glx::GetProcAddress(s as *const u8) as *const libc::c_void
                 })
             });
 
             let share = if let Some(win) = builder.sharing {
-                win.window.x.context
+                win.x.context
             } else {
                 ptr::null()
             };
@@ -346,16 +358,15 @@ impl Window {
     }
 
     pub fn is_closed(&self) -> bool {
-        use std::sync::atomic::Relaxed;
+        use std::sync::atomic::Ordering::Relaxed;
         self.is_closed.load(Relaxed)
     }
 
     pub fn set_title(&self, title: &str) {
-        let c_title = title.to_c_str();
-        unsafe {
-            ffi::XStoreName(self.x.display, self.x.window, c_title.as_ptr());
+        with_c_str(title, |title| unsafe {
+            ffi::XStoreName(self.x.display, self.x.window, title);
             ffi::XFlush(self.x.display);
-        }
+        })
     }
 
     pub fn show(&self) {
@@ -372,7 +383,7 @@ impl Window {
         }
     }
 
-    fn get_geometry(&self) -> Option<(int, int, uint, uint)> {
+    fn get_geometry(&self) -> Option<(i32, i32, u32, u32)> {
         unsafe {
             use std::mem;
 
@@ -391,27 +402,27 @@ impl Window {
                 return None;
             }
 
-            Some((x as int, y as int, width as uint, height as uint))
+            Some((x as i32, y as i32, width as u32, height as u32))
         }
     }
 
-    pub fn get_position(&self) -> Option<(int, int)> {
+    pub fn get_position(&self) -> Option<(i32, i32)> {
         self.get_geometry().map(|(x, y, _, _)| (x, y))
     }
 
-    pub fn set_position(&self, x: int, y: int) {
+    pub fn set_position(&self, x: i32, y: i32) {
         unsafe { ffi::XMoveWindow(self.x.display, self.x.window, x as libc::c_int, y as libc::c_int) }
     }
 
-    pub fn get_inner_size(&self) -> Option<(uint, uint)> {
+    pub fn get_inner_size(&self) -> Option<(u32, u32)> {
         self.get_geometry().map(|(_, _, w, h)| (w, h))
     }
 
-    pub fn get_outer_size(&self) -> Option<(uint, uint)> {
+    pub fn get_outer_size(&self) -> Option<(u32, u32)> {
         unimplemented!()
     }
 
-    pub fn set_inner_size(&self, _x: uint, _y: uint) {
+    pub fn set_inner_size(&self, _x: u32, _y: u32) {
         unimplemented!()
     }
 
@@ -421,10 +432,10 @@ impl Window {
         }
     }
 
-    pub fn poll_events(&self) -> Vec<Event> {
+    pub fn poll_events(&self) -> RingBuf<Event> {
         use std::mem;
 
-        let mut events = Vec::new();
+        let mut events = RingBuf::new();
 
         loop {
             use std::num::Int;
@@ -447,15 +458,15 @@ impl Window {
 
                 ffi::ClientMessage => {
                     use events::Event::{Closed, Awakened};
-                    use std::sync::atomic::Relaxed;
+                    use std::sync::atomic::Ordering::Relaxed;
 
                     let client_msg: &ffi::XClientMessageEvent = unsafe { mem::transmute(&xev) };
 
                     if client_msg.l[0] == self.wm_delete_window as libc::c_long {
                         self.is_closed.store(true, Relaxed);
-                        events.push(Closed);
+                        events.push_back(Closed);
                     } else {
-                        events.push(Awakened);
+                        events.push_back(Awakened);
                     }
                 },
 
@@ -465,14 +476,14 @@ impl Window {
                     let (current_width, current_height) = self.current_size.get();
                     if current_width != cfg_event.width || current_height != cfg_event.height {
                         self.current_size.set((cfg_event.width, cfg_event.height));
-                        events.push(Resized(cfg_event.width as uint, cfg_event.height as uint));
+                        events.push_back(Resized(cfg_event.width as u32, cfg_event.height as u32));
                     }
                 },
 
                 ffi::MotionNotify => {
                     use events::Event::MouseMoved;
                     let event: &ffi::XMotionEvent = unsafe { mem::transmute(&xev) };
-                    events.push(MouseMoved((event.x as int, event.y as int)));
+                    events.push_back(MouseMoved((event.x as i32, event.y as i32)));
                 },
 
                 ffi::KeyPress | ffi::KeyRelease => {
@@ -490,18 +501,18 @@ impl Window {
                     let written = unsafe {
                         use std::str;
 
-                        let mut buffer: [u8, ..16] = [mem::uninitialized(), ..16];
+                        let mut buffer: [u8; 16] = [mem::uninitialized(); 16];
                         let raw_ev: *mut ffi::XKeyEvent = event;
                         let count = ffi::Xutf8LookupString(self.x.ic, mem::transmute(raw_ev),
                             mem::transmute(buffer.as_mut_ptr()),
                             buffer.len() as libc::c_int, ptr::null_mut(), ptr::null_mut());
 
-                        str::from_utf8(buffer.as_slice().slice_to(count as uint))
+                        str::from_utf8(buffer.as_slice().slice_to(count as usize))
                             .unwrap_or("").to_string()
                     };
 
                     for chr in written.as_slice().chars() {
-                        events.push(ReceivedCharacter(chr));
+                        events.push_back(ReceivedCharacter(chr));
                     }
 
                     let keysym = unsafe {
@@ -510,7 +521,7 @@ impl Window {
 
                     let vkey =  events::keycode_to_element(keysym as libc::c_uint);
 
-                    events.push(KeyboardInput(state, event.keycode as u8, vkey));
+                    events.push_back(KeyboardInput(state, event.keycode as u8, vkey));
                 },
 
                 ffi::ButtonPress | ffi::ButtonRelease => {
@@ -527,11 +538,11 @@ impl Window {
                         ffi::Button2 => Some(MiddleMouseButton),
                         ffi::Button3 => Some(RightMouseButton),
                         ffi::Button4 => {
-                            events.push(MouseWheel(1));
+                            events.push_back(MouseWheel(1));
                             None
                         }
                         ffi::Button5 => {
-                            events.push(MouseWheel(-1));
+                            events.push_back(MouseWheel(-1));
                             None
                         }
                         _ => None
@@ -539,7 +550,7 @@ impl Window {
 
                     match button {
                         Some(button) =>
-                            events.push(MouseInput(state, button)),
+                            events.push_back(MouseInput(state, button)),
                         None => ()
                     };
                 },
@@ -551,7 +562,7 @@ impl Window {
         events
     }
 
-    pub fn wait_events(&self) -> Vec<Event> {
+    pub fn wait_events(&self) -> RingBuf<Event> {
         use std::mem;
 
         loop {
@@ -576,11 +587,10 @@ impl Window {
     }
 
     pub fn get_proc_address(&self, addr: &str) -> *const () {
-        use std::c_str::ToCStr;
         use std::mem;
 
         unsafe {
-            addr.with_c_str(|s| {
+            with_c_str(addr, |s| {
                 ffi::glx::GetProcAddress(mem::transmute(s)) as *const ()
             })
         }
@@ -599,7 +609,54 @@ impl Window {
         ::Api::OpenGl
     }
 
-    pub fn set_window_resize_callback(&mut self, _: Option<fn(uint, uint)>) {
+    pub fn set_window_resize_callback(&mut self, _: Option<fn(u32, u32)>) {
+    }
+
+    pub fn set_cursor(&self, cursor: MouseCursor) {
+        unsafe {
+            use std::ffi::CString;
+            let cursor_name = match cursor {
+                MouseCursor::Alias => "link",
+                MouseCursor::Arrow => "arrow",
+                MouseCursor::Cell => "plus",
+                MouseCursor::Copy => "copy",
+                MouseCursor::Crosshair => "crosshair",
+                MouseCursor::Default => "left_ptr",
+                MouseCursor::Grabbing => "grabbing",
+                MouseCursor::Hand | MouseCursor::Grab => "hand",
+                MouseCursor::Help => "question_arrow",
+                MouseCursor::Move => "move",
+                MouseCursor::NoDrop => "circle",
+                MouseCursor::NotAllowed => "crossed_circle",
+                MouseCursor::Progress => "left_ptr_watch",
+
+                /// Resize cursors
+                MouseCursor::EResize => "right_side",
+                MouseCursor::NResize => "top_side",
+                MouseCursor::NeResize => "top_right_corner",
+                MouseCursor::NwResize => "top_left_corner",
+                MouseCursor::SResize => "bottom_side",
+                MouseCursor::SeResize => "bottom_right_corner",
+                MouseCursor::SwResize => "bottom_left_corner",
+                MouseCursor::WResize => "left_side",
+                MouseCursor::EwResize | MouseCursor::ColResize => "h_double_arrow",
+                MouseCursor::NsResize | MouseCursor::RowResize => "v_double_arrow",
+                MouseCursor::NwseResize => "bd_double_arrow",
+                MouseCursor::NeswResize => "fd_double_arrow",
+
+                MouseCursor::Text | MouseCursor::VerticalText => "xterm",
+                MouseCursor::Wait => "watch",
+                
+                /// TODO: Find matching X11 cursors
+                MouseCursor::ContextMenu | MouseCursor::NoneCursor |
+                MouseCursor::AllScroll | MouseCursor::ZoomIn |
+                MouseCursor::ZoomOut => "left_ptr",
+            };
+            let c_string = CString::from_slice(cursor_name.as_bytes());
+            let xcursor = ffi::XcursorLibraryLoadCursor(self.x.display, c_string.as_ptr());
+            ffi::XDefineCursor (self.x.display, self.x.window, xcursor);
+            ffi::XFlush(self.x.display);
+        }
     }
 
     pub fn hidpi_factor(&self) -> f32 {

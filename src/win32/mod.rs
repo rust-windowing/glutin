@@ -1,13 +1,12 @@
 use std::sync::atomic::AtomicBool;
 use std::ptr;
+use std::ffi::CString;
+use std::collections::RingBuf;
+use std::sync::mpsc::Receiver;
 use libc;
-use {CreationError, Event};
+use {CreationError, Event, MouseCursor};
 
-#[cfg(feature = "window")]
-use WindowBuilder;
-
-#[cfg(feature = "headless")]
-use HeadlessRendererBuilder;
+use BuilderAttribs;
 
 pub use self::monitor::{MonitorID, get_available_monitors, get_primary_monitor};
 
@@ -18,16 +17,14 @@ mod gl;
 mod init;
 mod monitor;
 
-/// 
-#[cfg(feature = "headless")]
+///
 pub struct HeadlessContext(Window);
 
-#[cfg(feature = "headless")]
 impl HeadlessContext {
     /// See the docs in the crate root file.
-    pub fn new(builder: HeadlessRendererBuilder) -> Result<HeadlessContext, CreationError> {
-        let HeadlessRendererBuilder { dimensions, gl_version, gl_debug } = builder;
-        init::new_window(Some(dimensions), "".to_string(), None, gl_version, gl_debug, false, true,
+    pub fn new(builder: BuilderAttribs) -> Result<HeadlessContext, CreationError> {
+        let BuilderAttribs { dimensions, gl_version, gl_debug, .. } = builder;
+        init::new_window(dimensions, "".to_string(), None, gl_version, gl_debug, false, true,
                          None, None)
                          .map(|w| HeadlessContext(w))
     }
@@ -47,9 +44,14 @@ impl HeadlessContext {
         ::Api::OpenGl
     }
 
-    pub fn set_window_resize_callback(&mut self, _: Option<fn(uint, uint)>) {
+    pub fn set_window_resize_callback(&mut self, _: Option<fn(u32, u32)>) {
     }
 }
+
+#[cfg(feature = "headless")]
+unsafe impl Send for HeadlessContext {}
+#[cfg(feature = "headless")]
+unsafe impl Sync for HeadlessContext {}
 
 /// The Win32 implementation of the main `Window` object.
 pub struct Window {
@@ -75,19 +77,21 @@ pub struct Window {
     is_closed: AtomicBool,
 }
 
-#[cfg(feature = "window")]
+unsafe impl Send for Window {}
+unsafe impl Sync for Window {}
+
 impl Window {
     /// See the docs in the crate root file.
-    pub fn new(builder: WindowBuilder) -> Result<Window, CreationError> {
-        let WindowBuilder { dimensions, title, monitor, gl_version,
-                            gl_debug, vsync, visible, sharing, multisampling } = builder;
+    pub fn new(builder: BuilderAttribs) -> Result<Window, CreationError> {
+        let BuilderAttribs { dimensions, title, monitor, gl_version,
+                             gl_debug, vsync, visible, sharing, multisampling, .. } = builder;
         init::new_window(dimensions, title, monitor, gl_version, gl_debug, vsync,
-                         !visible, sharing.map(|w| w.window.context), multisampling)
+                         !visible, sharing.map(|w| init::ContextHack(w.context)),
+                         multisampling)
     }
 }
 
-#[cfg(feature = "window")]
-#[deriving(Clone)]
+#[derive(Clone)]
 pub struct WindowProxy;
 
 impl WindowProxy {
@@ -99,12 +103,12 @@ impl WindowProxy {
 impl Window {
     /// See the docs in the crate root file.
     pub fn is_closed(&self) -> bool {
-        use std::sync::atomic::Relaxed;
+        use std::sync::atomic::Ordering::Relaxed;
         self.is_closed.load(Relaxed)
     }
 
     /// See the docs in the crate root file.
-    /// 
+    ///
     /// Calls SetWindowText on the HWND.
     pub fn set_title(&self, text: &str) {
         unsafe {
@@ -127,7 +131,7 @@ impl Window {
     }
 
     /// See the docs in the crate root file.
-    pub fn get_position(&self) -> Option<(int, int)> {
+    pub fn get_position(&self) -> Option<(i32, i32)> {
         use std::mem;
 
         let mut placement: winapi::WINDOWPLACEMENT = unsafe { mem::zeroed() };
@@ -138,11 +142,11 @@ impl Window {
         }
 
         let ref rect = placement.rcNormalPosition;
-        Some((rect.left as int, rect.top as int))
+        Some((rect.left as i32, rect.top as i32))
     }
 
     /// See the docs in the crate root file.
-    pub fn set_position(&self, x: int, y: int) {
+    pub fn set_position(&self, x: i32, y: i32) {
         use libc;
 
         unsafe {
@@ -153,7 +157,7 @@ impl Window {
     }
 
     /// See the docs in the crate root file.
-    pub fn get_inner_size(&self) -> Option<(uint, uint)> {
+    pub fn get_inner_size(&self) -> Option<(u32, u32)> {
         use std::mem;
         let mut rect: winapi::RECT = unsafe { mem::uninitialized() };
 
@@ -162,13 +166,13 @@ impl Window {
         }
 
         Some((
-            (rect.right - rect.left) as uint,
-            (rect.bottom - rect.top) as uint
+            (rect.right - rect.left) as u32,
+            (rect.bottom - rect.top) as u32
         ))
     }
 
     /// See the docs in the crate root file.
-    pub fn get_outer_size(&self) -> Option<(uint, uint)> {
+    pub fn get_outer_size(&self) -> Option<(u32, u32)> {
         use std::mem;
         let mut rect: winapi::RECT = unsafe { mem::uninitialized() };
 
@@ -177,13 +181,13 @@ impl Window {
         }
 
         Some((
-            (rect.right - rect.left) as uint,
-            (rect.bottom - rect.top) as uint
+            (rect.right - rect.left) as u32,
+            (rect.bottom - rect.top) as u32
         ))
     }
 
     /// See the docs in the crate root file.
-    pub fn set_inner_size(&self, x: uint, y: uint) {
+    pub fn set_inner_size(&self, x: u32, y: u32) {
         use libc;
 
         unsafe {
@@ -199,33 +203,33 @@ impl Window {
 
     /// See the docs in the crate root file.
     // TODO: return iterator
-    pub fn poll_events(&self) -> Vec<Event> {
-        let mut events = Vec::new();
+    pub fn poll_events(&self) -> RingBuf<Event> {
+        let mut events = RingBuf::new();
         loop {
             match self.events_receiver.try_recv() {
-                Ok(ev) => events.push(ev),
+                Ok(ev) => events.push_back(ev),
                 Err(_) => break
             }
         }
 
         // if one of the received events is `Closed`, setting `is_closed` to true
         if events.iter().any(|e| match e { &::events::Event::Closed => true, _ => false }) {
-            use std::sync::atomic::Relaxed;
+            use std::sync::atomic::Ordering::Relaxed;
             self.is_closed.store(true, Relaxed);
         }
-        
+
         events
     }
 
     /// See the docs in the crate root file.
     // TODO: return iterator
-    pub fn wait_events(&self) -> Vec<Event> {
-        match self.events_receiver.recv_opt() {
+    pub fn wait_events(&self) -> RingBuf<Event> {
+        match self.events_receiver.recv() {
             Ok(ev) => {
                 // if the received event is `Closed`, setting `is_closed` to true
                 match ev {
                     ::events::Event::Closed => {
-                        use std::sync::atomic::Relaxed;
+                        use std::sync::atomic::Ordering::Relaxed;
                         self.is_closed.store(true, Relaxed);
                     },
                     _ => ()
@@ -238,9 +242,9 @@ impl Window {
             },
 
             Err(_) => {
-                use std::sync::atomic::Relaxed;
+                use std::sync::atomic::Ordering::Relaxed;
                 self.is_closed.store(true, Relaxed);
-                vec![]
+                RingBuf::new()
             }
         }
     }
@@ -253,14 +257,13 @@ impl Window {
 
     /// See the docs in the crate root file.
     pub fn get_proc_address(&self, addr: &str) -> *const () {
-        use std::c_str::ToCStr;
+        let addr = CString::from_slice(addr.as_bytes());
+        let addr = addr.as_slice_with_nul().as_ptr();
 
         unsafe {
-            addr.with_c_str(|s| {
-                let p = gl::wgl::GetProcAddress(s) as *const ();
-                if !p.is_null() { return p; }
-                winapi::GetProcAddress(self.gl_library, s) as *const ()
-            })
+            let p = gl::wgl::GetProcAddress(addr) as *const ();
+            if !p.is_null() { return p; }
+            winapi::GetProcAddress(self.gl_library, addr) as *const ()
         }
     }
 
@@ -280,7 +283,11 @@ impl Window {
         ::Api::OpenGl
     }
 
-    pub fn set_window_resize_callback(&mut self, _: Option<fn(uint, uint)>) {
+    pub fn set_window_resize_callback(&mut self, _: Option<fn(u32, u32)>) {
+    }
+
+    pub fn set_cursor(&self, cursor: MouseCursor) {
+        unimplemented!()
     }
 
     pub fn hidpi_factor(&self) -> f32 {

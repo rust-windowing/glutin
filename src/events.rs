@@ -1,10 +1,10 @@
-#[deriving(Clone, Show, Copy)]
+#[derive(Clone, Show, Copy)]
 pub enum Event {
     /// The size of the window has changed.
-    Resized(uint, uint),
+    Resized(u32, u32),
 
     /// The position of the window has changed.
-    Moved(int, int),
+    Moved(i32, i32),
 
     /// The window has been closed.
     Closed,
@@ -23,7 +23,7 @@ pub enum Event {
     /// The cursor has moved on the window.
     ///
     /// The parameter are the (x,y) coords in pixels relative to the top-left corner of the window.
-    MouseMoved((int, int)),
+    MouseMoved((i32, i32)),
 
     /// A positive value indicates that the wheel was rotated forward, away from the user;
     ///  a negative value indicates that the wheel was rotated backward, toward the user.
@@ -38,13 +38,13 @@ pub enum Event {
 
 pub type ScanCode = u8;
 
-#[deriving(Show, Hash, PartialEq, Eq, Clone, Copy)]
+#[derive(Show, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum ElementState {
     Pressed,
     Released,
 }
 
-#[deriving(Show, Hash, PartialEq, Eq, Clone, Copy)]
+#[derive(Show, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum MouseButton {
     LeftMouseButton,
     RightMouseButton,
@@ -52,7 +52,7 @@ pub enum MouseButton {
     OtherMouseButton(u8),
 }
 
-#[deriving(Show, Hash, PartialEq, Eq, Clone, Copy)]
+#[derive(Show, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum VirtualKeyCode {
     /// The '1' key over the letters.
     Key1,
