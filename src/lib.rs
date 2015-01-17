@@ -1,4 +1,3 @@
-#![feature(tuple_indexing)]
 #![feature(unsafe_destructor)]
 #![unstable]
 

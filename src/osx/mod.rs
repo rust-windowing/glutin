@@ -360,7 +360,6 @@ impl Window {
                     let mut ds = DelegateState {
                         is_closed: self.is_closed.get(),
                         context: self.context,
-                        window: self.window,
                         view: self.view,
                         handler: self.resize,
                     };
@@ -462,7 +461,6 @@ impl Window {
     }
 
     pub unsafe fn make_current(&self) {
-        let _: id = msg_send()(self.context, selector("update"));
         self.context.makeCurrentContext();
     }
 

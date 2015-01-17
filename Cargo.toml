@@ -23,8 +23,7 @@ gl_common = "*"
 gl_generator = "*"
 
 [target.arm-linux-androideabi.dependencies.android_glue]
-git = "https://github.com/servo/android-rs-glue"
-branch = "servo"
+git = "https://github.com/tomaka/android-rs-glue"
 
 [target.i686-apple-darwin.dependencies.cocoa]
 git = "https://github.com/servo/rust-cocoa"
