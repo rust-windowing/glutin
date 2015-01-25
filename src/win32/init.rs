@@ -2,6 +2,7 @@ use std::sync::atomic::AtomicBool;
 use std::ptr;
 use super::event;
 use super::Window;
+use BuilderAttribs;
 use {CreationError, Event};
 use CreationError::OsError;
 
@@ -24,18 +25,14 @@ thread_local!(static WINDOW: Rc<RefCell<Option<(winapi::HWND, Sender<Event>)>>> 
 pub struct ContextHack(pub winapi::HGLRC);
 unsafe impl Send for ContextHack {}
 
-pub fn new_window(builder_dimensions: Option<(u32, u32)>, builder_title: String,
-                  builder_monitor: Option<super::MonitorID>,
-                  builder_gl_version: Option<(u32, u32)>, builder_debug: bool,
-                  builder_vsync: bool, builder_hidden: bool,
-                  builder_sharelists: Option<ContextHack>, builder_multisampling: Option<u16>)
+pub fn new_window(builder: BuilderAttribs<'static>, builder_sharelists: Option<ContextHack>)
                   -> Result<Window, CreationError>
 {
     use std::mem;
     use std::os;
 
     // initializing variables to be sent to the task
-    let title = builder_title.as_slice().utf16_units()
+    let title = builder.title.as_slice().utf16_units()
         .chain(Some(0).into_iter()).collect::<Vec<u16>>();    // title to utf16
     //let hints = hints.clone();
     let (tx, rx) = channel();
@@ -77,15 +74,15 @@ pub fn new_window(builder_dimensions: Option<(u32, u32)>, builder_title: String,
 
         // building a RECT object with coordinates
         let mut rect = winapi::RECT {
-            left: 0, right: builder_dimensions.unwrap_or((1024, 768)).0 as winapi::LONG,
-            top: 0, bottom: builder_dimensions.unwrap_or((1024, 768)).1 as winapi::LONG,
+            left: 0, right: builder.dimensions.unwrap_or((1024, 768)).0 as winapi::LONG,
+            top: 0, bottom: builder.dimensions.unwrap_or((1024, 768)).1 as winapi::LONG,
         };
 
         // switching to fullscreen if necessary
         // this means adjusting the window's position so that it overlaps the right monitor,
         //  and change the monitor's resolution if necessary
-        if builder_monitor.is_some() {
-            let monitor = builder_monitor.as_ref().unwrap();
+        if builder.monitor.is_some() {
+            let monitor = builder.monitor.as_ref().unwrap();
 
             // adjusting the rect
             {
@@ -114,7 +111,7 @@ pub fn new_window(builder_dimensions: Option<(u32, u32)>, builder_title: String,
         }
 
         // computing the style and extended style of the window
-        let (ex_style, style) = if builder_monitor.is_some() {
+        let (ex_style, style) = if builder.monitor.is_some() {
             (winapi::WS_EX_APPWINDOW, winapi::WS_POPUP | winapi::WS_CLIPSIBLINGS | winapi::WS_CLIPCHILDREN)
         } else {
             (winapi::WS_EX_APPWINDOW | winapi::WS_EX_WINDOWEDGE,
@@ -124,9 +121,8 @@ pub fn new_window(builder_dimensions: Option<(u32, u32)>, builder_title: String,
         // adjusting the window coordinates using the style
         unsafe { winapi::AdjustWindowRectEx(&mut rect, style, 0, ex_style) };
 
-        // getting the address of wglCreateContextAttribsARB and the pixel format
-        //  that we will use
-        let (extra_functions, pixel_format) = {
+        // getting the address of wglCreateContextAttribsARB
+        let extra_functions = {
             // creating a dummy invisible window for GL initialization
             let dummy_window = unsafe {
                 let handle = winapi::CreateWindowExW(ex_style, class_name.as_ptr(),
@@ -159,21 +155,19 @@ pub fn new_window(builder_dimensions: Option<(u32, u32)>, builder_title: String,
                 hdc
             };
 
-            // getting the pixel format that we will use
+            // getting a dummy hardware-accelerated pixel format to get the extensions
             let pixel_format = {
                 // initializing a PIXELFORMATDESCRIPTOR that indicates what we want
                 let mut output: winapi::PIXELFORMATDESCRIPTOR = unsafe { mem::zeroed() };
                 output.nSize = mem::size_of::<winapi::PIXELFORMATDESCRIPTOR>() as winapi::WORD;
                 output.nVersion = 1;
                 output.dwFlags = winapi::PFD_DRAW_TO_WINDOW | winapi::PFD_DOUBLEBUFFER |
-                    winapi::PFD_SUPPORT_OPENGL | winapi::PFD_GENERIC_ACCELERATED;
+                                 winapi::PFD_SUPPORT_OPENGL | winapi::PFD_GENERIC_ACCELERATED;
                 output.iPixelType = winapi::PFD_TYPE_RGBA;
                 output.cColorBits = 24;
                 output.cAlphaBits = 8;
-                output.cAccumBits = 0;
                 output.cDepthBits = 24;
                 output.cStencilBits = 8;
-                output.cAuxBuffers = 0;
                 output.iLayerType = winapi::PFD_MAIN_PLANE;
 
                 let pf_index = unsafe { winapi::ChoosePixelFormat(dummy_hdc, &output) };
@@ -242,18 +236,18 @@ pub fn new_window(builder_dimensions: Option<(u32, u32)>, builder_title: String,
             unsafe { winapi::DestroyWindow(dummy_window); }
 
             // returning the address
-            (extra_functions, pixel_format)
+            extra_functions
         };
 
         // creating the real window this time
         let real_window = unsafe {
-            let (width, height) = if builder_monitor.is_some() || builder_dimensions.is_some() {
+            let (width, height) = if builder.monitor.is_some() || builder.dimensions.is_some() {
                 (Some(rect.right - rect.left), Some(rect.bottom - rect.top))
             } else {
                 (None, None)
             };
 
-            let style = if builder_hidden {
+            let style = if !builder.visible || builder.headless {
                 style
             } else {
                 style | winapi::WS_VISIBLE
@@ -262,8 +256,8 @@ pub fn new_window(builder_dimensions: Option<(u32, u32)>, builder_title: String,
             let handle = winapi::CreateWindowExW(ex_style, class_name.as_ptr(),
                 title.as_ptr() as winapi::LPCWSTR,
                 style | winapi::WS_CLIPSIBLINGS | winapi::WS_CLIPCHILDREN,
-                if builder_monitor.is_some() { 0 } else { winapi::CW_USEDEFAULT },
-                if builder_monitor.is_some() { 0 } else { winapi::CW_USEDEFAULT },
+                if builder.monitor.is_some() { 0 } else { winapi::CW_USEDEFAULT },
+                if builder.monitor.is_some() { 0 } else { winapi::CW_USEDEFAULT },
                 width.unwrap_or(winapi::CW_USEDEFAULT), height.unwrap_or(winapi::CW_USEDEFAULT),
                 ptr::null_mut(), ptr::null_mut(), winapi::GetModuleHandleW(ptr::null()),
                 ptr::null_mut());
@@ -290,9 +284,78 @@ pub fn new_window(builder_dimensions: Option<(u32, u32)>, builder_title: String,
             hdc
         };
 
-        // calling SetPixelFormat
+        // setting the pixel format
         unsafe {
-            if winapi::SetPixelFormat(hdc, 1, &pixel_format) == 0 {
+            if !extra_functions.ChoosePixelFormatARB.is_loaded() {
+                tx.send(Err(OsError(format!("wglChoosePixelFormatARB not loaded"))));
+                winapi::DestroyWindow(real_window);
+                return;
+            }
+
+            let mut attribs_list: Vec<libc::c_int> = vec![
+                gl::wgl_extra::DRAW_TO_WINDOW_ARB as libc::c_int, 1,
+                gl::wgl_extra::SUPPORT_OPENGL_ARB as libc::c_int, 1,
+                gl::wgl_extra::DOUBLE_BUFFER_ARB as libc::c_int, 1,
+                gl::wgl_extra::PIXEL_TYPE_ARB as libc::c_int,
+                gl::wgl_extra::TYPE_RGBA_ARB as libc::c_int,
+            ];
+
+            if let Some(color) = builder.color_bits {
+                attribs_list.push(gl::wgl_extra::COLOR_BITS_ARB as libc::c_int);
+                attribs_list.push(color as libc::c_int);
+            }
+
+            if let Some(alpha) = builder.alpha_bits {
+                attribs_list.push(gl::wgl_extra::ALPHA_BITS_ARB as libc::c_int);
+                attribs_list.push(alpha as libc::c_int);
+            }
+
+            if let Some(depth) = builder.depth_bits {
+                attribs_list.push(gl::wgl_extra::DEPTH_BITS_ARB as libc::c_int);
+                attribs_list.push(depth as libc::c_int);
+            }
+
+            if let Some(stencil) = builder.stencil_bits {
+                attribs_list.push(gl::wgl_extra::STENCIL_BITS_ARB as libc::c_int);
+                attribs_list.push(stencil as libc::c_int);
+            }
+
+            if builder.stereoscopy {
+                attribs_list.push(gl::wgl_extra::STEREO_ARB as libc::c_int);
+                attribs_list.push(1);
+            }
+
+            if let Some(samples) = builder.multisampling {
+                attribs_list.push(gl::wgl_extra::SAMPLE_BUFFERS_ARB as libc::c_int);
+                attribs_list.push(1);
+                attribs_list.push(gl::wgl_extra::SAMPLES_ARB as libc::c_int);
+                attribs_list.push(samples as libc::c_int);
+            }
+
+            attribs_list.push(0);
+
+            let mut format = mem::uninitialized();
+            let mut num_formats = mem::uninitialized();
+            if extra_functions.ChoosePixelFormatARB(hdc as *const libc::c_void,
+                                                    attribs_list.as_ptr(), ptr::null(),
+                                                    1, &mut format, &mut num_formats) == 0
+            {
+                tx.send(Err(OsError(format!("wglChoosePixelFormatARB function failed"))));
+                winapi::DestroyWindow(real_window);
+                return;
+            }
+
+            let mut output = mem::uninitialized();
+            if winapi::DescribePixelFormat(hdc, format,
+                mem::size_of::<winapi::PIXELFORMATDESCRIPTOR>() as winapi::UINT, &mut output) == 0
+            {
+                tx.send(Err(OsError(format!("DescribePixelFormat function failed: {}",
+                    os::error_string(os::errno() as usize)))));
+                unsafe { winapi::DestroyWindow(real_window); }
+                return;
+            }
+
+            if winapi::SetPixelFormat(hdc, 1, &output) == 0 {
                 tx.send(Err(OsError(format!("SetPixelFormat function failed: {}",
                     os::error_string(os::errno() as usize)))));
                 winapi::DestroyWindow(real_window);
@@ -306,15 +369,15 @@ pub fn new_window(builder_dimensions: Option<(u32, u32)>, builder_title: String,
 
             let mut attributes = Vec::new();
 
-            if builder_gl_version.is_some() {
-                let version = builder_gl_version.as_ref().unwrap();
+            if builder.gl_version.is_some() {
+                let version = builder.gl_version.as_ref().unwrap();
                 attributes.push(gl::wgl_extra::CONTEXT_MAJOR_VERSION_ARB as libc::c_int);
                 attributes.push(version.0 as libc::c_int);
                 attributes.push(gl::wgl_extra::CONTEXT_MINOR_VERSION_ARB as libc::c_int);
                 attributes.push(version.1 as libc::c_int);
             }
 
-            if builder_debug {
+            if builder.gl_debug {
                 attributes.push(gl::wgl_extra::CONTEXT_FLAGS_ARB as libc::c_int);
                 attributes.push(gl::wgl_extra::CONTEXT_DEBUG_BIT_ARB as libc::c_int);
             }
@@ -348,7 +411,7 @@ pub fn new_window(builder_dimensions: Option<(u32, u32)>, builder_title: String,
         };
 
         // calling SetForegroundWindow if fullscreen
-        if builder_monitor.is_some() {
+        if builder.monitor.is_some() {
             unsafe { winapi::SetForegroundWindow(real_window) };
         }
 
@@ -378,7 +441,7 @@ pub fn new_window(builder_dimensions: Option<(u32, u32)>, builder_title: String,
         };
 
         // handling vsync
-        if builder_vsync {
+        if builder.vsync {
             if extra_functions.SwapIntervalEXT.is_loaded() {
                 unsafe { gl::wgl::MakeCurrent(hdc as *const libc::c_void, context) };
                 if unsafe { extra_functions.SwapIntervalEXT(1) } == 0 {
@@ -602,44 +665,3 @@ extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
         }
     }
 }
-
-/*fn hints_to_pixelformat(hints: &Hints) -> winapi::PIXELFORMATDESCRIPTOR {
-    use std::mem;
-
-    winapi::PIXELFORMATDESCRIPTOR {
-        nSize: size_of::<winapi::PIXELFORMATDESCRIPTOR>(),
-        nVersion: 1,
-        dwFlags:
-            if hints.stereo { PFD_STEREO } else { 0 },
-        iPixelType: PFD_TYPE_RGBA,
-        cColorBits: hints.red_bits + hints.green_bits + hints.blue_bits,
-        cRedBits: 
-
-    pub nSize: WORD,
-    pub nVersion: WORD,
-    pub dwFlags: DWORD,
-    pub iPixelType: BYTE,
-    pub cColorBits: BYTE,
-    pub cRedBits: BYTE,
-    pub cRedShift: BYTE,
-    pub cGreenBits: BYTE,
-    pub cGreenShift: BYTE,
-    pub cBlueBits: BYTE,
-    pub cBlueShift: BYTE,
-    pub cAlphaBits: BYTE,
-    pub cAlphaShift: BYTE,
-    pub cAccumBits: BYTE,
-    pub cAccumRedBits: BYTE,
-    pub cAccumGreenBits: BYTE,
-    pub cAccumBlueBits: BYTE,
-    pub cAccumAlphaBits: BYTE,
-    pub cDepthBits: BYTE,
-    pub cStencilBits: BYTE,
-    pub cAuxBuffers: BYTE,
-    pub iLayerType: BYTE,
-    pub bReserved: BYTE,
-    pub dwLayerMask: DWORD,
-    pub dwVisibleMask: DWORD,
-    pub dwDamageMask: DWORD,
-    }
-}*/
