@@ -121,10 +121,10 @@ impl Window {
                 attribute_list.push_all(&[ffi::egl::RENDERABLE_TYPE as i32,
                                          ffi::egl::OPENGL_ES2_BIT as i32]);
             }
-            attribute_list.push_all(&[ffi::egl::RED_SIZE as i32, 1]);
-            attribute_list.push_all(&[ffi::egl::GREEN_SIZE as i32, 1]);
-            attribute_list.push_all(&[ffi::egl::BLUE_SIZE as i32, 1]);
-            attribute_list.push_all(&[ffi::egl::DEPTH_SIZE as i32, 1]);
+            attribute_list.push_all(&[ffi::egl::RED_SIZE as i32, 8]);
+            attribute_list.push_all(&[ffi::egl::GREEN_SIZE as i32, 8]);
+            attribute_list.push_all(&[ffi::egl::BLUE_SIZE as i32, 8]);
+            attribute_list.push_all(&[ffi::egl::DEPTH_SIZE as i32, 8]);
             attribute_list.push(ffi::egl::NONE as i32);
 
             let mut num_config: ffi::egl::types::EGLint = mem::uninitialized();
