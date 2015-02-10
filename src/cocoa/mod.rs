@@ -441,7 +441,7 @@ impl Window {
                     NSMouseMoved            => {
                         let window_point = NSEvent::locationInWindow(event);
                         let window = NSEvent::window(event);
-                        let view_point = if window == 0 {
+                        let view_point = if window == nil {
                             let window_rect = self.window.convertRectFromScreen_(NSRect::new(window_point, NSSize::new(0.0, 0.0)));
                             self.view.convertPoint_fromView_(window_rect.origin, nil)
                         } else {
