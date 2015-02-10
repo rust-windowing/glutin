@@ -433,15 +433,14 @@ impl Window {
                     self.is_closed.set(ds.is_closed);
                 }
 
-                match msg_send()(event, selector("type")) {
+                match NSEvent::eventType(event) {
                     NSLeftMouseDown         => { events.push_back(MouseInput(Pressed, MouseButton::Left)); },
                     NSLeftMouseUp           => { events.push_back(MouseInput(Released, MouseButton::Left)); },
                     NSRightMouseDown        => { events.push_back(MouseInput(Pressed, MouseButton::Right)); },
                     NSRightMouseUp          => { events.push_back(MouseInput(Released, MouseButton::Right)); },
                     NSMouseMoved            => {
-                        let window_point: NSPoint = msg_send()(event, selector("locationInWindow"));
-                        // let window_point = event.locationInWindow();
-                        let window: id = msg_send()(event, selector("window"));
+                        let window_point = NSEvent::locationInWindow(event);
+                        let window = NSEvent::window(event);
                         let view_point = if window == 0 {
                             let window_rect = self.window.convertRectFromScreen_(NSRect::new(window_point, NSSize::new(0.0, 0.0)));
                             self.view.convertPoint_fromView_(window_rect.origin, nil)
@@ -526,7 +525,7 @@ impl Window {
     }
 
     pub unsafe fn make_current(&self) {
-        let _: id = msg_send()(self.context, selector("update"));
+        NSOpenGLContext::update(self.context);
         self.context.makeCurrentContext();
     }
 
