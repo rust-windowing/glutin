@@ -7,7 +7,8 @@ use libc;
 
 use BuilderAttribs;
 
-use cocoa::base::{Class, id, YES, NO, NSUInteger, nil, objc_allocateClassPair, class, objc_registerClassPair};
+use cocoa::base::{Class, id, YES, NO, NSUInteger, nil};
+use cocoa::base::{objc_allocateClassPair, class, objc_registerClassPair, objc_disposeClassPair};
 use cocoa::base::{selector, msg_send, msg_send_stret, class_addMethod, class_addIvar};
 use cocoa::base::{object_setInstanceVariable, object_getInstanceVariable};
 use cocoa::appkit;
@@ -124,7 +125,7 @@ impl WindowDelegate {
                     objc_registerClassPair(delegate_class);
                 // Free class at exit
                 rt::at_exit(|| {
-                    // objc_disposeClassPair(delegate_class);
+                    objc_disposeClassPair(delegate_class);
                 });
             });
             delegate_class
