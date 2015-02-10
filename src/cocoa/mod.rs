@@ -221,9 +221,9 @@ impl Window {
         unsafe {
             app.activateIgnoringOtherApps_(YES);
             if builder.visible {
-                window.makeKeyAndOrderFront_(nil);
+                NSWindow::makeKeyAndOrderFront_(window, nil);
             } else {
-                window.makeKeyWindow();
+                NSWindow::makeKeyWindow(window, );
             }
         }
 
@@ -283,13 +283,13 @@ impl Window {
                 None
             } else {
                 let title = NSString::alloc(nil).init_str(title);
-                window.setTitle_(title);
-                window.setAcceptsMouseMovedEvents_(YES);
+                NSWindow::setTitle_(window, title);
+                NSWindow::setAcceptsMouseMovedEvents_(window, YES);
                 if monitor.is_some() {
-                    window.setLevel_(NSMainMenuWindowLevel as i64 + 1);
+                    NSWindow::setLevel_(window, NSMainMenuWindowLevel as i64 + 1);
                 }
                 else {
-                    window.center();
+                    NSWindow::center(window, );
                 }
                 Some(window)
             }
@@ -302,8 +302,8 @@ impl Window {
             if view == nil {
                 None
             } else {
-                view.setWantsBestResolutionOpenGLSurface_(YES);
-                window.setContentView_(view);
+                NSView::setWantsBestResolutionOpenGLSurface_(view, YES);
+                NSWindow::setContentView_(window, view);
                 Some(view)
             }
         }
@@ -353,7 +353,7 @@ impl Window {
     pub fn set_title(&self, title: &str) {
         unsafe {
             let title = NSString::alloc(nil).init_str(title);
-            self.window.setTitle_(title);
+            NSWindow::setTitle_(self.window, title);
         }
     }
 
@@ -442,10 +442,10 @@ impl Window {
                         let window_point = NSEvent::locationInWindow(event);
                         let window = NSEvent::window(event);
                         let view_point = if window == nil {
-                            let window_rect = self.window.convertRectFromScreen_(NSRect::new(window_point, NSSize::new(0.0, 0.0)));
-                            self.view.convertPoint_fromView_(window_rect.origin, nil)
+                            let window_rect = NSWindow::convertRectFromScreen_(self.window, NSRect::new(window_point, NSSize::new(0.0, 0.0)));
+                            NSView::convertPoint_fromView_(self.view, window_rect.origin, nil)
                         } else {
-                            self.view.convertPoint_fromView_(window_point, nil)
+                            NSView::convertPoint_fromView_(self.view, window_point, nil)
                         };
                         let view_rect = NSView::frame(self.view);
                         let scale_factor = self.hidpi_factor();
@@ -453,7 +453,7 @@ impl Window {
                                                      (scale_factor * (view_rect.size.height - view_point.y) as f32) as i32)));
                     },
                     NSKeyDown               => {
-                        let received_c_str = event.characters().UTF8String();
+                        let received_c_str = NSEvent::characters(event).UTF8String();
                         let received_str = CString::from_slice(c_str_to_bytes(&received_c_str));
                         for received_char in from_utf8(received_str.as_bytes()).unwrap().chars() {
                             if received_char.is_ascii() {
@@ -490,7 +490,7 @@ impl Window {
                             events.push_back(alt_modifier.unwrap());
                         }
                     },
-                    NSScrollWheel           => { events.push_back(MouseWheel(event.scrollingDeltaY() as i32)); },
+                    NSScrollWheel           => { events.push_back(MouseWheel(NSEvent::scrollingDeltaY(event) as i32)); },
                     NSOtherMouseDown        => { },
                     NSOtherMouseUp          => { },
                     NSOtherMouseDragged     => { },
@@ -507,7 +507,6 @@ impl Window {
         } else if key_pressed && !NSEvent::modifierFlags(event).contains(keymask) {
             return Some(KeyboardInput(Released, NSEvent::keyCode(event) as u8, Some(key)));
         }
-
         return None;
     }
 
