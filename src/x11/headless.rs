@@ -20,6 +20,8 @@ pub struct HeadlessContext {
 
 impl HeadlessContext {
     pub fn new(builder: BuilderAttribs) -> Result<HeadlessContext, CreationError> {
+        assert!(builder.gl_api != Some(::Api::OpenGlEs) && builder.gl_api != Some(::Api::WebGl));
+
         let dimensions = builder.dimensions.unwrap();
 
         Ok(HeadlessContext {

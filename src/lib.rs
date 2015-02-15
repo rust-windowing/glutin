@@ -182,6 +182,7 @@ struct BuilderAttribs<'a> {
     dimensions: Option<(u32, u32)>,
     title: String,
     monitor: Option<winimpl::MonitorID>,
+    gl_api: Option<Api>,
     gl_version: Option<(u32, u32)>,
     gl_debug: bool,
     vsync: bool,
@@ -203,6 +204,7 @@ impl BuilderAttribs<'static> {
             dimensions: None,
             title: "glutin window".to_string(),
             monitor: None,
+            gl_api: None,
             gl_version: None,
             gl_debug: cfg!(ndebug),
             vsync: false,
@@ -228,6 +230,7 @@ impl<'a> BuilderAttribs<'a> {
             dimensions: self.dimensions,
             title: self.title,
             monitor: self.monitor,
+            gl_api: self.gl_api,
             gl_version: self.gl_version,
             gl_debug: self.gl_debug,
             vsync: self.vsync,
@@ -288,7 +291,8 @@ impl<'a> WindowBuilder<'a> {
     ///
     /// Version is a (major, minor) pair. For example to request OpenGL 3.3
     ///  you would pass `(3, 3)`.
-    pub fn with_gl_version(mut self, version: (u32, u32)) -> WindowBuilder<'a> {
+    pub fn with_gl_version(mut self, api: Api, version: (u32, u32)) -> WindowBuilder<'a> {
+        self.attribs.gl_api = Some(api);
         self.attribs.gl_version = Some(version);
         self
     }
@@ -403,7 +407,8 @@ impl HeadlessRendererBuilder {
     ///
     /// Version is a (major, minor) pair. For example to request OpenGL 3.3
     ///  you would pass `(3, 3)`.
-    pub fn with_gl_version(mut self, version: (u32, u32)) -> HeadlessRendererBuilder {
+    pub fn with_gl_version(mut self, api: Api, version: (u32, u32)) -> HeadlessRendererBuilder {
+        self.attribs.gl_api = Some(api);
         self.attribs.gl_version = Some(version);
         self
     }

@@ -124,6 +124,8 @@ impl Window {
     pub fn new(builder: BuilderAttribs) -> Result<Window, CreationError> {
         use std::{mem, ptr};
 
+        assert!(builder.gl_api != Some(::Api::OpenGl) && builder.gl_api != Some(::Api::WebGl));
+
         if builder.sharing.is_some() {
             unimplemented!()
         }
