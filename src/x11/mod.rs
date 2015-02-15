@@ -6,6 +6,7 @@ pub use self::window::{Window, WindowProxy, MonitorID, get_available_monitors, g
 #[cfg(feature = "window")]
 pub use self::window::{WaitEventsIterator, PollEventsIterator};
 
+mod egl;
 mod ffi;
 
 #[cfg(feature = "headless")]

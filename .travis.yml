@@ -6,7 +6,7 @@ env:
     - secure: "kVjHgK+6ivT5tUleNH/m6+69tPf8gkPNSPLsnXrkMJaIeXSnnKKQegP1O0UCThYAUbbwrUGlrKJUngDxkD8jSANhzAULX9t1iXho41InzYBEErTanXBYF8WO1rK1keKjLwiYw4KuvbiBoSeKabzQRwv0kMttxY57+hKVROr5dSg="
 
 install:
-  - sudo apt-get install libXxf86vm-dev libosmesa6-dev
+  - sudo apt-get install libXxf86vm-dev libosmesa6-dev libgles2-mesa-dev
 
 script:
   - cargo build --verbose
