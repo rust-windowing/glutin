@@ -34,6 +34,8 @@ pub fn new_window(builder: BuilderAttribs<'static>, builder_sharelists: Option<C
     use std::mem;
     use std::os;
 
+    assert!(builder.gl_api != Some(::Api::OpenGlEs) && builder.gl_api != Some(::Api::WebGl));
+
     // initializing variables to be sent to the task
     let title = builder.title.as_slice().utf16_units()
         .chain(Some(0).into_iter()).collect::<Vec<u16>>();    // title to utf16

@@ -336,6 +336,8 @@ impl<'a> Iterator for WaitEventsIterator<'a> {
 impl Window {
     #[cfg(feature = "window")]
     pub fn new(builder: BuilderAttribs) -> Result<Window, CreationError> {
+        assert!(builder.gl_api != Some(::Api::OpenGlEs) && builder.gl_api != Some(::Api::WebGl));
+
         if builder.sharing.is_some() {
             unimplemented!()
         }

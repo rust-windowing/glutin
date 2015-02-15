@@ -7,6 +7,7 @@ use std::cell::Cell;
 use std::sync::atomic::AtomicBool;
 use std::collections::RingBuf;
 use super::ffi;
+use super::egl;
 use std::sync::{Arc, Mutex, Once, ONCE_INIT, Weak};
 use std::sync::{StaticMutex, MUTEX_INIT};
 
@@ -42,12 +43,19 @@ fn with_c_str<F, T>(s: &str, f: F) -> T where F: FnOnce(*const libc::c_char) -> 
 struct XWindow {
     display: *mut ffi::Display,
     window: ffi::Window,
-    context: ffi::GLXContext,
+    context: Context,
     is_fullscreen: bool,
     screen_id: libc::c_int,
     xf86_desk_mode: *mut ffi::XF86VidModeModeInfo,
     ic: ffi::XIC,
     im: ffi::XIM,
+    egl_display: Option<egl::types::EGLDisplay>,
+    egl_surface: Option<egl::types::EGLSurface>,
+}
+
+enum Context {
+    Glx(ffi::GLXContext),
+    Egl(egl::types::EGLContext),
 }
 
 unsafe impl Send for XWindow {}
@@ -59,8 +67,23 @@ unsafe impl Sync for Window {}
 impl Drop for XWindow {
     fn drop(&mut self) {
         unsafe {
-            ffi::glx::MakeCurrent(self.display, 0, ptr::null());
-            ffi::glx::DestroyContext(self.display, self.context);
+            match self.context {
+                Context::Glx(_) => { ffi::glx::MakeCurrent(self.display, 0, ptr::null()); },
+                Context::Egl(_) => { egl::MakeCurrent(self.egl_display.unwrap(), ptr::null(),
+                                                      ptr::null(), ptr::null()); }
+            };
+            
+            if let Some(surface) = self.egl_surface {
+                egl::DestroySurface(self.egl_display.unwrap(), surface);
+            }
+
+            match self.context {
+                Context::Glx(c) => ffi::glx::DestroyContext(self.display, c),
+                Context::Egl(c) => {
+                    egl::DestroyContext(self.egl_display.unwrap(), c);
+                    egl::Terminate(self.egl_display.unwrap());
+                }
+            };
 
             if self.is_fullscreen {
                 ffi::XF86VidModeSwitchToMode(self.display, self.screen_id, self.xf86_desk_mode);
@@ -477,100 +500,182 @@ impl Window {
             }
         }
 
-
         // creating GL context
-        let (context, extra_functions) = unsafe {
-            let mut attributes = Vec::new();
+        let (context, egl_display, egl_surface) = unsafe {
+            if builder.gl_api != Some(::Api::OpenGlEs) {
+                let mut attributes = Vec::new();
 
-            if builder.gl_version.is_some() {
-                let version = builder.gl_version.as_ref().unwrap();
-                attributes.push(ffi::GLX_CONTEXT_MAJOR_VERSION);
-                attributes.push(version.0 as libc::c_int);
-                attributes.push(ffi::GLX_CONTEXT_MINOR_VERSION);
-                attributes.push(version.1 as libc::c_int);
+                if builder.gl_version.is_some() {
+                    let version = builder.gl_version.as_ref().unwrap();
+                    attributes.push(ffi::GLX_CONTEXT_MAJOR_VERSION);
+                    attributes.push(version.0 as libc::c_int);
+                    attributes.push(ffi::GLX_CONTEXT_MINOR_VERSION);
+                    attributes.push(version.1 as libc::c_int);
+                }
+
+                if builder.gl_debug {
+                    attributes.push(ffi::glx_extra::CONTEXT_FLAGS_ARB as libc::c_int);
+                    attributes.push(ffi::glx_extra::CONTEXT_DEBUG_BIT_ARB as libc::c_int);
+                }
+
+                attributes.push(0);
+
+                // loading the extra GLX functions
+                let extra_functions = ffi::glx_extra::Glx::load_with(|addr| {
+                    with_c_str(addr, |s| {
+                        use libc;
+                        ffi::glx::GetProcAddress(s as *const u8) as *const libc::c_void
+                    })
+                });
+
+                let share = if let Some(win) = builder.sharing {
+                    match win.x.context {
+                        Context::Glx(c) => c,
+                        Context::Egl(_) => panic!("Can't share a GLX context with an EGL context")
+                    }
+                } else {
+                    ptr::null()
+                };
+
+                let mut context = if extra_functions.CreateContextAttribsARB.is_loaded() {
+                    extra_functions.CreateContextAttribsARB(display as *mut ffi::glx_extra::types::Display,
+                        fb_config, share, 1, attributes.as_ptr())
+                } else {
+                    ptr::null()
+                };
+
+                if context.is_null() {
+                    context = ffi::glx::CreateContext(display, &mut visual_infos, share, 1)
+                }
+
+                if context.is_null() {
+                    return Err(OsError(format!("GL context creation failed")));
+                }
+
+                // vsync
+                if builder.vsync {
+                    unsafe { ffi::glx::MakeCurrent(display, window, context) };
+
+                    if extra_functions.SwapIntervalEXT.is_loaded() {
+                        // this should be the most common extension
+                        unsafe {
+                            extra_functions.SwapIntervalEXT(display as *mut _, window, 1);
+                        }
+
+                        // checking that it worked
+                        if builder.strict {
+                            let mut swap = unsafe { mem::uninitialized() };
+                            unsafe {
+                                ffi::glx::QueryDrawable(display, window,
+                                                        ffi::glx_extra::SWAP_INTERVAL_EXT as i32,
+                                                        &mut swap);
+                            }
+
+                            if swap != 1 {
+                                return Err(OsError(format!("Couldn't setup vsync: expected \
+                                                            interval `1` but got `{}`", swap)));
+                            }
+                        }
+
+                    // GLX_MESA_swap_control is not official
+                    /*} else if extra_functions.SwapIntervalMESA.is_loaded() {
+                        unsafe {
+                            extra_functions.SwapIntervalMESA(1);
+                        }*/
+
+                    } else if extra_functions.SwapIntervalSGI.is_loaded() {
+                        unsafe {
+                            extra_functions.SwapIntervalSGI(1);
+                        }
+
+                    } else if builder.strict {
+                        return Err(OsError(format!("Couldn't find any available vsync extension")));
+                    }
+
+                    unsafe { ffi::glx::MakeCurrent(display, 0, ptr::null()) };
+                }
+
+                (Context::Glx(context), None, None)
+
+            } else {        // GLES
+                assert!(builder.sharing.is_none());     // FIXME: not implemented
+
+                let display = unsafe {
+                    let display = egl::GetDisplay(display);
+                    if display.is_null() {
+                        return Err(OsError("No EGL display connection available".to_string()));
+                    }
+                    display
+                };
+
+                if egl::Initialize(display, ptr::null_mut(), ptr::null_mut()) == 0 {
+                    return Err(OsError(format!("eglInitialize failed")))
+                };
+
+                let mut attribute_list = vec!();
+                attribute_list.push_all(&[
+                    egl::RENDERABLE_TYPE as i32,
+                    egl::OPENGL_ES2_BIT as i32,
+                ]);
+
+                {
+                    let (red, green, blue) = match builder.color_bits.unwrap_or(24) {
+                        24 => (8, 8, 8),
+                        16 => (6, 5, 6),
+                        _ => panic!("Bad color_bits"),
+                    };
+                    attribute_list.push_all(&[egl::RED_SIZE as i32, red]);
+                    attribute_list.push_all(&[egl::GREEN_SIZE as i32, green]);
+                    attribute_list.push_all(&[egl::BLUE_SIZE as i32, blue]);
+                }
+
+                attribute_list.push_all(&[
+                    egl::DEPTH_SIZE as i32,
+                    builder.depth_bits.unwrap_or(8) as i32,
+                ]);
+
+                attribute_list.push(egl::NONE as i32);
+
+                let config = unsafe {
+                    let mut num_config: egl::types::EGLint = mem::uninitialized();
+                    let mut config: egl::types::EGLConfig = mem::uninitialized();
+                    if egl::ChooseConfig(display, attribute_list.as_ptr(), &mut config, 1,
+                        &mut num_config) == 0
+                    {
+                        return Err(OsError(format!("eglChooseConfig failed")))
+                    }
+
+                    if num_config <= 0 {
+                        return Err(OsError(format!("eglChooseConfig returned no available config")))
+                    }
+
+                    config
+                };
+
+                let context = unsafe {
+                    let mut context_attributes = vec!();
+                    context_attributes.push_all(&[egl::CONTEXT_CLIENT_VERSION as i32, 2]);
+                    context_attributes.push(egl::NONE as i32);
+
+                    let context = egl::CreateContext(display, config, ptr::null(),
+                                                          context_attributes.as_ptr());
+                    if context.is_null() {
+                        return Err(OsError(format!("eglCreateContext failed")))
+                    }
+                    context
+                };
+
+                let surface = unsafe {
+                    let surface = egl::CreateWindowSurface(display, config, window, ptr::null());
+                    if surface.is_null() {
+                        return Err(OsError(format!("eglCreateWindowSurface failed")))
+                    }
+                    surface
+                };
+
+                (Context::Egl(context), Some(display), Some(surface))
             }
-
-            if builder.gl_debug {
-                attributes.push(ffi::glx_extra::CONTEXT_FLAGS_ARB as libc::c_int);
-                attributes.push(ffi::glx_extra::CONTEXT_DEBUG_BIT_ARB as libc::c_int);
-            }
-
-            attributes.push(0);
-
-            // loading the extra GLX functions
-            let extra_functions = ffi::glx_extra::Glx::load_with(|addr| {
-                with_c_str(addr, |s| {
-                    use libc;
-                    ffi::glx::GetProcAddress(s as *const u8) as *const libc::c_void
-                })
-            });
-
-            let share = if let Some(win) = builder.sharing {
-                win.x.context
-            } else {
-                ptr::null()
-            };
-
-            let mut context = if extra_functions.CreateContextAttribsARB.is_loaded() {
-                extra_functions.CreateContextAttribsARB(display as *mut ffi::glx_extra::types::Display,
-                    fb_config, share, 1, attributes.as_ptr())
-            } else {
-                ptr::null()
-            };
-
-            if context.is_null() {
-                context = ffi::glx::CreateContext(display, &mut visual_infos, share, 1)
-            }
-
-            if context.is_null() {
-                return Err(OsError(format!("GL context creation failed")));
-            }
-
-            (context, extra_functions)
         };
-
-        // vsync
-        if builder.vsync {
-            unsafe { ffi::glx::MakeCurrent(display, window, context) };
-
-            if extra_functions.SwapIntervalEXT.is_loaded() {
-                // this should be the most common extension
-                unsafe {
-                    extra_functions.SwapIntervalEXT(display as *mut _, window, 1);
-                }
-
-                // checking that it worked
-                if builder.strict {
-                    let mut swap = unsafe { mem::uninitialized() };
-                    unsafe {
-                        ffi::glx::QueryDrawable(display, window,
-                                                ffi::glx_extra::SWAP_INTERVAL_EXT as i32,
-                                                &mut swap);
-                    }
-
-                    if swap != 1 {
-                        return Err(OsError(format!("Couldn't setup vsync: expected \
-                                                    interval `1` but got `{}`", swap)));
-                    }
-                }
-
-            // GLX_MESA_swap_control is not official
-            /*} else if extra_functions.SwapIntervalMESA.is_loaded() {
-                unsafe {
-                    extra_functions.SwapIntervalMESA(1);
-                }*/
-
-            } else if extra_functions.SwapIntervalSGI.is_loaded() {
-                unsafe {
-                    extra_functions.SwapIntervalSGI(1);
-                }
-
-            } else if builder.strict {
-                return Err(OsError(format!("Couldn't find any available vsync extension")));
-            }
-
-            unsafe { ffi::glx::MakeCurrent(display, 0, ptr::null()) };
-        }
 
         // creating the window object
         let window = Window {
@@ -583,6 +688,8 @@ impl Window {
                 screen_id: screen_id,
                 is_fullscreen: builder.monitor.is_some(),
                 xf86_desk_mode: xf86_desk_mode,
+                egl_display: egl_display,
+                egl_surface: egl_surface,
             }),
             is_closed: AtomicBool::new(false),
             wm_delete_window: wm_delete_window,
@@ -682,24 +789,44 @@ impl Window {
     }
 
     pub unsafe fn make_current(&self) {
-        let res = ffi::glx::MakeCurrent(self.x.display, self.x.window, self.x.context);
-        if res == 0 {
-            panic!("glx::MakeCurrent failed");
+        match self.x.context {
+            Context::Glx(context) => {
+                let res = ffi::glx::MakeCurrent(self.x.display, self.x.window, context);
+                if res == 0 {
+                    panic!("MakeCurrent failed");
+                }
+            },
+            Context::Egl(context) => {
+                egl::MakeCurrent(self.x.egl_display.unwrap(), self.x.egl_surface.unwrap(),
+                                 self.x.egl_surface.unwrap(), context);
+            }
         }
     }
 
     pub fn get_proc_address(&self, addr: &str) -> *const () {
         use std::mem;
+        use std::ffi::CString;
+
+        let addr = CString::from_slice(addr.as_bytes());
+        let addr = addr.as_slice_with_nul().as_ptr();
 
         unsafe {
-            with_c_str(addr, |s| {
-                ffi::glx::GetProcAddress(mem::transmute(s)) as *const ()
-            })
+            match self.x.context {
+                Context::Glx(_) => ffi::glx::GetProcAddress(mem::transmute(addr)) as *const (),
+                Context::Egl(_) => egl::GetProcAddress(addr) as *const ()
+            }
         }
     }
 
     pub fn swap_buffers(&self) {
-        unsafe { ffi::glx::SwapBuffers(self.x.display, self.x.window) }
+        match self.x.context {
+            Context::Glx(_) => {
+                unsafe { ffi::glx::SwapBuffers(self.x.display, self.x.window) }
+            },
+            Context::Egl(_) => {
+                unsafe { egl::SwapBuffers(self.x.egl_display.unwrap(), self.x.egl_surface.unwrap()); }
+            }
+        }
     }
 
     pub fn platform_display(&self) -> *mut libc::c_void {
