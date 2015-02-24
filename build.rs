@@ -65,17 +65,17 @@ fn main() {
                                         "3.2", "core", &mut file).unwrap();
     }
 
-    // TODO: only build the bindings below if we run tests/examples
-
-    let mut file = File::create(&dest.join("test_gl_bindings.rs")).unwrap();
-    gl_generator::generate_bindings(gl_generator::StructGenerator,
-                                    gl_generator::registry::Ns::Gl,
-                                    khronos_api::GL_XML, vec![],
-                                    "1.1", "core", &mut file).unwrap();
-
-    let mut file = File::create(&dest.join("test_gles1_bindings.rs")).unwrap();
-    gl_generator::generate_bindings(gl_generator::StructGenerator,
-                                    gl_generator::registry::Ns::Gles1,
-                                    khronos_api::GL_XML, vec![],
-                                    "1.1", "core", &mut file).unwrap();
+    if os::getenv("PROFILE").unwrap() == "test" {
+        let mut file = File::create(&dest.join("test_gl_bindings.rs")).unwrap();
+        gl_generator::generate_bindings(gl_generator::StructGenerator,
+                                        gl_generator::registry::Ns::Gl,
+                                        khronos_api::GL_XML, vec![],
+                                        "1.1", "core", &mut file).unwrap();
+    
+        let mut file = File::create(&dest.join("test_gles1_bindings.rs")).unwrap();
+        gl_generator::generate_bindings(gl_generator::StructGenerator,
+                                        gl_generator::registry::Ns::Gles1,
+                                        khronos_api::GL_XML, vec![],
+                                        "1.1", "core", &mut file).unwrap();
+    }
 }
