@@ -133,7 +133,7 @@ impl<'a> Iterator for PollEventsIterator<'a> {
 
             match xev.kind() {
                 ffi::KeymapNotify => {
-                    unsafe { ffi::XRefreshKeyboardMapping(&xev as *const ffi::XEvent as *const _) }
+                    unsafe { ffi::XRefreshKeyboardMapping(&mut xev as *mut ffi::XEvent as *mut _) }
                 },
 
                 ffi::ClientMessage => {
