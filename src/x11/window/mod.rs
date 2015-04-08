@@ -67,7 +67,7 @@ impl Drop for XWindow {
         unsafe {
             // we don't call MakeCurrent(0, 0) because we are not sure that the context
             // is still the current one
-            ffi::glx::DestroyContext(mem::transmute(self.display), self.context);
+            ffi::glx::DestroyContext(self.display as *mut _, self.context);
 
             if self.is_fullscreen {
                 ffi::XF86VidModeSwitchToMode(self.display, self.screen_id, self.xf86_desk_mode);
@@ -89,7 +89,7 @@ pub struct WindowProxy {
 
 impl WindowProxy {
     pub fn wakeup_event_loop(&self) {
-        let mut xev = ffi::XClientMessageEvent {
+        let xev: ffi::XEvent = From::from(ffi::XClientMessageEvent {
             kind: ffi::ClientMessage,
             window: self.x.window,
             format: 32,
@@ -98,10 +98,10 @@ impl WindowProxy {
             send_event: 0,
             display: self.x.display,
             data: unsafe { mem::zeroed() },
-        };
+        });
 
         unsafe {
-            ffi::XSendEvent(self.x.display, self.x.window, 0, 0, mem::transmute(&mut xev));
+            ffi::XSendEvent(self.x.display, self.x.window, 0, 0, &xev);
             ffi::XFlush(self.x.display);
         }
     }
@@ -133,14 +133,14 @@ impl<'a> Iterator for PollEventsIterator<'a> {
 
             match xev.kind() {
                 ffi::KeymapNotify => {
-                    unsafe { ffi::XRefreshKeyboardMapping(mem::transmute(&xev)) }
+                    unsafe { ffi::XRefreshKeyboardMapping(&xev as *const ffi::XEvent as *const _) }
                 },
 
                 ffi::ClientMessage => {
                     use events::Event::{Closed, Awakened};
                     use std::sync::atomic::Ordering::Relaxed;
 
-                    let client_msg: &ffi::XClientMessageEvent = unsafe { mem::transmute(&xev) };
+                    let client_msg: ffi::XClientMessageEvent = From::from(xev);
 
                     if client_msg.data.get_long(0) == self.window.wm_delete_window as libc::c_long {
                         self.window.is_closed.store(true, Relaxed);
@@ -152,7 +152,7 @@ impl<'a> Iterator for PollEventsIterator<'a> {
 
                 ffi::ConfigureNotify => {
                     use events::Event::Resized;
-                    let cfg_event: &ffi::XConfigureEvent = unsafe { mem::transmute(&xev) };
+                    let cfg_event: ffi::XConfigureEvent = From::from(xev);
                     let (current_width, current_height) = self.window.current_size.get();
                     if current_width != cfg_event.width || current_height != cfg_event.height {
                         self.window.current_size.set((cfg_event.width, cfg_event.height));
@@ -162,18 +162,17 @@ impl<'a> Iterator for PollEventsIterator<'a> {
 
                 ffi::MotionNotify => {
                     use events::Event::MouseMoved;
-                    let event: &ffi::XMotionEvent = unsafe { mem::transmute(&xev) };
+                    let event: ffi::XMotionEvent = From::from(xev);
                     return Some(MouseMoved((event.x as i32, event.y as i32)));
                 },
 
                 ffi::KeyPress | ffi::KeyRelease => {
                     use events::Event::{KeyboardInput, ReceivedCharacter};
                     use events::ElementState::{Pressed, Released};
-                    let event: &mut ffi::XKeyEvent = unsafe { mem::transmute(&xev) };
+                    let mut event: ffi::XKeyEvent = From::from(xev);
 
                     if event.kind == ffi::KeyPress {
-                        let raw_ev: *mut ffi::XKeyEvent = event;
-                        unsafe { ffi::XFilterEvent(mem::transmute(raw_ev), self.window.x.window) };
+                        unsafe { ffi::XFilterEvent(&mut event as *mut ffi::XKeyEvent as *mut _, self.window.x.window) };
                     }
 
                     let state = if xev.kind() == ffi::KeyPress { Pressed } else { Released };
@@ -182,8 +181,7 @@ impl<'a> Iterator for PollEventsIterator<'a> {
                         use std::str;
 
                         let mut buffer: [u8; 16] = [mem::uninitialized(); 16];
-                        let raw_ev: *mut ffi::XKeyEvent = event;
-                        let count = ffi::Xutf8LookupString(self.window.x.ic, mem::transmute(raw_ev),
+                        let count = ffi::Xutf8LookupString(self.window.x.ic, &event,
                             mem::transmute(buffer.as_mut_ptr()),
                             buffer.len() as libc::c_int, ptr::null_mut(), ptr::null_mut());
 
@@ -211,7 +209,7 @@ impl<'a> Iterator for PollEventsIterator<'a> {
                     use events::ElementState::{Pressed, Released};
                     use events::MouseButton::{Left, Right, Middle};
 
-                    let event: &ffi::XButtonEvent = unsafe { mem::transmute(&xev) };
+                    let event: ffi::XButtonEvent = From::from(xev);
 
                     let state = if xev.kind() == ffi::ButtonPress { Pressed } else { Released };
 
@@ -381,7 +379,7 @@ impl Window {
         // creating the color map
         let cmap = unsafe {
             let cmap = ffi::XCreateColormap(display, root,
-                mem::transmute(visual_infos.visual), ffi::AllocNone);
+                visual_infos.visual as *mut _, ffi::AllocNone);
             // TODO: error checking?
             cmap
         };
@@ -413,7 +411,7 @@ impl Window {
         let window = unsafe {
             let win = ffi::XCreateWindow(display, root, 0, 0, dimensions.0 as libc::c_uint,
                 dimensions.1 as libc::c_uint, 0, visual_infos.depth, ffi::InputOutput,
-                mem::transmute(visual_infos.visual), window_attributes,
+                visual_infos.visual as *mut _, window_attributes,
                 &mut set_win_attr);
             win
         };
