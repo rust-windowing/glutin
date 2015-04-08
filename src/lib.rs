@@ -257,6 +257,7 @@ pub struct BuilderAttribs<'a> {
     color_bits: Option<u8>,
     alpha_bits: Option<u8>,
     stereoscopy: bool,
+    srgb: Option<bool>,
 }
 
 impl BuilderAttribs<'static> {
@@ -278,6 +279,7 @@ impl BuilderAttribs<'static> {
             color_bits: None,
             alpha_bits: None,
             stereoscopy: false,
+            srgb: None,
         }
     }
 }
@@ -303,6 +305,7 @@ impl<'a> BuilderAttribs<'a> {
             color_bits: self.color_bits,
             alpha_bits: self.alpha_bits,
             stereoscopy: self.stereoscopy,
+            srgb: self.srgb,
         };
 
         (new_attribs, sharing)
@@ -334,6 +337,16 @@ impl<'a> BuilderAttribs<'a> {
 
             if !format.stereoscopy && self.stereoscopy {
                 continue;
+            }
+
+            if self.multisampling.is_some() && format.multisampling.is_none() {
+                continue;
+            }
+
+            if let Some(srgb) = self.srgb {
+                if srgb != format.srgb {
+                    continue;
+                }
             }
 
             current_software_result = Some((id.clone(), format.clone()));
