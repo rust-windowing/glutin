@@ -329,7 +329,7 @@ impl Window {
 
             let mut num_fb: libc::c_int = mem::uninitialized();
 
-            let fb = ffi::glx::ChooseFBConfig(mem::transmute(display), ffi::XDefaultScreen(display),
+            let fb = ffi::glx::ChooseFBConfig(display as *mut _, ffi::XDefaultScreen(display),
                 visual_attributes.as_ptr(), &mut num_fb);
             if fb.is_null() {
                 return Err(OsError(format!("glx::ChooseFBConfig failed")));
@@ -366,7 +366,7 @@ impl Window {
 
         // getting the visual infos
         let mut visual_infos: ffi::glx::types::XVisualInfo = unsafe {
-            let vi = ffi::glx::GetVisualFromFBConfig(mem::transmute(display), fb_config);
+            let vi = ffi::glx::GetVisualFromFBConfig(display as *mut _, fb_config);
             if vi.is_null() {
                 return Err(OsError(format!("glx::ChooseVisual failed")));
             }
@@ -529,7 +529,7 @@ impl Window {
             };
 
             if context.is_null() {
-                context = ffi::glx::CreateContext(mem::transmute(display), &mut visual_infos, share, 1)
+                context = ffi::glx::CreateContext(display as *mut _, &mut visual_infos, share, 1)
             }
 
             if context.is_null() {
@@ -541,7 +541,7 @@ impl Window {
 
         // vsync
         if builder.vsync {
-            unsafe { ffi::glx::MakeCurrent(mem::transmute(display), window, context) };
+            unsafe { ffi::glx::MakeCurrent(display as *mut _, window, context) };
 
             if extra_functions.SwapIntervalEXT.is_loaded() {
                 // this should be the most common extension
@@ -553,7 +553,7 @@ impl Window {
                 if builder.strict {
                     let mut swap = unsafe { mem::uninitialized() };
                     unsafe {
-                        ffi::glx::QueryDrawable(mem::transmute(display), window,
+                        ffi::glx::QueryDrawable(display as *mut _, window,
                                                 ffi::glx_extra::SWAP_INTERVAL_EXT as i32,
                                                 &mut swap);
                     }
@@ -579,7 +579,7 @@ impl Window {
                 return Err(OsError(format!("Couldn't find any available vsync extension")));
             }
 
-            unsafe { ffi::glx::MakeCurrent(mem::transmute(display), 0, ptr::null()) };
+            unsafe { ffi::glx::MakeCurrent(display as *mut _, 0, ptr::null()) };
         }
 
         // creating the window object
@@ -693,7 +693,7 @@ impl Window {
     }
 
     pub unsafe fn make_current(&self) {
-        let res = ffi::glx::MakeCurrent(mem::transmute(self.x.display), self.x.window, self.x.context);
+        let res = ffi::glx::MakeCurrent(self.x.display as *mut _, self.x.window, self.x.context);
         if res == 0 {
             panic!("glx::MakeCurrent failed");
         }
@@ -714,7 +714,7 @@ impl Window {
     }
 
     pub fn swap_buffers(&self) {
-        unsafe { ffi::glx::SwapBuffers(mem::transmute(self.x.display), self.x.window) }
+        unsafe { ffi::glx::SwapBuffers(self.x.display as *mut _, self.x.window) }
     }
 
     pub fn platform_display(&self) -> *mut libc::c_void {
