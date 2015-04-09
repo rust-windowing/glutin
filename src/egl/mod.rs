@@ -16,7 +16,7 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new(builder: BuilderAttribs, native_window: ffi::EGLNativeDisplayType)
+    pub fn new(builder: BuilderAttribs, native_window: ffi::EGLNativeWindowType)
                -> Result<Context, CreationError>
     {
         if builder.sharing.is_some() {

@@ -8,6 +8,8 @@ use std::sync::atomic::AtomicBool;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex, Once, ONCE_INIT};
 
+use egl::Context as EglContext;
+
 use super::ffi;
 use super::glx_context::Context as GlxContext;
 
@@ -52,12 +54,18 @@ fn with_c_str<F, T>(s: &str, f: F) -> T where F: FnOnce(*const libc::c_char) -> 
 struct XWindow {
     display: *mut ffi::Display,
     window: ffi::Window,
-    context: GlxContext,
+    context: Context,
     is_fullscreen: bool,
     screen_id: libc::c_int,
     xf86_desk_mode: *mut ffi::XF86VidModeModeInfo,
     ic: ffi::XIC,
     im: ffi::XIM,
+}
+
+enum Context {
+    Glx(GlxContext),
+    Egl(EglContext),
+    None,
 }
 
 unsafe impl Send for XWindow {}
@@ -69,6 +77,8 @@ unsafe impl Sync for Window {}
 impl Drop for XWindow {
     fn drop(&mut self) {
         unsafe {
+            self.context = Context::None;
+
             if self.is_fullscreen {
                 ffi::XF86VidModeSwitchToMode(self.display, self.screen_id, self.xf86_desk_mode);
                 ffi::XF86VidModeSetViewPort(self.display, self.screen_id, 0, 0);
@@ -480,7 +490,18 @@ impl Window {
 
         let is_fullscreen = builder.monitor.is_some();
         // creating the context
-        let context = try!(GlxContext::new(builder, display, window, fb_config, visual_infos));
+        let context = match builder.gl_version {
+            GlRequest::Latest | GlRequest::Specific(Api::OpenGl, _) | GlRequest::GlThenGles { .. } => {
+                Context::Glx(try!(GlxContext::new(builder, display, window,
+                                                  fb_config, visual_infos)))
+            },
+            GlRequest::Specific(Api::OpenGlEs, _) => {
+                Context::Egl(try!(EglContext::new(builder, window)))
+            },
+            GlRequest::Specific(_, _) => {
+                return Err(CreationError::NotSupported);
+            },
+        };
 
         // creating the window object
         let window = Window {
@@ -593,19 +614,35 @@ impl Window {
     }
 
     pub unsafe fn make_current(&self) {
-        self.x.context.make_current();
+        match self.x.context {
+            Context::Glx(ref ctxt) => ctxt.make_current(),
+            Context::Egl(ref ctxt) => ctxt.make_current(),
+            Context::None => {}
+        }
     }
 
     pub fn is_current(&self) -> bool {
-        self.x.context.is_current()
+        match self.x.context {
+            Context::Glx(ref ctxt) => ctxt.is_current(),
+            Context::Egl(ref ctxt) => ctxt.is_current(),
+            Context::None => panic!()
+        }
     }
 
     pub fn get_proc_address(&self, addr: &str) -> *const () {
-        self.x.context.get_proc_address(addr)
+        match self.x.context {
+            Context::Glx(ref ctxt) => ctxt.get_proc_address(addr),
+            Context::Egl(ref ctxt) => ctxt.get_proc_address(addr),
+            Context::None => ptr::null()
+        }
     }
 
     pub fn swap_buffers(&self) {
-        self.x.context.swap_buffers()
+        match self.x.context {
+            Context::Glx(ref ctxt) => ctxt.swap_buffers(),
+            Context::Egl(ref ctxt) => ctxt.swap_buffers(),
+            Context::None => {}
+        }
     }
 
     pub fn platform_display(&self) -> *mut libc::c_void {
@@ -618,7 +655,11 @@ impl Window {
 
     /// See the docs in the crate root file.
     pub fn get_api(&self) -> ::Api {
-        self.x.context.get_api()
+        match self.x.context {
+            Context::Glx(ref ctxt) => ctxt.get_api(),
+            Context::Egl(ref ctxt) => ctxt.get_api(),
+            Context::None => panic!()
+        }
     }
 
     pub fn set_window_resize_callback(&mut self, _: Option<fn(u32, u32)>) {
