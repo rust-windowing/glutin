@@ -7,6 +7,7 @@ pub use self::window::{Window, WindowProxy, MonitorID, get_available_monitors, g
 pub use self::window::{WaitEventsIterator, PollEventsIterator};
 
 mod ffi;
+mod glx_context;
 
 #[cfg(feature = "headless")]
 mod headless;
