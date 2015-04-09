@@ -496,7 +496,7 @@ impl Window {
                                                   fb_config, visual_infos)))
             },
             GlRequest::Specific(Api::OpenGlEs, _) => {
-                Context::Egl(try!(EglContext::new(builder, window)))
+                Context::Egl(try!(EglContext::new(builder, Some(display as *const _), window)))
             },
             GlRequest::Specific(_, _) => {
                 return Err(CreationError::NotSupported);

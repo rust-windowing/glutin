@@ -16,15 +16,15 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new(builder: BuilderAttribs, native_window: ffi::EGLNativeWindowType)
-               -> Result<Context, CreationError>
+    pub fn new(builder: BuilderAttribs, native_display: Option<ffi::EGLNativeDisplayType>,
+               native_window: ffi::EGLNativeWindowType) -> Result<Context, CreationError>
     {
         if builder.sharing.is_some() {
             unimplemented!()
         }
 
         let display = unsafe {
-            let display = ffi::egl::GetDisplay(mem::transmute(ffi::egl::DEFAULT_DISPLAY));
+            let display = ffi::egl::GetDisplay(native_display.unwrap_or(mem::transmute(ffi::egl::DEFAULT_DISPLAY)));
             if display.is_null() {
                 return Err(CreationError::OsError("No EGL display connection available".to_string()));
             }
