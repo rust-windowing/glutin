@@ -283,6 +283,30 @@ impl BuilderAttribs<'static> {
     }
 }
 
+impl Clone for BuilderAttribs<'static> {
+    fn clone(&self) -> BuilderAttribs<'static> {
+        BuilderAttribs {
+            headless: self.headless,
+            strict: self.strict,
+            sharing: None,
+            dimensions: self.dimensions,
+            title: self.title.clone(),
+            monitor: self.monitor.clone(),
+            gl_version: self.gl_version,
+            gl_debug: self.gl_debug,
+            vsync: self.vsync,
+            visible: self.visible,
+            multisampling: self.multisampling,
+            depth_bits: self.depth_bits,
+            stencil_bits: self.stencil_bits,
+            color_bits: self.color_bits,
+            alpha_bits: self.alpha_bits,
+            stereoscopy: self.stereoscopy,
+            srgb: self.srgb,
+        }
+    }
+}
+
 impl<'a> BuilderAttribs<'a> {
     fn extract_non_static(mut self) -> (BuilderAttribs<'static>, Option<&'a platform::Window>) {
         let sharing = self.sharing.take();

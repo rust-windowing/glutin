@@ -19,6 +19,7 @@ use BuilderAttribs;
 pub use self::headless::HeadlessContext;
 pub use self::monitor::{MonitorID, get_available_monitors, get_primary_monitor};
 
+use egl;
 use winapi;
 use user32;
 use kernel32;
@@ -54,9 +55,6 @@ pub struct Window {
 
     /// The current cursor state.
     cursor_state: Arc<Mutex<CursorState>>,
-
-    /// The pixel format that has been used to create this window.
-    pixel_format: PixelFormat,
 }
 
 unsafe impl Send for Window {}
@@ -65,12 +63,19 @@ unsafe impl Sync for Window {}
 /// A simple wrapper that destroys the context when it is destroyed.
 // FIXME: remove `pub` (https://github.com/rust-lang/rust/issues/23585)
 #[doc(hidden)]
-pub struct ContextWrapper(pub winapi::HGLRC);
+pub enum ContextWrapper {
+    Wgl(winapi::HGLRC),
+    Egl(egl::Context),
+    None,
+}
 
 impl Drop for ContextWrapper {
     fn drop(&mut self) {
-        unsafe {
-            gl::wgl::DeleteContext(self.0 as *const libc::c_void);
+        match self {
+            &mut ContextWrapper::Wgl(ctxt) => unsafe {
+                gl::wgl::DeleteContext(ctxt as *const libc::c_void);
+            },
+            _ => {}
         }
     }
 }
@@ -101,7 +106,8 @@ impl Window {
     /// See the docs in the crate root file.
     pub fn new(builder: BuilderAttribs) -> Result<Window, CreationError> {
         let (builder, sharing) = builder.extract_non_static();
-        let sharing = sharing.map(|w| init::ContextHack(w.context.0));
+        assert!(sharing.is_none());     // FIXME: <- remove
+        let sharing = None; // FIXME: sharing.map(|w| init::ContextHack(w.context.0));
         init::new_window(builder, sharing)
     }
 
@@ -220,32 +226,56 @@ impl Window {
 
     /// See the docs in the crate root file.
     pub unsafe fn make_current(&self) {
-        // TODO: check return value
-        gl::wgl::MakeCurrent(self.window.1 as *const libc::c_void,
-                             self.context.0 as *const libc::c_void);
+        match self.context {
+            ContextWrapper::Wgl(ctxt) => {
+                // TODO: check return value
+                gl::wgl::MakeCurrent(self.window.1 as *const libc::c_void,
+                                     ctxt as *const libc::c_void);
+            },
+            ContextWrapper::Egl(ref ctxt) => ctxt.make_current(),
+            _ => unreachable!()
+        }
     }
 
     /// See the docs in the crate root file.
     pub fn is_current(&self) -> bool {
-        unsafe { gl::wgl::GetCurrentContext() == self.context.0 as *const libc::c_void }
+        match self.context {
+            ContextWrapper::Wgl(ctxt) => {
+                unsafe { gl::wgl::GetCurrentContext() == ctxt as *const libc::c_void }
+            },
+            ContextWrapper::Egl(ref ctxt) => ctxt.is_current(),
+            _ => unreachable!()
+        }
     }
 
     /// See the docs in the crate root file.
     pub fn get_proc_address(&self, addr: &str) -> *const () {
-        let addr = CString::new(addr.as_bytes()).unwrap();
-        let addr = addr.as_ptr();
+        match self.context {
+            ContextWrapper::Wgl(ctxt) => {
+                let addr = CString::new(addr.as_bytes()).unwrap();
+                let addr = addr.as_ptr();
 
-        unsafe {
-            let p = gl::wgl::GetProcAddress(addr) as *const ();
-            if !p.is_null() { return p; }
-            kernel32::GetProcAddress(self.gl_library, addr) as *const ()
+                unsafe {
+                    let p = gl::wgl::GetProcAddress(addr) as *const ();
+                    if !p.is_null() { return p; }
+                    kernel32::GetProcAddress(self.gl_library, addr) as *const ()
+                }
+            },
+            ContextWrapper::Egl(ref ctxt) => ctxt.get_proc_address(addr),
+            _ => unreachable!()
         }
     }
 
     /// See the docs in the crate root file.
     pub fn swap_buffers(&self) {
-        unsafe {
-            gdi32::SwapBuffers(self.window.1);
+        match self.context {
+            ContextWrapper::Wgl(ctxt) => {
+                unsafe {
+                    gdi32::SwapBuffers(self.window.1);
+                }
+            },
+            ContextWrapper::Egl(ref ctxt) => ctxt.swap_buffers(),
+            _ => unreachable!()
         }
     }
 
@@ -263,7 +293,7 @@ impl Window {
     }
 
     pub fn get_pixel_format(&self) -> PixelFormat {
-        self.pixel_format.clone()
+        unimplemented!();
     }
 
     pub fn set_window_resize_callback(&mut self, _: Option<fn(u32, u32)>) {
@@ -411,6 +441,8 @@ impl Drop for Window {
         unsafe {
             // we don't call MakeCurrent(0, 0) because we are not sure that the context
             // is still the current one
+            self.context = ContextWrapper::None;
+
             user32::PostMessageW(self.window.0, winapi::WM_DESTROY, 0, 0);
         }
     }

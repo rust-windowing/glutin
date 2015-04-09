@@ -521,6 +521,7 @@ pub fn get_primary_monitor() -> MonitorID {
 }
 
 /// Identifier for a monitor.
+#[derive(Clone)]
 pub struct MonitorID(platform::MonitorID);
 
 impl MonitorID {

@@ -1,5 +1,5 @@
 use libc;
-use platform::ffi;
+use winapi;
 
 pub mod egl {
     pub type khronos_utime_nanoseconds_t = super::khronos_utime_nanoseconds_t;
@@ -22,7 +22,4 @@ pub type khronos_ssize_t = libc::c_long;
 pub type EGLint = libc::int32_t;
 pub type EGLNativeDisplayType = *const libc::c_void;
 pub type EGLNativePixmapType = *const libc::c_void;     // FIXME: egl_native_pixmap_t instead
-pub type EGLNativeWindowType = ffi::Window;
-
-#[link(name = "EGL")]
-extern {}
+pub type EGLNativeWindowType = winapi::HWND;

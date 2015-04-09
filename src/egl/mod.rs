@@ -53,11 +53,14 @@ impl Context {
         };
 
         let mut attribute_list = vec!();
+        attribute_list.push(ffi::egl::RENDERABLE_TYPE as i32);
+        attribute_list.push(ffi::egl::OPENGL_ES2_BIT as i32);
 
-        if use_gles2 {
-            attribute_list.push(ffi::egl::RENDERABLE_TYPE as i32);
-            attribute_list.push(ffi::egl::OPENGL_ES2_BIT as i32);
-        }
+        attribute_list.push(ffi::egl::CONFORMANT as i32);
+        attribute_list.push(ffi::egl::OPENGL_ES2_BIT as i32);
+
+        attribute_list.push(ffi::egl::SURFACE_TYPE as i32);
+        attribute_list.push(ffi::egl::WINDOW_BIT as i32);
 
         {
             let (red, green, blue) = match builder.color_bits.unwrap_or(24) {
@@ -105,10 +108,8 @@ impl Context {
 
         let context = unsafe {
             let mut context_attributes = vec!();
-            if use_gles2 {
-                context_attributes.push(ffi::egl::CONTEXT_CLIENT_VERSION as i32);
-                context_attributes.push(2);
-            }
+            context_attributes.push(ffi::egl::CONTEXT_CLIENT_VERSION as i32);
+            context_attributes.push(2);
             context_attributes.push(ffi::egl::NONE as i32);
 
             let context = egl.CreateContext(display, config, ptr::null(),
