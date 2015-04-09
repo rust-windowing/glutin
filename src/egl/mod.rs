@@ -7,16 +7,18 @@ use libc;
 use std::ffi::CString;
 use std::{mem, ptr};
 
-mod ffi;
+pub mod ffi;
 
 pub struct Context {
+    egl: ffi::egl::Egl,
     display: ffi::egl::types::EGLDisplay,
     context: ffi::egl::types::EGLContext,
     surface: ffi::egl::types::EGLSurface,
 }
 
 impl Context {
-    pub fn new(builder: BuilderAttribs, native_display: Option<ffi::EGLNativeDisplayType>,
+    pub fn new(egl: ffi::egl::Egl, builder: BuilderAttribs,
+               native_display: Option<ffi::EGLNativeDisplayType>,
                native_window: ffi::EGLNativeWindowType) -> Result<Context, CreationError>
     {
         if builder.sharing.is_some() {
@@ -24,7 +26,7 @@ impl Context {
         }
 
         let display = unsafe {
-            let display = ffi::egl::GetDisplay(native_display.unwrap_or(mem::transmute(ffi::egl::DEFAULT_DISPLAY)));
+            let display = egl.GetDisplay(native_display.unwrap_or(mem::transmute(ffi::egl::DEFAULT_DISPLAY)));
             if display.is_null() {
                 return Err(CreationError::OsError("No EGL display connection available".to_string()));
             }
@@ -35,7 +37,7 @@ impl Context {
             let mut major: ffi::egl::types::EGLint = mem::uninitialized();
             let mut minor: ffi::egl::types::EGLint = mem::uninitialized();
 
-            if ffi::egl::Initialize(display, &mut major, &mut minor) == 0 {
+            if egl.Initialize(display, &mut major, &mut minor) == 0 {
                 return Err(CreationError::OsError(format!("eglInitialize failed")))
             }
 
@@ -80,8 +82,8 @@ impl Context {
         let config = unsafe {
             let mut num_config: ffi::egl::types::EGLint = mem::uninitialized();
             let mut config: ffi::egl::types::EGLConfig = mem::uninitialized();
-            if ffi::egl::ChooseConfig(display, attribute_list.as_ptr(), &mut config, 1,
-                &mut num_config) == 0
+            if egl.ChooseConfig(display, attribute_list.as_ptr(), &mut config, 1,
+                                &mut num_config) == 0
             {
                 return Err(CreationError::OsError(format!("eglChooseConfig failed")))
             }
@@ -94,7 +96,7 @@ impl Context {
         };
 
         let surface = unsafe {
-            let surface = ffi::egl::CreateWindowSurface(display, config, native_window, ptr::null());
+            let surface = egl.CreateWindowSurface(display, config, native_window, ptr::null());
             if surface.is_null() {
                 return Err(CreationError::OsError(format!("eglCreateWindowSurface failed")))
             }
@@ -109,8 +111,8 @@ impl Context {
             }
             context_attributes.push(ffi::egl::NONE as i32);
 
-            let context = ffi::egl::CreateContext(display, config, ptr::null(),
-                                                  context_attributes.as_ptr());
+            let context = egl.CreateContext(display, config, ptr::null(),
+                                            context_attributes.as_ptr());
             if context.is_null() {
                 return Err(CreationError::OsError(format!("eglCreateContext failed")))
             }
@@ -118,6 +120,7 @@ impl Context {
         };
 
         Ok(Context {
+            egl: egl,
             display: display,
             context: context,
             surface: surface,
@@ -126,7 +129,7 @@ impl Context {
 
     pub fn make_current(&self) {
         let ret = unsafe {
-            ffi::egl::MakeCurrent(self.display, self.surface, self.surface, self.context)
+            self.egl.MakeCurrent(self.display, self.surface, self.surface, self.context)
         };
 
         if ret == 0 {
@@ -135,20 +138,20 @@ impl Context {
     }
 
     pub fn is_current(&self) -> bool {
-        unsafe { ffi::egl::GetCurrentContext() == self.context }
+        unsafe { self.egl.GetCurrentContext() == self.context }
     }
 
     pub fn get_proc_address(&self, addr: &str) -> *const () {
         let addr = CString::new(addr.as_bytes()).unwrap();
         let addr = addr.as_ptr();
         unsafe {
-            ffi::egl::GetProcAddress(addr) as *const ()
+            self.egl.GetProcAddress(addr) as *const ()
         }
     }
 
     pub fn swap_buffers(&self) {
         let ret = unsafe {
-            ffi::egl::SwapBuffers(self.display, self.surface)
+            self.egl.SwapBuffers(self.display, self.surface)
         };
 
         if ret == 0 {
@@ -171,9 +174,9 @@ impl Drop for Context {
         unsafe {
             // we don't call MakeCurrent(0, 0) because we are not sure that the context
             // is still the current one
-            ffi::egl::DestroyContext(self.display, self.context);
-            ffi::egl::DestroySurface(self.display, self.surface);
-            ffi::egl::Terminate(self.display);
+            self.egl.DestroyContext(self.display, self.context);
+            self.egl.DestroySurface(self.display, self.surface);
+            self.egl.Terminate(self.display);
         }
     }
 }
