@@ -125,8 +125,12 @@ impl Context {
     }
 
     pub fn make_current(&self) {
-        unsafe {
-            ffi::egl::MakeCurrent(self.display, self.surface, self.surface, self.context);
+        let ret = unsafe {
+            ffi::egl::MakeCurrent(self.display, self.surface, self.surface, self.context)
+        };
+
+        if ret == 0 {
+            panic!("eglMakeCurrent failed");
         }
     }
 
@@ -143,8 +147,12 @@ impl Context {
     }
 
     pub fn swap_buffers(&self) {
-        unsafe {
-            ffi::egl::SwapBuffers(self.display, self.surface);
+        let ret = unsafe {
+            ffi::egl::SwapBuffers(self.display, self.surface)
+        };
+
+        if ret == 0 {
+            panic!("eglSwapBuffers failed");
         }
     }
 
