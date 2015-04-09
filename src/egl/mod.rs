@@ -93,6 +93,14 @@ impl Context {
             config
         };
 
+        let surface = unsafe {
+            let surface = ffi::egl::CreateWindowSurface(display, config, native_window, ptr::null());
+            if surface.is_null() {
+                return Err(CreationError::OsError(format!("eglCreateWindowSurface failed")))
+            }
+            surface
+        };
+
         let context = unsafe {
             let mut context_attributes = vec!();
             if use_gles2 {
@@ -107,14 +115,6 @@ impl Context {
                 return Err(CreationError::OsError(format!("eglCreateContext failed")))
             }
             context
-        };
-
-        let surface = unsafe {
-            let surface = ffi::egl::CreateWindowSurface(display, config, native_window, ptr::null());
-            if surface.is_null() {
-                return Err(CreationError::OsError(format!("eglCreateWindowSurface failed")))
-            }
-            surface
         };
 
         Ok(Context {
@@ -171,8 +171,8 @@ impl Drop for Context {
         unsafe {
             // we don't call MakeCurrent(0, 0) because we are not sure that the context
             // is still the current one
-            ffi::egl::DestroySurface(self.display, self.surface);
             ffi::egl::DestroyContext(self.display, self.context);
+            ffi::egl::DestroySurface(self.display, self.surface);
             ffi::egl::Terminate(self.display);
         }
     }
