@@ -6,8 +6,10 @@ use std::{mem, ptr};
 use std::cell::Cell;
 use std::sync::atomic::AtomicBool;
 use std::collections::VecDeque;
-use super::ffi;
 use std::sync::{Arc, Mutex, Once, ONCE_INIT};
+
+use super::ffi;
+use super::glx_context::Context as GlxContext;
 
 use Api;
 use CursorState;
@@ -50,7 +52,7 @@ fn with_c_str<F, T>(s: &str, f: F) -> T where F: FnOnce(*const libc::c_char) -> 
 struct XWindow {
     display: *mut ffi::Display,
     window: ffi::Window,
-    context: ffi::GLXContext,
+    context: GlxContext,
     is_fullscreen: bool,
     screen_id: libc::c_int,
     xf86_desk_mode: *mut ffi::XF86VidModeModeInfo,
@@ -67,10 +69,6 @@ unsafe impl Sync for Window {}
 impl Drop for XWindow {
     fn drop(&mut self) {
         unsafe {
-            // we don't call MakeCurrent(0, 0) because we are not sure that the context
-            // is still the current one
-            ffi::glx::DestroyContext(self.display, self.context);
-
             if self.is_fullscreen {
                 ffi::XF86VidModeSwitchToMode(self.display, self.screen_id, self.xf86_desk_mode);
                 ffi::XF86VidModeSetViewPort(self.display, self.screen_id, 0, 0);
@@ -480,109 +478,9 @@ impl Window {
             }
         }
 
-
-        // creating GL context
-        let (context, extra_functions) = unsafe {
-            let mut attributes = Vec::new();
-
-            match builder.gl_version {
-                GlRequest::Latest => {},
-                GlRequest::Specific(Api::OpenGl, (major, minor)) => {
-                    attributes.push(ffi::GLX_CONTEXT_MAJOR_VERSION);
-                    attributes.push(major as libc::c_int);
-                    attributes.push(ffi::GLX_CONTEXT_MINOR_VERSION);
-                    attributes.push(minor as libc::c_int);
-                },
-                GlRequest::Specific(_, _) => panic!("Only OpenGL is supported"),
-                GlRequest::GlThenGles { opengl_version: (major, minor), .. } => {
-                    attributes.push(ffi::GLX_CONTEXT_MAJOR_VERSION);
-                    attributes.push(major as libc::c_int);
-                    attributes.push(ffi::GLX_CONTEXT_MINOR_VERSION);
-                    attributes.push(minor as libc::c_int);
-                },
-            }
-
-            if builder.gl_debug {
-                attributes.push(ffi::glx_extra::CONTEXT_FLAGS_ARB as libc::c_int);
-                attributes.push(ffi::glx_extra::CONTEXT_DEBUG_BIT_ARB as libc::c_int);
-            }
-
-            attributes.push(0);
-
-            // loading the extra GLX functions
-            let extra_functions = ffi::glx_extra::Glx::load_with(|addr| {
-                with_c_str(addr, |s| {
-                    use libc;
-                    ffi::glx::GetProcAddress(s as *const u8) as *const libc::c_void
-                })
-            });
-
-            let share = if let Some(win) = builder.sharing {
-                win.x.context
-            } else {
-                ptr::null()
-            };
-
-            let mut context = if extra_functions.CreateContextAttribsARB.is_loaded() {
-                extra_functions.CreateContextAttribsARB(display as *mut ffi::glx_extra::types::Display,
-                    fb_config, share, 1, attributes.as_ptr())
-            } else {
-                ptr::null()
-            };
-
-            if context.is_null() {
-                context = ffi::glx::CreateContext(display, &mut visual_infos, share, 1)
-            }
-
-            if context.is_null() {
-                return Err(OsError(format!("GL context creation failed")));
-            }
-
-            (context, extra_functions)
-        };
-
-        // vsync
-        if builder.vsync {
-            unsafe { ffi::glx::MakeCurrent(display, window, context) };
-
-            if extra_functions.SwapIntervalEXT.is_loaded() {
-                // this should be the most common extension
-                unsafe {
-                    extra_functions.SwapIntervalEXT(display as *mut _, window, 1);
-                }
-
-                // checking that it worked
-                if builder.strict {
-                    let mut swap = unsafe { mem::uninitialized() };
-                    unsafe {
-                        ffi::glx::QueryDrawable(display, window,
-                                                ffi::glx_extra::SWAP_INTERVAL_EXT as i32,
-                                                &mut swap);
-                    }
-
-                    if swap != 1 {
-                        return Err(OsError(format!("Couldn't setup vsync: expected \
-                                                    interval `1` but got `{}`", swap)));
-                    }
-                }
-
-            // GLX_MESA_swap_control is not official
-            /*} else if extra_functions.SwapIntervalMESA.is_loaded() {
-                unsafe {
-                    extra_functions.SwapIntervalMESA(1);
-                }*/
-
-            } else if extra_functions.SwapIntervalSGI.is_loaded() {
-                unsafe {
-                    extra_functions.SwapIntervalSGI(1);
-                }
-
-            } else if builder.strict {
-                return Err(OsError(format!("Couldn't find any available vsync extension")));
-            }
-
-            unsafe { ffi::glx::MakeCurrent(display, 0, ptr::null()) };
-        }
+        let is_fullscreen = builder.monitor.is_some();
+        // creating the context
+        let context = try!(GlxContext::new(builder, display, window, fb_config, visual_infos));
 
         // creating the window object
         let window = Window {
@@ -593,7 +491,7 @@ impl Window {
                 ic: ic,
                 context: context,
                 screen_id: screen_id,
-                is_fullscreen: builder.monitor.is_some(),
+                is_fullscreen: is_fullscreen,
                 xf86_desk_mode: xf86_desk_mode,
             }),
             is_closed: AtomicBool::new(false),
@@ -695,28 +593,19 @@ impl Window {
     }
 
     pub unsafe fn make_current(&self) {
-        let res = ffi::glx::MakeCurrent(self.x.display, self.x.window, self.x.context);
-        if res == 0 {
-            panic!("glx::MakeCurrent failed");
-        }
+        self.x.context.make_current();
     }
 
     pub fn is_current(&self) -> bool {
-        unsafe { ffi::glx::GetCurrentContext() == self.x.context }
+        self.x.context.is_current()
     }
 
     pub fn get_proc_address(&self, addr: &str) -> *const () {
-        use std::mem;
-
-        unsafe {
-            with_c_str(addr, |s| {
-                ffi::glx::GetProcAddress(mem::transmute(s)) as *const ()
-            })
-        }
+        self.x.context.get_proc_address(addr)
     }
 
     pub fn swap_buffers(&self) {
-        unsafe { ffi::glx::SwapBuffers(self.x.display, self.x.window) }
+        self.x.context.swap_buffers()
     }
 
     pub fn platform_display(&self) -> *mut libc::c_void {
@@ -729,7 +618,7 @@ impl Window {
 
     /// See the docs in the crate root file.
     pub fn get_api(&self) -> ::Api {
-        ::Api::OpenGl
+        self.x.context.get_api()
     }
 
     pub fn set_window_resize_callback(&mut self, _: Option<fn(u32, u32)>) {
