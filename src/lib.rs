@@ -233,27 +233,25 @@ pub struct PixelFormat {
 }
 
 /// Attributes
-// FIXME: remove `pub` (https://github.com/rust-lang/rust/issues/23585)
 #[doc(hidden)]
 pub struct BuilderAttribs<'a> {
-    #[allow(dead_code)]
-    headless: bool,
-    strict: bool,
-    sharing: Option<&'a platform::Window>,
-    dimensions: Option<(u32, u32)>,
-    title: String,
-    monitor: Option<platform::MonitorID>,
-    gl_version: GlRequest,
-    gl_debug: bool,
-    vsync: bool,
-    visible: bool,
-    multisampling: Option<u16>,
-    depth_bits: Option<u8>,
-    stencil_bits: Option<u8>,
-    color_bits: Option<u8>,
-    alpha_bits: Option<u8>,
-    stereoscopy: bool,
-    srgb: Option<bool>,
+    pub headless: bool,
+    pub strict: bool,
+    pub sharing: Option<&'a platform::Window>,
+    pub dimensions: Option<(u32, u32)>,
+    pub title: String,
+    pub monitor: Option<platform::MonitorID>,
+    pub gl_version: GlRequest,
+    pub gl_debug: bool,
+    pub vsync: bool,
+    pub visible: bool,
+    pub multisampling: Option<u16>,
+    pub depth_bits: Option<u8>,
+    pub stencil_bits: Option<u8>,
+    pub color_bits: Option<u8>,
+    pub alpha_bits: Option<u8>,
+    pub stereoscopy: bool,
+    pub srgb: Option<bool>,
 }
 
 impl BuilderAttribs<'static> {
