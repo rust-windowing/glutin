@@ -28,6 +28,11 @@ impl<'a> WindowBuilder<'a> {
         }
     }
 
+    /// Get the read-only reference of window attributes.
+    pub fn get_attributes(&self) -> &BuilderAttribs<'a> {
+        &self.attribs
+    }
+
     /// Requests the window to be of specific dimensions.
     ///
     /// Width and height are in pixels.
