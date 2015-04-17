@@ -4,6 +4,7 @@ use super::super::ffi;
 use super::ensure_thread_init;
 use native_monitor::NativeMonitorId;
 
+#[derive(Clone)]
 pub struct MonitorID(pub u32);
 
 pub fn get_available_monitors() -> VecDeque<MonitorID> {

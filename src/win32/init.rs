@@ -202,22 +202,54 @@ unsafe fn init(title: Vec<u16>, builder: BuilderAttribs<'static>,
         WindowWrapper(handle, hdc)
     };
 
-    // calling SetPixelFormat
-    let pixel_format = {
-        let formats = if extra_functions.GetPixelFormatAttribivARB.is_loaded() {
-            enumerate_arb_pixel_formats(&extra_functions, &real_window)
-        } else {
-            enumerate_native_pixel_formats(&real_window)
-        };
+    // if the user requests OpenGL ES, trying to load EGL from AMD drivers now
+    let context = match builder.gl_version {
+        GlRequest::Specific(Api::OpenGlEs, _) => {
+            let dll_name = if cfg!(target_pointer_width = "64") {
+                "atio6axx.dll"
+            } else {
+                "atioglxx.dll" 
+            };
 
-        let (id, f) = try!(builder.choose_pixel_format(formats.into_iter().map(|(a, b)| (b, a))));
-        try!(set_pixel_format(&real_window, id));
-        f
+            let dll_name = OsStr::new(dll_name).encode_wide().chain(Some(0).into_iter())
+                                               .collect::<Vec<_>>();
+
+            let dll = unsafe { kernel32::LoadLibraryW(dll_name.as_ptr()) };
+
+            if dll.is_null() {
+                None
+
+            } else {
+                let egl = ::egl::ffi::egl::Egl::load_with(|name| {
+                    let name = CString::new(name).unwrap();
+                    unsafe { kernel32::GetProcAddress(dll, name.as_ptr()) as *const libc::c_void }
+                });
+
+                ::egl::Context::new(egl, builder.clone(), Some(ptr::null()), real_window.0)
+                        .ok().map(|c| ContextWrapper::Egl(c))
+            }
+        },
+        _ => None
     };
 
-    // creating the OpenGL context
-    let context = try!(create_context(Some((&extra_functions, &builder)), &real_window,
-                                      builder_sharelists));
+    let context = if let Some(context) = context {
+        context
+    } else {
+        // calling SetPixelFormat
+        {
+            let formats = if extra_functions.GetPixelFormatAttribivARB.is_loaded() {
+                enumerate_arb_pixel_formats(&extra_functions, &real_window)
+            } else {
+                enumerate_native_pixel_formats(&real_window)
+            };
+
+            let (id, _) = try!(builder.choose_pixel_format(formats.into_iter().map(|(a, b)| (b, a))));
+            try!(set_pixel_format(&real_window, id));
+        }
+
+        // creating the OpenGL context
+        try!(create_context(Some((&extra_functions, &builder)), &real_window, builder_sharelists))
+    };
 
     // calling SetForegroundWindow if fullscreen
     if builder.monitor.is_some() {
@@ -264,7 +296,6 @@ unsafe fn init(title: Vec<u16>, builder: BuilderAttribs<'static>,
         events_receiver: events_receiver,
         is_closed: AtomicBool::new(false),
         cursor_state: cursor_state,
-        pixel_format: pixel_format,
     })
 }
 
@@ -403,7 +434,7 @@ unsafe fn create_context(extra: Option<(&gl::wgl_extra::Wgl, &BuilderAttribs<'st
                            format!("{}", io::Error::last_os_error()))));
     }
 
-    Ok(ContextWrapper(ctxt as winapi::HGLRC))
+    Ok(ContextWrapper::Wgl(ctxt as winapi::HGLRC))
 }
 
 unsafe fn enumerate_native_pixel_formats(hdc: &WindowWrapper) -> Vec<(PixelFormat, libc::c_int)> {
