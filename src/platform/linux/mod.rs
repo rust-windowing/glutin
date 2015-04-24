@@ -11,11 +11,11 @@ use libc;
 use api::osmesa::{self, OsMesaContext};
 
 #[cfg(feature = "window")]
-pub use self::api_dispatch::{Window, WindowProxy, MonitorID, get_available_monitors, get_primary_monitor};
+pub use api::gbm::{Window, WindowProxy, MonitorID, get_available_monitors, get_primary_monitor};
 #[cfg(feature = "window")]
-pub use self::api_dispatch::{WaitEventsIterator, PollEventsIterator};
+pub use api::gbm::{WaitEventsIterator, PollEventsIterator};
 #[cfg(feature = "window")]
-mod api_dispatch;
+//mod api_dispatch;
 
 #[cfg(not(feature = "window"))]
 pub type Window = ();       // TODO: hack to make things work

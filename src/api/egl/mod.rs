@@ -295,14 +295,14 @@ unsafe fn enumerate_configs(egl: &ffi::egl::Egl, display: ffi::egl::types::EGLDi
             }
 
         } else if api == Api::OpenGl {
-            if renderable & ffi::egl::OPENGL_BIT == 0 ||
+            /*if renderable & ffi::egl::OPENGL_BIT == 0 ||
                conformant & ffi::egl::OPENGL_BIT == 0
             {
                 continue;
-            }
+            }*/
         }
 
-        if attrib!(egl, display, config_id, ffi::egl::SURFACE_TYPE) & ffi::egl::WINDOW_BIT as i32 == 0 {
+        /*if attrib!(egl, display, config_id, ffi::egl::SURFACE_TYPE) & ffi::egl::WINDOW_BIT as i32 == 0 {
             continue;
         }
 
@@ -312,7 +312,7 @@ unsafe fn enumerate_configs(egl: &ffi::egl::Egl, display: ffi::egl::types::EGLDi
 
         if attrib!(egl, display, config_id, ffi::egl::COLOR_BUFFER_TYPE) != ffi::egl::RGB_BUFFER as i32 {
             continue;
-        }
+        }*/
 
         result.push((config_id, PixelFormat {
             hardware_accelerated: attrib!(egl, display, config_id, ffi::egl::CONFIG_CAVEAT)
