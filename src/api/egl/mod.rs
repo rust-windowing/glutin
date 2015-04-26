@@ -47,11 +47,11 @@ impl Context {
         };
 
         let use_gles2 = match builder.gl_version {
-            GlRequest::Specific(Api::OpenGlEs, (2, _)) => true,
-            GlRequest::Specific(Api::OpenGlEs, _) => false,
+            GlRequest::Specific(Api::OpenGlEs, (1, _)) => false,
+            GlRequest::Specific(Api::OpenGlEs, _) => true,
             GlRequest::Specific(_, _) => return Err(CreationError::NotSupported),
-            GlRequest::GlThenGles { opengles_version: (2, _), .. } => true,
-            _ => false,
+            GlRequest::GlThenGles { opengles_version: (1, _), .. } => false,
+            _ => true,
         };
 
         let mut attribute_list = vec!();
@@ -99,6 +99,10 @@ impl Context {
 
             config
         };
+
+        if unsafe { egl.BindAPI(ffi::egl::OPENGL_ES_API) } == 0 {
+            return Err(CreationError::OsError(format!("eglBindAPI failed")))
+        }
 
         let surface = unsafe {
             let surface = egl.CreateWindowSurface(display, config, native_window, ptr::null());

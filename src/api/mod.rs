@@ -4,5 +4,6 @@ pub mod dlopen;
 pub mod egl;
 pub mod glx;
 pub mod osmesa;
+pub mod raspi_videocore;
 pub mod win32;
 pub mod x11;
