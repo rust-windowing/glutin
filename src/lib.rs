@@ -557,6 +557,11 @@ pub struct WindowAttributes {
     /// [iOS only] Enable multitouch, see [UIView#multipleTouchEnabled]
     /// (https://developer.apple.com/library/ios/documentation/UIKit/Reference/UIView_Class/#//apple_ref/occ/instp/UIView/multipleTouchEnabled)
     pub multitouch: bool,
+
+    /// Parent Window.
+    ///
+    /// The default is `std::ptr::null_mut()`
+    pub parent: WindowID,
 }
 
 impl Default for WindowAttributes {
@@ -570,6 +575,7 @@ impl Default for WindowAttributes {
             transparent: false,
             decorations: true,
             multitouch: false,
+            parent: std::ptr::null_mut(),
         }
     }
 }
@@ -656,3 +662,6 @@ mod native_monitor {
         Unavailable
     }
 }
+
+/// Identifier for a display system window.
+pub type WindowID = *mut libc::c_void;
