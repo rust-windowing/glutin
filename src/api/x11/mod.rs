@@ -239,16 +239,19 @@ impl<'a> Iterator for PollEventsIterator<'a> {
 
                     let state = if xev.get_type() == ffi::ButtonPress { Pressed } else { Released };
 
+                    // Scroll wheel ticks do not have any inherent delta in XInput, because
+                    // they register as mouse button clicks. We use 10 for the moment.
+                    const SCROLL_TICK_DELTA : f64 = 10.0;
                     let button = match event.button {
                         ffi::Button1 => Some(Left),
                         ffi::Button2 => Some(Middle),
                         ffi::Button3 => Some(Right),
                         ffi::Button4 => {
-                            self.window.pending_events.lock().unwrap().push_back(MouseWheel(0.0, 1.0));
+                            self.window.pending_events.lock().unwrap().push_back(MouseWheel(0.0, SCROLL_TICK_DELTA));
                             None
                         }
                         ffi::Button5 => {
-                            self.window.pending_events.lock().unwrap().push_back(MouseWheel(0.0, -1.0));
+                            self.window.pending_events.lock().unwrap().push_back(MouseWheel(0.0, -SCROLL_TICK_DELTA));
                             None
                         }
                         _ => None
