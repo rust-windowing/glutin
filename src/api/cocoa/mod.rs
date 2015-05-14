@@ -39,6 +39,7 @@ use std::ascii::AsciiExt;
 use std::ops::Deref;
 
 use events::Event::{Awakened, MouseInput, MouseMoved, ReceivedCharacter, KeyboardInput, MouseWheel, Closed};
+use events::MouseWheelMotion;
 use events::ElementState::{Pressed, Released};
 use events::MouseButton;
 use events;
@@ -275,7 +276,7 @@ impl<'a> Iterator for PollEventsIterator<'a> {
                     self.window.delegate.state.pending_events.lock().unwrap().extend(events.into_iter());
                     event
                 },
-                NSScrollWheel           => { Some(MouseWheel(event.scrollingDeltaX() as f64, event.scrollingDeltaY() as f64)) },
+                NSScrollWheel           => { Some(MouseWheel(MouseWheelMotion::Delta(event.scrollingDeltaX() as f64, event.scrollingDeltaY() as f64))) },
                 _                       => { None },
             };
 

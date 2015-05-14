@@ -26,10 +26,7 @@ pub enum Event {
     MouseMoved((i32, i32)),
 
     /// Returns the horizontal and vertical mouse scrolling.
-    ///
-    /// A positive value indicates that the wheel was rotated forward, away from the user;
-    /// a negative value indicates that the wheel was rotated backward, toward the user.
-    MouseWheel(f64, f64),
+    MouseWheel(MouseWheelMotion),
 
     /// An event from the mouse has been received.
     MouseInput(ElementState, MouseButton),
@@ -55,6 +52,16 @@ pub enum MouseButton {
     Right,
     Middle,
     Other(u8),
+}
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
+pub enum MouseWheelMotion {
+    /// A positive value indicates that the wheel was rotated forward, away from the user;
+    /// a negative value indicates that the wheel was rotated backward, toward the user.
+    Delta(i64, i64),
+
+    TickUp,
+    TickDown,
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
