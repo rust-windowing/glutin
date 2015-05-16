@@ -234,6 +234,7 @@ impl<'a> Iterator for PollEventsIterator<'a> {
 
                 ffi::ButtonPress | ffi::ButtonRelease => {
                     use events::Event::{MouseInput, MouseWheel};
+                    use events::MouseWheelMotion;
                     use events::ElementState::{Pressed, Released};
                     use events::MouseButton::{Left, Right, Middle};
 
@@ -246,11 +247,11 @@ impl<'a> Iterator for PollEventsIterator<'a> {
                         ffi::Button2 => Some(Middle),
                         ffi::Button3 => Some(Right),
                         ffi::Button4 => {
-                            self.window.pending_events.lock().unwrap().push_back(MouseWheel(0.0, 1.0));
+                            self.window.pending_events.lock().unwrap().push_back(MouseWheel(MouseWheelMotion::TickDown));
                             None
                         }
                         ffi::Button5 => {
-                            self.window.pending_events.lock().unwrap().push_back(MouseWheel(0.0, -1.0));
+                            self.window.pending_events.lock().unwrap().push_back(MouseWheel(MouseWheelMotion::TickUp));
                             None
                         }
                         _ => None
