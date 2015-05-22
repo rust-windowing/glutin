@@ -39,6 +39,7 @@ pub enum Event {
 
     /// The window needs to be redrawn.
     Refresh,
+
 }
 
 pub type ScanCode = u8;

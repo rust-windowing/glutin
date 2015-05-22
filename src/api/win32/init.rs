@@ -164,7 +164,7 @@ unsafe fn init(title: Vec<u16>, builder: BuilderAttribs<'static>,
             let dll_name = if cfg!(target_pointer_width = "64") {
                 "atio6axx.dll"
             } else {
-                "atioglxx.dll" 
+                "atioglxx.dll"
             };
             let dll_name = OsStr::new(dll_name).encode_wide().chain(Some(0).into_iter())
                                                .collect::<Vec<_>>();
@@ -211,7 +211,7 @@ unsafe fn init(title: Vec<u16>, builder: BuilderAttribs<'static>,
                 _ => unimplemented!()
             };
 
-            try!(WglContext::new(&builder, real_window.0, builder_sharelists).map(Context::Wgl))       
+            try!(WglContext::new(&builder, real_window.0, builder_sharelists).map(Context::Wgl))
         }
     };
 
@@ -265,7 +265,7 @@ unsafe fn init(title: Vec<u16>, builder: BuilderAttribs<'static>,
 unsafe fn register_window_class() -> Vec<u16> {
     let class_name = OsStr::new("Window Class").encode_wide().chain(Some(0).into_iter())
                                                .collect::<Vec<_>>();
-    
+
     let class = winapi::WNDCLASSEXW {
         cbSize: mem::size_of::<winapi::WNDCLASSEXW>() as winapi::UINT,
         style: winapi::CS_HREDRAW | winapi::CS_VREDRAW | winapi::CS_OWNDC,
@@ -313,7 +313,7 @@ unsafe fn switch_to_fullscreen(rect: &mut winapi::RECT, monitor: &MonitorID)
     let result = user32::ChangeDisplaySettingsExW(monitor.get_adapter_name().as_ptr(),
                                                   &mut screen_settings, ptr::null_mut(),
                                                   winapi::CDS_FULLSCREEN, ptr::null_mut());
-    
+
     if result != winapi::DISP_CHANGE_SUCCESSFUL {
         return Err(OsError(format!("ChangeDisplaySettings failed: {}", result)));
     }

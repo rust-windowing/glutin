@@ -2,6 +2,9 @@
 
 pub use api::android::*;
 
+#[cfg(feature = "joystick")]
+pub mod joystick;
+
 pub struct HeadlessContext(i32);
 
 impl HeadlessContext {

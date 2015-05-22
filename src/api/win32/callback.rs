@@ -42,7 +42,7 @@ fn send_event(input_window: winapi::HWND, event: Event) {
 }
 
 /// This is the callback that is called by `DispatchMessage` in the events loop.
-/// 
+///
 /// Returning 0 tells the Win32 API that the message has been processed.
 // FIXME: detect WM_DWMCOMPOSITIONCHANGED and call DwmEnableBlurBehindWindow if necessary
 pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
@@ -198,7 +198,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
             if data.header.dwType == winapi::RIM_TYPEMOUSE {
                 let _x = data.mouse.lLastX;  // FIXME: this is not always the relative movement
                 let _y = data.mouse.lLastY;
-                // TODO: 
+                // TODO:
                 //send_event(window, Event::MouseRawMovement { x: x, y: y });
 
                 0
@@ -226,7 +226,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
                 let cstash = cstash.as_ref();
                 // there's a very bizarre borrow checker bug
                 // possibly related to rust-lang/rust/#23338
-                let cursor_state = if let Some(cstash) = cstash { 
+                let cursor_state = if let Some(cstash) = cstash {
                     if let Ok(cursor_state) = cstash.cursor_state.lock() {
                         match *cursor_state {
                             CursorState::Normal => {

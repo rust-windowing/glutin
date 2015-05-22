@@ -16,6 +16,9 @@ pub use self::api_dispatch::{WaitEventsIterator, PollEventsIterator};
 #[cfg(feature = "window")]
 mod api_dispatch;
 
+#[cfg(feature = "joystick")]
+pub mod joystick;
+
 #[cfg(not(feature = "window"))]
 pub type Window = ();       // TODO: hack to make things work
 #[cfg(not(feature = "window"))]

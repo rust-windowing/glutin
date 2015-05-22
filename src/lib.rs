@@ -29,6 +29,11 @@ extern crate lazy_static;
 #[macro_use]
 extern crate shared_library;
 
+#[cfg(feature = "joystick")]
+extern crate pool;
+#[cfg(feature = "joystick")]
+extern crate uuid;
+
 extern crate gl_common;
 extern crate libc;
 
@@ -62,6 +67,8 @@ pub use window::{WindowBuilder, Window, WindowProxy, PollEventsIterator, WaitEve
 pub use window::{AvailableMonitorsIter, MonitorID, get_available_monitors, get_primary_monitor};
 #[cfg(feature = "window")]
 pub use native_monitor::NativeMonitorId;
+#[cfg(feature = "joystick")]
+pub mod joystick;
 
 mod api;
 mod platform;

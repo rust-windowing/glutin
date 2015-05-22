@@ -10,6 +10,9 @@ use CreationError;
 use PixelFormat;
 use GlContext;
 
+#[cfg(feature = "joystick")]
+pub mod joystick;
+
 ///
 pub struct HeadlessContext(Window);
 

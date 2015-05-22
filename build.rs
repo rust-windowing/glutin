@@ -1,3 +1,5 @@
+fn main() { }
+/*
 extern crate gl_generator;
 extern crate khronos_api;
 
@@ -119,3 +121,4 @@ fn main() {
                                     khronos_api::GL_XML, vec![],
                                     "1.1", "core", &mut file).unwrap();
 }
+*/

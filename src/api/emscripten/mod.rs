@@ -81,7 +81,7 @@ impl Window {
         };
 
         // setting the attributes
-        // FIXME: 
+        // FIXME:
         /*match builder.gl_version {
             Some((major, minor)) => {
                 attributes.majorVersion = major as libc::c_int;
@@ -197,7 +197,7 @@ impl GlContext for Window {
     }
 
     fn is_current(&self) -> bool {
-        true        // FIXME: 
+        true        // FIXME:
     }
 
     fn get_proc_address(&self, addr: &str) -> *const libc::c_void {
@@ -211,7 +211,7 @@ impl GlContext for Window {
 
     fn swap_buffers(&self) {
         unsafe {
-            ffi::emscripten_sleep(1);   // FIXME: 
+            ffi::emscripten_sleep(1);   // FIXME:
         }
     }
 

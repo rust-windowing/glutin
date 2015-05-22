@@ -102,7 +102,7 @@ pub fn get_available_monitors() -> VecDeque<MonitorID> {
             let mut dev: winapi::DEVMODEW = mem::zeroed();
             dev.dmSize = mem::size_of::<winapi::DEVMODEW>() as winapi::WORD;
 
-            if user32::EnumDisplaySettingsExW(adapter.DeviceName.as_ptr(), 
+            if user32::EnumDisplaySettingsExW(adapter.DeviceName.as_ptr(),
                 winapi::ENUM_CURRENT_SETTINGS,
                 &mut dev, 0) == 0
             {

@@ -91,7 +91,7 @@ impl Window {
 
         let sharing = sharing.map(|w| match w.context {
             Context::Wgl(ref c) => RawContext::Wgl(c.get_hglrc()),
-            Context::Egl(_) => unimplemented!(),        // FIXME: 
+            Context::Egl(_) => unimplemented!(),        // FIXME:
         });
 
         init::new_window(builder, sharing)

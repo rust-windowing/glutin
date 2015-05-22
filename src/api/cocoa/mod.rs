@@ -18,8 +18,8 @@ use objc::runtime::{Class, Object, Sel, BOOL, YES, NO};
 use objc::declare::ClassDecl;
 
 use cocoa::base::{id, nil};
-use cocoa::foundation::{NSAutoreleasePool, NSDate, NSDefaultRunLoopMode, NSPoint, NSRect, NSSize, 
-                        NSString, NSUInteger}; 
+use cocoa::foundation::{NSAutoreleasePool, NSDate, NSDefaultRunLoopMode, NSPoint, NSRect, NSSize,
+                        NSString, NSUInteger};
 use cocoa::appkit;
 use cocoa::appkit::*;
 use cocoa::appkit::NSEventSubtype::*;
@@ -387,7 +387,7 @@ impl Window {
     }
 
     fn create_window(builder: &BuilderAttribs) -> Option<IdRef> {
-        unsafe { 
+        unsafe {
             let screen = match builder.monitor {
                 Some(ref monitor_id) => {
                     let native_id = match monitor_id.get_native_identifier() {
@@ -499,7 +499,7 @@ impl Window {
 
         // A color depth higher than 64 implies we're using either 16-bit
         // floats or 32-bit floats and OS X requires a flag to be set
-        // accordingly. 
+        // accordingly.
         if color_depth >= 64 {
             attributes.push(NSOpenGLPFAColorFloat as u32);
         }
@@ -588,7 +588,7 @@ impl Window {
     pub fn get_position(&self) -> Option<(i32, i32)> {
         unsafe {
             let content_rect = NSWindow::contentRectForFrameRect_(*self.window, NSWindow::frame(*self.window));
-            
+
             // TODO: consider extrapolating the calculations for the y axis to
             // a private method
             Some((content_rect.origin.x as i32, (CGDisplayPixelsHigh(CGMainDisplayID()) as f64 - (content_rect.origin.y + content_rect.size.height)) as i32))
@@ -600,7 +600,7 @@ impl Window {
             let frame = NSWindow::frame(*self.view);
 
             // NOTE: `setFrameOrigin` might not give desirable results when
-            // setting window, as it treats bottom left as origin. 
+            // setting window, as it treats bottom left as origin.
             // `setFrameTopLeftPoint` treats top left as origin (duh), but
             // does not equal the value returned by `get_window_position`
             // (there is a difference by 22 for me on yosemite)
@@ -674,7 +674,7 @@ impl Window {
     }
 
     pub fn set_cursor(&self, cursor: MouseCursor) {
-        let cursor_name = match cursor {                
+        let cursor_name = match cursor {
             MouseCursor::Arrow | MouseCursor::Default => "arrowCursor",
             MouseCursor::Hand => "pointingHandCursor",
             MouseCursor::Grabbing | MouseCursor::Grab => "closedHandCursor",
