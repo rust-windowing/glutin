@@ -99,11 +99,8 @@ impl Window {
     ///
     /// Calls SetWindowText on the HWND.
     pub fn set_title(&self, text: &str) {
-        let text = OsStr::new(text).encode_wide().chain(Some(0).into_iter())
-                                   .collect::<Vec<_>>();
-
         unsafe {
-            user32::SetWindowTextW(self.window.0, text.as_ptr() as winapi::LPCWSTR);
+            user32::SetWindowTextW(self.window.0, text.to_wide().as_ptr() as winapi::LPCWSTR);
         }
     }
 
@@ -381,5 +378,18 @@ impl Drop for Window {
             // is still the current one
             user32::PostMessageW(self.window.0, winapi::WM_DESTROY, 0, 0);
         }
+    }
+}
+
+///
+/// Convenience trait for marshaling strings to Windows.
+///
+pub trait ToWide {
+    fn to_wide(&self) -> Vec<u16>;
+}
+
+impl<T: AsRef<OsStr>> ToWide for T {
+    fn to_wide(&self) -> Vec<u16> {
+        self.as_ref().encode_wide().chain(Some(0)).collect()
     }
 }
