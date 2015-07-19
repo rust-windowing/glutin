@@ -167,8 +167,7 @@ unsafe fn init(title: Vec<u16>, builder: BuilderAttribs<'static>,
             } else {
                 "atioglxx.dll" 
             };
-            let dll_name = dll_name.to_wide();
-            let dll = unsafe { kernel32::LoadLibraryW(dll_name.as_ptr()) };
+            let dll = unsafe { kernel32::LoadLibraryW(dll_name.to_wide().as_ptr()) };
 
             if !dll.is_null() {
                 let egl = ::api::egl::ffi::egl::Egl::load_with(|name| {

@@ -472,9 +472,7 @@ unsafe fn set_pixel_format(hdc: winapi::HDC, id: libc::c_int) -> Result<(), Crea
 
 /// Loads the `opengl32.dll` library.
 unsafe fn load_opengl32_dll() -> Result<winapi::HMODULE, CreationError> {
-    let name = "opengl32.dll".to_wide();
-
-    let lib = kernel32::LoadLibraryW(name.as_ptr());
+    let lib = kernel32::LoadLibraryW("opengl32.dll".to_wide().as_ptr());
 
     if lib.is_null() {
         return Err(CreationError::OsError(format!("LoadLibrary function failed: {}",
