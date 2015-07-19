@@ -11,6 +11,7 @@ use super::Window;
 use super::MonitorID;
 use super::WindowWrapper;
 use super::Context;
+use super::ToWide;
 
 use Api;
 use BuilderAttribs;
@@ -46,8 +47,7 @@ pub fn new_window(builder: BuilderAttribs<'static>, builder_sharelists: Option<R
 {
     // initializing variables to be sent to the task
 
-    let title = OsStr::new(&builder.title).encode_wide().chain(Some(0).into_iter())
-                                          .collect::<Vec<_>>();
+    let title = builder.title.to_wide();
 
     let (tx, rx) = channel();
 
@@ -167,9 +167,7 @@ unsafe fn init(title: Vec<u16>, builder: BuilderAttribs<'static>,
             } else {
                 "atioglxx.dll" 
             };
-            let dll_name = OsStr::new(dll_name).encode_wide().chain(Some(0).into_iter())
-                                               .collect::<Vec<_>>();
-            let dll = unsafe { kernel32::LoadLibraryW(dll_name.as_ptr()) };
+            let dll = unsafe { kernel32::LoadLibraryW(dll_name.to_wide().as_ptr()) };
 
             if !dll.is_null() {
                 let egl = ::api::egl::ffi::egl::Egl::load_with(|name| {
@@ -263,8 +261,7 @@ unsafe fn init(title: Vec<u16>, builder: BuilderAttribs<'static>,
 }
 
 unsafe fn register_window_class() -> Vec<u16> {
-    let class_name = OsStr::new("Window Class").encode_wide().chain(Some(0).into_iter())
-                                               .collect::<Vec<_>>();
+    let class_name = "Window Class".to_wide();
     
     let class = winapi::WNDCLASSEXW {
         cbSize: mem::size_of::<winapi::WNDCLASSEXW>() as winapi::UINT,

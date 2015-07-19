@@ -11,6 +11,7 @@ use Robustness;
 use Api;
 
 use self::make_current_guard::CurrentContextGuard;
+use super::win32::ToWide;
 
 use libc;
 use std::ffi::{CStr, CString, OsStr};
@@ -471,10 +472,7 @@ unsafe fn set_pixel_format(hdc: winapi::HDC, id: libc::c_int) -> Result<(), Crea
 
 /// Loads the `opengl32.dll` library.
 unsafe fn load_opengl32_dll() -> Result<winapi::HMODULE, CreationError> {
-    let name = OsStr::new("opengl32.dll").encode_wide().chain(Some(0).into_iter())
-                                         .collect::<Vec<_>>();
-
-    let lib = kernel32::LoadLibraryW(name.as_ptr());
+    let lib = kernel32::LoadLibraryW("opengl32.dll".to_wide().as_ptr());
 
     if lib.is_null() {
         return Err(CreationError::OsError(format!("LoadLibrary function failed: {}",
