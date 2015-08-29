@@ -169,6 +169,53 @@ fn main() {
                                         "3.2", "core", &mut file).unwrap();
     }
 
+    if target.contains("dragonfly") || target.contains("freebsd") {
+        let mut file = File::create(&dest.join("glx_bindings.rs")).unwrap();
+        gl_generator::generate_bindings(gl_generator::StructGenerator,
+                                        gl_generator::registry::Ns::Glx,
+                                        gl_generator::Fallbacks::All,
+                                        khronos_api::GLX_XML, vec![],
+                                        "1.4", "core", &mut file).unwrap();
+
+        let mut file = File::create(&dest.join("glx_extra_bindings.rs")).unwrap();
+        gl_generator::generate_bindings(gl_generator::StructGenerator,
+                                        gl_generator::registry::Ns::Glx,
+                                        gl_generator::Fallbacks::All,
+                                        khronos_api::GLX_XML,
+                                        vec![
+                                            "GLX_ARB_create_context".to_string(),
+                                            "GLX_ARB_create_context_profile".to_string(),
+                                            "GLX_ARB_create_context_robustness".to_string(),
+                                            "GLX_ARB_framebuffer_sRGB".to_string(),
+                                            "GLX_EXT_framebuffer_sRGB".to_string(),
+                                            "GLX_EXT_swap_control".to_string(),
+                                            "GLX_SGI_swap_control".to_string()
+                                        ],
+                                        "1.4", "core", &mut file).unwrap();
+
+        let mut file = File::create(&dest.join("egl_bindings.rs")).unwrap();
+        gl_generator::generate_bindings(gl_generator::StructGenerator,
+                                        gl_generator::registry::Ns::Egl,
+                                        gl_generator::Fallbacks::All,
+                                        khronos_api::EGL_XML,
+                                        vec![
+                                            "EGL_KHR_create_context".to_string(),
+                                            "EGL_EXT_create_context_robustness".to_string(),
+                                            "EGL_KHR_create_context_no_error".to_string(),
+                                            "EGL_KHR_platform_x11".to_string(),
+                                            "EGL_KHR_platform_android".to_string(),
+                                            "EGL_KHR_platform_wayland".to_string(),
+                                            "EGL_KHR_platform_gbm".to_string(),
+                                            "EGL_EXT_platform_base".to_string(),
+                                            "EGL_EXT_platform_x11".to_string(),
+                                            "EGL_MESA_platform_gbm".to_string(),
+                                            "EGL_EXT_platform_wayland".to_string(),
+                                            "EGL_EXT_platform_device".to_string(),
+                                        ],
+                                        "1.5", "core", &mut file).unwrap();
+    }
+
+
     // TODO: only build the bindings below if we run tests/examples
 
     let mut file = File::create(&dest.join("test_gl_bindings.rs")).unwrap();
