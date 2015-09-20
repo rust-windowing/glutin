@@ -84,8 +84,9 @@ impl Drop for XWindow {
             let _lock = GLOBAL_XOPENIM_LOCK.lock().unwrap();
 
             if self.is_fullscreen {
-                (self.display.xf86vmode.XF86VidModeSwitchToMode)(self.display.display, self.screen_id, self.xf86_desk_mode);
-                (self.display.xf86vmode.XF86VidModeSetViewPort)(self.display.display, self.screen_id, 0, 0);
+                let xf86vmode = self.display.xf86vmode.as_ref().unwrap();
+                (xf86vmode.XF86VidModeSwitchToMode)(self.display.display, self.screen_id, self.xf86_desk_mode);
+                (xf86vmode.XF86VidModeSetViewPort)(self.display.display, self.screen_id, 0, 0);
             }
 
             (self.display.xlib.XDestroyIC)(self.ic);
@@ -307,7 +308,12 @@ impl Window {
         let (mode_to_switch_to, xf86_desk_mode) = unsafe {
             let mut mode_num: libc::c_int = mem::uninitialized();
             let mut modes: *mut *mut ffi::XF86VidModeModeInfo = mem::uninitialized();
-            if (display.xf86vmode.XF86VidModeGetAllModeLines)(display.display, screen_id, &mut mode_num, &mut modes) == 0 {
+
+            if let Some(xf86vmode) = display.xf86vmode.as_ref() {
+                if (xf86vmode.XF86VidModeGetAllModeLines)(display.display, screen_id, &mut mode_num, &mut modes) == 0 {
+                    return Err(OsError(format!("Could not query the video modes")));
+                }
+            } else {
                 return Err(OsError(format!("Could not query the video modes")));
             }
 
@@ -432,8 +438,9 @@ impl Window {
         if let Some(mut mode_to_switch_to) = mode_to_switch_to {
             window_attributes |= ffi::CWOverrideRedirect;
             unsafe {
-                (display.xf86vmode.XF86VidModeSwitchToMode)(display.display, screen_id, &mut mode_to_switch_to);
-                (display.xf86vmode.XF86VidModeSetViewPort)(display.display, screen_id, 0, 0);
+                let xf86vmode = display.xf86vmode.as_ref().unwrap();
+                (xf86vmode.XF86VidModeSwitchToMode)(display.display, screen_id, &mut mode_to_switch_to);
+                (xf86vmode.XF86VidModeSetViewPort)(display.display, screen_id, 0, 0);
                 set_win_attr.override_redirect = 1;
             }
         }

@@ -12,7 +12,7 @@ use api::dlopen;
 /// A connection to an X server.
 pub struct XConnection {
     pub xlib: ffi::Xlib,
-    pub xf86vmode: ffi::Xf86vmode,
+    pub xf86vmode: Option<ffi::Xf86vmode>,
     pub xcursor: ffi::Xcursor,
     pub xinput2: ffi::XInput2,
     pub glx: Option<ffi::glx::Glx>,
@@ -28,7 +28,7 @@ impl XConnection {
         // opening the libraries
         let xlib = try!(ffi::Xlib::open());
         let xcursor = try!(ffi::Xcursor::open());
-        let xf86vmode = try!(ffi::Xf86vmode::open());
+        let xf86vmode = ffi::Xf86vmode::open().ok();
         let xinput2 = try!(ffi::XInput2::open());
 
         unsafe extern "C" fn x_error_callback(_: *mut ffi::Display, event: *mut ffi::XErrorEvent)
