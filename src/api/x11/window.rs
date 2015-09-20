@@ -704,9 +704,12 @@ impl Window {
                 MouseCursor::ZoomOut => "left_ptr",
             };
             let c_string = CString::new(cursor_name.as_bytes().to_vec()).unwrap();
-            let xcursor = (self.x.display.xcursor.XcursorLibraryLoadCursor)(self.x.display.display, c_string.as_ptr());
-            (self.x.display.xlib.XDefineCursor)(self.x.display.display, self.x.window, xcursor);
-            (self.x.display.xlib.XFlush)(self.x.display.display);
+
+            if let Some(xcursor) = self.x.display.xcursor.as_ref() {
+                let cursor = (xcursor.XcursorLibraryLoadCursor)(self.x.display.display, c_string.as_ptr());
+                (self.x.display.xlib.XDefineCursor)(self.x.display.display, self.x.window, cursor);
+                (self.x.display.xlib.XFlush)(self.x.display.display);
+            }
         }
     }
 

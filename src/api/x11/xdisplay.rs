@@ -13,7 +13,7 @@ use api::dlopen;
 pub struct XConnection {
     pub xlib: ffi::Xlib,
     pub xf86vmode: Option<ffi::Xf86vmode>,
-    pub xcursor: ffi::Xcursor,
+    pub xcursor: Option<ffi::Xcursor>,
     pub xinput2: ffi::XInput2,
     pub glx: Option<ffi::glx::Glx>,
     pub egl: Option<Egl>,
@@ -27,7 +27,7 @@ impl XConnection {
     pub fn new() -> Result<XConnection, XNotSupported> {
         // opening the libraries
         let xlib = try!(ffi::Xlib::open());
-        let xcursor = try!(ffi::Xcursor::open());
+        let xcursor = ffi::Xcursor::open().ok();
         let xf86vmode = ffi::Xf86vmode::open().ok();
         let xinput2 = try!(ffi::XInput2::open());
 
