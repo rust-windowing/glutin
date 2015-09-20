@@ -51,57 +51,59 @@ pub struct XInputEventHandler {
 
 impl XInputEventHandler {
     pub fn new(display: &Arc<XConnection>, window: ffi::Window, ic: ffi::XIC) -> XInputEventHandler {
-        // query XInput support
-        let mut opcode: libc::c_int = 0;
-        let mut event: libc::c_int = 0;
-        let mut error: libc::c_int = 0;
-        let xinput_str = CString::new("XInputExtension").unwrap();
+        if let Some(xinput2) = display.xinput2.as_ref() {
+            // query XInput support
+            let mut opcode: libc::c_int = 0;
+            let mut event: libc::c_int = 0;
+            let mut error: libc::c_int = 0;
+            let xinput_str = CString::new("XInputExtension").unwrap();
 
-        unsafe {
-            if (display.xlib.XQueryExtension)(display.display, xinput_str.as_ptr(), &mut opcode, &mut event, &mut error) == ffi::False {
-                panic!("XInput not available")
+            unsafe {
+                if (display.xlib.XQueryExtension)(display.display, xinput_str.as_ptr(), &mut opcode, &mut event, &mut error) == ffi::False {
+                    panic!("XInput not available")
+                }
             }
-        }
 
-        let mut xinput_major_ver = ffi::XI_2_Major;
-        let mut xinput_minor_ver = ffi::XI_2_Minor;
+            let mut xinput_major_ver = ffi::XI_2_Major;
+            let mut xinput_minor_ver = ffi::XI_2_Minor;
 
-        unsafe {
-            if (display.xinput2.XIQueryVersion)(display.display, &mut xinput_major_ver, &mut xinput_minor_ver) != ffi::Success as libc::c_int {
-                panic!("Unable to determine XInput version");
+            unsafe {
+                if (xinput2.XIQueryVersion)(display.display, &mut xinput_major_ver, &mut xinput_minor_ver) != ffi::Success as libc::c_int {
+                    panic!("Unable to determine XInput version");
+                }
             }
-        }
 
-        // specify the XInput events we want to receive.
-        // Button clicks and mouse events are handled via XInput
-        // events. Key presses are still handled via plain core
-        // X11 events.
-        let mut mask: [libc::c_uchar; 3] = [0; 3];
-        let mut input_event_mask = ffi::XIEventMask {
-            deviceid: ffi::XIAllMasterDevices,
-            mask_len: mask.len() as i32,
-            mask: mask.as_mut_ptr()
-        };
-        let events = &[
-            ffi::XI_ButtonPress,
-            ffi::XI_ButtonRelease,
-            ffi::XI_Motion,
-            ffi::XI_Enter,
-            ffi::XI_Leave,
-            ffi::XI_FocusIn,
-            ffi::XI_FocusOut,
-            ffi::XI_TouchBegin,
-            ffi::XI_TouchUpdate,
-            ffi::XI_TouchEnd,
-        ];
-        for event in events {
-            ffi::XISetMask(&mut mask, *event);
-        }
+            // specify the XInput events we want to receive.
+            // Button clicks and mouse events are handled via XInput
+            // events. Key presses are still handled via plain core
+            // X11 events.
+            let mut mask: [libc::c_uchar; 3] = [0; 3];
+            let mut input_event_mask = ffi::XIEventMask {
+                deviceid: ffi::XIAllMasterDevices,
+                mask_len: mask.len() as i32,
+                mask: mask.as_mut_ptr()
+            };
+            let events = &[
+                ffi::XI_ButtonPress,
+                ffi::XI_ButtonRelease,
+                ffi::XI_Motion,
+                ffi::XI_Enter,
+                ffi::XI_Leave,
+                ffi::XI_FocusIn,
+                ffi::XI_FocusOut,
+                ffi::XI_TouchBegin,
+                ffi::XI_TouchUpdate,
+                ffi::XI_TouchEnd,
+            ];
+            for event in events {
+                ffi::XISetMask(&mut mask, *event);
+            }
 
-        unsafe {
-            match (display.xinput2.XISelectEvents)(display.display, window, &mut input_event_mask, 1) {
-                status if status as u8 == ffi::Success => (),
-                err => panic!("Failed to select events {:?}", err)
+            unsafe {
+                match (xinput2.XISelectEvents)(display.display, window, &mut input_event_mask, 1) {
+                    status if status as u8 == ffi::Success => (),
+                    err => panic!("Failed to select events {:?}", err)
+                }
             }
         }
 
@@ -265,41 +267,46 @@ impl XInputEventHandler {
 }
 
 fn read_input_axis_info(display: &Arc<XConnection>) -> Vec<Axis> {
-    let mut axis_list = Vec::new();
-    let mut device_count = 0;
+    if let Some(xinput2) = display.xinput2.as_ref() {
+        let mut axis_list = Vec::new();
+        let mut device_count = 0;
 
-    // Check all input devices for scroll axes.
-    let devices = unsafe{
-        (display.xinput2.XIQueryDevice)(display.display, ffi::XIAllDevices, &mut device_count)
-    };
-    for i in 0..device_count {
-        let device = unsafe { *(devices.offset(i as isize)) };
-        for k in 0..device.num_classes {
-            let class = unsafe { *(device.classes.offset(k as isize)) };
-            match unsafe { (*class)._type } {
-                // Note that scroll axis
-                // are reported both as 'XIScrollClass' and 'XIValuatorClass'
-                // axes. For the moment we only care about scrolling axes.
-                ffi::XIScrollClass => {
-                    let scroll_class: &ffi::XIScrollClassInfo = unsafe{mem::transmute(class)};
-                    axis_list.push(Axis{
-                        id: scroll_class.sourceid,
-                        device_id: device.deviceid,
-                        axis_number: scroll_class.number,
-                        axis_type: match scroll_class.scroll_type {
-                            ffi::XIScrollTypeHorizontal => AxisType::HorizontalScroll,
-                            ffi::XIScrollTypeVertical => AxisType::VerticalScroll,
-                            _ => { unreachable!() }
-                        },
-                        scroll_increment: scroll_class.increment,
-                    })
-                },
-                _ => {}
+        // Check all input devices for scroll axes.
+        let devices = unsafe{
+            (xinput2.XIQueryDevice)(display.display, ffi::XIAllDevices, &mut device_count)
+        };
+        for i in 0..device_count {
+            let device = unsafe { *(devices.offset(i as isize)) };
+            for k in 0..device.num_classes {
+                let class = unsafe { *(device.classes.offset(k as isize)) };
+                match unsafe { (*class)._type } {
+                    // Note that scroll axis
+                    // are reported both as 'XIScrollClass' and 'XIValuatorClass'
+                    // axes. For the moment we only care about scrolling axes.
+                    ffi::XIScrollClass => {
+                        let scroll_class: &ffi::XIScrollClassInfo = unsafe{mem::transmute(class)};
+                        axis_list.push(Axis{
+                            id: scroll_class.sourceid,
+                            device_id: device.deviceid,
+                            axis_number: scroll_class.number,
+                            axis_type: match scroll_class.scroll_type {
+                                ffi::XIScrollTypeHorizontal => AxisType::HorizontalScroll,
+                                ffi::XIScrollTypeVertical => AxisType::VerticalScroll,
+                                _ => { unreachable!() }
+                            },
+                            scroll_increment: scroll_class.increment,
+                        })
+                    },
+                    _ => {}
+                }
             }
         }
+        
+        axis_list
+
+    } else {
+        Vec::new()
     }
-    
-    axis_list
 }
 
 /// Given an input motion event for an axis and the previous
