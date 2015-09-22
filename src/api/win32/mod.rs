@@ -254,7 +254,8 @@ impl Window {
 
     #[inline]
     pub fn set_cursor(&self, _cursor: MouseCursor) {
-        unimplemented!()
+        // XXX FIXME -- ignore this for now, we need to implement this
+        //unimplemented!()
     }
 
     pub fn set_cursor_state(&self, state: CursorState) -> Result<(), String> {
