@@ -253,8 +253,41 @@ impl Window {
     }
 
     #[inline]
-    pub fn set_cursor(&self, _cursor: MouseCursor) {
-        unimplemented!()
+    pub fn set_cursor(&self, cursor: MouseCursor) {
+        let cursor_name = match cursor {
+            MouseCursor::Arrow | MouseCursor::Default => "IDC_ARROW",
+            MouseCursor::Hand => "IDC_HAND",
+            // MouseCursor::Grabbing | MouseCursor::Grab => "closedHandCursor", cant find the windows grab
+            MouseCursor::Text |  MouseCursor::VerticalText => "IDC_IBEAM",
+            // MouseCursor::Copy => "dragCopyCursor",
+            // MouseCursor::Alias => "dragLinkCursor",
+            MouseCursor::NotAllowed | MouseCursor::NoDrop => "IDC_NO",
+            // MouseCursor::ContextMenu => "contextualMenuCursor",
+            MouseCursor::Crosshair => "IDC_CROSS",
+            MouseCursor::EResize => "IDC_SIZEWE",
+            MouseCursor::NResize => "IDC_SIZENS",
+            MouseCursor::WResize => "IDC_SIZEWE",
+            MouseCursor::SResize => "IDC_SIZENS",
+            MouseCursor::EwResize | MouseCursor::ColResize => "IDC_SIZEWE",
+            MouseCursor::NsResize | MouseCursor::RowResize => "IDC_SIZENS",
+
+            /// TODO: Find appropriate OSX cursors
+            MouseCursor::NeResize | MouseCursor::NwResize |
+            MouseCursor::SeResize | MouseCursor::SwResize |
+            MouseCursor::NwseResize | MouseCursor::NeswResize |
+
+            MouseCursor::Cell | MouseCursor::NoneCursor |
+            MouseCursor::Wait | MouseCursor::Progress | MouseCursor::Help |
+            MouseCursor::Move | MouseCursor::AllScroll | MouseCursor::ZoomIn |
+            MouseCursor::ZoomOut => "IDC_ARROW",
+        };
+        let sel = Sel::register(cursor_name);
+        let cls = Class::get("NSCursor").unwrap();
+        unsafe {
+            use objc::MessageArguments;
+            let cursor: id = ().send(cls as *const _ as id, sel);
+            let _: () = msg_send![cursor, set];
+        }
     }
 
     pub fn set_cursor_state(&self, state: CursorState) -> Result<(), String> {
