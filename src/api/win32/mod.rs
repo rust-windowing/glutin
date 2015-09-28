@@ -280,7 +280,7 @@ impl Window {
             MouseCursor::ZoomOut => winapi::IDC_ARROW,
         };
             unsafe {
-                user32::LoadCursorW(ptr::null_mut(), cursor_name);
+                user32::SetCursor(user32::LoadCursorW(ptr::null_mut(), cursor_name));
             }
     }
 
