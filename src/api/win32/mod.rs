@@ -255,23 +255,21 @@ impl Window {
     #[inline]
     pub fn set_cursor(&self, cursor: MouseCursor) {
         let cursor_name = match cursor {
-            MouseCursor::Arrow | MouseCursor::Default => "IDC_ARROW",
-            MouseCursor::Hand => "IDC_HAND",
-            // MouseCursor::Grabbing | MouseCursor::Grab => "closedHandCursor", cant find the windows grab
-            MouseCursor::Text |  MouseCursor::VerticalText => "IDC_IBEAM",
-            // MouseCursor::Copy => "dragCopyCursor",
-            // MouseCursor::Alias => "dragLinkCursor",
-            MouseCursor::NotAllowed | MouseCursor::NoDrop => "IDC_NO",
-            // MouseCursor::ContextMenu => "contextualMenuCursor",
-            MouseCursor::Crosshair => "IDC_CROSS",
-            MouseCursor::EResize => "IDC_SIZEWE",
-            MouseCursor::NResize => "IDC_SIZENS",
-            MouseCursor::WResize => "IDC_SIZEWE",
-            MouseCursor::SResize => "IDC_SIZENS",
-            MouseCursor::EwResize | MouseCursor::ColResize => "IDC_SIZEWE",
-            MouseCursor::NsResize | MouseCursor::RowResize => "IDC_SIZENS",
+            MouseCursor::Arrow | MouseCursor::Default => winapi::IDC_ARROW,
+            MouseCursor::Hand => winapi::IDC_HAND,
+            MouseCursor::Text |  MouseCursor::VerticalText => winapi::IDC_IBEAM,
 
-            /// TODO: Find appropriate OSX cursors
+            MouseCursor::NotAllowed | MouseCursor::NoDrop => winapi::IDC_NO,
+            MouseCursor::Crosshair => winapi::IDC_CROSS,
+            MouseCursor::EResize => winapi::IDC_SIZEWE,
+            MouseCursor::NResize => winapi::IDC_SIZENS,
+            MouseCursor::WResize => winapi::IDC_SIZEWE,
+            MouseCursor::SResize => winapi::IDC_SIZENS,
+            MouseCursor::EwResize | MouseCursor::ColResize => winapi::IDC_SIZEWE,
+            MouseCursor::NsResize | MouseCursor::RowResize => winapi::IDC_SIZENS,
+
+            MouseCursor::Grabbing | MouseCursor::Grab | MouseCursor::Copy |
+            MouseCursor::Alias    | MouseCursor::ContextMenu |
             MouseCursor::NeResize | MouseCursor::NwResize |
             MouseCursor::SeResize | MouseCursor::SwResize |
             MouseCursor::NwseResize | MouseCursor::NeswResize |
@@ -279,15 +277,11 @@ impl Window {
             MouseCursor::Cell | MouseCursor::NoneCursor |
             MouseCursor::Wait | MouseCursor::Progress | MouseCursor::Help |
             MouseCursor::Move | MouseCursor::AllScroll | MouseCursor::ZoomIn |
-            MouseCursor::ZoomOut => "IDC_ARROW",
+            MouseCursor::ZoomOut => winapi::IDC_ARROW,
         };
-        let sel = Sel::register(cursor_name);
-        let cls = Class::get("NSCursor").unwrap();
-        unsafe {
-            use objc::MessageArguments;
-            let cursor: id = ().send(cls as *const _ as id, sel);
-            let _: () = msg_send![cursor, set];
-        }
+            unsafe {
+                user32::LoadCursorW(ptr::null_mut(), cursor_name);
+            }
     }
 
     pub fn set_cursor_state(&self, state: CursorState) -> Result<(), String> {
