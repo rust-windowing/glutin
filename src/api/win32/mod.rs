@@ -279,9 +279,9 @@ impl Window {
             MouseCursor::Move | MouseCursor::AllScroll | MouseCursor::ZoomIn |
             MouseCursor::ZoomOut => winapi::IDC_ARROW,
         };
-            unsafe {
-                user32::SetCursor(user32::LoadCursorW(ptr::null_mut(), cursor_name));
-            }
+        unsafe {
+            user32::SetCursor(user32::LoadCursorW(ptr::null_mut(), cursor_name));
+        }
     }
 
     pub fn set_cursor_state(&self, state: CursorState) -> Result<(), String> {
