@@ -267,15 +267,15 @@ impl Window {
             MouseCursor::SResize => winapi::IDC_SIZENS,
             MouseCursor::EwResize | MouseCursor::ColResize => winapi::IDC_SIZEWE,
             MouseCursor::NsResize | MouseCursor::RowResize => winapi::IDC_SIZENS,
+            MouseCursor::NeResize | MouseCursor::SwResize => winapi::IDC_SIZENESW,
+            MouseCursor::NwResize | MouseCursor::SeResize => winapi::IDC_SIZENWSE,
+            MouseCursor::NwseResize | MouseCursor::NeswResize => winapi::IDC_SIZEALL,
+            MouseCursor::Wait | MouseCursor::Progress => winapi::IDC_WAIT,
+            MouseCursor::Help => winapi::IDC_HELP,
 
             MouseCursor::Grabbing | MouseCursor::Grab | MouseCursor::Copy |
             MouseCursor::Alias    | MouseCursor::ContextMenu |
-            MouseCursor::NeResize | MouseCursor::NwResize |
-            MouseCursor::SeResize | MouseCursor::SwResize |
-            MouseCursor::NwseResize | MouseCursor::NeswResize |
-
             MouseCursor::Cell | MouseCursor::NoneCursor |
-            MouseCursor::Wait | MouseCursor::Progress | MouseCursor::Help |
             MouseCursor::Move | MouseCursor::AllScroll | MouseCursor::ZoomIn |
             MouseCursor::ZoomOut => winapi::IDC_ARROW,
         };
