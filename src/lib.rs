@@ -519,6 +519,23 @@ impl Default for PixelFormatRequirements {
     }
 }
 
+/// A wrapper for a native window pointer.
+#[derive(Debug, Clone)]
+pub struct WindowID {
+    pub window: *mut libc::c_void,
+}
+
+impl WindowID {
+    pub fn new(window: *mut libc::c_void) -> WindowID {
+        WindowID {
+            window: window
+        }
+    }
+}
+
+unsafe impl Send for WindowID {}
+unsafe impl Sync for WindowID {}
+
 /// Attributes to use when creating a window.
 #[derive(Clone)]
 pub struct WindowAttributes {
@@ -560,8 +577,8 @@ pub struct WindowAttributes {
 
     /// Parent Window.
     ///
-    /// The default is `std::ptr::null_mut()`
-    pub parent: WindowID,
+    /// The default is `None`.
+    pub parent: Option<WindowID>,
 }
 
 impl Default for WindowAttributes {
@@ -575,7 +592,7 @@ impl Default for WindowAttributes {
             transparent: false,
             decorations: true,
             multitouch: false,
-            parent: std::ptr::null_mut(),
+            parent: None,
         }
     }
 }
@@ -662,6 +679,3 @@ mod native_monitor {
         Unavailable
     }
 }
-
-/// Identifier for a display system window.
-pub type WindowID = *mut libc::c_void;

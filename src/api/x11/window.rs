@@ -401,13 +401,11 @@ impl Window {
             },
         };
 
-        // getting the parent window
-        let parent = if window_attrs.parent.is_null() {
-                         unsafe { (display.xlib.XDefaultRootWindow)(display.display) }
-        } else {
-            window_attrs.parent as ffi::Window
+        // getting the parent window; root if None
+        let parent = match window_attrs.parent {
+            Some(ref w) => w.window as ffi::Window,
+            None => unsafe { (display.xlib.XDefaultRootWindow)(display.display) }
         };
-        // getting the root window
 
         // creating the color map
         let cmap = unsafe {
