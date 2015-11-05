@@ -197,7 +197,7 @@ impl<'a> WindowBuilder<'a> {
     }
 
     /// Sets the parent window
-    pub fn with_parent(mut self, parent: WindowID) -> WindowBuilder<'a> {
+    pub fn with_parent(mut self, parent: Option<WindowID>) -> WindowBuilder<'a> {
         self.window.parent = parent;
         self
     }
