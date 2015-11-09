@@ -8,7 +8,6 @@ use PixelFormat;
 use PixelFormatRequirements;
 use Robustness;
 
-use gl_common;
 use libc;
 
 use platform;
@@ -117,13 +116,6 @@ impl HeadlessContext {
 
     #[inline]
     pub fn set_window_resize_callback(&mut self, _: Option<fn(u32, u32)>) {
-    }
-}
-
-impl gl_common::GlFunctionsSource for HeadlessContext {
-    #[inline]
-    fn get_proc_addr(&self, addr: &str) -> *const libc::c_void {
-        self.get_proc_address(addr)
     }
 }
 
