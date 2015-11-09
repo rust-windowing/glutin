@@ -18,7 +18,6 @@ use Window;
 use WindowAttributes;
 use native_monitor::NativeMonitorId;
 
-use gl_common;
 use libc;
 
 use platform;
@@ -489,13 +488,6 @@ impl Window {
     #[inline]
     pub fn set_cursor_state(&self, state: CursorState) -> Result<(), String> {
         self.window.set_cursor_state(state)
-    }
-}
-
-impl gl_common::GlFunctionsSource for Window {
-    #[inline]
-    fn get_proc_addr(&self, addr: &str) -> *const libc::c_void {
-        self.get_proc_address(addr)
     }
 }
 
