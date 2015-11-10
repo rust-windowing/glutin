@@ -11,14 +11,13 @@ documentation = "https://tomaka.github.io/glutin/"
 build = "build.rs"
 
 [dependencies]
-gl_common = "0.1.0"
-lazy_static = "0.1.10"
-libc = "0.2"
+lazy_static = "=0.1.15"
+libc = "=0.2.0"
 shared_library = "0.1.0"
 
 [build-dependencies]
-gl_generator = "0.2.0"
-khronos_api = "0.0.8"
+gl_generator = "=0.2.0"
+khronos_api = "=0.0.8"
 
 [dev-dependencies]
 clock_ticks = "0.1.0"
@@ -27,97 +26,97 @@ clock_ticks = "0.1.0"
 version = "0.1"
 
 [target.i386-apple-ios.dependencies]
-objc = "0.1.8"
+objc = "=0.1.8"
 
 [target.x86_64-apple-ios.dependencies]
-objc = "0.1.8"
+objc = "=0.1.8"
 
 [target.aarch64-apple-ios.dependencies]
-objc = "0.1.8"
+objc = "=0.1.8"
 
 [target.armv7s-apple-ios.dependencies]
-objc = "0.1.8"
+objc = "=0.1.8"
 
 [target.armv7-apple-ios.dependencies]
-objc = "0.1.8"
+objc = "=0.1.8"
 
 [target.x86_64-apple-darwin.dependencies]
-objc = "0.1.8"
+objc = "=0.1.8"
 cgl = "0.1"
 cocoa = "0.1.4"
 core-foundation = "0"
 core-graphics = "0"
 
 [target.i686-pc-windows-gnu.dependencies]
-winapi = "0.2"
-shell32-sys = "0.1"
-gdi32-sys = "0.1"
-user32-sys = "~0.1.2"
-kernel32-sys = "0.2"
-dwmapi-sys = "0.1"
+winapi = "=0.2.5"
+shell32-sys = "=0.1.1"
+gdi32-sys = "=0.1.1"
+user32-sys = "=0.1.2"
+kernel32-sys = "=0.2.1"
+dwmapi-sys = "=0.1.0"
 
 [target.i686-pc-windows-msvc.dependencies]
-winapi = "0.2"
-shell32-sys = "0.1"
-gdi32-sys = "0.1"
-user32-sys = "~0.1.2"
-kernel32-sys = "0.2"
-dwmapi-sys = "0.1"
+winapi = "=0.2.5"
+shell32-sys = "=0.1.1"
+gdi32-sys = "=0.1.1"
+user32-sys = "=0.1.2"
+kernel32-sys = "=0.2.1"
+dwmapi-sys = "=0.1.0"
 
 [target.x86_64-pc-windows-gnu.dependencies]
-winapi = "0.2"
-shell32-sys = "0.1"
-gdi32-sys = "0.1"
-user32-sys = "~0.1.2"
-kernel32-sys = "0.2"
-dwmapi-sys = "0.1"
+winapi = "=0.2.5"
+shell32-sys = "=0.1.1"
+gdi32-sys = "=0.1.1"
+user32-sys = "=0.1.2"
+kernel32-sys = "=0.2.1"
+dwmapi-sys = "=0.1.0"
 
 [target.x86_64-pc-windows-msvc.dependencies]
-winapi = "0.2"
-shell32-sys = "0.1"
-gdi32-sys = "0.1"
-user32-sys = "~0.1.2"
-kernel32-sys = "0.2"
-dwmapi-sys = "0.1"
+winapi = "=0.2.5"
+shell32-sys = "=0.1.1"
+gdi32-sys = "=0.1.1"
+user32-sys = "=0.1.2"
+kernel32-sys = "=0.2.1"
+dwmapi-sys = "=0.1.0"
 
 [target.i686-unknown-linux-gnu.dependencies]
-osmesa-sys = "0.0.5"
+osmesa-sys = "=0.0.5"
 wayland-client = { version = "0.2.1", features = ["egl", "dlopen"] }
 wayland-kbd = "0.2.0"
 wayland-window = "0.1.0"
 x11-dl = "~2.0"
 
 [target.x86_64-unknown-linux-gnu.dependencies]
-osmesa-sys = "0.0.5"
-wayland-client = { version = "0.2.1", features = ["egl", "dlopen"] }
-wayland-kbd = "0.2.0"
-wayland-window = "0.1.0"
-x11-dl = "~2.0"
+osmesa-sys = "=0.0.5"
+wayland-client = { version = "=0.2.1", features = ["egl", "dlopen"] }
+wayland-kbd = "=0.2.0"
+wayland-window = "=0.1.0"
+x11-dl = "=2.0.1"
 
 [target.arm-unknown-linux-gnueabihf.dependencies]
-osmesa-sys = "0.0.5"
-wayland-client = { version = "0.2.1", features = ["egl", "dlopen"] }
-wayland-kbd = "0.2.0"
-wayland-window = "0.1.0"
-x11-dl = "~2.0"
+osmesa-sys = "=0.0.5"
+wayland-client = { version = "=0.2.1", features = ["egl", "dlopen"] }
+wayland-kbd = "=0.2.0"
+wayland-window = "=0.1.0"
+x11-dl = "=2.0.1"
 
 [target.aarch64-unknown-linux-gnu.dependencies]
-osmesa-sys = "0.0.5"
-wayland-client = { version = "0.2.1", features = ["egl", "dlopen"] }
-wayland-kbd = "0.2.0"
-wayland-window = "0.1.0"
-x11-dl = "~2.0"
+osmesa-sys = "=0.0.5"
+wayland-client = { version = "=0.2.1", features = ["egl", "dlopen"] }
+wayland-kbd = "=0.2.0"
+wayland-window = "=0.1.0"
+x11-dl = "=2.0.1"
 
 [target.x86_64-unknown-dragonfly.dependencies]
-osmesa-sys = "0.0.5"
-wayland-client = { version = "0.2.1", features = ["egl", "dlopen"] }
-wayland-kbd = "0.2.0"
-wayland-window = "0.1.0"
-x11-dl = "~2.0"
+osmesa-sys = "=0.0.5"
+wayland-client = { version = "=0.2.1", features = ["egl", "dlopen"] }
+wayland-kbd = "=0.2.0"
+wayland-window = "=0.1.0"
+x11-dl = "=2.0.1"
 
 [target.x86_64-unknown-freebsd.dependencies]
-osmesa-sys = "0.0.5"
-wayland-client = { version = "0.2.1", features = ["egl", "dlopen"] }
-wayland-kbd = "0.2.0"
-wayland-window = "0.1.0"
-x11-dl = "~2.0"
+osmesa-sys = "=0.0.5"
+wayland-client = { version = "=0.2.1", features = ["egl", "dlopen"] }
+wayland-kbd = "=0.2.0"
+wayland-window = "=0.1.0"
+x11-dl = "=2.0.1"
