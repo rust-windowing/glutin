@@ -551,7 +551,7 @@ impl Window {
             unsafe {
                 (display.xlib.XSendEvent)(
                     display.display,
-                    root,
+                    parent,
                     0,
                     ffi::SubstructureRedirectMask | ffi::SubstructureNotifyMask,
                     &mut x_event as *mut _
