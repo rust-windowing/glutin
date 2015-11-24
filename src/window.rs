@@ -19,9 +19,7 @@ use WindowID;
 use WindowAttributes;
 use native_monitor::NativeMonitorId;
 
-use gl_common;
 use libc;
-
 use platform;
 
 /// Object that allows you to build windows.
@@ -404,8 +402,8 @@ impl Window {
     ///
     /// Contrary to `wglGetProcAddress`, all available OpenGL functions return an address.
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const libc::c_void {
-        self.window.get_proc_address(addr) as *const libc::c_void
+    pub fn get_proc_address(&self, addr: &str) -> *const () {
+        self.window.get_proc_address(addr)
     }
 
     /// Swaps the buffers in case of double or triple buffering.
@@ -499,13 +497,6 @@ impl Window {
     }
 }
 
-impl gl_common::GlFunctionsSource for Window {
-    #[inline]
-    fn get_proc_addr(&self, addr: &str) -> *const libc::c_void {
-        self.get_proc_address(addr)
-    }
-}
-
 impl GlContext for Window {
     #[inline]
     unsafe fn make_current(&self) -> Result<(), ContextError> {
@@ -518,7 +509,7 @@ impl GlContext for Window {
     }
 
     #[inline]
-    fn get_proc_address(&self, addr: &str) -> *const libc::c_void {
+    fn get_proc_address(&self, addr: &str) -> *const () {
         self.get_proc_address(addr)
     }
 
