@@ -1,5 +1,5 @@
 [package]
-name = "glutin"
+name = "servo-glutin"
 version = "0.4.2"
 authors = ["tomaka <pierre.krieger1708@gmail.com>"]
 description = "Cross-plaform OpenGL context provider."
@@ -127,9 +127,9 @@ wayland-window = "0.1.0"
 x11-dl = "~2.2"
 
 [target.i686-unknown-linux-gnu.dependencies.x11]
-version = "*"
+version = "2.2"
 features = ["xlib", "xf86vmode", "xcursor"]
 
 [target.x86_64-unknown-linux-gnu.dependencies.x11]
-version = "*"
+version = "2.2"
 features = ["xlib", "xf86vmode", "xcursor"]
