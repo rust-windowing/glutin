@@ -260,8 +260,35 @@ impl Window {
     }
 
     #[inline]
-    pub fn set_cursor(&self, _cursor: MouseCursor) {
-        unimplemented!()
+    pub fn set_cursor(&self, cursor: MouseCursor) {
+        let cursor_name = match cursor {
+            MouseCursor::Arrow | MouseCursor::Default => winapi::IDC_ARROW,
+            MouseCursor::Hand => winapi::IDC_HAND,
+            MouseCursor::Text |  MouseCursor::VerticalText => winapi::IDC_IBEAM,
+
+            MouseCursor::NotAllowed | MouseCursor::NoDrop => winapi::IDC_NO,
+            MouseCursor::Crosshair => winapi::IDC_CROSS,
+            MouseCursor::EResize => winapi::IDC_SIZEWE,
+            MouseCursor::NResize => winapi::IDC_SIZENS,
+            MouseCursor::WResize => winapi::IDC_SIZEWE,
+            MouseCursor::SResize => winapi::IDC_SIZENS,
+            MouseCursor::EwResize | MouseCursor::ColResize => winapi::IDC_SIZEWE,
+            MouseCursor::NsResize | MouseCursor::RowResize => winapi::IDC_SIZENS,
+            MouseCursor::NeResize | MouseCursor::SwResize => winapi::IDC_SIZENESW,
+            MouseCursor::NwResize | MouseCursor::SeResize => winapi::IDC_SIZENWSE,
+            MouseCursor::NwseResize | MouseCursor::NeswResize => winapi::IDC_SIZEALL,
+            MouseCursor::Wait | MouseCursor::Progress => winapi::IDC_WAIT,
+            MouseCursor::Help => winapi::IDC_HELP,
+
+            MouseCursor::Grabbing | MouseCursor::Grab | MouseCursor::Copy |
+            MouseCursor::Alias    | MouseCursor::ContextMenu |
+            MouseCursor::Cell | MouseCursor::NoneCursor |
+            MouseCursor::Move | MouseCursor::AllScroll | MouseCursor::ZoomIn |
+            MouseCursor::ZoomOut => winapi::IDC_ARROW,
+        };
+        unsafe {
+            user32::SetCursor(user32::LoadCursorW(ptr::null_mut(), cursor_name));
+        }
     }
 
     pub fn set_cursor_state(&self, state: CursorState) -> Result<(), String> {
