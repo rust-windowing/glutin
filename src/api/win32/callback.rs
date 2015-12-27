@@ -254,9 +254,11 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
                     if let Ok(window_state) = cstash.window_state.lock() {
                         match window_state.cursor_state {
                             CursorState::Normal => {
+                                user32::DefWindowProcW(window, msg, wparam, lparam);
+                            /*
                                 user32::SetCursor(user32::LoadCursorW(
                                         ptr::null_mut(),
-                                        winapi::IDC_ARROW));
+                                        winapi::IDC_ARROW));*/
                             },
                             CursorState::Grab | CursorState::Hide => {
                                 user32::SetCursor(ptr::null_mut());

@@ -518,6 +518,12 @@ pub struct WindowAttributes {
     /// [iOS only] Enable multitouch, see [UIView#multipleTouchEnabled]
     /// (https://developer.apple.com/library/ios/documentation/UIKit/Reference/UIView_Class/#//apple_ref/occ/instp/UIView/multipleTouchEnabled)
     pub multitouch: bool,
+
+    /// Whether the windowed mode window will be resizable by the user. The window will still be resizable using the set_inner_size function. 
+    /// This hint is ignored for full screen windows.
+    ///
+    /// The default is 'true'.
+    pub resizable: bool,
 }
 
 impl Default for WindowAttributes {
@@ -533,6 +539,7 @@ impl Default for WindowAttributes {
             transparent: false,
             decorations: true,
             multitouch: false,
+            resizable: true,
         }
     }
 }

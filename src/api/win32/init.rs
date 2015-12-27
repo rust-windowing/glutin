@@ -123,7 +123,8 @@ unsafe fn init(title: Vec<u16>, window: &WindowAttributes, pf_reqs: &PixelFormat
         (winapi::WS_EX_APPWINDOW, winapi::WS_POPUP | winapi::WS_CLIPSIBLINGS | winapi::WS_CLIPCHILDREN)
     } else {
         (winapi::WS_EX_APPWINDOW | winapi::WS_EX_WINDOWEDGE,
-            winapi::WS_OVERLAPPEDWINDOW | winapi::WS_CLIPSIBLINGS | winapi::WS_CLIPCHILDREN)
+            winapi::WS_CLIPSIBLINGS | winapi::WS_CLIPCHILDREN | winapi::WS_CAPTION | winapi::WS_SYSMENU | winapi::WS_MINIMIZEBOX |
+            if window.resizable { winapi::WS_MAXIMIZEBOX | winapi::WS_SIZEBOX } else { 0 })
     };
 
     // adjusting the window coordinates using the style
@@ -257,7 +258,7 @@ unsafe fn register_window_class() -> Vec<u16> {
         cbWndExtra: 0,
         hInstance: kernel32::GetModuleHandleW(ptr::null()),
         hIcon: ptr::null_mut(),
-        hCursor: ptr::null_mut(),       // must be null in order for cursor state to work properly
+        hCursor: user32::LoadCursorW(ptr::null_mut(), winapi::IDC_ARROW),       // must be null in order for cursor state to work properly
         hbrBackground: ptr::null_mut(),
         lpszMenuName: ptr::null(),
         lpszClassName: class_name.as_ptr(),
