@@ -493,6 +493,11 @@ impl Window {
         self.window.set_cursor(cursor);
     }
 
+    /// Resets the mouse cursor to the default behaviour.
+    pub fn reset_cursor(&self) {
+        self.window.reset_cursor();
+    }
+
     /// Returns the ratio between the backing framebuffer resolution and the
     /// window size in screen pixels. This is typically one for a normal display
     /// and two for a retina display.

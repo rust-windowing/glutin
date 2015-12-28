@@ -48,7 +48,7 @@ pub type Cursor = *const winapi::wchar_t;
 /// Contains information about states and the window for the callback.
 #[derive(Clone)]
 pub struct WindowState {
-    pub cursor: Cursor,
+    pub cursor: Option<Cursor>,
     pub cursor_state: CursorState,
     pub attributes: WindowAttributes
 }
@@ -283,9 +283,13 @@ impl Window {
         };
 
         let mut cur = self.window_state.lock().unwrap();
-        cur.cursor = cursor_id;
+        cur.cursor = Some(cursor_id);
     }
 
+    pub fn reset_cursor(&self) {
+        let mut cur = self.window_state.lock().unwrap();
+        cur.cursor = None; 
+    }
 
     pub fn set_cursor_state(&self, state: CursorState) -> Result<(), String> {
         let mut current_state = self.window_state.lock().unwrap();
