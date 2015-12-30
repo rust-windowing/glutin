@@ -239,8 +239,12 @@ unsafe fn init(title: Vec<u16>, window: &WindowAttributes, pf_reqs: &PixelFormat
 
     let path = CString::new(window.icon.clone()).unwrap().as_ptr();
     let h_icon = user32::LoadImageA(ptr::null_mut(), path, winapi::IMAGE_ICON, 0, 0, winapi::LR_DEFAULTSIZE | winapi::LR_LOADFROMFILE);
-    user32::PostMessageW(real_window.0, winapi::WM_SETICON, 0, h_icon as i64);
-    user32::PostMessageW(real_window.0, winapi::WM_SETICON, 1, h_icon as i64);
+
+    // Won't accept an isize for some reason
+    #[cfg(target_pointer_width="32")] type Handle = i32;
+	#[cfg(target_pointer_width="64")] type Handle = i64;
+    user32::PostMessageW(real_window.0, winapi::WM_SETICON, 0, h_icon as Handle);
+    user32::PostMessageW(real_window.0, winapi::WM_SETICON, 1, h_icon as Handle);
 
     // building the struct
     Ok(Window {
