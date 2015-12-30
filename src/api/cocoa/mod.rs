@@ -13,6 +13,7 @@ use GlProfile;
 use GlRequest;
 use PixelFormat;
 use PixelFormatRequirements;
+use ReleaseBehavior;
 use Robustness;
 use WindowAttributes;
 use native_monitor::NativeMonitorId;
@@ -33,7 +34,7 @@ use core_foundation::base::TCFType;
 use core_foundation::string::CFString;
 use core_foundation::bundle::{CFBundleGetBundleWithIdentifier, CFBundleGetFunctionPointerForName};
 
-use core_graphics::display::{CGAssociateMouseAndMouseCursorPosition, CGMainDisplayID, CGDisplayPixelsHigh};
+use core_graphics::display::{CGAssociateMouseAndMouseCursorPosition, CGMainDisplayID, CGDisplayPixelsHigh, CGWarpMouseCursorPosition};
 
 use std::ffi::CStr;
 use std::collections::VecDeque;
@@ -268,6 +269,10 @@ impl Window {
             unimplemented!()
         }
 
+        // not implemented
+        assert!(win_attribs.min_dimensions.is_none());
+        assert!(win_attribs.max_dimensions.is_none());
+
         match opengl.robustness {
             Robustness::RobustNoResetNotification | Robustness::RobustLoseContextOnReset => {
                 return Err(CreationError::RobustnessNotSupported);
@@ -366,7 +371,7 @@ impl Window {
                         let count: NSUInteger = msg_send![screens, count];
                         let key = IdRef::new(NSString::alloc(nil).init_str("NSScreenNumber"));
                         let mut matching_screen: Option<id> = None;
-                        for i in (0..count) {
+                        for i in 0..count {
                             let screen = msg_send![screens, objectAtIndex:i as NSUInteger];
                             let device_description = NSScreen::deviceDescription(screen);
                             let value: id = msg_send![device_description, objectForKey:*key];
@@ -392,26 +397,24 @@ impl Window {
                 }
             };
 
-            let masks = match (attrs.decorations, attrs.transparent) {
-                (true, false) =>
-                    // Classic opaque window with titlebar
-                    NSClosableWindowMask as NSUInteger |
-                    NSMiniaturizableWindowMask as NSUInteger |
-                    NSResizableWindowMask as NSUInteger |
-                    NSTitledWindowMask as NSUInteger,
-                (false, false) =>
-                    // Opaque window without a titlebar
-                    NSClosableWindowMask as NSUInteger |
-                    NSMiniaturizableWindowMask as NSUInteger |
-                    NSResizableWindowMask as NSUInteger |
-                    NSTitledWindowMask as NSUInteger |
-                    NSFullSizeContentViewWindowMask as NSUInteger,
-                (_, true) =>
-                    // Fully transparent window.
-                    // No shadow, decorations or borders.
-                    NSBorderlessWindowMask as NSUInteger
+            let masks = if screen.is_some() || attrs.transparent {
+                // Fullscreen or transparent window
+                NSBorderlessWindowMask as NSUInteger
+            } else if attrs.decorations {
+                // Classic opaque window with titlebar
+                NSClosableWindowMask as NSUInteger |
+                NSMiniaturizableWindowMask as NSUInteger |
+                NSResizableWindowMask as NSUInteger |
+                NSTitledWindowMask as NSUInteger
+            } else {
+                // Opaque window without a titlebar
+                NSClosableWindowMask as NSUInteger |
+                NSMiniaturizableWindowMask as NSUInteger |
+                NSResizableWindowMask as NSUInteger |
+                NSTitledWindowMask as NSUInteger |
+                NSFullSizeContentViewWindowMask as NSUInteger
             };
-
+            
             let window = IdRef::new(NSWindow::alloc(nil).initWithContentRect_styleMask_backing_defer_(
                 frame,
                 masks,
@@ -489,6 +492,8 @@ impl Window {
         let alpha_depth = pf_reqs.alpha_bits.unwrap_or(8);
         let color_depth = pf_reqs.color_bits.unwrap_or(24) + alpha_depth;
 
+        // TODO: handle hardware_accelerated parameter of pf_reqs
+
         let mut attributes = vec![
             NSOpenGLPFADoubleBuffer as u32,
             NSOpenGLPFAClosestPolicy as u32,
@@ -499,10 +504,19 @@ impl Window {
             NSOpenGLPFAOpenGLProfile as u32, profile,
         ];
 
-        // A color depth higher than 64 implies we're using either 16-bit
-        // floats or 32-bit floats and OS X requires a flag to be set
-        // accordingly. 
-        if color_depth >= 64 {
+        if pf_reqs.release_behavior != ReleaseBehavior::Flush {
+            return Err(CreationError::NoAvailablePixelFormat);
+        }
+
+        if pf_reqs.stereoscopy {
+            unimplemented!();   // TODO: 
+        }
+
+        if pf_reqs.double_buffer == Some(false) {
+            unimplemented!();   // TODO: 
+        }
+
+        if pf_reqs.float_color_buffer {
             attributes.push(NSOpenGLPFAColorFloat as u32);
         }
 
@@ -751,8 +765,17 @@ impl Window {
     }
 
     #[inline]
-    pub fn set_cursor_position(&self, _x: i32, _y: i32) -> Result<(), ()> {
-        unimplemented!();
+    pub fn set_cursor_position(&self, x: i32, y: i32) -> Result<(), ()> {
+        let (window_x, window_y) = self.get_position().unwrap_or((0, 0));
+        let (cursor_x, cursor_y) = (window_x + x, window_y + y);
+        
+        unsafe {
+            // TODO: Check for errors.
+            let _ = CGWarpMouseCursorPosition(CGPoint { x: cursor_x as CGFloat, y: cursor_y as CGFloat });
+            let _ = CGAssociateMouseAndMouseCursorPosition(true);
+        }
+
+        Ok(())
     }
 }
 
