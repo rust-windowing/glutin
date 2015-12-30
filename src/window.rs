@@ -53,6 +53,24 @@ impl<'a> WindowBuilder<'a> {
         self.window.dimensions = Some((width, height));
         self
     }
+    
+    /// Sets a minimum dimension size for the window
+    ///
+    /// Width and height are in pixels.
+    #[inline]
+    pub fn with_min_dimensions(mut self, width: u32, height: u32) -> WindowBuilder<'a> {
+        self.window.min_dimensions = Some((width, height));
+        self
+    }
+
+    /// Sets a maximum dimension size for the window
+    ///
+    /// Width and height are in pixels.
+    #[inline]
+    pub fn with_max_dimensions(mut self, width: u32, height: u32) -> WindowBuilder<'a> {
+        self.window.max_dimensions = Some((width, height));
+        self
+    }
 
     /// Requests a specific title for the window.
     #[inline]
@@ -169,7 +187,7 @@ impl<'a> WindowBuilder<'a> {
     /// Sets whether sRGB should be enabled on the window. `None` means "I don't care".
     #[inline]
     pub fn with_srgb(mut self, srgb_enabled: Option<bool>) -> WindowBuilder<'a> {
-        self.pf_reqs.srgb = srgb_enabled;
+        self.pf_reqs.srgb = srgb_enabled.unwrap_or(false);
         self
     }
 

@@ -2,6 +2,7 @@ use std::ptr;
 use std::fmt;
 use std::error::Error;
 use std::ffi::CString;
+use std::sync::Mutex;
 
 use libc;
 
@@ -18,29 +19,24 @@ pub struct XConnection {
     pub glx: Option<ffi::glx::Glx>,
     pub egl: Option<Egl>,
     pub display: *mut ffi::Display,
+    pub latest_error: Mutex<Option<XError>>,
 }
 
 unsafe impl Send for XConnection {}
 unsafe impl Sync for XConnection {}
 
+pub type XErrorHandler = Option<unsafe extern fn(*mut ffi::Display, *mut ffi::XErrorEvent) -> libc::c_int>;
+
 impl XConnection {
-    pub fn new() -> Result<XConnection, XNotSupported> {
+    pub fn new(error_handler: XErrorHandler) -> Result<XConnection, XNotSupported> {
         // opening the libraries
         let xlib = try!(ffi::Xlib::open());
         let xcursor = try!(ffi::Xcursor::open());
         let xf86vmode = try!(ffi::Xf86vmode::open());
         let xinput2 = try!(ffi::XInput2::open());
 
-        unsafe extern "C" fn x_error_callback(_: *mut ffi::Display, event: *mut ffi::XErrorEvent)
-                                              -> libc::c_int
-        {
-            println!("[glutin] x error code={} major={} minor={}!", (*event).error_code,
-                     (*event).request_code, (*event).minor_code);
-            0
-        }
-
         unsafe { (xlib.XInitThreads)() };
-        unsafe { (xlib.XSetErrorHandler)(Some(x_error_callback)) };
+        unsafe { (xlib.XSetErrorHandler)(error_handler) };
 
         // TODO: use something safer than raw "dlopen"
         let glx = {
@@ -93,7 +89,26 @@ impl XConnection {
             glx: glx,
             egl: egl,
             display: display,
+            latest_error: Mutex::new(None),
         })
+    }
+
+    /// Checks whether an error has been triggered by the previous function calls.
+    #[inline]
+    pub fn check_errors(&self) -> Result<(), XError> {
+        let error = self.latest_error.lock().unwrap().take();
+
+        if let Some(error) = error {
+            Err(error)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Ignores any previous error.
+    #[inline]
+    pub fn ignore_error(&self) {
+        *self.latest_error.lock().unwrap() = None;
     }
 }
 
@@ -101,6 +116,29 @@ impl Drop for XConnection {
     #[inline]
     fn drop(&mut self) {
         unsafe { (self.xlib.XCloseDisplay)(self.display) };
+    }
+}
+
+/// Error triggered by xlib.
+#[derive(Debug, Clone)]
+pub struct XError {
+    pub description: String,
+    pub error_code: u8,
+    pub request_code: u8,
+    pub minor_code: u8,
+}
+
+impl Error for XError {
+    #[inline]
+    fn description(&self) -> &str {
+        &self.description
+    }
+}
+
+impl fmt::Display for XError {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(formatter, "X error: {} (code: {}, request code: {}, minor code: {})",
+               self.description, self.error_code, self.request_code, self.minor_code)
     }
 }
 
