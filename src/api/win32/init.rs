@@ -20,7 +20,7 @@ use GlRequest;
 use PixelFormatRequirements;
 use WindowAttributes;
 
-use std::ffi::{OsStr};
+use std::ffi::{OsStr, CString};
 use std::os::windows::ffi::OsStrExt;
 use std::sync::mpsc::channel;
 
@@ -236,6 +236,11 @@ unsafe fn init(title: Vec<u16>, window: &WindowAttributes, pf_reqs: &PixelFormat
         });
         rx
     };
+
+    let path = CString::new(window.icon.clone()).unwrap().as_ptr();
+    let h_icon = user32::LoadImageA(ptr::null_mut(), path, winapi::IMAGE_ICON, 0, 0, winapi::LR_DEFAULTSIZE | winapi::LR_LOADFROMFILE);
+    user32::PostMessageW(real_window.0, winapi::WM_SETICON, 0, h_icon as i64);
+    user32::PostMessageW(real_window.0, winapi::WM_SETICON, 1, h_icon as i64);
 
     // building the struct
     Ok(Window {

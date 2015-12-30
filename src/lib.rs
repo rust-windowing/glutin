@@ -499,6 +499,11 @@ pub struct WindowAttributes {
     /// The default is `"glutin window"`.
     pub title: String,
 
+    /// The file path to the icon of the window in the tray and title bar.
+    ///
+    /// The default is `""`.
+    pub icon: String,
+
     /// Whether the window should be immediately visible upon creation.
     ///
     /// The default is `true`.
@@ -529,6 +534,7 @@ impl Default for WindowAttributes {
             max_dimensions: None,
             monitor: None,
             title: "glutin window".to_owned(),
+            icon: "".to_owned(),
             visible: true,
             transparent: false,
             decorations: true,

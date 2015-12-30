@@ -78,6 +78,13 @@ impl<'a> WindowBuilder<'a> {
         self
     }
 
+    /// Sets the path to the icon of the window.
+    #[inline]
+    pub fn with_icon(mut self, icon: String) -> WindowBuilder<'a> {
+        self.window.icon = icon;
+        self
+    }
+
     /// Requests fullscreen mode.
     ///
     /// If you don't specify dimensions for the window, it will match the monitor's.
