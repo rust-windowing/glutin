@@ -242,7 +242,7 @@ unsafe fn init(title: Vec<u16>, window: &WindowAttributes, pf_reqs: &PixelFormat
 
     // Won't accept an isize for some reason
     #[cfg(target_pointer_width="32")] type Handle = i32;
-	#[cfg(target_pointer_width="64")] type Handle = i64;
+    #[cfg(target_pointer_width="64")] type Handle = i64;
     user32::PostMessageW(real_window.0, winapi::WM_SETICON, 0, h_icon as Handle);
     user32::PostMessageW(real_window.0, winapi::WM_SETICON, 1, h_icon as Handle);
 
