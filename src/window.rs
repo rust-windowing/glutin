@@ -79,7 +79,7 @@ impl<'a> WindowBuilder<'a> {
         self
     }
 
-    /// Sets the path to the icon of the window.
+    /// Sets the path to the icon of the window. Currently only works with .ico file types, other file types will result in a FileNotFound creation error.
     #[inline]
     pub fn with_icon(mut self, icon: PathBuf) -> WindowBuilder<'a> {
         self.window.icon = Some(icon);

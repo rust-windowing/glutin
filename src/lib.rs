@@ -502,7 +502,7 @@ pub struct WindowAttributes {
     /// The default is `"glutin window"`.
     pub title: String,
 
-    /// The file path to the icon of the window in the tray and title bar.
+    /// The file path to the icon of the window in the tray and title bar. Currently only works with .ico file types, other file types will result in a FileNotFound creation error.
     ///
     /// The default is `None`.
     pub icon: Option<PathBuf>,
