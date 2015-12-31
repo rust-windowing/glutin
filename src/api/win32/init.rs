@@ -239,19 +239,16 @@ unsafe fn init(title: Vec<u16>, window: &WindowAttributes, pf_reqs: &PixelFormat
         rx
     };
 
-    match window.icon {
-        Some(ref icon) => {
-            let list: Vec<u16> = icon.as_os_str().encode_wide().chain(Some(0)).collect();
-            let h_icon = user32::LoadImageW(ptr::null_mut(), list.as_ptr(), winapi::IMAGE_ICON, 0, 0, winapi::LR_DEFAULTSIZE | winapi::LR_LOADFROMFILE);
+    if let Some(ref icon) = window.icon {
+        let list: Vec<u16> = icon.as_os_str().encode_wide().chain(Some(0)).collect();
+        let h_icon = user32::LoadImageW(ptr::null_mut(), list.as_ptr(), winapi::IMAGE_ICON, 0, 0, winapi::LR_DEFAULTSIZE | winapi::LR_LOADFROMFILE);
 
-            if h_icon.is_null() {
-                return Err(CreationError::FileNotFound);
-            }
+        if h_icon.is_null() {
+            return Err(CreationError::FileNotFound);
+        }
 
-            user32::PostMessageW(real_window.0, winapi::WM_SETICON, 0, h_icon as winapi::LPARAM);
-            user32::PostMessageW(real_window.0, winapi::WM_SETICON, 1, h_icon as winapi::LPARAM);
-        },
-        None => { }
+        user32::PostMessageW(real_window.0, winapi::WM_SETICON, 0, h_icon as winapi::LPARAM);
+        user32::PostMessageW(real_window.0, winapi::WM_SETICON, 1, h_icon as winapi::LPARAM);
     }
 
     // building the struct
