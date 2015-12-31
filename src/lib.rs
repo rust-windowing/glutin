@@ -23,6 +23,8 @@
 //!
 //! By default only `window` is enabled.
 
+#![feature(unmarked_api)]
+
 #[macro_use]
 extern crate lazy_static;
 
@@ -69,6 +71,7 @@ pub use native_monitor::NativeMonitorId;
 use std::io;
 #[cfg(not(target_os = "macos"))]
 use std::cmp::Ordering;
+use std::path::PathBuf;
 
 mod api;
 mod platform;
@@ -143,6 +146,7 @@ pub enum CreationError {
     RobustnessNotSupported,
     OpenGlVersionNotSupported,
     NoAvailablePixelFormat,
+    FileNotFound,
 }
 
 impl CreationError {
@@ -157,6 +161,7 @@ impl CreationError {
                                                          supported.",
             CreationError::NoAvailablePixelFormat => "Couldn't find any pixel format that matches \
                                                       the criterias.",
+            CreationError::FileNotFound => "Couldn't find a file with the given path."
         }
     }
 }
@@ -501,8 +506,8 @@ pub struct WindowAttributes {
 
     /// The file path to the icon of the window in the tray and title bar.
     ///
-    /// The default is `""`.
-    pub icon: String,
+    /// The default is `None`.
+    pub icon: Option<PathBuf>,
 
     /// Whether the window should be immediately visible upon creation.
     ///
@@ -534,7 +539,7 @@ impl Default for WindowAttributes {
             max_dimensions: None,
             monitor: None,
             title: "glutin window".to_owned(),
-            icon: "".to_owned(),
+            icon: None,
             visible: true,
             transparent: false,
             decorations: true,

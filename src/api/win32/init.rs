@@ -20,7 +20,7 @@ use GlRequest;
 use PixelFormatRequirements;
 use WindowAttributes;
 
-use std::ffi::{OsStr, CString};
+use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
 use std::sync::mpsc::channel;
 
@@ -94,6 +94,8 @@ unsafe fn init(title: Vec<u16>, window: &WindowAttributes, pf_reqs: &PixelFormat
                opengl: &GlAttributes<RawContext>, egl: Option<Egl>)
                -> Result<Window, CreationError>
 {
+    #[cfg(windows)] use std::os::windows::ffi::OsStrExt;
+
     let opengl = opengl.clone().map_sharing(|sharelists| {
         match sharelists {
             RawContext::Wgl(c) => c,
@@ -237,14 +239,20 @@ unsafe fn init(title: Vec<u16>, window: &WindowAttributes, pf_reqs: &PixelFormat
         rx
     };
 
-    let path = CString::new(window.icon.clone()).unwrap().as_ptr();
-    let h_icon = user32::LoadImageA(ptr::null_mut(), path, winapi::IMAGE_ICON, 0, 0, winapi::LR_DEFAULTSIZE | winapi::LR_LOADFROMFILE);
+    match window.icon {
+        Some(ref icon) => {
+            let list: Vec<u16> = icon.as_os_str().encode_wide().chain(Some(0)).collect();
+            let h_icon = user32::LoadImageW(ptr::null_mut(), list.as_ptr(), winapi::IMAGE_ICON, 0, 0, winapi::LR_DEFAULTSIZE | winapi::LR_LOADFROMFILE);
 
-    // Won't accept an isize for some reason
-    #[cfg(target_pointer_width="32")] type Handle = i32;
-    #[cfg(target_pointer_width="64")] type Handle = i64;
-    user32::PostMessageW(real_window.0, winapi::WM_SETICON, 0, h_icon as Handle);
-    user32::PostMessageW(real_window.0, winapi::WM_SETICON, 1, h_icon as Handle);
+            if h_icon.is_null() {
+                return Err(CreationError::FileNotFound);
+            }
+
+            user32::PostMessageW(real_window.0, winapi::WM_SETICON, 0, h_icon as winapi::LPARAM);
+            user32::PostMessageW(real_window.0, winapi::WM_SETICON, 1, h_icon as winapi::LPARAM);
+        },
+        None => { }
+    }
 
     // building the struct
     Ok(Window {

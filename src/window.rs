@@ -1,5 +1,6 @@
 use std::collections::vec_deque::IntoIter as VecDequeIter;
 use std::default::Default;
+use std::path::PathBuf;
 
 use Api;
 use ContextError;
@@ -80,8 +81,8 @@ impl<'a> WindowBuilder<'a> {
 
     /// Sets the path to the icon of the window.
     #[inline]
-    pub fn with_icon(mut self, icon: String) -> WindowBuilder<'a> {
-        self.window.icon = icon;
+    pub fn with_icon(mut self, icon: PathBuf) -> WindowBuilder<'a> {
+        self.window.icon = Some(icon);
         self
     }
 
