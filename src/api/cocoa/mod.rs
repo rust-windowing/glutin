@@ -269,6 +269,10 @@ impl Window {
             unimplemented!()
         }
 
+        if win_attribs.icon.is_some() {
+            unimplemented!()
+        }
+
         // not implemented
         assert!(win_attribs.min_dimensions.is_none());
         assert!(win_attribs.max_dimensions.is_none());

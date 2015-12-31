@@ -124,6 +124,10 @@ impl Window {
         assert!(win_attribs.min_dimensions.is_none());
         assert!(win_attribs.max_dimensions.is_none());
 
+        if win_attribs.icon.is_some() {
+            unimplemented!()
+        }
+
         let opengl = opengl.clone().map_sharing(|w| &w.context);
 
         let native_window = unsafe { android_glue::get_native_window() };
