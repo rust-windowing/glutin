@@ -23,8 +23,6 @@
 //!
 //! By default only `window` is enabled.
 
-#![feature(unmarked_api)]
-
 #[macro_use]
 extern crate lazy_static;
 
