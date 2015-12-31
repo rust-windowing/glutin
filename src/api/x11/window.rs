@@ -305,7 +305,7 @@ impl Window {
     {
         let dimensions = window_attrs.dimensions.unwrap_or((800, 600));
 
-        if win_attrs.icon.is_some() {
+        if window_attrs.icon.is_some() {
             unimplemented!()
         }
 
