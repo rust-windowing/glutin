@@ -298,6 +298,11 @@ impl Window {
     }
 
     #[inline]
+    pub fn reset_cursor(&self) {
+        unimplemented!()
+    }
+
+    #[inline]
     pub fn set_cursor_state(&self, state: CursorState) -> Result<(), String> {
         use CursorState::{Grab, Normal, Hide};
         // TODO : not yet possible on wayland to grab cursor

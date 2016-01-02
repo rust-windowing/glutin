@@ -347,6 +347,11 @@ impl Window {
     }
 
     #[inline]
+    pub fn reset_cursor(&self) {
+        unimplemented!()
+    }
+
+    #[inline]
     pub fn set_cursor_state(&self, _: CursorState) -> Result<(), String> {
         Ok(())
     }

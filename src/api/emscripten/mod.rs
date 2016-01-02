@@ -203,6 +203,11 @@ impl Window {
     }
 
     #[inline]
+    pub fn reset_cursor(&self) {
+        unimplemented!()
+    }
+
+    #[inline]
     pub fn hidpi_factor(&self) -> f32 {
         1.0
     }

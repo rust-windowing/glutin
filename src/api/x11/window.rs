@@ -789,6 +789,11 @@ impl Window {
         }
     }
 
+    #[inline]
+    pub fn reset_cursor(&self) {
+        unimplemented!()
+    }
+
     pub fn set_cursor_state(&self, state: CursorState) -> Result<(), String> {
         use CursorState::{ Grab, Normal };
 

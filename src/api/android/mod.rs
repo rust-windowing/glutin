@@ -237,6 +237,10 @@ impl Window {
     }
 
     #[inline]
+    pub fn reset_cursor(&self) {
+    }
+
+    #[inline]
     pub fn set_cursor_state(&self, state: CursorState) -> Result<(), String> {
         Ok(())
     }
