@@ -49,12 +49,17 @@ pub struct XInputEventHandler {
     ic: ffi::XIC,
     axis_list: Vec<Axis>,
     current_state: InputState,
+    device_pixel_ratio: f32,
     multitouch: bool,
 }
 
 impl XInputEventHandler {
-    pub fn new(display: &Arc<XConnection>, window: ffi::Window, ic: ffi::XIC,
-               window_attrs: &WindowAttributes) -> XInputEventHandler {
+    pub fn new(display: &Arc<XConnection>,
+               window: ffi::Window,
+               ic: ffi::XIC,
+               window_attrs: &WindowAttributes,
+               device_pixel_ratio: f32)
+               -> XInputEventHandler {
         // query XInput support
         let mut opcode: libc::c_int = 0;
         let mut event: libc::c_int = 0;
@@ -119,6 +124,7 @@ impl XInputEventHandler {
                 axis_values: Vec::new()
             },
             multitouch: window_attrs.multitouch,
+            device_pixel_ratio: device_pixel_ratio,
         }
     }
 
@@ -240,7 +246,9 @@ impl XInputEventHandler {
                     let new_cursor_pos = (event_data.event_x, event_data.event_y);
                     if new_cursor_pos != self.current_state.cursor_pos {
                         self.current_state.cursor_pos = new_cursor_pos;
-                        Some(MouseMoved((new_cursor_pos.0 as i32, new_cursor_pos.1 as i32)))
+                        Some(MouseMoved((
+                            self.device_pixels_to_screen_pixels(new_cursor_pos.0 as f32) as i32,
+                            self.device_pixels_to_screen_pixels(new_cursor_pos.1 as f32) as i32)))
                     } else {
                         None
                     }
@@ -271,12 +279,20 @@ impl XInputEventHandler {
                 };
                 Some(Event::Touch(Touch {
                     phase: phase,
-                    location: (event_data.event_x, event_data.event_y),
+                    location:
+                        (self.device_pixels_to_screen_pixels(event_data.event_x as f32) as f64,
+                         self.device_pixels_to_screen_pixels(event_data.event_y as f32) as f64),
                     id: event_data.detail as u64,
                 }))
             }
             _ => None
         }
+    }
+
+    fn device_pixels_to_screen_pixels<N>(&self, device_pixels: N) -> N
+                                         where N: From<f32> + Into<f32> {
+        let device_pixels: f32 = device_pixels.into();
+        (device_pixels / self.device_pixel_ratio).into()
     }
 }
 

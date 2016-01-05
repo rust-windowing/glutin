@@ -35,6 +35,11 @@ lazy_static! {      // TODO: use a static mutex when that's possible, and put me
     static ref GLOBAL_XOPENIM_LOCK: Mutex<()> = Mutex::new(());
 }
 
+#[cfg(not(feature = "use-xsettings"))]
+pub type XSettingsClient = ();
+#[cfg(feature = "use-xsettings")]
+pub type XSettingsClient = ::xsettings::Client;
+
 // TODO: remove me
 fn with_c_str<F, T>(s: &str, f: F) -> T where F: FnOnce(*const libc::c_char) -> T {
     use std::ffi::CString;
@@ -298,7 +303,13 @@ pub struct Window {
     /// Events that have been retreived with XLib but not dispatched with iterators yet
     pending_events: Mutex<VecDeque<Event>>,
     cursor_state: Mutex<CursorState>,
-    input_handler: Mutex<XInputEventHandler>
+    input_handler: Mutex<XInputEventHandler>,
+    /// The XSETTINGS client. This trips the dead code warning because we never consult it after
+    /// the initial HiDPI query. But we really should be listening for HiDPI change events, and
+    /// when that happens we'll need to keep the client around. So we might as well store it here.
+    #[allow(dead_code)]
+    xsettings_client: XSettingsClient,
+    current_hidpi_factor: f32,
 }
 
 impl Window {
@@ -306,16 +317,21 @@ impl Window {
                pf_reqs: &PixelFormatRequirements, opengl: &GlAttributes<&Window>)
                -> Result<Window, CreationError>
     {
-        let dimensions = window_attrs.dimensions.unwrap_or((800, 600));
-
-        // not implemented
-        assert!(window_attrs.min_dimensions.is_none());
-        assert!(window_attrs.max_dimensions.is_none());
-
         let screen_id = match window_attrs.monitor {
             Some(PlatformMonitorId::X(MonitorId(_, monitor))) => monitor as i32,
             _ => unsafe { (display.xlib.XDefaultScreen)(display.display) },
         };
+
+        let xsettings_client = display.create_xsettings_client(screen_id);
+        let hidpi_factor = query_hidpi_factor(&xsettings_client);
+
+        let mut dimensions = window_attrs.dimensions.unwrap_or((800, 600));
+        dimensions = ((dimensions.0 as f32 * hidpi_factor) as u32,
+                      (dimensions.1 as f32 * hidpi_factor) as u32);
+
+        // not implemented
+        assert!(window_attrs.min_dimensions.is_none());
+        assert!(window_attrs.max_dimensions.is_none());
 
         // finding the mode to switch to if necessary
         let (mode_to_switch_to, xf86_desk_mode) = unsafe {
@@ -630,11 +646,16 @@ impl Window {
                 window_proxy_data: window_proxy_data,
             }),
             is_closed: AtomicBool::new(false),
-            wm_delete_window: wm_delete_window,
-            current_size: Cell::new((0, 0)),
+            wm_delete_window: wm_delete_window, current_size: Cell::new((0, 0)),
             pending_events: Mutex::new(VecDeque::new()),
             cursor_state: Mutex::new(CursorState::Normal),
-            input_handler: Mutex::new(XInputEventHandler::new(display, window, ic, window_attrs))
+            input_handler: Mutex::new(XInputEventHandler::new(display,
+                                                              window,
+                                                              ic,
+                                                              window_attrs,
+                                                              hidpi_factor)),
+            xsettings_client: xsettings_client,
+            current_hidpi_factor: hidpi_factor,
         };
 
         if window_attrs.visible {
@@ -718,7 +739,11 @@ impl Window {
                 return None;
             }
 
-            Some((x as i32, y as i32, width as u32, height as u32, border as u32))
+            Some((x as i32,
+                  y as i32,
+                  self.device_pixels_to_screen_pixels(width as f32) as u32,
+                  self.device_pixels_to_screen_pixels(height as f32) as u32,
+                  border as u32))
         }
     }
 
@@ -744,7 +769,13 @@ impl Window {
 
     #[inline]
     pub fn set_inner_size(&self, x: u32, y: u32) {
-        unsafe { (self.x.display.xlib.XResizeWindow)(self.x.display.display, self.x.window, x as libc::c_uint, y as libc::c_uint); }
+        unsafe {
+            (self.x.display.xlib.XResizeWindow)(
+                self.x.display.display,
+                self.x.window,
+                self.screen_pixels_to_device_pixels(x as f32) as libc::c_uint,
+                self.screen_pixels_to_device_pixels(y as f32) as libc::c_uint);
+        }
         self.x.display.check_errors().expect("Failed to call XResizeWindow");
     }
 
@@ -887,9 +918,8 @@ impl Window {
         }
     }
 
-    #[inline]
     pub fn hidpi_factor(&self) -> f32 {
-        1.0
+        self.current_hidpi_factor
     }
 
     pub fn set_cursor_position(&self, x: i32, y: i32) -> Result<(), ()> {
@@ -897,6 +927,18 @@ impl Window {
             (self.x.display.xlib.XWarpPointer)(self.x.display.display, 0, self.x.window, 0, 0, 0, 0, x, y);
             self.x.display.check_errors().map_err(|_| ())
         }
+    }
+
+    pub fn device_pixels_to_screen_pixels<N>(&self, device_pixels: N) -> N
+                                             where N: From<f32> + Into<f32> {
+        let device_pixels: f32 = device_pixels.into();
+        (device_pixels / self.hidpi_factor()).into()
+    }
+
+    pub fn screen_pixels_to_device_pixels<N>(&self, device_pixels: N) -> N
+                                             where N: From<f32> + Into<f32> {
+        let device_pixels: f32 = device_pixels.into();
+        (device_pixels * self.hidpi_factor()).into()
     }
 }
 
@@ -955,3 +997,22 @@ impl GlContext for Window {
         }
     }
 }
+
+#[cfg(not(feature = "use-xsettings"))]
+fn query_hidpi_factor(_: &XSettingsClient) -> f32 {
+    1.0
+}
+
+#[cfg(feature = "use-xsettings")]
+fn query_hidpi_factor(xsettings_client: &XSettingsClient) -> f32 {
+    match xsettings_client.get_setting(b"Xft/DPI") {
+        Ok(setting) => {
+            match setting.data() {
+                ::xsettings::SettingData::Int(dpi) => (dpi as f32) / 98304.0,
+                _ => 1.0,
+            }
+        }
+        Err(_) => 1.0,
+    }
+}
+
