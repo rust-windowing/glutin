@@ -94,7 +94,6 @@ unsafe fn init(title: Vec<u16>, window: &WindowAttributes, pf_reqs: &PixelFormat
                opengl: &GlAttributes<RawContext>, egl: Option<Egl>)
                -> Result<Window, CreationError>
 {
-    #[cfg(windows)] use std::os::windows::ffi::OsStrExt;
 
     let opengl = opengl.clone().map_sharing(|sharelists| {
         match sharelists {

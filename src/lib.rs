@@ -144,7 +144,7 @@ pub enum CreationError {
     RobustnessNotSupported,
     OpenGlVersionNotSupported,
     NoAvailablePixelFormat,
-    FileNotFound,
+    IconFileNotFound,
 }
 
 impl CreationError {
@@ -159,7 +159,7 @@ impl CreationError {
                                                          supported.",
             CreationError::NoAvailablePixelFormat => "Couldn't find any pixel format that matches \
                                                       the criterias.",
-            CreationError::FileNotFound => "Couldn't find a file with the given path."
+            CreationError::IconFileNotFound => "Couldn't find an icon with the given path."
         }
     }
 }
@@ -502,7 +502,7 @@ pub struct WindowAttributes {
     /// The default is `"glutin window"`.
     pub title: String,
 
-    /// The file path to the icon of the window in the tray and title bar. Currently only works with .ico file types, other file types will result in a FileNotFound creation error.
+    /// The file path to the icon of the window in the tray and title bar. Currently only works with .ico file types, other file types will result in a IconFileNotFound creation error.
     ///
     /// The default is `None`.
     pub icon: Option<PathBuf>,
