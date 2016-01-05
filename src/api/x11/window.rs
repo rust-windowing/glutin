@@ -642,8 +642,13 @@ impl Window {
                 let ref x_window: &XWindow = window.x.borrow();
 
                 // XSetInputFocus generates an error if the window is not visible,
-                // therefore we call XSync before to make sure it's the case
-                (display.xlib.XSync)(display.display, 0);
+                // therefore we call XIfEvent before and listen to the Expose event
+                let mut event = mem::zeroed();
+                (display.xlib.XIfEvent)(display.display,
+                                        &mut event,
+                                        Some(check_event),
+                                        ptr::null_mut());
+
                 (display.xlib.XSetInputFocus)(
                     display.display,
                     x_window.window,
@@ -651,6 +656,17 @@ impl Window {
                     ffi::CurrentTime
                 );
                 display.check_errors().expect("Failed to call XSetInputFocus");
+
+                unsafe extern "C" fn check_event(_: *mut ffi::Display,
+                                                 event: *mut ffi::XEvent,
+                                                 _: *mut i8)
+                                                 -> ffi::Bool {
+                    if (*event).get_type() == ffi::Expose {
+                        ffi::True
+                    } else {
+                        ffi::False
+                    }
+                }
             }
         }
 
