@@ -490,7 +490,7 @@ impl Window {
     /// Modifies the mouse cursor of the window.
     /// Passing 'None' will reset the cursor to its default behaviour.
     /// Has no effect on Android.
-    pub fn set_cursor(&self, cursor: Option<MouseCursor>) {
+    pub fn set_cursor(&self, cursor: MouseCursor) {
         self.window.set_cursor(cursor);
     }
 

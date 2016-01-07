@@ -198,7 +198,7 @@ impl Window {
     }
 
     #[inline]
-    pub fn set_cursor(&self, _cursor: Option<MouseCursor>) {
+    pub fn set_cursor(&self, _cursor: MouseCursor) {
         unimplemented!()
     }
 

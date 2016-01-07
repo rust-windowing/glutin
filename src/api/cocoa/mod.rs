@@ -699,46 +699,41 @@ impl Window {
         self.delegate.state.resize_handler = callback;
     }
 
-    pub fn set_cursor(&self, cursor: Option<MouseCursor>) {
-        if let Some(cursor_id) = cursor {
-            let cursor_name = match cursor_id {                            
-                MouseCursor::Arrow | MouseCursor::Default => "arrowCursor",
-                MouseCursor::Hand => "pointingHandCursor",
-                MouseCursor::Grabbing | MouseCursor::Grab => "closedHandCursor",
-                MouseCursor::Text => "IBeamCursor",
-                MouseCursor::VerticalText => "IBeamCursorForVerticalLayout",
-                MouseCursor::Copy => "dragCopyCursor",
-                MouseCursor::Alias => "dragLinkCursor",
-                MouseCursor::NotAllowed | MouseCursor::NoDrop => "operationNotAllowedCursor",
-                MouseCursor::ContextMenu => "contextualMenuCursor",
-                MouseCursor::Crosshair => "crosshairCursor",
-                MouseCursor::EResize => "resizeRightCursor",
-                MouseCursor::NResize => "resizeUpCursor",
-                MouseCursor::WResize => "resizeLeftCursor",
-                MouseCursor::SResize => "resizeDownCursor",
-                MouseCursor::EwResize | MouseCursor::ColResize => "resizeLeftRightCursor",
-                MouseCursor::NsResize | MouseCursor::RowResize => "resizeUpDownCursor",
+    pub fn set_cursor(&self, cursor: MouseCursor) {
+        let cursor_name = match cursor {                            
+            MouseCursor::Arrow | MouseCursor::Default => "arrowCursor",
+            MouseCursor::Hand => "pointingHandCursor",
+            MouseCursor::Grabbing | MouseCursor::Grab => "closedHandCursor",
+            MouseCursor::Text => "IBeamCursor",
+            MouseCursor::VerticalText => "IBeamCursorForVerticalLayout",
+            MouseCursor::Copy => "dragCopyCursor",
+            MouseCursor::Alias => "dragLinkCursor",
+            MouseCursor::NotAllowed | MouseCursor::NoDrop => "operationNotAllowedCursor",
+            MouseCursor::ContextMenu => "contextualMenuCursor",
+            MouseCursor::Crosshair => "crosshairCursor",
+            MouseCursor::EResize => "resizeRightCursor",
+            MouseCursor::NResize => "resizeUpCursor",
+            MouseCursor::WResize => "resizeLeftCursor",
+            MouseCursor::SResize => "resizeDownCursor",
+            MouseCursor::EwResize | MouseCursor::ColResize => "resizeLeftRightCursor",
+            MouseCursor::NsResize | MouseCursor::RowResize => "resizeUpDownCursor",
 
-                /// TODO: Find appropriate OSX cursors
-                MouseCursor::NeResize | MouseCursor::NwResize |
-                MouseCursor::SeResize | MouseCursor::SwResize |
-                MouseCursor::NwseResize | MouseCursor::NeswResize |
+            /// TODO: Find appropriate OSX cursors
+            MouseCursor::NeResize | MouseCursor::NwResize |
+            MouseCursor::SeResize | MouseCursor::SwResize |
+            MouseCursor::NwseResize | MouseCursor::NeswResize |
 
-                MouseCursor::Cell | MouseCursor::NoneCursor |
-                MouseCursor::Wait | MouseCursor::Progress | MouseCursor::Help |
-                MouseCursor::Move | MouseCursor::AllScroll | MouseCursor::ZoomIn |
-                MouseCursor::ZoomOut => "arrowCursor",
-            };
-            let sel = Sel::register(cursor_name);
-            let cls = Class::get("NSCursor").unwrap();
-            unsafe {
-                use objc::MessageArguments;
-                let cursor: id = ().send(cls as *const _ as id, sel);
-                let _: () = msg_send![cursor, set];
-            }
-        } else {
-            // Reset
-            unimplemented!();
+            MouseCursor::Cell | MouseCursor::NoneCursor |
+            MouseCursor::Wait | MouseCursor::Progress | MouseCursor::Help |
+            MouseCursor::Move | MouseCursor::AllScroll | MouseCursor::ZoomIn |
+            MouseCursor::ZoomOut => "arrowCursor",
+        };
+        let sel = Sel::register(cursor_name);
+        let cls = Class::get("NSCursor").unwrap();
+        unsafe {
+            use objc::MessageArguments;
+            let cursor: id = ().send(cls as *const _ as id, sel);
+            let _: () = msg_send![cursor, set];
         }
     }
 
