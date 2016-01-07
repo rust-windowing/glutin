@@ -293,7 +293,7 @@ impl Window {
     }
 
     #[inline]
-    pub fn set_cursor(&self, cursor: MouseCursor) {
+    pub fn set_cursor(&self, cursor: Some<MouseCursor>) {
         match self {
             &Window::X(ref w) => w.set_cursor(cursor),
             &Window::Wayland(ref w) => w.set_cursor(cursor)

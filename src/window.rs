@@ -488,14 +488,10 @@ impl Window {
     }
 
     /// Modifies the mouse cursor of the window.
+    /// Passing 'None' will reset the cursor to its default behaviour.
     /// Has no effect on Android.
-    pub fn set_cursor(&self, cursor: MouseCursor) {
+    pub fn set_cursor(&self, cursor: Option<MouseCursor>) {
         self.window.set_cursor(cursor);
-    }
-
-    /// Resets the mouse cursor to the default behaviour.
-    pub fn reset_cursor(&self) {
-        self.window.reset_cursor();
     }
 
     /// Returns the ratio between the backing framebuffer resolution and the

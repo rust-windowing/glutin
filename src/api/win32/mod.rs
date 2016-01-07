@@ -264,31 +264,30 @@ impl Window {
     }
 
     #[inline]
-    pub fn set_cursor(&self, _cursor: MouseCursor) {
-        let cursor_id = match _cursor {
-            MouseCursor::Arrow | MouseCursor::Default => winapi::IDC_ARROW,
-            MouseCursor::Hand => winapi::IDC_HAND,
-            MouseCursor::Crosshair => winapi::IDC_CROSS,
-            MouseCursor::Text | MouseCursor::VerticalText => winapi::IDC_IBEAM,
-            MouseCursor::NotAllowed | MouseCursor::NoDrop => winapi::IDC_NO,
-            MouseCursor::EResize => winapi::IDC_SIZEWE,
-            MouseCursor::NResize => winapi::IDC_SIZENS,
-            MouseCursor::WResize => winapi::IDC_SIZEWE,
-            MouseCursor::SResize => winapi::IDC_SIZENS,
-            MouseCursor::EwResize | MouseCursor::ColResize => winapi::IDC_SIZEWE,
-            MouseCursor::NsResize | MouseCursor::RowResize => winapi::IDC_SIZENS,
-            MouseCursor::Wait | MouseCursor::Progress => winapi::IDC_WAIT,
-            MouseCursor::Help => winapi::IDC_HELP,
-            _ => winapi::IDC_ARROW, // use arrow for the missing cases.
+    pub fn set_cursor(&self, _cursor: Option<MouseCursor>) {
+        if let Some(cursor_id) = _cursor {
+            let cursor_name = match cursor_id {
+                MouseCursor::Arrow | MouseCursor::Default => winapi::IDC_ARROW,
+                MouseCursor::Hand => winapi::IDC_HAND,
+                MouseCursor::Crosshair => winapi::IDC_CROSS,
+                MouseCursor::Text | MouseCursor::VerticalText => winapi::IDC_IBEAM,
+                MouseCursor::NotAllowed | MouseCursor::NoDrop => winapi::IDC_NO,
+                MouseCursor::EResize => winapi::IDC_SIZEWE,
+                MouseCursor::NResize => winapi::IDC_SIZENS,
+                MouseCursor::WResize => winapi::IDC_SIZEWE,
+                MouseCursor::SResize => winapi::IDC_SIZENS,
+                MouseCursor::EwResize | MouseCursor::ColResize => winapi::IDC_SIZEWE,
+                MouseCursor::NsResize | MouseCursor::RowResize => winapi::IDC_SIZENS,
+                MouseCursor::Wait | MouseCursor::Progress => winapi::IDC_WAIT,
+                MouseCursor::Help => winapi::IDC_HELP,
+                _ => winapi::IDC_ARROW, // use arrow for the missing cases.
+            };
+            let mut cur = self.window_state.lock().unwrap();
+            cur.cursor = Some(cursor_name);
+        } else {
+            let mut cur = self.window_state.lock().unwrap();
+            cur.cursor = None; 
         };
-
-        let mut cur = self.window_state.lock().unwrap();
-        cur.cursor = Some(cursor_id);
-    }
-
-    pub fn reset_cursor(&self) {
-        let mut cur = self.window_state.lock().unwrap();
-        cur.cursor = None; 
     }
 
     pub fn set_cursor_state(&self, state: CursorState) -> Result<(), String> {

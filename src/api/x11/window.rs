@@ -742,56 +742,56 @@ impl Window {
     pub fn set_window_resize_callback(&mut self, _: Option<fn(u32, u32)>) {
     }
 
-    pub fn set_cursor(&self, cursor: MouseCursor) {
+    pub fn set_cursor(&self, cursor: Some<MouseCursor>) {
         unsafe {
             use std::ffi::CString;
-            let cursor_name = match cursor {
-                MouseCursor::Alias => "link",
-                MouseCursor::Arrow => "arrow",
-                MouseCursor::Cell => "plus",
-                MouseCursor::Copy => "copy",
-                MouseCursor::Crosshair => "crosshair",
-                MouseCursor::Default => "left_ptr",
-                MouseCursor::Grabbing => "grabbing",
-                MouseCursor::Hand | MouseCursor::Grab => "hand",
-                MouseCursor::Help => "question_arrow",
-                MouseCursor::Move => "move",
-                MouseCursor::NoDrop => "circle",
-                MouseCursor::NotAllowed => "crossed_circle",
-                MouseCursor::Progress => "left_ptr_watch",
+            if let Some(cursor_id) = cursor {
+                let cursor_name = match cursor_id {
+                    MouseCursor::Alias => "link",
+                    MouseCursor::Arrow => "arrow",
+                    MouseCursor::Cell => "plus",
+                    MouseCursor::Copy => "copy",
+                    MouseCursor::Crosshair => "crosshair",
+                    MouseCursor::Default => "left_ptr",
+                    MouseCursor::Grabbing => "grabbing",
+                    MouseCursor::Hand | MouseCursor::Grab => "hand",
+                    MouseCursor::Help => "question_arrow",
+                    MouseCursor::Move => "move",
+                    MouseCursor::NoDrop => "circle",
+                    MouseCursor::NotAllowed => "crossed_circle",
+                    MouseCursor::Progress => "left_ptr_watch",
 
-                /// Resize cursors
-                MouseCursor::EResize => "right_side",
-                MouseCursor::NResize => "top_side",
-                MouseCursor::NeResize => "top_right_corner",
-                MouseCursor::NwResize => "top_left_corner",
-                MouseCursor::SResize => "bottom_side",
-                MouseCursor::SeResize => "bottom_right_corner",
-                MouseCursor::SwResize => "bottom_left_corner",
-                MouseCursor::WResize => "left_side",
-                MouseCursor::EwResize | MouseCursor::ColResize => "h_double_arrow",
-                MouseCursor::NsResize | MouseCursor::RowResize => "v_double_arrow",
-                MouseCursor::NwseResize => "bd_double_arrow",
-                MouseCursor::NeswResize => "fd_double_arrow",
+                    /// Resize cursors
+                    MouseCursor::EResize => "right_side",
+                    MouseCursor::NResize => "top_side",
+                    MouseCursor::NeResize => "top_right_corner",
+                    MouseCursor::NwResize => "top_left_corner",
+                    MouseCursor::SResize => "bottom_side",
+                    MouseCursor::SeResize => "bottom_right_corner",
+                    MouseCursor::SwResize => "bottom_left_corner",
+                    MouseCursor::WResize => "left_side",
+                    MouseCursor::EwResize | MouseCursor::ColResize => "h_double_arrow",
+                    MouseCursor::NsResize | MouseCursor::RowResize => "v_double_arrow",
+                    MouseCursor::NwseResize => "bd_double_arrow",
+                    MouseCursor::NeswResize => "fd_double_arrow",
 
-                MouseCursor::Text | MouseCursor::VerticalText => "xterm",
-                MouseCursor::Wait => "watch",
+                    MouseCursor::Text | MouseCursor::VerticalText => "xterm",
+                    MouseCursor::Wait => "watch",
 
-                /// TODO: Find matching X11 cursors
-                MouseCursor::ContextMenu | MouseCursor::NoneCursor |
-                MouseCursor::AllScroll | MouseCursor::ZoomIn |
-                MouseCursor::ZoomOut => "left_ptr",
+                    /// TODO: Find matching X11 cursors
+                    MouseCursor::ContextMenu | MouseCursor::NoneCursor |
+                    MouseCursor::AllScroll | MouseCursor::ZoomIn |
+                    MouseCursor::ZoomOut => "left_ptr",
+                };
+                let c_string = CString::new(cursor_name.as_bytes().to_vec()).unwrap();
+                let xcursor = (self.x.display.xcursor.XcursorLibraryLoadCursor)(self.x.display.display, c_string.as_ptr());
+                (self.x.display.xlib.XDefineCursor)(self.x.display.display, self.x.window, xcursor);
+                (self.x.display.xlib.XFlush)(self.x.display.display);
+            } else {
+                // Reset
+                unimplemented!();
             };
-            let c_string = CString::new(cursor_name.as_bytes().to_vec()).unwrap();
-            let xcursor = (self.x.display.xcursor.XcursorLibraryLoadCursor)(self.x.display.display, c_string.as_ptr());
-            (self.x.display.xlib.XDefineCursor)(self.x.display.display, self.x.window, xcursor);
-            (self.x.display.xlib.XFlush)(self.x.display.display);
         }
-    }
-
-    #[inline]
-    pub fn reset_cursor(&self) {
-        unimplemented!()
     }
 
     pub fn set_cursor_state(&self, state: CursorState) -> Result<(), String> {

@@ -198,12 +198,7 @@ impl Window {
     }
 
     #[inline]
-    pub fn set_cursor(&self, _cursor: MouseCursor) {
-        unimplemented!()
-    }
-
-    #[inline]
-    pub fn reset_cursor(&self) {
+    pub fn set_cursor(&self, _cursor: Option<MouseCursor>) {
         unimplemented!()
     }
 

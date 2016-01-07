@@ -123,6 +123,7 @@ impl Window {
         // not implemented
         assert!(win_attribs.min_dimensions.is_none());
         assert!(win_attribs.max_dimensions.is_none());
+        assert!(window.resizable);
 
         let opengl = opengl.clone().map_sharing(|w| &w.context);
 
@@ -233,11 +234,7 @@ impl Window {
     }
 
     #[inline]
-    pub fn set_cursor(&self, _: MouseCursor) {
-    }
-
-    #[inline]
-    pub fn reset_cursor(&self) {
+    pub fn set_cursor(&self, _: Some<MouseCursor>) {
     }
 
     #[inline]
