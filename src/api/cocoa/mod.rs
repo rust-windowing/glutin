@@ -272,7 +272,7 @@ impl Window {
         // not implemented
         assert!(win_attribs.min_dimensions.is_none());
         assert!(win_attribs.max_dimensions.is_none());
-        assert!(window.resizable);
+        assert!(win_attribs.resizable);
 
         match opengl.robustness {
             Robustness::RobustNoResetNotification | Robustness::RobustLoseContextOnReset => {
