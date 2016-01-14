@@ -538,7 +538,7 @@ unsafe fn choose_fbconfig(egl: &ffi::egl::Egl, display: ffi::egl::types::EGLDisp
             out.push(stencil as c_int);
         }
 
-        if let Some(true) = reqs.double_buffer {
+        if let Some(false) = reqs.double_buffer {
             return Err(CreationError::NoAvailablePixelFormat);
         }
 
