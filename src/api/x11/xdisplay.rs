@@ -4,11 +4,12 @@ use std::error::Error;
 use std::ffi::CString;
 use std::sync::Mutex;
 
-use libc;
+use libc::{self, c_int};
 
 use super::ffi;
-use api::egl::ffi::egl::Egl;
 use api::dlopen;
+use api::egl::ffi::egl::Egl;
+use api::x11::window::XSettingsClient;
 
 /// A connection to an X server.
 pub struct XConnection {
@@ -109,6 +110,21 @@ impl XConnection {
     #[inline]
     pub fn ignore_error(&self) {
         *self.latest_error.lock().unwrap() = None;
+    }
+
+    #[cfg(not(feature = "use-xsettings"))]
+    pub fn create_xsettings_client(&self, _: c_int) -> XSettingsClient {
+        ()
+    }
+
+    #[cfg(feature = "use-xsettings")]
+    pub fn create_xsettings_client(&self, screen_id: c_int) -> XSettingsClient {
+        unsafe {
+            ::xsettings::Client::new(self.display as *mut _,
+                                     screen_id,
+                                     Box::new(|_, _, _| {}),
+                                     Box::new(|_, _, _| {}))
+        }
     }
 }
 
