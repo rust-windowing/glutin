@@ -272,9 +272,15 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
                     if let Ok(window_state) = cstash.window_state.lock() {
                         match window_state.cursor_state {
                             CursorState::Normal => {
-                                user32::SetCursor(user32::LoadCursorW(
+                                if let Some(cur) =  window_state.cursor {
+                                    user32::SetCursor(user32::LoadCursorW(
                                         ptr::null_mut(),
-                                        window_state.cursor));
+                                        cur));
+                                } else {
+                                    user32::DefWindowProcW(
+                                        window, msg, wparam, lparam);
+                                }
+                                
                             },
                             CursorState::Grab | CursorState::Hide => {
                                 user32::SetCursor(ptr::null_mut());
@@ -321,14 +327,39 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
 
                         match window_state.attributes.min_dimensions {
                             Some((width, height)) => {
-                                (*mmi).min_track = winapi::POINT { x: width as i32, y: height as i32 };
+                                let mut rc_client: winapi::RECT = mem::uninitialized();
+                                let mut rc_wind: winapi::RECT = mem::uninitialized();
+                                user32::GetClientRect(window, &mut rc_client);
+                                user32::GetWindowRect(window, &mut rc_wind);
+
+                                let border_width : i32 = (rc_wind.right - rc_wind.left) - 
+                                    (rc_client.right - rc_client.left);
+                                let border_height : i32 = (rc_wind.bottom - rc_wind.top) - 
+                                    (rc_client.bottom - rc_client.top);
+
+                                (*mmi).min_track = winapi::POINT { 
+                                    x: width as i32 + border_width, 
+                                    y: height as i32 + border_height  
+                                };
                             },
                             None => { }
                         }
 
                         match window_state.attributes.max_dimensions {
                             Some((width, height)) => {
-                                (*mmi).max_track = winapi::POINT { x: width as i32, y: height as i32 };
+                                let mut rc_client: winapi::RECT = mem::uninitialized();
+                                let mut rc_wind: winapi::RECT = mem::uninitialized();
+                                user32::GetClientRect(window, &mut rc_client);
+                                user32::GetWindowRect(window, &mut rc_wind);
+
+                                let border_width : i32 = (rc_wind.right - rc_wind.left) - 
+                                    (rc_client.right - rc_client.left);
+                                let border_height : i32 = (rc_wind.bottom - rc_wind.top) - 
+                                    (rc_client.bottom - rc_client.top);
+
+                                (*mmi).max_track = winapi::POINT { 
+                                    x: width as i32 + border_width , 
+                                    y: height as i32 + border_height};
                             },
                             None => { }
                         }

@@ -302,6 +302,11 @@ impl Window {
     }
 
     #[inline]
+    pub fn reset_cursor(&self) {
+        unimplemented!()
+    }
+
+    #[inline]
     pub fn set_cursor_state(&self, state: CursorState) -> Result<(), String> {
         match self {
             &Window::X(ref w) => w.set_cursor_state(state),

@@ -211,6 +211,14 @@ impl<'a> WindowBuilder<'a> {
         self
     }
 
+    /// specifies whether the windowed mode window will be resizable by the user. The window will still be resizable using the set_inner_size function. 
+    /// This hint is ignored for full screen windows.
+    #[inline]
+    pub fn with_resizability(mut self, resizable: bool) -> WindowBuilder<'a> {
+        self.window.resizable = resizable;
+        self
+    }
+
     /// Builds the window.
     ///
     /// Error should be very rare and only occur in case of permission denied, incompatible system,
@@ -480,6 +488,7 @@ impl Window {
     }
 
     /// Modifies the mouse cursor of the window.
+    /// Passing 'None' will reset the cursor to its default behaviour.
     /// Has no effect on Android.
     pub fn set_cursor(&self, cursor: MouseCursor) {
         self.window.set_cursor(cursor);

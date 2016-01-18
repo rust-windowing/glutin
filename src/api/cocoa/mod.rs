@@ -272,6 +272,7 @@ impl Window {
         // not implemented
         assert!(win_attribs.min_dimensions.is_none());
         assert!(win_attribs.max_dimensions.is_none());
+        assert!(win_attribs.resizable);
 
         match opengl.robustness {
             Robustness::RobustNoResetNotification | Robustness::RobustLoseContextOnReset => {
@@ -699,7 +700,7 @@ impl Window {
     }
 
     pub fn set_cursor(&self, cursor: MouseCursor) {
-        let cursor_name = match cursor {                
+        let cursor_name = match cursor {                            
             MouseCursor::Arrow | MouseCursor::Default => "arrowCursor",
             MouseCursor::Hand => "pointingHandCursor",
             MouseCursor::Grabbing | MouseCursor::Grab => "closedHandCursor",
