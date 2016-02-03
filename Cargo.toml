@@ -2,7 +2,7 @@
 name = "servo-glutin"
 version = "0.4.8"
 authors = ["tomaka <pierre.krieger1708@gmail.com>"]
-description = "Cross-plaform OpenGL context provider."
+description = "Cross-platform OpenGL context provider."
 keywords = ["windowing", "opengl"]
 license = "Apache-2.0"
 readme = "README.md"
@@ -101,6 +101,13 @@ wayland-window = "0.2.2"
 x11-dl = "~2.3"
 
 [target.arm-unknown-linux-gnueabihf.dependencies]
+osmesa-sys = "0.0.5"
+wayland-client = { version = "0.5.4", features = ["egl", "dlopen"] }
+wayland-kbd = "0.3.3"
+wayland-window = "0.2.2"
+x11-dl = "~2.3"
+
+[target.armv7-unknown-linux-gnueabihf.dependencies]
 osmesa-sys = "0.0.5"
 wayland-client = { version = "0.5.4", features = ["egl", "dlopen"] }
 wayland-kbd = "0.3.3"
