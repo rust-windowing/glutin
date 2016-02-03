@@ -295,7 +295,7 @@ impl Window {
             Some(window) => window,
             None         => { return Err(OsError(format!("Couldn't create NSWindow"))); },
         };
-        let view = match Window::create_view(*window) {
+        let view = match Window::get_or_create_view(*window, win_attribs.decorations) {
             Some(view) => view,
             None       => { return Err(OsError(format!("Couldn't create NSView"))); },
         };
@@ -416,8 +416,7 @@ impl Window {
                 NSClosableWindowMask as NSUInteger |
                 NSMiniaturizableWindowMask as NSUInteger |
                 NSResizableWindowMask as NSUInteger |
-                NSTitledWindowMask as NSUInteger |
-                NSFullSizeContentViewWindowMask as NSUInteger
+                NSTitledWindowMask as NSUInteger,
             };
 
             let window = IdRef::new(NSWindow::alloc(nil).initWithContentRect_styleMask_backing_defer_(
@@ -432,8 +431,24 @@ impl Window {
                 window.setAcceptsMouseMovedEvents_(YES);
 
                 if !attrs.decorations {
+                    // Make titles invisible so that nothing is drawn.
                     window.setTitleVisibility_(NSWindowTitleVisibility::NSWindowTitleHidden);
                     window.setTitlebarAppearsTransparent_(YES);
+
+                    // Get rid of all the buttons so that they won't be drawn and the user can't
+                    // click them.
+                    for &button_type in &[
+                        NSWindowButton::NSWindowCloseButton,
+                        NSWindowButton::NSWindowMiniaturizeButton,
+                        NSWindowButton::NSWindowZoomButton,
+                        NSWindowButton::NSWindowToolbarButton,
+                        NSWindowButton::NSWindowFullScreenButton,
+                    ] {
+                        if let Some(button) =
+                                IdRef::new(window.standardWindowButton_(button_type)).non_nil() {
+                            button.removeFromSuperview()
+                        }
+                    }
                 }
 
                 if screen.is_some() {
@@ -447,14 +462,29 @@ impl Window {
         }
     }
 
-    fn create_view(window: id) -> Option<IdRef> {
+    fn get_or_create_view(window: id, decorations: bool) -> Option<IdRef> {
         unsafe {
-            let view = IdRef::new(NSView::alloc(nil).init());
-            view.non_nil().map(|view| {
-                view.setWantsBestResolutionOpenGLSurface_(YES);
-                window.setContentView_(*view);
-                view
-            })
+            if decorations {
+                let view = IdRef::new(NSView::alloc(nil).init());
+                return view.non_nil().map(|view| {
+                    view.setWantsBestResolutionOpenGLSurface_(YES);
+                    window.setContentView_(*view);
+                    view
+                })
+            }
+
+            // This hack is a little evil. We get the superview of the content view, which is the
+            // `NSThemeFrame`, and install an OpenGL context into it. `NSThemeFrame` is a private
+            // class, but we only call public `NSView` APIs on it here, so this seems OK.
+            //
+            // The reason for using this hack as opposed to `NSFullSizeContentViewWindowMask` is
+            // that the latter forces the window to be Core Animation-backed, which results in us
+            // rendering to an off screen surface. Not only does this inject another compositor
+            // into the system, but it also results in us rendering to an off-screen surface,
+            // disabling the swap interval.
+            let view = window.contentView().superview();
+            view.setWantsBestResolutionOpenGLSurface_(YES);
+            Some(IdRef::new(view))
         }
     }
 
