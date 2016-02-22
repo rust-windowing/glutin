@@ -163,6 +163,20 @@ unsafe fn init(title: Vec<u16>, window: &WindowAttributes, pf_reqs: &PixelFormat
                                        format!("{}", io::Error::last_os_error()))));
         }
 
+        if window.multitouch {
+            // These are not on winapi yet
+            const NID_READY:i32 = 0x00000080;
+            extern "system" {
+                fn RegisterTouchWindow(hwnd: winapi::HWND,
+                                       flags:winapi::ULONG ) -> winapi::BOOL;
+            }
+        
+            let digitizer = user32::GetSystemMetrics( winapi::SM_DIGITIZER );
+            if digitizer & NID_READY != 0 {
+                RegisterTouchWindow( handle, 0 );
+            }
+        }
+
         let hdc = user32::GetDC(handle);
         if hdc.is_null() {
             return Err(OsError(format!("GetDC function failed: {}",
