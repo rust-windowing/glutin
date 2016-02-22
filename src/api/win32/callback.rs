@@ -295,7 +295,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
                 ;MAX_POINTS
             ]; 
 
-            if GetTouchInputInfo( lparam as winapi::HANDLE, 16,
+            if GetTouchInputInfo( lparam as winapi::HANDLE, MAX_POINTS as u32,
                                   &mut inputs[0] as *mut TOUCHINPUT,
                                   mem::size_of::<TOUCHINPUT>() as winapi::c_uint ) > 0 {
                 for i in 0..pcount {
