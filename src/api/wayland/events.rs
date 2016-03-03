@@ -98,7 +98,8 @@ pub fn translate_event(
                             WlPointerAxis::HorizontalScroll => {
                                 MouseScrollDelta::PixelDelta(0.0, amplitude as f32)
                             }
-                        }
+                        },
+                        TouchPhase::Moved
                     ), surface))
                 } else {
                     None
