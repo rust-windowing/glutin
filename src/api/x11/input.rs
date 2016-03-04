@@ -170,7 +170,7 @@ impl XInputEventHandler {
     }
 
     pub fn translate_event(&mut self, cookie: &ffi::XGenericEventCookie) -> Option<Event> {
-        use events::Event::{Focused, MouseInput, MouseMoved, MouseWheel};
+        use events::Event::{Focused, MouseInput, MouseMoved, MouseWheel, TouchPhase};
         use events::ElementState::{Pressed, Released};
         use events::MouseButton::{Left, Right, Middle};
         use events::MouseScrollDelta::LineDelta;
