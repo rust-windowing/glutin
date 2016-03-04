@@ -1,7 +1,5 @@
 #![cfg(target_os = "macos")]
 
-pub use self::headless::HeadlessContext;
-
 use {CreationError, Event, MouseCursor, CursorState};
 use CreationError::OsError;
 use libc;
@@ -44,12 +42,14 @@ use std::sync::Mutex;
 use std::ascii::AsciiExt;
 use std::ops::Deref;
 
-use events::Event::{Awakened, MouseInput, MouseMoved, ReceivedCharacter, KeyboardInput, MouseWheel, Closed, Focused};
 use events::ElementState::{Pressed, Released};
-use events::MouseButton;
-use events;
+use events::Event::{Awakened, MouseInput, MouseMoved, ReceivedCharacter, KeyboardInput};
+use events::Event::{MouseWheel, Closed, Focused, TouchpadPressure};
+use events::{self, MouseButton, TouchPhase};
 
 pub use self::monitor::{MonitorId, get_available_monitors, get_primary_monitor};
+pub use self::headless::HeadlessContext;
+pub use self::headless::PlatformSpecificHeadlessBuilderAttributes;
 
 mod monitor;
 mod event;
@@ -179,6 +179,9 @@ impl Drop for WindowDelegate {
     }
 }
 
+#[derive(Default)]
+pub struct PlatformSpecificWindowBuilderAttributes;
+
 pub struct Window {
     view: IdRef,
     window: IdRef,
@@ -222,7 +225,7 @@ impl<'a> Iterator for PollEventsIterator<'a> {
         let event: Option<Event>;
         unsafe {
             let nsevent = NSApp().nextEventMatchingMask_untilDate_inMode_dequeue_(
-                NSAnyEventMask.bits(),
+                NSAnyEventMask.bits() | NSEventMaskPressure.bits(),
                 NSDate::distantPast(nil),
                 NSDefaultRunLoopMode,
                 YES);
@@ -247,7 +250,7 @@ impl<'a> Iterator for WaitEventsIterator<'a> {
         let event: Option<Event>;
         unsafe {
             let nsevent = NSApp().nextEventMatchingMask_untilDate_inMode_dequeue_(
-                NSAnyEventMask.bits(),
+                NSAnyEventMask.bits() | NSEventMaskPressure.bits(),
                 NSDate::distantFuture(nil),
                 NSDefaultRunLoopMode,
                 YES);
@@ -264,7 +267,8 @@ impl<'a> Iterator for WaitEventsIterator<'a> {
 
 impl Window {
     pub fn new(win_attribs: &WindowAttributes, pf_reqs: &PixelFormatRequirements,
-               opengl: &GlAttributes<&Window>) -> Result<Window, CreationError>
+               opengl: &GlAttributes<&Window>, _: &PlatformSpecificWindowBuilderAttributes)
+               -> Result<Window, CreationError>
     {
         if opengl.sharing.is_some() {
             unimplemented!()
@@ -836,7 +840,7 @@ impl Clone for IdRef {
 unsafe fn NSEventToEvent(window: &Window, nsevent: id) -> Option<Event> {
     if nsevent == nil { return None; }
 
-    let event_type = msg_send![nsevent, type];
+    let event_type = nsevent.eventType();
     NSApp().sendEvent_(if let NSKeyDown = event_type { nil } else { nsevent });
 
     match event_type {
@@ -867,9 +871,7 @@ unsafe fn NSEventToEvent(window: &Window, nsevent: id) -> Option<Event> {
             let received_c_str = nsevent.characters().UTF8String();
             let received_str = CStr::from_ptr(received_c_str);
             for received_char in from_utf8(received_str.to_bytes()).unwrap().chars() {
-                if received_char.is_ascii() {
-                    events.push_back(ReceivedCharacter(received_char));
-                }
+                events.push_back(ReceivedCharacter(received_char));
             }
 
             let vkey =  event::vkeycode_to_element(NSEvent::keyCode(nsevent));
@@ -919,7 +921,15 @@ unsafe fn NSEventToEvent(window: &Window, nsevent: id) -> Option<Event> {
                 LineDelta(scale_factor * nsevent.scrollingDeltaX() as f32,
                           scale_factor * nsevent.scrollingDeltaY() as f32)
             };
-            Some(MouseWheel(delta))
+            let phase = match nsevent.phase() {
+                NSEventPhaseMayBegin | NSEventPhaseBegan => TouchPhase::Started,
+                NSEventPhaseEnded => TouchPhase::Ended,
+                _ => TouchPhase::Moved,
+            };
+            Some(MouseWheel(delta, phase))
+        },
+        NSEventTypePressure => {
+            Some(TouchpadPressure(nsevent.pressure(), nsevent.stage()))
         },
         _  => { None },
     }
