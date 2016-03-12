@@ -42,8 +42,13 @@ impl WindowExt for Window {
 
 /// Additional methods on `WindowBuilder` that are specific to Unix.
 pub trait WindowBuilderExt {
-
+    /// Sets the Xlib parent window.
+    fn with_xlib_parent(self, parent: Option<WindowId>) -> WindowBuilder<'a>;
 }
 
 impl<'a> WindowBuilderExt for WindowBuilder<'a> {
+    fn with_xlib_parent(mut self, parent: Option<WindowId>) -> WindowBuilder<'a> {
+        self.platform_specific.xlib_parent = parent;
+        self
+    }
 }

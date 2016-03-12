@@ -406,13 +406,21 @@ impl Window {
             },
         };
 
-        // getting the root window
-        let root = unsafe { (display.xlib.XDefaultRootWindow)(display.display) };
-        display.check_errors().expect("Failed to get root window");
+        // getting the parent window; root if None
+        let parent = match window_attrs.platform_specific.xlib_parent {
+            Some(ref w) => w.window as ffi::Window,
+            None => {
+                let root = unsafe {
+                    (display.xlib.XDefaultRootWindow)(display.display)
+                };
+                display.check_errors().expect("Failed to get root window");
+                root
+            }
+        };
 
         // creating the color map
         let cmap = unsafe {
-            let cmap = (display.xlib.XCreateColormap)(display.display, root,
+            let cmap = (display.xlib.XCreateColormap)(display.display, parent,
                                                       visual_infos.visual as *mut _,
                                                       ffi::AllocNone);
             display.check_errors().expect("Failed to call XCreateColormap");
@@ -443,7 +451,7 @@ impl Window {
 
         // finally creating the window
         let window = unsafe {
-            let win = (display.xlib.XCreateWindow)(display.display, root, 0, 0, dimensions.0 as libc::c_uint,
+            let win = (display.xlib.XCreateWindow)(display.display, parent, 0, 0, dimensions.0 as libc::c_uint,
                 dimensions.1 as libc::c_uint, 0, visual_infos.depth, ffi::InputOutput as libc::c_uint,
                 visual_infos.visual as *mut _, window_attributes,
                 &mut set_win_attr);
@@ -564,7 +572,7 @@ impl Window {
             unsafe {
                 (display.xlib.XSendEvent)(
                     display.display,
-                    root,
+                    parent,
                     0,
                     ffi::SubstructureRedirectMask | ffi::SubstructureNotifyMask,
                     &mut x_event as *mut _
