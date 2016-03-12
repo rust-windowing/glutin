@@ -16,7 +16,9 @@ pub use self::api_dispatch::PlatformSpecificWindowBuilderAttributes;
 mod api_dispatch;
 
 #[derive(Default)]
-pub struct PlatformSpecificHeadlessBuilderAttributes;
+pub struct PlatformSpecificHeadlessBuilderAttributes {
+    pub xlib_parent: Option<WindowID>,
+}
 
 pub struct HeadlessContext(OsMesaContext);
 
