@@ -1,6 +1,6 @@
 [package]
 name = "servo-glutin"
-version = "0.4.12"
+version = "0.4.13"
 authors = ["The glutin contributors, Pierre Krieger <pierre.krieger1708@gmail.com>"]
 description = "Cross-platform OpenGL context provider."
 keywords = ["windowing", "opengl"]
