@@ -312,6 +312,10 @@ impl Window {
     {
         let dimensions = window_attrs.dimensions.unwrap_or((800, 600));
 
+        if window_attrs.icon.is_some() {
+            unimplemented!()
+        }
+
         // not implemented
         assert!(window_attrs.min_dimensions.is_none());
         assert!(window_attrs.max_dimensions.is_none());

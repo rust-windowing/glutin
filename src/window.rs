@@ -1,5 +1,6 @@
 use std::collections::vec_deque::IntoIter as VecDequeIter;
 use std::default::Default;
+use std::path::PathBuf;
 
 use Api;
 use ContextError;
@@ -79,6 +80,13 @@ impl<'a> WindowBuilder<'a> {
     #[inline]
     pub fn with_title(mut self, title: String) -> WindowBuilder<'a> {
         self.window.title = title;
+        self
+    }
+
+    /// Sets the path to the icon of the window. Currently only works with .ico file types, other file types will result in a FileNotFound creation error.
+    #[inline]
+    pub fn with_icon(mut self, icon: PathBuf) -> WindowBuilder<'a> {
+        self.window.icon = Some(icon);
         self
     }
 

@@ -20,7 +20,7 @@ use GlRequest;
 use PixelFormatRequirements;
 use WindowAttributes;
 
-use std::ffi::{OsStr};
+use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
 use std::sync::mpsc::channel;
 
@@ -94,6 +94,7 @@ unsafe fn init(title: Vec<u16>, window: &WindowAttributes, pf_reqs: &PixelFormat
                opengl: &GlAttributes<RawContext>, egl: Option<Egl>)
                -> Result<Window, CreationError>
 {
+
     let opengl = opengl.clone().map_sharing(|sharelists| {
         match sharelists {
             RawContext::Wgl(c) => c,
@@ -236,6 +237,18 @@ unsafe fn init(title: Vec<u16>, window: &WindowAttributes, pf_reqs: &PixelFormat
         });
         rx
     };
+
+    if let Some(ref icon) = window.icon {
+        let list: Vec<u16> = icon.as_os_str().encode_wide().chain(Some(0)).collect();
+        let h_icon = user32::LoadImageW(ptr::null_mut(), list.as_ptr(), winapi::IMAGE_ICON, 0, 0, winapi::LR_DEFAULTSIZE | winapi::LR_LOADFROMFILE);
+
+        if h_icon.is_null() {
+            return Err(CreationError::IconFileNotFound);
+        }
+
+        user32::PostMessageW(real_window.0, winapi::WM_SETICON, 0, h_icon as winapi::LPARAM);
+        user32::PostMessageW(real_window.0, winapi::WM_SETICON, 1, h_icon as winapi::LPARAM);
+    }
 
     // building the struct
     Ok(Window {

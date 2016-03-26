@@ -69,6 +69,7 @@ pub use native_monitor::NativeMonitorId;
 use std::io;
 #[cfg(not(target_os = "macos"))]
 use std::cmp::Ordering;
+use std::path::PathBuf;
 
 mod api;
 mod platform;
@@ -143,6 +144,7 @@ pub enum CreationError {
     RobustnessNotSupported,
     OpenGlVersionNotSupported,
     NoAvailablePixelFormat,
+    IconFileNotFound,
 }
 
 impl CreationError {
@@ -157,6 +159,7 @@ impl CreationError {
                                                          supported.",
             CreationError::NoAvailablePixelFormat => "Couldn't find any pixel format that matches \
                                                       the criterias.",
+            CreationError::IconFileNotFound => "Couldn't find an icon with the given path."
         }
     }
 }
@@ -499,6 +502,11 @@ pub struct WindowAttributes {
     /// The default is `"glutin window"`.
     pub title: String,
 
+    /// The file path to the icon of the window in the tray and title bar. Currently only works with .ico file types, other file types will result in a IconFileNotFound creation error.
+    ///
+    /// The default is `None`.
+    pub icon: Option<PathBuf>,
+
     /// Whether the window should be immediately visible upon creation.
     ///
     /// The default is `true`.
@@ -529,6 +537,7 @@ impl Default for WindowAttributes {
             max_dimensions: None,
             monitor: None,
             title: "glutin window".to_owned(),
+            icon: None,
             visible: true,
             transparent: false,
             decorations: true,
