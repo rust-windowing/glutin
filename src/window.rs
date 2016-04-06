@@ -15,6 +15,7 @@ use PixelFormat;
 use PixelFormatRequirements;
 use Robustness;
 use Window;
+use WindowID;
 use WindowAttributes;
 use native_monitor::NativeMonitorId;
 
@@ -212,6 +213,12 @@ impl<'a> WindowBuilder<'a> {
     #[inline]
     pub fn with_multitouch(mut self) -> WindowBuilder<'a> {
         self.window.multitouch = true;
+        self
+    }
+
+    /// Sets the parent window
+    pub fn with_parent(mut self, parent: Option<WindowID>) -> WindowBuilder<'a> {
+        self.window.parent = parent;
         self
     }
 

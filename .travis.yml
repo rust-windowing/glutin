@@ -36,3 +36,6 @@ after_success:
       [ $TRAVIS_BRANCH = master ] &&
       [ $TRAVIS_PULL_REQUEST = false ] &&
       cargo publish --token ${CRATESIO_TOKEN}
+
+notifications:
+  webhooks: http://build.servo.org:54856/travis

@@ -1,6 +1,6 @@
 [package]
-name = "glutin"
-version = "0.4.9"
+name = "servo-glutin"
+version = "0.4.14"
 authors = ["The glutin contributors, Pierre Krieger <pierre.krieger1708@gmail.com>"]
 description = "Cross-platform OpenGL context provider."
 keywords = ["windowing", "opengl"]
@@ -9,6 +9,13 @@ readme = "README.md"
 repository = "https://github.com/tomaka/glutin"
 documentation = "https://tomaka.github.io/glutin/"
 build = "build.rs"
+
+[lib]
+name = "glutin"
+
+[features]
+default = []
+headless = []
 
 [dependencies]
 lazy_static = "0.1.10"
@@ -41,7 +48,7 @@ objc = "0.2"
 cgl = "0.1"
 cocoa = "0.3"
 core-foundation = "0"
-core-graphics = "0.3"
+core-graphics = ">=0.2, <0.4"
 
 [target.i686-pc-windows-gnu.dependencies]
 winapi = "0.2"
