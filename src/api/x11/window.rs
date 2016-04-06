@@ -3,7 +3,7 @@ use CreationError;
 use CreationError::OsError;
 use libc;
 use std::borrow::Borrow;
-use std::{mem, ptr};
+use std::{mem, ptr, cmp};
 use std::cell::Cell;
 use std::sync::atomic::AtomicBool;
 use std::collections::VecDeque;
@@ -310,11 +310,23 @@ impl Window {
                pf_reqs: &PixelFormatRequirements, opengl: &GlAttributes<&Window>)
                -> Result<Window, CreationError>
     {
-        let dimensions = window_attrs.dimensions.unwrap_or((800, 600));
+        let dimensions = {
 
-        // not implemented
-        assert!(window_attrs.min_dimensions.is_none());
-        assert!(window_attrs.max_dimensions.is_none());
+            // x11 only applies constraints when the window is actively resized
+            // by the user, so we have to manually apply the initial constraints
+            let mut dimensions = window_attrs.dimensions.unwrap_or((800, 600));
+            if let Some(max) = window_attrs.max_dimensions {
+                dimensions.0 = cmp::min(dimensions.0, max.0);
+                dimensions.1 = cmp::min(dimensions.1, max.1);
+            }
+
+            if let Some(min) = window_attrs.min_dimensions {
+                dimensions.0 = cmp::max(dimensions.0, min.0);
+                dimensions.1 = cmp::max(dimensions.1, min.1);
+            }
+            dimensions
+
+        };
 
         let screen_id = match window_attrs.monitor {
             Some(PlatformMonitorId::X(MonitorId(_, monitor))) => monitor as i32,
@@ -339,7 +351,7 @@ impl Window {
                         let m = (0 .. mode_num).map(|i| {
                             let m: ffi::XF86VidModeModeInfo = ptr::read(*modes.offset(i as isize) as *const _); m
                         }).find(|m| m.hdisplay >= dimensions.0 as u16 && m.vdisplay >= dimensions.1 as u16);
-    
+
                         match m {
                             Some(m) => Some(m),
                             None => return Err(OsError(format!("Could not find a suitable graphics mode")))
@@ -595,6 +607,32 @@ impl Window {
                 (display.xf86vmode.XF86VidModeSetViewPort)(display.display, screen_id, 0, 0);
                 display.check_errors().expect("Failed to call XF86VidModeSetViewPort");
             }
+
+        } else {
+
+            // set size hints
+            let mut size_hints: ffi::XSizeHints = unsafe { mem::zeroed() };
+            size_hints.flags = ffi::PSize;
+            size_hints.width = dimensions.0 as i32;
+            size_hints.height = dimensions.1 as i32;
+
+            if let Some(dimensions) = window_attrs.min_dimensions {
+                size_hints.flags |= ffi::PMinSize;
+                size_hints.min_width = dimensions.0 as i32;
+                size_hints.min_height = dimensions.1 as i32;
+            }
+
+            if let Some(dimensions) = window_attrs.max_dimensions {
+                size_hints.flags |= ffi::PMaxSize;
+                size_hints.max_width = dimensions.0 as i32;
+                size_hints.max_height = dimensions.1 as i32;
+            }
+
+            unsafe {
+                (display.xlib.XSetNormalHints)(display.display, window, &mut size_hints);
+                display.check_errors().expect("Failed to call XSetNormalHints");
+            }
+
         }
 
         // finish creating the OpenGL context
@@ -851,29 +889,61 @@ impl Window {
             self.x.display.check_errors().expect("Failed to call XcursorLibraryLoadCursor");
             (self.x.display.xlib.XDefineCursor)(self.x.display.display, self.x.window, xcursor);
             (self.x.display.xlib.XFlush)(self.x.display.display);
+            (self.x.display.xlib.XFreeCursor)(self.x.display.display, xcursor);
             self.x.display.check_errors().expect("Failed to call XDefineCursor");
         }
     }
 
     pub fn set_cursor_state(&self, state: CursorState) -> Result<(), String> {
-        use CursorState::{ Grab, Normal };
+        use CursorState::{ Grab, Normal, Hide };
 
         let mut cursor_state = self.cursor_state.lock().unwrap();
-
         match (state, *cursor_state) {
-            (Normal, Grab) => {
+            (Normal, Normal) | (Hide, Hide) | (Grab, Grab) => return Ok(()),
+            _ => {},
+        }
+
+        match *cursor_state {
+            Grab => {
                 unsafe {
                     (self.x.display.xlib.XUngrabPointer)(self.x.display.display, ffi::CurrentTime);
                     self.x.display.check_errors().expect("Failed to call XUngrabPointer");
-                    *cursor_state = Normal;
-                    Ok(())
                 }
             },
-
-            (Grab, Normal) => {
+            Normal => {},
+            Hide => {
                 unsafe {
-                    *cursor_state = Grab;
+                    let xcursor = (self.x.display.xlib.XCreateFontCursor)(self.x.display.display, 68/*XC_left_ptr*/);
+                    self.x.display.check_errors().expect("Failed to call XCreateFontCursor");
+                    (self.x.display.xlib.XDefineCursor)(self.x.display.display, self.x.window, xcursor);
+                    self.x.display.check_errors().expect("Failed to call XDefineCursor");
+                    (self.x.display.xlib.XFlush)(self.x.display.display);
+                    (self.x.display.xlib.XFreeCursor)(self.x.display.display, xcursor);
+                }
+            },
+        }
 
+        *cursor_state = state;
+        match state {
+            Normal => Ok(()),
+            Hide => {
+                let data = &[0, 0, 0, 0, 0, 0, 0, 0];
+                unsafe {
+                    let mut black = ffi::XColor {
+                        red: 0, green: 0, blue: 0,
+                        pad: 0, pixel: 0, flags: 0,
+                    };
+                    let bitmap = (self.x.display.xlib.XCreateBitmapFromData)(self.x.display.display, self.x.window, data.as_ptr(), 8, 8);
+                    let cursor = (self.x.display.xlib.XCreatePixmapCursor)(self.x.display.display, bitmap, bitmap, &mut black, &mut black, 0, 0);
+                    (self.x.display.xlib.XDefineCursor)(self.x.display.display, self.x.window, cursor);
+                    self.x.display.check_errors().expect("Failed to call XDefineCursor");
+                    (self.x.display.xlib.XFreeCursor)(self.x.display.display, cursor);
+                    (self.x.display.xlib.XFreePixmap)(self.x.display.display, bitmap);
+                }
+                Ok(())
+            },
+            Grab => {
+                unsafe {
                     match (self.x.display.xlib.XGrabPointer)(
                         self.x.display.display, self.x.window, ffi::False,
                         (ffi::ButtonPressMask | ffi::ButtonReleaseMask | ffi::EnterWindowMask |
@@ -892,11 +962,6 @@ impl Window {
                     }
                 }
             },
-
-            // Nothing needs to change
-            (Grab, Grab) | (Normal, Normal) => Ok(()),
-
-            _ => unimplemented!(),
         }
     }
 
