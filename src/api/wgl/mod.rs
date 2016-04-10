@@ -218,130 +218,122 @@ unsafe fn create_context(extra: Option<(&gl::wgl_extra::Wgl, &PixelFormatRequire
                          _: winapi::HWND, hdc: winapi::HDC)
                          -> Result<ContextWrapper, CreationError>
 {
-    let share;
+    let mut share = ptr::null_mut();
 
-    if let Some((extra_functions, pf_reqs, opengl, extensions)) = extra {
-        share = opengl.sharing.unwrap_or(ptr::null_mut());
+    if gl::wgl::GetCurrentContext() != ptr::null_mut() {
+		if let Some((extra_functions, pf_reqs, opengl, extensions)) = extra {
+			share = opengl.sharing.unwrap_or(ptr::null_mut());
+			
+			if extensions.split(' ').find(|&i| i == "WGL_ARB_create_context").is_some() {
+				let mut attributes = Vec::new();
 
-        if extensions.split(' ').find(|&i| i == "WGL_ARB_create_context").is_some() {
-            let mut attributes = Vec::new();
+				match opengl.version {
+					GlRequest::Latest => {},
+					GlRequest::Specific(Api::OpenGl, (major, minor)) => {
+						attributes.push(gl::wgl_extra::CONTEXT_MAJOR_VERSION_ARB as c_int);
+						attributes.push(major as c_int);
+						attributes.push(gl::wgl_extra::CONTEXT_MINOR_VERSION_ARB as c_int);
+						attributes.push(minor as c_int);
+					},
+					GlRequest::Specific(Api::OpenGlEs, (major, minor)) => {
+						if extensions.split(' ').find(|&i| i == "WGL_EXT_create_context_es2_profile")
+												.is_some()
+						{
+							attributes.push(gl::wgl_extra::CONTEXT_PROFILE_MASK_ARB as c_int);
+							attributes.push(gl::wgl_extra::CONTEXT_ES2_PROFILE_BIT_EXT as c_int);
+						} else {
+							return Err(CreationError::OpenGlVersionNotSupported);
+						}
 
-            match opengl.version {
-                GlRequest::Latest => {},
-                GlRequest::Specific(Api::OpenGl, (major, minor)) => {
-                    attributes.push(gl::wgl_extra::CONTEXT_MAJOR_VERSION_ARB as c_int);
-                    attributes.push(major as c_int);
-                    attributes.push(gl::wgl_extra::CONTEXT_MINOR_VERSION_ARB as c_int);
-                    attributes.push(minor as c_int);
-                },
-                GlRequest::Specific(Api::OpenGlEs, (major, minor)) => {
-                    if extensions.split(' ').find(|&i| i == "WGL_EXT_create_context_es2_profile")
-                                            .is_some()
-                    {
-                        attributes.push(gl::wgl_extra::CONTEXT_PROFILE_MASK_ARB as c_int);
-                        attributes.push(gl::wgl_extra::CONTEXT_ES2_PROFILE_BIT_EXT as c_int);
-                    } else {
-                        return Err(CreationError::OpenGlVersionNotSupported);
-                    }
+						attributes.push(gl::wgl_extra::CONTEXT_MAJOR_VERSION_ARB as c_int);
+						attributes.push(major as c_int);
+						attributes.push(gl::wgl_extra::CONTEXT_MINOR_VERSION_ARB as c_int);
+						attributes.push(minor as c_int);
+					},
+					GlRequest::Specific(_, _) => return Err(CreationError::OpenGlVersionNotSupported),
+					GlRequest::GlThenGles { opengl_version: (major, minor), .. } => {
+						attributes.push(gl::wgl_extra::CONTEXT_MAJOR_VERSION_ARB as c_int);
+						attributes.push(major as c_int);
+						attributes.push(gl::wgl_extra::CONTEXT_MINOR_VERSION_ARB as c_int);
+						attributes.push(minor as c_int);
+					},
+				}
 
-                    attributes.push(gl::wgl_extra::CONTEXT_MAJOR_VERSION_ARB as c_int);
-                    attributes.push(major as c_int);
-                    attributes.push(gl::wgl_extra::CONTEXT_MINOR_VERSION_ARB as c_int);
-                    attributes.push(minor as c_int);
-                },
-                GlRequest::Specific(_, _) => return Err(CreationError::OpenGlVersionNotSupported),
-                GlRequest::GlThenGles { opengl_version: (major, minor), .. } => {
-                    attributes.push(gl::wgl_extra::CONTEXT_MAJOR_VERSION_ARB as c_int);
-                    attributes.push(major as c_int);
-                    attributes.push(gl::wgl_extra::CONTEXT_MINOR_VERSION_ARB as c_int);
-                    attributes.push(minor as c_int);
-                },
-            }
+				if let Some(profile) = opengl.profile {
+					if extensions.split(' ').find(|&i| i == "WGL_ARB_create_context_profile").is_some()
+					{
+						let flag = match profile {
+							GlProfile::Compatibility =>
+								gl::wgl_extra::CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
+							GlProfile::Core =>
+								gl::wgl_extra::CONTEXT_CORE_PROFILE_BIT_ARB,
+						};
+						attributes.push(gl::wgl_extra::CONTEXT_PROFILE_MASK_ARB as c_int);
+						attributes.push(flag as c_int);
+					} else {
+						return Err(CreationError::NotSupported);
+					}
+				}
 
-            if let Some(profile) = opengl.profile {
-                if extensions.split(' ').find(|&i| i == "WGL_ARB_create_context_profile").is_some()
-                {
-                    let flag = match profile {
-                        GlProfile::Compatibility =>
-                            gl::wgl_extra::CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
-                        GlProfile::Core =>
-                            gl::wgl_extra::CONTEXT_CORE_PROFILE_BIT_ARB,
-                    };
-                    attributes.push(gl::wgl_extra::CONTEXT_PROFILE_MASK_ARB as c_int);
-                    attributes.push(flag as c_int);
-                } else {
-                    return Err(CreationError::NotSupported);
-                }
-            }
+				let flags = {
+					let mut flags = 0;
 
-            let flags = {
-                let mut flags = 0;
+					// robustness
+					if extensions.split(' ').find(|&i| i == "WGL_ARB_create_context_robustness").is_some() {
+						match opengl.robustness {
+							Robustness::RobustNoResetNotification | Robustness::TryRobustNoResetNotification => {
+								attributes.push(gl::wgl_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB as c_int);
+								attributes.push(gl::wgl_extra::NO_RESET_NOTIFICATION_ARB as c_int);
+								flags = flags | gl::wgl_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as c_int;
+							},
+							Robustness::RobustLoseContextOnReset | Robustness::TryRobustLoseContextOnReset => {
+								attributes.push(gl::wgl_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB as c_int);
+								attributes.push(gl::wgl_extra::LOSE_CONTEXT_ON_RESET_ARB as c_int);
+								flags = flags | gl::wgl_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as c_int;
+							},
+							Robustness::NotRobust => (),
+							Robustness::NoError => (),
+						}
+					} else {
+						match opengl.robustness {
+							Robustness::RobustNoResetNotification | Robustness::RobustLoseContextOnReset => {
+								return Err(CreationError::RobustnessNotSupported);
+							},
+							_ => ()
+						}
+					}
 
-                // robustness
-                if extensions.split(' ').find(|&i| i == "WGL_ARB_create_context_robustness").is_some() {
-                    match opengl.robustness {
-                        Robustness::RobustNoResetNotification | Robustness::TryRobustNoResetNotification => {
-                            attributes.push(gl::wgl_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB as c_int);
-                            attributes.push(gl::wgl_extra::NO_RESET_NOTIFICATION_ARB as c_int);
-                            flags = flags | gl::wgl_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as c_int;
-                        },
-                        Robustness::RobustLoseContextOnReset | Robustness::TryRobustLoseContextOnReset => {
-                            attributes.push(gl::wgl_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB as c_int);
-                            attributes.push(gl::wgl_extra::LOSE_CONTEXT_ON_RESET_ARB as c_int);
-                            flags = flags | gl::wgl_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as c_int;
-                        },
-                        Robustness::NotRobust => (),
-                        Robustness::NoError => (),
-                    }
-                } else {
-                    match opengl.robustness {
-                        Robustness::RobustNoResetNotification | Robustness::RobustLoseContextOnReset => {
-                            return Err(CreationError::RobustnessNotSupported);
-                        },
-                        _ => ()
-                    }
-                }
+					if opengl.debug {
+						flags = flags | gl::wgl_extra::CONTEXT_DEBUG_BIT_ARB as c_int;
+					}
 
-                if opengl.debug {
-                    flags = flags | gl::wgl_extra::CONTEXT_DEBUG_BIT_ARB as c_int;
-                }
+					flags
+				};
 
-                flags
-            };
+				attributes.push(gl::wgl_extra::CONTEXT_FLAGS_ARB as c_int);
+				attributes.push(flags);
 
-            attributes.push(gl::wgl_extra::CONTEXT_FLAGS_ARB as c_int);
-            attributes.push(flags);
+				attributes.push(0);
+				
+				let ctxt = extra_functions.CreateContextAttribsARB(hdc as *const c_void,
+																   share as *const c_void,
+																   attributes.as_ptr());
 
-            attributes.push(0);
-
-            let ctxt = extra_functions.CreateContextAttribsARB(hdc as *const c_void,
-                                                               share as *const c_void,
-                                                               attributes.as_ptr());
-
-            if ctxt.is_null() {
-                return Err(CreationError::OsError(format!("wglCreateContextAttribsARB failed: {}",
-                                                      format!("{}", io::Error::last_os_error()))));
-            } else {
-                return Ok(ContextWrapper(ctxt as winapi::HGLRC));
-            }
-        }
-
-    } else {
-        share = ptr::null_mut();
-    }
+				if ctxt.is_null() {
+					return Err(CreationError::OsError(format!("wglCreateContextAttribsARB failed: {}",
+														  format!("{}", io::Error::last_os_error()))));
+				} else {
+					return Ok(ContextWrapper(ctxt as winapi::HGLRC));
+				}
+			}
+		}
+	}
 
     let ctxt = gl::wgl::CreateContext(hdc as *const c_void);
     if ctxt.is_null() {
         return Err(CreationError::OsError(format!("wglCreateContext failed: {}",
                                                   format!("{}", io::Error::last_os_error()))));
     }
-
-    if !share.is_null() {
-        if gl::wgl::ShareLists(share as *const c_void, ctxt) == 0 {
-            return Err(CreationError::OsError(format!("wglShareLists failed: {}",
-                                                      format!("{}", io::Error::last_os_error()))));
-        }
-    };
 
     Ok(ContextWrapper(ctxt as winapi::HGLRC))
 }
