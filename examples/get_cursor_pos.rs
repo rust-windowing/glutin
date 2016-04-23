@@ -1,9 +1,8 @@
 extern crate glutin;
 
 fn main() {
-    let mut window = glutin::WindowBuilder::new().build().unwrap();
-    window.set_title("A fantastic window!");
-    let _ = unsafe { window.make_current() };
+    let window = glutin::WindowBuilder::new().build().unwrap();
+    window.set_title("Press any key to display cursor position");
 
     for event in window.wait_events() {
         match event {
