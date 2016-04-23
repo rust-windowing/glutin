@@ -727,11 +727,8 @@ impl Window {
     #[inline]
     pub fn get_cursor_position(&self) -> Result<(i32, i32), ()> {
         unsafe {
-            // Very unsafe, but I think it's fine as mouseLocation doesn't touch the pointer.
-            // https://github.com/servo/cocoa-rs/blob/master/src/appkit.rs#L2070-L2072
-            // TODO: Check for errors.
-            let point = NSEvent::mouseLocation(ptr::null_mut() as id);
-            Ok(self.view.convertPoint_fromView_(point, ptr::null_mut() as id))
+            let point = self.window.mouseLocationOutsideOfEventStream();
+            Ok((point.x, point.y))
         }
     }
 }
