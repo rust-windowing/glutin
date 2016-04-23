@@ -330,6 +330,14 @@ impl Window {
     }
 
     #[inline]
+    pub fn get_cursor_position(&self) -> Result<(i32, i32), ()> {
+        match self {
+            &Window::X(ref w) => w.get_cursor_position(),
+            &Window::Wayland(ref w) => w.get_cursor_position()
+        }
+    }
+
+    #[inline]
     pub fn platform_display(&self) -> *mut libc::c_void {
         match self {
             &Window::X(ref w) => w.platform_display(),
