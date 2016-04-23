@@ -502,6 +502,12 @@ impl Window {
     pub fn set_cursor_position(&self, x: i32, y: i32) -> Result<(), ()> {
         self.window.set_cursor_position(x, y)
     }
+    
+    /// Gets the position of the cursor in window coordinates.
+    #[inline]
+    pub fn get_cursor_position(&self) -> Result<(i32, i32), ()> {
+        self.window.get_cursor_position()
+    }
 
     /// Sets how glutin handles the cursor. See the documentation of `CursorState` for details.
     ///

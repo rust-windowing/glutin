@@ -367,6 +367,21 @@ impl Window {
 
         Ok(())
     }
+
+    pub fn get_cursor_position(&self) -> Result<(i32, i32), ()> {
+        let mut point: winapi::POINT = unsafe { mem::uninitialized() };
+
+        unsafe {
+            if user32::GetCursorPos(&mut point) == 0 {
+                return Err(());
+            }
+
+            if user32::ScreenToClient(self.window.0, &mut point) == 0 {
+                return Err(());
+            }
+        }
+        Ok((point.x, point.y))
+    }
 }
 
 impl GlContext for Window {
