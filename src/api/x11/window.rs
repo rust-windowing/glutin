@@ -1029,13 +1029,13 @@ impl Window {
 
     pub fn get_cursor_position(&self) -> Result<(i32, i32), ()> {
         unsafe {
-            let root_return  : ffi::Window = mem::uninitialized();
-            let child_return : ffi::Window = mem::uninitialized();
-            let root_x_return: libc::c_int = mem::uninitialized();
-            let root_y_return: libc::c_int = mem::uninitialized();
-            let win_x_return : libc::c_int = mem::uninitialized();
-            let win_y_return : libc::c_int = mem::uninitialized();
-            let mask_return  : libc::c_uint = mem::uninitialized();
+            let mut root_return  : ffi::Window = mem::uninitialized();
+            let mut child_return : ffi::Window = mem::uninitialized();
+            let mut root_x_return: libc::c_int = mem::uninitialized();
+            let mut root_y_return: libc::c_int = mem::uninitialized();
+            let mut win_x_return : libc::c_int = mem::uninitialized();
+            let mut win_y_return : libc::c_int = mem::uninitialized();
+            let mut mask_return  : libc::c_uint = mem::uninitialized();
 
             (self.x.display.xlib.XQueryPointer)(self.x.display.display, self.x.window, &mut root_return, &mut child_return, &mut root_x_return, &mut root_y_return, &mut win_x_return, &mut win_y_return, &mut mask_return);
             self.x.display.check_errors().map(|_| (win_x_return as i32, win_y_return as i32)).map_err(|_| ())
