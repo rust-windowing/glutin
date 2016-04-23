@@ -27,7 +27,6 @@ use cocoa::foundation::{NSAutoreleasePool, NSDate, NSDefaultRunLoopMode, NSPoint
 use cocoa::appkit;
 use cocoa::appkit::*;
 use cocoa::appkit::NSEventSubtype::*;
-use cocoa::foundation::NSPoint;
 
 use core_foundation::base::TCFType;
 use core_foundation::string::CFString;
@@ -728,7 +727,7 @@ impl Window {
     pub fn get_cursor_position(&self) -> Result<(i32, i32), ()> {
         unsafe {
             let point = self.window.mouseLocationOutsideOfEventStream();
-            Ok((point.x, point.y))
+            Ok((point.x as i32, point.y as i32))
         }
     }
 }
