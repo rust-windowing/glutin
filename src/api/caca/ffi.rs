@@ -20,4 +20,6 @@ shared_library!(LibCaca, "libcaca.so.0",
                               bmask: libc::uint32_t, amask: libc::uint32_t) -> *mut caca_dither_t,
     pub fn caca_get_canvas_width(cv: *mut caca_canvas_t) -> libc::c_int,
     pub fn caca_get_canvas_height(cv: *mut caca_canvas_t) -> libc::c_int,
+    pub fn caca_wherex(cv: *const caca_canvas_t) -> libc::c_int,
+    pub fn caca_wherey(cv: *const caca_canvas_t) -> libc::c_int,
 );
