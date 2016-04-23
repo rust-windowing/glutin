@@ -241,10 +241,12 @@ impl Window {
 
     #[inline]
     pub fn get_cursor_position(&self) -> Result<(i32, i32), ()> {
-        let canvas = (self.libcaca.caca_get_canvas)(self.display);
-        let x = (self.libcaca.caca_wherex)(canvas);
-        let y = (self.libcaca.caca_wherey)(canvas);
-        Ok((x as i32, y as i32))
+        unsafe {
+            let canvas = (self.libcaca.caca_get_canvas)(self.display);
+            let x = (self.libcaca.caca_wherex)(canvas);
+            let y = (self.libcaca.caca_wherey)(canvas);
+            Ok((x as i32, y as i32))
+        }
     }
 }
 
