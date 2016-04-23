@@ -320,6 +320,12 @@ impl Window {
     }
 
     #[inline]
+    pub fn get_cursor_position(&self) -> Result<(i32, i32), ()> {
+        // TODO: 
+        Err(())
+    }
+
+    #[inline]
     pub fn platform_display(&self) -> *mut libc::c_void {
         unimplemented!()
     }
