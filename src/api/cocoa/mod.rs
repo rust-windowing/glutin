@@ -27,6 +27,7 @@ use cocoa::foundation::{NSAutoreleasePool, NSDate, NSDefaultRunLoopMode, NSPoint
 use cocoa::appkit;
 use cocoa::appkit::*;
 use cocoa::appkit::NSEventSubtype::*;
+use cocoa::foundation::NSPoint;
 
 use core_foundation::base::TCFType;
 use core_foundation::string::CFString;
@@ -41,6 +42,7 @@ use std::str::from_utf8;
 use std::sync::Mutex;
 use std::ascii::AsciiExt;
 use std::ops::Deref;
+use std::ptr;
 
 use events::ElementState::{Pressed, Released};
 use events::Event::{Awakened, MouseInput, MouseMoved, ReceivedCharacter, KeyboardInput};
@@ -720,6 +722,17 @@ impl Window {
         }
 
         Ok(())
+    }
+
+    #[inline]
+    pub fn get_cursor_position(&self) -> Result<(i32, i32), ()> {
+        unsafe {
+            // Very unsafe, but I think it's fine as mouseLocation doesn't touch the pointer.
+            // https://github.com/servo/cocoa-rs/blob/master/src/appkit.rs#L2070-L2072
+            // TODO: Check for errors.
+            let point = NSEvent::mouseLocation(ptr::null_mut() as id);
+            Ok(self.view.convertPoint_fromView_(point, ptr::null_mut() as id))
+        }
     }
 }
 
