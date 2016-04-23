@@ -366,6 +366,11 @@ impl Window {
     }
 
     #[inline]
+    pub fn get_cursor_position(&self) -> Result<(i32, i32), ()> {
+        unimplemented!();
+    }
+
+    #[inline]
     pub fn create_window_proxy(&self) -> WindowProxy {
         WindowProxy
     }

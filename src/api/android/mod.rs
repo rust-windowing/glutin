@@ -256,6 +256,11 @@ impl Window {
     pub fn set_cursor_position(&self, x: i32, y: i32) -> Result<(), ()> {
         unimplemented!();
     }
+
+    #[inline]
+    pub fn get_cursor_position(&self) -> Result<(i32, i32), ()> {
+        unimplemented!();
+    }
 }
 
 unsafe impl Send for Window {}
