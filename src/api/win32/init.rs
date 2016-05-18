@@ -81,8 +81,14 @@ pub fn new_window(window: &WindowAttributes, pf_reqs: &PixelFormatRequirements,
                     break;
                 }
 
-                user32::TranslateMessage(&msg);
-                user32::DispatchMessageW(&msg);   // calls `callback` (see the callback module)
+                // check for thread message to awaken
+                if msg.message == *super::WAKEUP_MSG_ID {
+                    use events::Event::Awakened;
+                    callback::send_event(None, Awakened);
+                } else {
+                    user32::TranslateMessage(&msg);
+                    user32::DispatchMessageW(&msg);   // calls `callback` (see the callback module)
+                }
             }
         }
     });
@@ -237,12 +243,15 @@ unsafe fn init(title: Vec<u16>, window: &WindowAttributes, pf_reqs: &PixelFormat
         rx
     };
 
+    let current_thread_id = kernel32::GetCurrentThreadId();
+
     // building the struct
     Ok(Window {
         window: real_window,
         context: context,
         events_receiver: events_receiver,
         window_state: window_state,
+        event_thread_id: current_thread_id,
     })
 }
 

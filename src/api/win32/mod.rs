@@ -66,6 +66,9 @@ pub struct Window {
 
     /// The current window state.
     window_state: Arc<Mutex<WindowState>>,
+
+    /// The event loop thread ID
+    event_thread_id: u32,
 }
 
 unsafe impl Send for Window {}
@@ -93,6 +96,7 @@ impl Drop for WindowWrapper {
 #[derive(Clone)]
 pub struct WindowProxy {
     hwnd: winapi::HWND,
+    event_thread_id: u32,
 }
 
 unsafe impl Send for WindowProxy {}
@@ -102,7 +106,7 @@ impl WindowProxy {
     #[inline]
     pub fn wakeup_event_loop(&self) {
         unsafe {
-            user32::PostMessageA(self.hwnd, *WAKEUP_MSG_ID, 0, 0);
+            user32::PostThreadMessageA(self.event_thread_id, *WAKEUP_MSG_ID, 0, 0);
         }
     }
 }
@@ -227,7 +231,7 @@ impl Window {
 
     #[inline]
     pub fn create_window_proxy(&self) -> WindowProxy {
-        WindowProxy { hwnd: self.window.0 }
+        WindowProxy { hwnd: self.window.0, event_thread_id: self.event_thread_id }
     }
 
     /// See the docs in the crate root file.

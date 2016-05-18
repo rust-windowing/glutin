@@ -36,7 +36,7 @@ struct MinMaxInfo {
 }
 
 /// Checks that the window is the good one, and if so send the event to it.
-fn send_event(input_window: winapi::HWND, event: Event) {
+pub fn send_event(input_window: Option<winapi::HWND>, event: Event) {
     CONTEXT_STASH.with(|context_stash| {
         let context_stash = context_stash.borrow();
         let stored = match *context_stash {
@@ -46,8 +46,13 @@ fn send_event(input_window: winapi::HWND, event: Event) {
 
         let &ThreadLocalData { ref win, ref sender, .. } = stored;
 
-        if win != &input_window {
-            return;
+        match input_window {
+            Some(ref in_win) => {
+                if win != in_win {
+                    return
+                }
+            }
+            None => (),
         }
 
         sender.send(event).ok();  // ignoring if closed
@@ -65,22 +70,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
     match msg {
         winapi::WM_DESTROY => {
             use events::Event::Closed;
-
-            CONTEXT_STASH.with(|context_stash| {
-                let context_stash = context_stash.borrow();
-                let stored = match *context_stash {
-                    None => return,
-                    Some(ref v) => v
-                };
-
-                let &ThreadLocalData { ref win, .. } = stored;
-
-                if win == &window {
-                    user32::PostQuitMessage(0);
-                }
-            });
-
-            send_event(window, Closed);
+            send_event(Some(window), Closed);
             0
         },
 
@@ -92,7 +82,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
             use events::Event::Resized;
             let w = winapi::LOWORD(lparam as winapi::DWORD) as u32;
             let h = winapi::HIWORD(lparam as winapi::DWORD) as u32;
-            send_event(window, Resized(w, h));
+            send_event(Some(window), Resized(w, h));
             0
         },
 
@@ -100,7 +90,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
             use events::Event::Moved;
             let x = winapi::LOWORD(lparam as winapi::DWORD) as i32;
             let y = winapi::HIWORD(lparam as winapi::DWORD) as i32;
-            send_event(window, Moved(x, y));
+            send_event(Some(window), Moved(x, y));
             0
         },
 
@@ -108,7 +98,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
             use std::mem;
             use events::Event::ReceivedCharacter;
             let chr: char = mem::transmute(wparam as u32);
-            send_event(window, ReceivedCharacter(chr));
+            send_event(Some(window), ReceivedCharacter(chr));
             0
         },
 
@@ -126,7 +116,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
             let x = winapi::GET_X_LPARAM(lparam) as i32;
             let y = winapi::GET_Y_LPARAM(lparam) as i32;
 
-            send_event(window, MouseMoved(x, y));
+            send_event(Some(window), MouseMoved(x, y));
 
             0
         },
@@ -140,7 +130,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
             let value = value as i32;
             let value = value as f32 / winapi::WHEEL_DELTA as f32;
 
-            send_event(window, MouseWheel(LineDelta(0.0, value), TouchPhase::Moved));
+            send_event(Some(window), MouseWheel(LineDelta(0.0, value), TouchPhase::Moved));
 
             0
         },
@@ -152,7 +142,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
                 user32::DefWindowProcW(window, msg, wparam, lparam)
             } else {
                 let (scancode, vkey) = event::vkeycode_to_element(wparam, lparam);
-                send_event(window, KeyboardInput(Pressed, scancode, vkey));
+                send_event(Some(window), KeyboardInput(Pressed, scancode, vkey));
                 0
             }
         },
@@ -161,7 +151,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
             use events::Event::KeyboardInput;
             use events::ElementState::Released;
             let (scancode, vkey) = event::vkeycode_to_element(wparam, lparam);
-            send_event(window, KeyboardInput(Released, scancode, vkey));
+            send_event(Some(window), KeyboardInput(Released, scancode, vkey));
             0
         },
 
@@ -169,7 +159,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
             use events::Event::MouseInput;
             use events::MouseButton::Left;
             use events::ElementState::Pressed;
-            send_event(window, MouseInput(Pressed, Left));
+            send_event(Some(window), MouseInput(Pressed, Left));
             0
         },
 
@@ -177,7 +167,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
             use events::Event::MouseInput;
             use events::MouseButton::Left;
             use events::ElementState::Released;
-            send_event(window, MouseInput(Released, Left));
+            send_event(Some(window), MouseInput(Released, Left));
             0
         },
 
@@ -185,7 +175,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
             use events::Event::MouseInput;
             use events::MouseButton::Right;
             use events::ElementState::Pressed;
-            send_event(window, MouseInput(Pressed, Right));
+            send_event(Some(window), MouseInput(Pressed, Right));
             0
         },
 
@@ -193,7 +183,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
             use events::Event::MouseInput;
             use events::MouseButton::Right;
             use events::ElementState::Released;
-            send_event(window, MouseInput(Released, Right));
+            send_event(Some(window), MouseInput(Released, Right));
             0
         },
 
@@ -201,7 +191,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
             use events::Event::MouseInput;
             use events::MouseButton::Middle;
             use events::ElementState::Pressed;
-            send_event(window, MouseInput(Pressed, Middle));
+            send_event(Some(window), MouseInput(Pressed, Middle));
             0
         },
 
@@ -209,7 +199,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
             use events::Event::MouseInput;
             use events::MouseButton::Middle;
             use events::ElementState::Released;
-            send_event(window, MouseInput(Released, Middle));
+            send_event(Some(window), MouseInput(Released, Middle));
             0
         },
 
@@ -218,7 +208,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
             use events::MouseButton::Other;
             use events::ElementState::Pressed;
             let xbutton = winapi::HIWORD(wparam as winapi::DWORD) as winapi::c_int; // waiting on PR for winapi to add GET_XBUTTON_WPARAM
-            send_event(window, MouseInput(Pressed, Other(xbutton as u8)));
+            send_event(Some(window), MouseInput(Pressed, Other(xbutton as u8)));
             0
         },
 
@@ -227,7 +217,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
             use events::MouseButton::Other;
             use events::ElementState::Released;
             let xbutton = winapi::HIWORD(wparam as winapi::DWORD) as winapi::c_int; 
-            send_event(window, MouseInput(Released, Other(xbutton as u8)));
+            send_event(Some(window), MouseInput(Released, Other(xbutton as u8)));
             0
         },
 
@@ -242,7 +232,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
                 let _x = data.mouse.lLastX;  // FIXME: this is not always the relative movement
                 let _y = data.mouse.lLastY;
                 // TODO:
-                //send_event(window, Event::MouseRawMovement { x: x, y: y });
+                //send_event(Some(window), Event::MouseRawMovement { x: x, y: y });
 
                 0
 
@@ -253,13 +243,13 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
 
         winapi::WM_SETFOCUS => {
             use events::Event::Focused;
-            send_event(window, Focused(true));
+            send_event(Some(window), Focused(true));
             0
         },
 
         winapi::WM_KILLFOCUS => {
             use events::Event::Focused;
-            send_event(window, Focused(false));
+            send_event(Some(window), Focused(false));
             0
         },
 
@@ -302,7 +292,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
                 let nch = shell32::DragQueryFileW(hdrop, i, pathbuf.as_mut_ptr(),
                                                   winapi::MAX_PATH as u32) as usize;
                 if nch > 0 {
-                    send_event(window, DroppedFile(OsString::from_wide(&pathbuf[0..nch]).into()));
+                    send_event(Some(window), DroppedFile(OsString::from_wide(&pathbuf[0..nch]).into()));
                 }
             }
 
@@ -342,7 +332,7 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
 
         x if x == *super::WAKEUP_MSG_ID => {
             use events::Event::Awakened;
-            send_event(window, Awakened);
+            send_event(None, Awakened);
             0
         },
 
