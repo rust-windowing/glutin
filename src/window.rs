@@ -1,6 +1,8 @@
 use std::collections::vec_deque::IntoIter as VecDequeIter;
 use std::default::Default;
 
+use winapi;
+
 use Api;
 use ContextError;
 use CreationError;
@@ -198,6 +200,13 @@ impl<'a> WindowBuilder<'a> {
     #[inline]
     pub fn with_multitouch(mut self) -> WindowBuilder<'a> {
         self.window.multitouch = true;
+        self
+    }
+
+    /// Uses the given window instead of creating a new one
+    #[inline]
+    pub fn with_parent(mut self, parent: winapi::HWND) -> WindowBuilder<'a> {
+        self.window.parent = Some(parent);
         self
     }
 

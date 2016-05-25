@@ -533,6 +533,9 @@ pub struct WindowAttributes {
     /// [iOS only] Enable multitouch, see [UIView#multipleTouchEnabled]
     /// (https://developer.apple.com/library/ios/documentation/UIKit/Reference/UIView_Class/#//apple_ref/occ/instp/UIView/multipleTouchEnabled)
     pub multitouch: bool,
+
+    /// Create window as a child if parent.is_some()
+    pub parent: Option<winapi::HWND>,
 }
 
 impl Default for WindowAttributes {
@@ -548,6 +551,7 @@ impl Default for WindowAttributes {
             transparent: false,
             decorations: true,
             multitouch: false,
+            parent: None,
         }
     }
 }

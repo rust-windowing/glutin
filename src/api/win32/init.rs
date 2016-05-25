@@ -33,6 +33,7 @@ use api::wgl::Context as WglContext;
 use api::egl;
 use api::egl::Context as EglContext;
 use api::egl::ffi::egl::Egl;
+use platform;
 
 #[derive(Clone)]
 pub enum RawContext {
@@ -59,39 +60,61 @@ pub fn new_window(window: &WindowAttributes, pf_reqs: &PixelFormatRequirements,
 
     let (tx, rx) = channel();
 
-    // `GetMessage` must be called in the same thread as CreateWindow, so we create a new thread
-    // dedicated to this window.
-    thread::spawn(move || {
+    let window2 = WindowAttributes2 {
+        dimensions: window.dimensions,
+        min_dimensions: window.min_dimensions,
+        max_dimensions: window.max_dimensions,
+        monitor: window.monitor,
+        title: window.title,
+        visible: window.visible,
+        transparent: window.transparent,
+        decorations: window.decorations,
+        multitouch: window.multitouch,
+    };
+
+    if let Some(parent) = window.parent {
         unsafe {
             // creating and sending the `Window`
-            match init(title, &window, &pf_reqs, &opengl, egl) {
+            match init(title, &window2, &pf_reqs, &opengl, egl, parent) {
                 Ok(w) => tx.send(Ok(w)).ok(),
-                Err(e) => {
-                    tx.send(Err(e)).ok();
-                    return;
-                }
+                Err(e) => tx.send(Err(e)).ok(),
             };
-
-            // now that the `Window` struct is initialized, the main `Window::new()` function will
-            //  return and this events loop will run in parallel
-            loop {
-                let mut msg = mem::uninitialized();
-
-                if user32::GetMessageW(&mut msg, ptr::null_mut(), 0, 0) == 0 {
-                    break;
-                }
-
-                user32::TranslateMessage(&msg);
-                user32::DispatchMessageW(&msg);   // calls `callback` (see the callback module)
-            }
         }
-    });
+    } else {
+        // `GetMessage` must be called in the same thread as CreateWindow, so we create a new thread
+        // dedicated to this window.
+        thread::spawn(move || {
+            unsafe {
+                // creating and sending the `Window`
+                match init(title, &window2, &pf_reqs, &opengl, egl, ptr::null_mut()) {
+                    Ok(w) => tx.send(Ok(w)).ok(),
+                    Err(e) => {
+                        tx.send(Err(e)).ok();
+                        return;
+                    }
+                };
+
+                // now that the `Window` struct is initialized, the main `Window::new()` function will
+                //  return and this events loop will run in parallel
+                loop {
+                    let mut msg = mem::uninitialized();
+
+                    if user32::GetMessageW(&mut msg, ptr::null_mut(), 0, 0) == 0 {
+                        break;
+                    }
+
+                    user32::TranslateMessage(&msg);
+                    user32::DispatchMessageW(&msg);   // calls `callback` (see the callback module)
+                }
+            }
+        });
+    }
 
     rx.recv().unwrap()
 }
 
-unsafe fn init(title: Vec<u16>, window: &WindowAttributes, pf_reqs: &PixelFormatRequirements,
-               opengl: &GlAttributes<RawContext>, egl: Option<Egl>)
+unsafe fn init(title: Vec<u16>, window: &WindowAttributes2, pf_reqs: &PixelFormatRequirements,
+               opengl: &GlAttributes<RawContext>, egl: Option<Egl>, parent: winapi::HWND)
                -> Result<Window, CreationError>
 {
     let opengl = opengl.clone().map_sharing(|sharelists| {
@@ -149,13 +172,20 @@ unsafe fn init(title: Vec<u16>, window: &WindowAttributes, pf_reqs: &PixelFormat
             style | winapi::WS_VISIBLE
         };
 
+        let style = if parent.is_null() {
+            style
+        } else {
+            //style | winapi::WS_CHILD
+            winapi::WS_CHILD | winapi::WS_VISIBLE
+        };
+
         let handle = user32::CreateWindowExW(ex_style | winapi::WS_EX_ACCEPTFILES,
             class_name.as_ptr(),
             title.as_ptr() as winapi::LPCWSTR,
             style | winapi::WS_CLIPSIBLINGS | winapi::WS_CLIPCHILDREN,
             x.unwrap_or(winapi::CW_USEDEFAULT), y.unwrap_or(winapi::CW_USEDEFAULT),
             width.unwrap_or(winapi::CW_USEDEFAULT), height.unwrap_or(winapi::CW_USEDEFAULT),
-            ptr::null_mut(), ptr::null_mut(), kernel32::GetModuleHandleW(ptr::null()),
+            /*ptr::null_mut()*/parent, ptr::null_mut(), kernel32::GetModuleHandleW(ptr::null()),
             ptr::null_mut());
 
         if handle.is_null() {
@@ -215,6 +245,19 @@ unsafe fn init(title: Vec<u16>, window: &WindowAttributes, pf_reqs: &PixelFormat
         user32::SetForegroundWindow(real_window.0);
     }
 
+    let window = WindowAttributes {
+        dimensions: window.dimensions,
+        min_dimensions: window.min_dimensions,
+        max_dimensions: window.max_dimensions,
+        monitor: window.monitor.clone(),
+        title: window.title.clone(),
+        visible: window.visible,
+        transparent: window.transparent,
+        decorations: window.decorations,
+        multitouch: window.multitouch,
+        parent: Some(parent),
+    };
+
     // Creating a mutex to track the current window state
     let window_state = Arc::new(Mutex::new(WindowState {
         cursor: winapi::IDC_ARROW, // use arrow by default
@@ -244,6 +287,56 @@ unsafe fn init(title: Vec<u16>, window: &WindowAttributes, pf_reqs: &PixelFormat
         events_receiver: events_receiver,
         window_state: window_state,
     })
+}
+
+/// This is a created as a workaround because HWND cannot cross thread boundaries.
+#[derive(Clone)]
+struct WindowAttributes2 {
+    /// The dimensions of the window. If this is `None`, some platform-specific dimensions will be
+    /// used.
+    ///
+    /// The default is `None`.
+    pub dimensions: Option<(u32, u32)>,
+
+    /// The minimum dimensions a window can be, If this is `None`, the window will have no minimum dimensions (aside from reserved).
+    ///
+    /// The default is `None`.
+    pub min_dimensions: Option<(u32, u32)>,
+
+    /// The maximum dimensions a window can be, If this is `None`, the maximum will have no maximum or will be set to the primary monitor's dimensions by the platform.
+    ///
+    /// The default is `None`.
+    pub max_dimensions: Option<(u32, u32)>,
+
+    /// If `Some`, the window will be in fullscreen mode with the given monitor.
+    ///
+    /// The default is `None`.
+    pub monitor: Option<platform::MonitorId>,
+
+    /// The title of the window in the title bar.
+    ///
+    /// The default is `"glutin window"`.
+    pub title: String,
+
+    /// Whether the window should be immediately visible upon creation.
+    ///
+    /// The default is `true`.
+    pub visible: bool,
+
+    /// Whether the the window should be transparent. If this is true, writing colors
+    /// with alpha values different than `1.0` will produce a transparent window.
+    ///
+    /// The default is `false`.
+    pub transparent: bool,
+
+    /// Whether the window should have borders and bars.
+    ///
+    /// The default is `true`.
+    pub decorations: bool,
+
+    /// [iOS only] Enable multitouch, see [UIView#multipleTouchEnabled]
+    /// (https://developer.apple.com/library/ios/documentation/UIKit/Reference/UIView_Class/#//apple_ref/occ/instp/UIView/multipleTouchEnabled)
+    pub multitouch: bool,
 }
 
 unsafe fn register_window_class() -> Vec<u16> {
