@@ -5,6 +5,7 @@ use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::ffi::OsString;
 use std::os::windows::ffi::OsStringExt;
+use std::collections::HashMap;
 
 use WindowAttributes;
 use CursorState;
@@ -19,7 +20,7 @@ use winapi;
 /// There's no parameters passed to the callback function, so it needs to get
 /// its context (the HWND, the Sender for events, etc.) stashed in
 /// a thread-local variable.
-thread_local!(pub static CONTEXT_STASH: RefCell<Option<ThreadLocalData>> = RefCell::new(None));
+thread_local!(pub static CONTEXT_STASH: RefCell<HashMap<winapi::HWND, ThreadLocalData>> = RefCell::new(HashMap::new()));
 
 pub struct ThreadLocalData {
     pub win: winapi::HWND,
@@ -39,9 +40,9 @@ struct MinMaxInfo {
 fn send_event(input_window: winapi::HWND, event: Event) {
     CONTEXT_STASH.with(|context_stash| {
         let context_stash = context_stash.borrow();
-        let stored = match *context_stash {
+        let stored = match (*context_stash).get(&input_window) {
             None => return,
-            Some(ref v) => v
+            Some(v) => v,
         };
 
         let &ThreadLocalData { ref win, ref sender, .. } = stored;
@@ -68,9 +69,9 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
 
             CONTEXT_STASH.with(|context_stash| {
                 let context_stash = context_stash.borrow();
-                let stored = match *context_stash {
+                let stored = match (*context_stash).get(&window) {
                     None => return,
-                    Some(ref v) => v
+                    Some(v) => v,
                 };
 
                 let &ThreadLocalData { ref win, .. } = stored;
@@ -266,24 +267,22 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
         winapi::WM_SETCURSOR => {
             CONTEXT_STASH.with(|context_stash| {
                 let cstash = context_stash.borrow();
-                let cstash = cstash.as_ref();
-                // there's a very bizarre borrow checker bug
-                // possibly related to rust-lang/rust/#23338
-                let _cursor_state = if let Some(cstash) = cstash {
-                    if let Ok(window_state) = cstash.window_state.lock() {
-                        match window_state.cursor_state {
-                            CursorState::Normal => {
-                                user32::SetCursor(user32::LoadCursorW(
-                                        ptr::null_mut(),
-                                        window_state.cursor));
-                            },
-                            CursorState::Grab | CursorState::Hide => {
-                                user32::SetCursor(ptr::null_mut());
+                let _cursor_state = match cstash.get(&window) {
+                    None => return,
+                    Some(cstash) => {
+                        if let Ok(window_state) = cstash.window_state.lock() {
+                            match window_state.cursor_state {
+                                CursorState::Normal => {
+                                    user32::SetCursor(user32::LoadCursorW(
+                                            ptr::null_mut(),
+                                            window_state.cursor));
+                                },
+                                CursorState::Grab | CursorState::Hide => {
+                                    user32::SetCursor(ptr::null_mut());
+                                }
                             }
                         }
                     }
-                } else {
-                    return
                 };
 
 //                let &ThreadLocalData { ref cursor_state, .. } = stored;
@@ -316,7 +315,8 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
             //(*mmi).max_size = winapi::POINT { x: .., y: .. }; // The dimensions of the primary monitor.
 
             CONTEXT_STASH.with(|context_stash| {
-                match context_stash.borrow().as_ref() {
+                match context_stash.borrow().get(&window) {
+                    None => return,
                     Some(cstash) => {
                         let window_state = cstash.window_state.lock().unwrap();
 
@@ -334,7 +334,6 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
                             None => { }
                         }
                     },
-                    None => { }
                 }
             });
             0

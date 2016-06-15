@@ -23,6 +23,7 @@ use WindowAttributes;
 use std::ffi::{OsStr};
 use std::os::windows::ffi::OsStrExt;
 use std::sync::mpsc::channel;
+use std::collections::HashMap;
 
 use winapi;
 use kernel32;
@@ -275,7 +276,7 @@ unsafe fn init(title: Vec<u16>, window: &WindowAttributes2, pf_reqs: &PixelForma
                 sender: tx.take().unwrap(),
                 window_state: window_state.clone()
             };
-            (*context_stash.borrow_mut()) = Some(data);
+            (*context_stash.borrow_mut()).insert(real_window.0, data);
         });
         rx
     };
