@@ -339,6 +339,12 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
             0
         },
 
+        winapi::WM_TIMER => {
+            use events::Event::Timer;
+            send_event(window, Timer(mem::transmute(wparam as u32)));
+            0
+        },
+
         x if x == *super::WAKEUP_MSG_ID => {
             use events::Event::Awakened;
             send_event(window, Awakened);

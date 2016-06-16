@@ -56,7 +56,9 @@ pub enum Event {
 
 
     /// Touch event has been received
-    Touch(Touch)
+    Touch(Touch),
+
+    Timer(u32),
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]

@@ -505,6 +505,36 @@ impl Window {
     pub fn set_cursor_state(&self, state: CursorState) -> Result<(), String> {
         self.window.set_cursor_state(state)
     }
+
+    /*#[cfg(windows)]
+    #[inline]
+    pub fn set_timer<F>(&self, timer_id: u32, timeout_ms: u32, callback: Option<F>) -> Result<(), ()> where F: FnMut(winapi::HWND, u32, u32) + Send + 'static {
+        self.window.set_timer(timer_id, timeout_ms, callback)
+    }
+
+    #[cfg(windows)]
+    #[inline]
+    pub fn kill_timer(&self, timer_id: u32) -> Result<(), ()> {
+        self.window.kill_timer(timer_id)
+    }*/
+
+    #[cfg(windows)]
+    #[inline]
+    pub fn set_timer(&self, timer_id: u32, timeout_ms: u32, callback: winapi::TimerProc) -> Result<(), ()> {
+        self.window.set_timer(timer_id, timeout_ms, callback)
+    }
+
+    #[cfg(windows)]
+    #[inline]
+    pub fn kill_timer(&self, timer_id: u32) -> Result<(), ()> {
+        self.window.kill_timer(timer_id)
+    }
+
+    #[cfg(windows)]
+    #[inline]
+    pub fn get_handle(&self) -> winapi::HWND {
+        self.window.get_handle()
+    }
 }
 
 impl GlContext for Window {

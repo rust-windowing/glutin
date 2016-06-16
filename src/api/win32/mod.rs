@@ -367,6 +367,55 @@ impl Window {
 
         Ok(())
     }
+
+    /*#[inline]
+    pub fn set_timer<F>(&self, timer_id: u32, timeout_ms: u32, callback: Option<F>) -> Result<(), ()> where F: FnMut(winapi::HWND, u32, u32) + Send + 'static {
+        unsafe {
+            let timerproc: winapi::TimerProc = match callback {
+                None => None,
+                Some(callback) => Some(handle_timer),
+            };
+            if user32::SetTimer(self.window.0, timer_id, timeout_ms, timerproc) == 0 {
+                return Err(());
+            }
+            Ok(())
+        }
+    }
+
+    #[inline]
+    pub fn kill_timer(&self, timer_id: u32) -> Result<(), ()> {
+        unsafe {
+            if user32::KillTimer(self.window.0, timer_id) == 0 {
+                return Err(());
+            }
+            Ok(())
+        }
+    }*/
+
+    #[inline]
+    pub fn set_timer(&self, timer_id: u32, timeout_ms: u32, callback: winapi::TimerProc) -> Result<(), ()> {
+        unsafe {
+            if user32::SetTimer(self.window.0, timer_id, timeout_ms, callback) == 0 {
+                return Err(());
+            }
+            Ok(())
+        }
+    }
+
+    #[inline]
+    pub fn kill_timer(&self, timer_id: u32) -> Result<(), ()> {
+        unsafe {
+            if user32::KillTimer(self.window.0, timer_id) == 0 {
+                return Err(());
+            }
+            Ok(())
+        }
+    }
+
+    #[inline]
+    pub fn get_handle(&self) -> winapi::HWND {
+        self.window.0
+    }
 }
 
 impl GlContext for Window {

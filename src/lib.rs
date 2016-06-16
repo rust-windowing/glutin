@@ -103,6 +103,7 @@ pub mod os;
 /// ```
 pub struct Window {
     window: platform::Window,
+    //timer_callback: Option<FnMut(winapi::HWND, u32, u32) + Send + 'static>,
 }
 
 /// Object that allows you to build windows.
