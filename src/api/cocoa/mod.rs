@@ -243,28 +243,29 @@ impl<'a> Iterator for WaitEventsIterator<'a> {
     type Item = Event;
 
     fn next(&mut self) -> Option<Event> {
-        if let Some(ev) = self.window.delegate.state.pending_events.lock().unwrap().pop_front() {
-            return Some(ev);
-        }
+        loop {
+            if let Some(ev) = self.window.delegate.state.pending_events.lock().unwrap().pop_front() {
+                return Some(ev);
+            }
 
-        let event: Option<Event>;
-        unsafe {
-            let pool = NSAutoreleasePool::new(nil);
+            let event: Option<Event>;
 
-            let nsevent = appkit::NSApp().nextEventMatchingMask_untilDate_inMode_dequeue_(
-                appkit::NSAnyEventMask.bits() | appkit::NSEventMaskPressure.bits(),
-                NSDate::distantFuture(nil),
-                NSDefaultRunLoopMode,
-                YES);
-            event = NSEventToEvent(self.window, nsevent);
+            unsafe {
+                let pool = NSAutoreleasePool::new(nil);
 
-            let _: () = msg_send![pool, release];
-        }
+                let nsevent = appkit::NSApp().nextEventMatchingMask_untilDate_inMode_dequeue_(
+                    appkit::NSAnyEventMask.bits() | appkit::NSEventMaskPressure.bits(),
+                    NSDate::distantFuture(nil),
+                    NSDefaultRunLoopMode,
+                    YES);
+                event = NSEventToEvent(self.window, nsevent);
 
-        if event.is_none() {
-            return Some(Event::Awakened);
-        } else {
-            return event;
+                let _: () = msg_send![pool, release];
+            }
+
+            if let Some(event) = event {
+                return Some(event);
+            }
         }
     }
 }
