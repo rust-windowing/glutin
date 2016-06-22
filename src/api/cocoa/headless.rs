@@ -27,6 +27,7 @@ impl HeadlessContext {
                -> Result<HeadlessContext, CreationError>
     {
         let context = unsafe {
+            let _ = NSApp();
 
             let attributes = try!(helpers::build_nsattributes(pf_reqs, opengl));
 
@@ -35,6 +36,7 @@ impl HeadlessContext {
                 return Err(OsError(format!("Could not create the pixel format")));
             }
             let context = NSOpenGLContext::alloc(nil).initWithFormat_shareContext_(pixelformat, nil);
+            msg_send![pixelformat, release];
             if context == nil {
                 return Err(OsError(format!("Could not create the rendering context")));
             }
@@ -57,7 +59,7 @@ impl GlContext for HeadlessContext {
 
     #[inline]
     fn is_current(&self) -> bool {
-        unimplemented!()
+        (unsafe { NSOpenGLContext::currentContext(nil) }) == self.context
     }
 
     #[inline]
@@ -87,6 +89,15 @@ impl GlContext for HeadlessContext {
     #[inline]
     fn get_pixel_format(&self) -> PixelFormat {
         unimplemented!();
+    }
+}
+
+impl Drop for HeadlessContext {
+    fn drop(&mut self) {
+        if self.is_current() {
+            unsafe { NSOpenGLContext::clearCurrentContext(nil) };
+        }
+        unsafe { msg_send![self.context, release] };
     }
 }
 
