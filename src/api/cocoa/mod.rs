@@ -799,7 +799,7 @@ impl IdRef {
 impl Drop for IdRef {
     fn drop(&mut self) {
         if self.0 != nil {
-            let _: () = unsafe { msg_send![self.0, release] };
+            let _: () = unsafe { msg_send![self.0, autorelease] };
         }
     }
 }
