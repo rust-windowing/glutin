@@ -5,6 +5,8 @@ use GlAttributes;
 use GlContext;
 use PixelFormatRequirements;
 
+use super::IdRef;
+
 use core_foundation::base::TCFType;
 use core_foundation::string::CFString;
 use core_foundation::bundle::{CFBundleGetBundleWithIdentifier, CFBundleGetFunctionPointerForName};
@@ -17,7 +19,7 @@ use api::cocoa::helpers;
 pub struct PlatformSpecificHeadlessBuilderAttributes;
 
 pub struct HeadlessContext {
-    context: id,
+    context: IdRef,
 }
 
 impl HeadlessContext {
@@ -31,13 +33,12 @@ impl HeadlessContext {
 
             let attributes = try!(helpers::build_nsattributes(pf_reqs, opengl));
 
-            let pixelformat = NSOpenGLPixelFormat::alloc(nil).initWithAttributes_(&attributes);
-            if pixelformat == nil {
+            let pixelformat = IdRef::new(NSOpenGLPixelFormat::alloc(nil).initWithAttributes_(&attributes));
+            if pixelformat.is_nil() {
                 return Err(OsError(format!("Could not create the pixel format")));
             }
-            let context = NSOpenGLContext::alloc(nil).initWithFormat_shareContext_(pixelformat, nil);
-            msg_send![pixelformat, release];
-            if context == nil {
+            let context = IdRef::new(NSOpenGLContext::alloc(nil).initWithFormat_shareContext_(*pixelformat, nil));
+            if context.is_nil() {
                 return Err(OsError(format!("Could not create the rendering context")));
             }
             context
@@ -59,7 +60,7 @@ impl GlContext for HeadlessContext {
 
     #[inline]
     fn is_current(&self) -> bool {
-        (unsafe { NSOpenGLContext::currentContext(nil) }) == self.context
+        (unsafe { NSOpenGLContext::currentContext(nil) }) == *self.context
     }
 
     #[inline]
@@ -89,15 +90,6 @@ impl GlContext for HeadlessContext {
     #[inline]
     fn get_pixel_format(&self) -> PixelFormat {
         unimplemented!();
-    }
-}
-
-impl Drop for HeadlessContext {
-    fn drop(&mut self) {
-        if self.is_current() {
-            unsafe { NSOpenGLContext::clearCurrentContext(nil) };
-        }
-        unsafe { msg_send![self.context, release] };
     }
 }
 
