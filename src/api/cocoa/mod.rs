@@ -917,6 +917,12 @@ unsafe fn NSEventToEvent(window: &Window, nsevent: id) -> Option<Event> {
         appkit::NSEventTypePressure => {
             Some(Event::TouchpadPressure(nsevent.pressure(), nsevent.stage()))
         },
-        _  => { None },
+        appkit::NSApplicationDefined => match nsevent.subtype() {
+            appkit::NSEventSubtype::NSApplicationActivatedEventType => {
+                Some(Event::Awakened)
+            },
+            _ => None,
+        },
+        _ => None,
     }
 }
