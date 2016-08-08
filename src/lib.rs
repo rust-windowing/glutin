@@ -177,7 +177,7 @@ impl CreationError {
     }
 }
 
-impl std::fmt::Display for CreationError {
+impl std::fmt::Debug for CreationError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         formatter.write_str(self.to_string())
     }
