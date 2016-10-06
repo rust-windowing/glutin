@@ -701,8 +701,10 @@ unsafe fn load_extra_functions(window: winapi::HWND) -> Result<gl::wgl_extra::Wg
         }
 
         // this dummy window should match the real one enough to get the same OpenGL driver
+        let title = OsStr::new("dummy window").encode_wide().chain(Some(0).into_iter())
+                                              .collect::<Vec<_>>();
         let win = user32::CreateWindowExW(ex_style, class_name.as_ptr(),
-                                          b"dummy window\0".as_ptr() as *const _, style,
+                                          title.as_ptr() as winapi::LPCWSTR, style,
                                           winapi::CW_USEDEFAULT, winapi::CW_USEDEFAULT,
                                           rect.right - rect.left,
                                           rect.bottom - rect.top,
