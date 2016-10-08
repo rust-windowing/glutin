@@ -497,6 +497,9 @@ impl<'a> Iterator for WaitEventsIterator<'a> {
 impl Drop for Window {
     #[inline]
     fn drop(&mut self) {
+        callback::CONTEXT_STASH.with(|context_stash| {
+            (*context_stash.borrow_mut()).remove(&self.window.0).unwrap();
+        });
         unsafe {
             // we don't call MakeCurrent(0, 0) because we are not sure that the context
             // is still the current one
