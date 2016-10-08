@@ -12,6 +12,8 @@ pub type EMSCRIPTEN_RESULT = libc::c_int;
 pub type em_webgl_context_callback = extern fn(libc::c_int, *const libc::c_void, *mut libc::c_void)
     -> EM_BOOL;
 
+pub type em_callback_func = unsafe extern fn();
+
 #[repr(C)]
 pub struct EmscriptenWebGLContextAttributes {
     pub alpha: EM_BOOL,
@@ -79,4 +81,6 @@ extern {
         height: *mut libc::c_double) -> EMSCRIPTEN_RESULT;
 
     pub fn emscripten_sleep(delay: libc::c_uint);
+
+    pub fn emscripten_set_main_loop(func : em_callback_func, fps : libc::c_int, simulate_infinite_loop : libc::c_int);
 }
