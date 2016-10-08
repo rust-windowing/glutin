@@ -76,7 +76,7 @@ pub fn new_window(window: &WindowAttributes, pf_reqs: &PixelFormatRequirements,
     if let Some(parent) = window.parent {
         unsafe {
             // creating and sending the `Window`
-            match init(title, &window2, &pf_reqs, &opengl, egl, parent) {
+            match init(title, &window2, &pf_reqs, &opengl, egl, parent.window as winapi::HWND) {
                 Ok(w) => tx.send(Ok(w)).ok(),
                 Err(e) => tx.send(Err(e)).ok(),
             };
@@ -246,6 +246,7 @@ unsafe fn init(title: Vec<u16>, window: &WindowAttributes2, pf_reqs: &PixelForma
         user32::SetForegroundWindow(real_window.0);
     }
 
+    use libc;
     let window = WindowAttributes {
         dimensions: window.dimensions,
         min_dimensions: window.min_dimensions,
@@ -256,7 +257,7 @@ unsafe fn init(title: Vec<u16>, window: &WindowAttributes2, pf_reqs: &PixelForma
         transparent: window.transparent,
         decorations: window.decorations,
         multitouch: window.multitouch,
-        parent: Some(parent),
+        parent: Some(super::super::super::WindowID::new(parent as *mut libc::c_void)),
     };
 
     // Creating a mutex to track the current window state
@@ -291,6 +292,7 @@ unsafe fn init(title: Vec<u16>, window: &WindowAttributes2, pf_reqs: &PixelForma
 }
 
 /// This is a created as a workaround because HWND cannot cross thread boundaries.
+// (the trait bound `*mut libc::c_void: std::marker::Send` is not satisfied)
 #[derive(Clone)]
 struct WindowAttributes2 {
     /// The dimensions of the window. If this is `None`, some platform-specific dimensions will be

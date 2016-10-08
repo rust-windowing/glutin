@@ -487,6 +487,20 @@ impl Default for PixelFormatRequirements {
     }
 }
 
+/// A wrapper for a native window pointer.
+#[derive(Debug, Clone)]
+pub struct WindowID {
+    pub window: *mut libc::c_void,
+}
+
+impl WindowID {
+    pub fn new(window: *mut libc::c_void) -> WindowID {
+        WindowID {
+            window: window
+        }
+    }
+}
+
 /// Attributes to use when creating a window.
 #[derive(Clone)]
 pub struct WindowAttributes {
@@ -537,7 +551,7 @@ pub struct WindowAttributes {
     pub multitouch: bool,
 
     /// Create window as a child if parent.is_some()
-    pub parent: Option<winapi::HWND>,
+    pub parent: Option<WindowID>,
 }
 
 impl Default for WindowAttributes {

@@ -205,8 +205,8 @@ impl<'a> WindowBuilder<'a> {
 
     /// Uses the given window instead of creating a new one
     #[inline]
-    pub fn with_parent(mut self, parent: winapi::HWND) -> WindowBuilder<'a> {
-        self.window.parent = Some(parent);
+    pub fn with_parent(mut self, parent: Option<super::WindowID>) -> WindowBuilder<'a> {
+        self.window.parent = parent;
         self
     }
 
