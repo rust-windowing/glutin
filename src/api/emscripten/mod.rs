@@ -15,6 +15,7 @@ use PixelFormatRequirements;
 use WindowAttributes;
 
 use std::collections::VecDeque;
+use platform::PlatformSpecificWindowBuilderAttributes;
 
 mod ffi;
 
@@ -92,7 +93,7 @@ impl MonitorId {
 
 impl Window {
     pub fn new(window: &WindowAttributes, pf_reqs: &PixelFormatRequirements,
-               opengl: &GlAttributes<&Window>) -> Result<Window, CreationError>
+               opengl: &GlAttributes<&Window>, _: &PlatformSpecificWindowBuilderAttributes) -> Result<Window, CreationError>
     {
         // getting the default values of attributes
         let mut attributes = unsafe {
