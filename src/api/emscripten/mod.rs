@@ -256,7 +256,6 @@ impl GlContext for Window {
 
     #[inline]
     fn swap_buffers(&self) -> Result<(), ContextError> {
-        unsafe { ffi::emscripten_sleep(1); }  // FIXME:  
         Ok(())
     }
 
