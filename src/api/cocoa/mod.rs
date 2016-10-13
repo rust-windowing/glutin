@@ -758,7 +758,7 @@ impl GlContext for Window {
 
     #[inline]
     fn swap_buffers(&self) -> Result<(), ContextError> {
-        unsafe { 
+        unsafe {
             let pool = NSAutoreleasePool::new(nil);
             self.context.flushBuffer();
             let _: () = msg_send![pool, release];
@@ -794,6 +794,10 @@ impl IdRef {
 
     fn non_nil(self) -> Option<IdRef> {
         if self.0 == nil { None } else { Some(self) }
+    }
+
+    fn is_nil(&self) -> bool {
+        self.0 == nil
     }
 }
 

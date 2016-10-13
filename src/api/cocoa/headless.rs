@@ -5,6 +5,8 @@ use GlAttributes;
 use GlContext;
 use PixelFormatRequirements;
 
+use super::IdRef;
+
 use core_foundation::base::TCFType;
 use core_foundation::string::CFString;
 use core_foundation::bundle::{CFBundleGetBundleWithIdentifier, CFBundleGetFunctionPointerForName};
@@ -17,7 +19,7 @@ use api::cocoa::helpers;
 pub struct PlatformSpecificHeadlessBuilderAttributes;
 
 pub struct HeadlessContext {
-    context: id,
+    context: IdRef,
 }
 
 impl HeadlessContext {
@@ -27,15 +29,16 @@ impl HeadlessContext {
                -> Result<HeadlessContext, CreationError>
     {
         let context = unsafe {
+            let _ = NSApp();
 
             let attributes = try!(helpers::build_nsattributes(pf_reqs, opengl));
 
-            let pixelformat = NSOpenGLPixelFormat::alloc(nil).initWithAttributes_(&attributes);
-            if pixelformat == nil {
+            let pixelformat = IdRef::new(NSOpenGLPixelFormat::alloc(nil).initWithAttributes_(&attributes));
+            if pixelformat.is_nil() {
                 return Err(OsError(format!("Could not create the pixel format")));
             }
-            let context = NSOpenGLContext::alloc(nil).initWithFormat_shareContext_(pixelformat, nil);
-            if context == nil {
+            let context = IdRef::new(NSOpenGLContext::alloc(nil).initWithFormat_shareContext_(*pixelformat, nil));
+            if context.is_nil() {
                 return Err(OsError(format!("Could not create the rendering context")));
             }
             context
@@ -57,7 +60,7 @@ impl GlContext for HeadlessContext {
 
     #[inline]
     fn is_current(&self) -> bool {
-        unimplemented!()
+        (unsafe { NSOpenGLContext::currentContext(nil) }) == *self.context
     }
 
     #[inline]
