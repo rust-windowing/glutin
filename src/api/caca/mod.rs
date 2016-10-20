@@ -57,8 +57,8 @@ impl MonitorId {
     }
 
     #[inline]
-    pub fn get_native_identifier(&self) -> ::native_monitor::NativeMonitorId {
-        ::native_monitor::NativeMonitorId::Unavailable
+    pub fn get_native_identifier(&self) -> ::winit::NativeMonitorId {
+        ::winit::NativeMonitorId::Unavailable
     }
 
     #[inline]
