@@ -15,11 +15,9 @@ use Robustness;
 use libc;
 use libc::c_int;
 use std::ffi::{CStr, CString};
-use std::{mem, ptr, slice};
+use std::{mem, ptr};
 
 use api::x11::ffi;
-
-use platform::Window as PlatformWindow;
 
 pub struct Context {
     glx: ffi::glx::Glx,
@@ -37,10 +35,14 @@ fn with_c_str<F, T>(s: &str, f: F) -> T where F: FnOnce(*const libc::c_char) -> 
 }
 
 impl Context {
-    pub fn new<'a>(glx: ffi::glx::Glx, xlib: &ffi::Xlib, pf_reqs: &PixelFormatRequirements,
-                   opengl: &'a GlAttributes<&'a Context>, display: *mut ffi::Display,
-                   screen_id: libc::c_int) -> Result<ContextPrototype<'a>, CreationError>
-    {
+    pub fn new<'a>(
+        glx: ffi::glx::Glx,
+        xlib: &ffi::Xlib,
+        pf_reqs: &PixelFormatRequirements,
+        opengl: &'a GlAttributes<&'a Context>,
+        display: *mut ffi::Display,
+        screen_id: libc::c_int,
+) -> Result<ContextPrototype<'a>, CreationError> {
         // This is completely ridiculous, but VirtualBox's OpenGL driver needs some call handled by
         // *it* (i.e. not Mesa) to occur before anything else can happen. That is because
         // VirtualBox's OpenGL driver is going to apply binary patches to Mesa in the DLL

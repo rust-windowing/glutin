@@ -31,6 +31,8 @@ extern crate shared_library;
 
 extern crate libc;
 
+extern crate winit;
+
 #[cfg(target_os = "windows")]
 extern crate winapi;
 #[cfg(target_os = "windows")]
@@ -64,11 +66,9 @@ pub use events::*;
 pub use headless::{HeadlessRendererBuilder, HeadlessContext};
 pub use window::{WindowProxy, PollEventsIterator, WaitEventsIterator};
 pub use window::{AvailableMonitorsIter, MonitorId, get_available_monitors, get_primary_monitor};
-pub use native_monitor::NativeMonitorId;
+pub use winit::NativeMonitorId;
 
 use std::io;
-#[cfg(not(target_os = "macos"))]
-use std::cmp::Ordering;
 
 mod api;
 mod platform;
@@ -103,22 +103,19 @@ pub mod os;
 /// ```
 pub struct Window {
     window: platform::Window,
+    winit_window: winit::Window,
 }
 
 /// Object that allows you to build windows.
-#[derive(Clone)]
+// #[derive(Clone)]
 pub struct WindowBuilder<'a> {
-    /// The attributes to use to create the window.
-    pub window: WindowAttributes,
+    winit_builder: winit::WindowBuilder,
 
     /// The attributes to use to create the context.
     pub opengl: GlAttributes<&'a platform::Window>,
 
     // Should be made public once it's stabilized.
     pf_reqs: PixelFormatRequirements,
-
-    /// Platform-specific configuration.
-    platform_specific: platform::PlatformSpecificWindowBuilderAttributes,
 }
 
 /// Trait that describes objects that have access to an OpenGL context.
@@ -329,78 +326,9 @@ pub enum ReleaseBehavior {
     Flush,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum MouseCursor {
-    /// The platform-dependent default cursor.
-    Default,
-    /// A simple crosshair.
-    Crosshair,
-    /// A hand (often used to indicate links in web browsers).
-    Hand,
-    /// Self explanatory.
-    Arrow,
-    /// Indicates something is to be moved.
-    Move,
-    /// Indicates text that may be selected or edited.
-    Text,
-    /// Program busy indicator.
-    Wait,
-    /// Help indicator (often rendered as a "?")
-    Help,
-    /// Progress indicator. Shows that processing is being done. But in contrast
-    /// with "Wait" the user may still interact with the program. Often rendered
-    /// as a spinning beach ball, or an arrow with a watch or hourglass.
-    Progress,
+pub use winit::MouseCursor;
 
-    /// Cursor showing that something cannot be done.
-    NotAllowed,
-    ContextMenu,
-    NoneCursor,
-    Cell,
-    VerticalText,
-    Alias,
-    Copy,
-    NoDrop,
-    Grab,
-    Grabbing,
-    AllScroll,
-    ZoomIn,
-    ZoomOut,
-
-    /// Indicate that some edge is to be moved. For example, the 'SeResize' cursor
-    /// is used when the movement starts from the south-east corner of the box.
-    EResize,
-    NResize,
-    NeResize,
-    NwResize,
-    SResize,
-    SeResize,
-    SwResize,
-    WResize,
-    EwResize,
-    NsResize,
-    NeswResize,
-    NwseResize,
-    ColResize,
-    RowResize,
-}
-
-/// Describes how glutin handles the cursor.
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum CursorState {
-    /// Normal cursor behavior.
-    Normal,
-
-    /// The cursor will be invisible when over the window.
-    Hide,
-
-    /// Grabs the mouse cursor. The cursor's motion will be confined to this
-    /// window and the window has exclusive access to further events regarding
-    /// the cursor.
-    ///
-    /// This is useful for first-person cameras for example.
-    Grab,
-}
+pub use winit::CursorState;
 
 /// Describes a possible format. Unused.
 #[allow(missing_docs)]
@@ -486,72 +414,7 @@ impl Default for PixelFormatRequirements {
     }
 }
 
-/// Attributes to use when creating a window.
-#[derive(Clone)]
-pub struct WindowAttributes {
-    /// The dimensions of the window. If this is `None`, some platform-specific dimensions will be
-    /// used.
-    ///
-    /// The default is `None`.
-    pub dimensions: Option<(u32, u32)>,
-
-    /// The minimum dimensions a window can be, If this is `None`, the window will have no minimum dimensions (aside from reserved).
-    ///
-    /// The default is `None`.
-    pub min_dimensions: Option<(u32, u32)>,
-
-    /// The maximum dimensions a window can be, If this is `None`, the maximum will have no maximum or will be set to the primary monitor's dimensions by the platform.
-    ///
-    /// The default is `None`.
-    pub max_dimensions: Option<(u32, u32)>,
-
-    /// If `Some`, the window will be in fullscreen mode with the given monitor.
-    ///
-    /// The default is `None`.
-    pub monitor: Option<platform::MonitorId>,
-
-    /// The title of the window in the title bar.
-    ///
-    /// The default is `"glutin window"`.
-    pub title: String,
-
-    /// Whether the window should be immediately visible upon creation.
-    ///
-    /// The default is `true`.
-    pub visible: bool,
-
-    /// Whether the the window should be transparent. If this is true, writing colors
-    /// with alpha values different than `1.0` will produce a transparent window.
-    ///
-    /// The default is `false`.
-    pub transparent: bool,
-
-    /// Whether the window should have borders and bars.
-    ///
-    /// The default is `true`.
-    pub decorations: bool,
-
-    /// [iOS only] Enable multitouch, see [UIView#multipleTouchEnabled]
-    /// (https://developer.apple.com/library/ios/documentation/UIKit/Reference/UIView_Class/#//apple_ref/occ/instp/UIView/multipleTouchEnabled)
-    pub multitouch: bool,
-}
-
-impl Default for WindowAttributes {
-    #[inline]
-    fn default() -> WindowAttributes {
-        WindowAttributes {
-            dimensions: None,
-            min_dimensions: None,
-            max_dimensions: None,
-            monitor: None,
-            title: "glutin window".to_owned(),
-            visible: true,
-            transparent: false,
-            decorations: true,
-            multitouch: false,
-        }
-    }
-}
+pub use winit::WindowAttributes; // TODO
 
 /// Attributes to use when creating an OpenGL context.
 #[derive(Clone)]
@@ -620,18 +483,3 @@ impl<S> Default for GlAttributes<S> {
     }
 }
 
-mod native_monitor {
-    /// Native platform identifier for a monitor. Different platforms use fundamentally different types
-    /// to represent a monitor ID.
-    #[derive(Clone, PartialEq, Eq)]
-    pub enum NativeMonitorId {
-        /// Cocoa and X11 use a numeric identifier to represent a monitor.
-        Numeric(u32),
-
-        /// Win32 uses a Unicode string to represent a monitor.
-        Name(String),
-
-        /// Other platforms (Android) don't support monitor identification.
-        Unavailable
-    }
-}

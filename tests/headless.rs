@@ -1,6 +1,5 @@
 extern crate glutin;
 extern crate libc;
-use glutin::*;
 use std::ptr;
 
 mod gl {
@@ -10,14 +9,14 @@ mod gl {
 use gl::types::*;
 
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 #[test]
 fn test_headless() {
     let width: i32 = 256;
     let height: i32 = 256;
     let window = glutin::HeadlessRendererBuilder::new(width as u32, height as u32).build().unwrap();
 
-    unsafe { window.make_current() };
+    unsafe { window.make_current().expect("Couldn't make window current") };
 
     let gl = gl::Gl::load_with(|symbol| window.get_proc_address(symbol) as *const _);
 
