@@ -625,13 +625,13 @@ mod native_monitor {
     /// to represent a monitor ID.
     #[derive(Clone, PartialEq, Eq)]
     pub enum NativeMonitorId {
-        /// Cocoa and X11 use a numeric identifier to represent a monitor.
+        /// Cocoa, X11 and Android use a numeric identifier to represent a monitor.
         Numeric(u32),
 
         /// Win32 uses a Unicode string to represent a monitor.
         Name(String),
 
-        /// Other platforms (Android) don't support monitor identification.
+        /// Other platforms don't support monitor identification.
         Unavailable
     }
 }

@@ -9,6 +9,9 @@ use {CreationError, Event, MouseCursor};
 use CreationError::OsError;
 use events::ElementState::{Pressed, Released};
 use events::{Touch, TouchPhase};
+use self::android_glue::jni;
+use self::android_glue::jni::JNIWrappers;
+use self::android_glue::write_log;
 
 use std::collections::VecDeque;
 
@@ -32,36 +35,105 @@ pub struct Window {
 }
 
 #[derive(Clone)]
-pub struct MonitorId;
+pub struct MonitorId {
+    pub id: jni::jint,
+    pub width: jni::jint,
+    pub height: jni::jint,
+}
 
 mod ffi;
 
 #[inline]
 pub fn get_available_monitors() -> VecDeque<MonitorId> {
     let mut rb = VecDeque::new();
-    rb.push_back(MonitorId);
+    println!("In get_available_monitors()");
+    
+    let jni_env = jni::attach_thread();
+    jni_env.ensure_local_capacity(32).unwrap();
+    
+    let point_class           = jni_env.find_class("android/graphics/Point").unwrap();
+    let context_class         = jni_env.find_class("android/content/Context").unwrap();
+    let display_manager_class = jni_env.find_class("android/hardware/display/DisplayManager").unwrap();
+    let display_class         = jni_env.find_class("android/view/Display").unwrap();
+    
+    let get_displays_method       = jni_env.find_method(display_manager_class, "getDisplays", "()[Landroid/view/Display;").unwrap();
+    let get_system_service_method = jni_env.find_method(context_class, "getSystemService", "(Ljava/lang/String;)Ljava/lang/Object;").unwrap();
+    let get_size_method           = jni_env.find_method(display_class, "getSize", "(Landroid/graphics/Point;)V").unwrap();
+    let get_display_id_method     = jni_env.find_method(display_class, "getDisplayId", "()I").unwrap();
+    let point_constructor         = jni_env.find_method(point_class, "<init>", "()V").unwrap();
+    
+    let display_service_field = jni_env.find_static_field(context_class, "DISPLAY_SERVICE", "Ljava/lang/String;").unwrap();
+    let x_field               = jni_env.find_field(point_class, "x", "I").unwrap();
+    let y_field               = jni_env.find_field(point_class, "y", "I").unwrap();
+    
+    unsafe {
+        if jni_env.has_exception() {
+            jni_env.describe_exception();
+            panic!("Java exception occurred looking something up");
+        }
+    
+        let context = jni::get_current_activity();
+        let display_service_value = (jni_env.functions().GetStaticObjectField)(jni_env, context_class, display_service_field);
+        let display_manager = (jni_env.functions().CallObjectMethod)(jni_env, context, get_system_service_method, display_service_value);
+        let display_array = (jni_env.functions().CallObjectMethod)(jni_env, display_manager, get_displays_method) as jni::jobjectArray;
+        let display_count = (jni_env.functions().GetArrayLength)(jni_env, display_array);
+        let point = (jni_env.functions().NewObject)(jni_env, point_class, point_constructor);
+        
+        for i in 0..display_count {
+            let display = (jni_env.functions().GetObjectArrayElement)(jni_env, display_array, i);
+            (jni_env.functions().CallVoidMethod)(jni_env, display, get_size_method, point);
+            let x_value = (jni_env.functions().GetIntField)(jni_env, point, x_field);
+            let y_value = (jni_env.functions().GetIntField)(jni_env, point, y_field);
+            let display_id = (jni_env.functions().CallIntMethod)(jni_env, display, get_display_id_method);
+            rb.push_back(MonitorId {id: display_id, width: x_value, height: y_value});
+            jni_env.delete_local_ref(display);
+        }
+    
+        jni_env.delete_local_ref(point);
+        jni_env.delete_local_ref(display_service_value);
+        jni_env.delete_local_ref(display_manager);
+        jni_env.delete_local_ref(display_array);
+    }
+    
+    jni_env.delete_local_ref(context_class);
+    jni_env.delete_local_ref(display_manager_class);
+    jni_env.delete_local_ref(display_class);
+    jni_env.delete_local_ref(point_class);
+    if jni_env.has_exception() {
+        jni_env.describe_exception();
+        panic!("Java exception occurred in get_available_monitors()");
+    }
+    jni::detach_thread();
+    
     rb
 }
 
 #[inline]
 pub fn get_primary_monitor() -> MonitorId {
-    MonitorId
+    let monitors = get_available_monitors();
+    for monitor in monitors {
+        if monitor.id == 0 { // Default monitor ID on Android is 0 (see https://developer.android.com/reference/android/view/Display.html#DEFAULT_DISPLAY)
+            return monitor;
+        }
+    }
+    panic!("Default monitor not found.")
 }
 
 impl MonitorId {
     #[inline]
     pub fn get_name(&self) -> Option<String> {
-        Some("Primary".to_string())
+        // TODO: replace with call to DisplayManager.getDisplay(id).getName()
+        Some(format!("Display{}", self.id).to_string())
     }
 
     #[inline]
     pub fn get_native_identifier(&self) -> NativeMonitorId {
-        NativeMonitorId::Unavailable
+        NativeMonitorId::Numeric(self.id as u32)
     }
 
     #[inline]
     pub fn get_dimensions(&self) -> (u32, u32) {
-        unimplemented!()
+        (self.width as u32, self.height as u32)
     }
 }
 
