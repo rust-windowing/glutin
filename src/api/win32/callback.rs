@@ -251,6 +251,77 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
             }
         },
 
+        winapi::WM_TOUCH => {
+            use events::Event::Touch;
+            use events::TouchPhase;
+            
+            #[repr(C)]
+            #[derive(Copy,Clone)]
+            #[allow(non_snake_case)]
+            struct TOUCHINPUT {
+                x: winapi::LONG,
+                y: winapi::LONG,
+                source: winapi::HANDLE,
+                dwID: winapi::DWORD,
+                dwFlags: winapi::DWORD,
+                dwMask: winapi::DWORD,
+                dwTime: winapi::DWORD,
+                dwExtraInfo: winapi::ULONG_PTR,
+                cxContact: winapi::DWORD,
+                cyContact: winapi::DWORD
+            }
+
+            const TOUCHEVENTF_MOVE: winapi::DWORD = 0x0001;
+            const TOUCHEVENTF_DOWN: winapi::DWORD = 0x0002;
+            const TOUCHEVENTF_UP:   winapi::DWORD = 0x0004;
+
+            extern "system" {
+                fn CloseTouchInputHandle(hwnd: winapi::HANDLE ) -> winapi::BOOL;
+                fn GetTouchInputInfo( hTouch: winapi::HANDLE, cInputs: winapi::c_uint,
+                                      pInputs: *mut TOUCHINPUT,
+                                      cbSize: winapi::c_uint ) -> winapi::BOOL;
+            }
+            
+            const MAX_POINTS: usize = 16;
+            
+            let mut pcount = winapi::LOWORD( wparam as u32 ) as usize;
+            let pcount = ::std::cmp::min( pcount, MAX_POINTS );
+
+            let mut inputs: [TOUCHINPUT; MAX_POINTS] = [
+                TOUCHINPUT {
+                    x: 0, y: 0, dwID: 0, dwFlags: 0, dwMask: 0, dwTime: 0,
+                    dwExtraInfo: 0 as winapi::ULONG_PTR, cxContact: 0, cyContact: 0,
+                    source: 0 as winapi::HANDLE
+                }
+                ;MAX_POINTS
+            ]; 
+
+            if GetTouchInputInfo( lparam as winapi::HANDLE, MAX_POINTS as u32,
+                                  &mut inputs[0] as *mut TOUCHINPUT,
+                                  mem::size_of::<TOUCHINPUT>() as winapi::c_uint ) > 0 {
+                for i in 0..pcount {
+                    let input = &inputs[i];
+                    send_event(window,
+                               Touch( ::events::Touch {
+                                   id: input.dwID as u64,
+                                   location: ((input.x as f64) / 100f64,
+                                              (input.y as f64) / 100f64),
+                                   phase: if input.dwFlags & TOUCHEVENTF_DOWN != 0 {
+                                       TouchPhase::Started
+                                   } else if input.dwFlags & TOUCHEVENTF_UP != 0 {
+                                       TouchPhase::Ended
+                                   } else if input.dwFlags & TOUCHEVENTF_MOVE != 0 {
+                                       TouchPhase::Moved
+                                   } else {
+                                       continue;
+                                   } }));
+                }
+            }
+
+            CloseTouchInputHandle( lparam as winapi::HANDLE );
+            0
+        },
+
         winapi::WM_SETFOCUS => {
             use events::Event::Focused;
             send_event(window, Focused(true));
