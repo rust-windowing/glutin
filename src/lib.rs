@@ -103,7 +103,6 @@ pub mod os;
 /// ```
 pub struct Window {
     window: platform::Window,
-    winit_window: winit::Window,
 }
 
 /// Object that allows you to build windows.

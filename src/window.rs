@@ -205,20 +205,14 @@ impl<'a> WindowBuilder<'a> {
     /// Error should be very rare and only occur in case of permission denied, incompatible system,
     /// out of memory, etc.
     pub fn build(self) -> Result<Window, CreationError> {
-        let winit_window = self.winit_builder.build().unwrap();
-
         let w = try!(platform::Window::new(
             &Default::default(),
             &self.pf_reqs,
             &self.opengl,
             &Default::default(),
-            &winit_window,
+            self.winit_builder,
         ));
-
-        Result::Ok(Window {
-            window: w,
-            winit_window: winit_window,
-        })
+        Result::Ok(Window{window: w})
     }
 
     /// Builds the window.
@@ -257,7 +251,7 @@ impl Window {
     /// This is a no-op if the window has already been closed.
     #[inline]
     pub fn set_title(&self, title: &str) {
-        self.winit_window.set_title(title)
+        self.window.set_title(title)
     }
 
     /// Shows the window if it was hidden.
@@ -268,7 +262,7 @@ impl Window {
     ///
     #[inline]
     pub fn show(&self) {
-        self.winit_window.show()
+        self.window.show()
     }
 
     /// Hides the window if it was visible.
@@ -279,7 +273,7 @@ impl Window {
     ///
     #[inline]
     pub fn hide(&self) {
-        self.winit_window.hide()
+        self.window.hide()
     }
 
     /// Returns the position of the top-left hand corner of the window relative to the
@@ -295,7 +289,7 @@ impl Window {
     /// Returns `None` if the window no longer exists.
     #[inline]
     pub fn get_position(&self) -> Option<(i32, i32)> {
-        self.winit_window.get_position()
+        self.window.get_position()
     }
 
     /// Modifies the position of the window.
@@ -305,7 +299,7 @@ impl Window {
     /// This is a no-op if the window has already been closed.
     #[inline]
     pub fn set_position(&self, x: i32, y: i32) {
-        self.winit_window.set_position(x, y)
+        self.window.set_position(x, y)
     }
 
     /// Returns the size in points of the client area of the window.
@@ -318,7 +312,7 @@ impl Window {
     /// DEPRECATED
     #[inline]
     pub fn get_inner_size(&self) -> Option<(u32, u32)> {
-        self.winit_window.get_inner_size()
+        self.window.get_inner_size()
     }
     
     /// Returns the size in points of the client area of the window.
@@ -329,7 +323,7 @@ impl Window {
     /// Returns `None` if the window no longer exists.
     #[inline]
     pub fn get_inner_size_points(&self) -> Option<(u32, u32)> {
-        self.winit_window.get_inner_size()
+        self.window.get_inner_size()
     }
 
 
@@ -342,10 +336,7 @@ impl Window {
     /// Returns `None` if the window no longer exists.
     #[inline]
     pub fn get_inner_size_pixels(&self) -> Option<(u32, u32)> {
-        self.winit_window.get_inner_size().map(|(x, y)| {
-            let hidpi = self.hidpi_factor();
-            ((x as f32 * hidpi) as u32, (y as f32 * hidpi) as u32)
-        })
+        self.window.get_inner_size_pixels()
     }
 
     /// Returns the size in pixels of the window.
@@ -356,7 +347,7 @@ impl Window {
     /// Returns `None` if the window no longer exists.
     #[inline]
     pub fn get_outer_size(&self) -> Option<(u32, u32)> {
-        self.winit_window.get_outer_size()
+        self.window.get_outer_size()
     }
 
     /// Modifies the inner size of the window.
@@ -366,7 +357,7 @@ impl Window {
     /// This is a no-op if the window has already been closed.
     #[inline]
     pub fn set_inner_size(&self, x: u32, y: u32) {
-        self.winit_window.set_inner_size(x, y)
+        self.window.set_inner_size(x, y)
     }
 
     /// Returns an iterator that poll for the next event in the window's events queue.
@@ -375,7 +366,7 @@ impl Window {
     /// Contrary to `wait_events`, this function never blocks.
     #[inline]
     pub fn poll_events(&self) -> winit::PollEventsIterator {
-        self.winit_window.poll_events()
+        self.window.poll_events()
     }
 
     /// Returns an iterator that returns events one by one, blocking if necessary until one is
@@ -384,7 +375,7 @@ impl Window {
     /// The iterator never returns `None`.
     #[inline]
     pub fn wait_events(&self) -> winit::WaitEventsIterator {
-        self.winit_window.wait_events()
+        self.window.wait_events()
     }
 
     /// Sets the context as the current context.
@@ -425,7 +416,7 @@ impl Window {
     /// other libraries that need this information.
     #[inline]
     pub unsafe fn platform_display(&self) -> *mut libc::c_void {
-        self.winit_window.platform_display()
+        self.window.platform_display()
     }
 
     /// DEPRECATED. Gets the native platform specific window handle. This is
@@ -433,7 +424,7 @@ impl Window {
     /// that need this information.
     #[inline]
     pub unsafe fn platform_window(&self) -> *mut libc::c_void {
-        self.winit_window.platform_window()
+        self.window.platform_window()
     }
 
     /// Returns the API that is currently provided by this window.
@@ -456,7 +447,7 @@ impl Window {
     /// passed to different threads.
     #[inline]
     pub fn create_window_proxy(&self) -> winit::WindowProxy {
-        self.winit_window.create_window_proxy()
+        self.window.create_window_proxy()
     }
 
     /// Sets a resize callback that is called by Mac (and potentially other
@@ -464,13 +455,13 @@ impl Window {
     /// during window resizing.
     #[inline]
     pub fn set_window_resize_callback(&mut self, callback: Option<fn(u32, u32)>) {
-        self.winit_window.set_window_resize_callback(callback);
+        self.window.set_window_resize_callback(callback);
     }
 
     /// Modifies the mouse cursor of the window.
     /// Has no effect on Android.
     pub fn set_cursor(&self, cursor: winit::MouseCursor) {
-        self.winit_window.set_cursor(cursor);
+        self.window.set_cursor(cursor);
     }
 
     /// Returns the ratio between the backing framebuffer resolution and the
@@ -478,13 +469,13 @@ impl Window {
     /// and two for a retina display.
     #[inline]
     pub fn hidpi_factor(&self) -> f32 {
-        self.winit_window.hidpi_factor()
+        self.window.hidpi_factor()
     }
 
     /// Changes the position of the cursor in window coordinates.
     #[inline]
     pub fn set_cursor_position(&self, x: i32, y: i32) -> Result<(), ()> {
-        self.winit_window.set_cursor_position(x, y)
+        self.window.set_cursor_position(x, y)
     }
 
     /// Sets how glutin handles the cursor. See the documentation of `CursorState` for details.
@@ -492,7 +483,7 @@ impl Window {
     /// Has no effect on Android.
     #[inline]
     pub fn set_cursor_state(&self, state: winit::CursorState) -> Result<(), String> {
-        self.winit_window.set_cursor_state(state)
+        self.window.set_cursor_state(state)
     }
 }
 
