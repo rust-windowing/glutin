@@ -11,7 +11,7 @@ use core_foundation::bundle::{CFBundleGetBundleWithIdentifier, CFBundleGetFuncti
 use cocoa::base::{id, nil};
 use cocoa::appkit::*;
 use PixelFormat;
-use api::cocoa::helpers;
+use super::helpers;
 
 #[derive(Clone, Default)]
 pub struct PlatformSpecificHeadlessBuilderAttributes;
