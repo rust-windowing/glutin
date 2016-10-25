@@ -17,8 +17,21 @@ use libc::c_int;
 use std::ffi::{CStr, CString};
 use std::{mem, ptr};
 
-use api::x11::ffi;
+pub mod ffi {
+    pub use x11_dl::xlib::*;
+    pub use self::glx::types::GLXContext;
 
+    /// GLX bindings
+    pub mod glx {
+        include!(concat!(env!("OUT_DIR"), "/glx_bindings.rs"));
+    }
+
+    /// Functions that are not necessarly always available
+    pub mod glx_extra {
+        include!(concat!(env!("OUT_DIR"), "/glx_extra_bindings.rs"));
+    }
+}
+ 
 pub struct Context {
     glx: ffi::glx::Glx,
     display: *mut ffi::Display,

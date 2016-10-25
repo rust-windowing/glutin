@@ -13,6 +13,8 @@ use api::osmesa::{self, OsMesaContext};
 pub use self::api_dispatch::{Window};
 pub use self::api_dispatch::PlatformSpecificWindowBuilderAttributes;
 mod api_dispatch;
+mod wayland;
+mod x11;
 
 #[derive(Clone, Default)]
 pub struct PlatformSpecificHeadlessBuilderAttributes;

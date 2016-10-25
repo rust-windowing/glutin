@@ -1,5 +1,3 @@
-#![cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "openbsd"))]
-
 use std::ffi::CString;
 use winit;
 use winit::os::unix::WindowExt;

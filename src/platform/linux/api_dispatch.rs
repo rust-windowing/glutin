@@ -9,8 +9,8 @@ use PixelFormat;
 use PixelFormatRequirements;
 use WindowAttributes;
 
-use api::wayland;
-use api::x11;
+use super::wayland;
+use super::x11;
 
 use winit::os::unix::WindowExt;
 

@@ -1,8 +1,6 @@
-#![cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "openbsd"))]
-
 pub use winit::os::unix::x11::{XError, XNotSupported, XConnection};
 
-pub mod ffi;
+use api::glx::ffi;
 
 use CreationError;
 use std::{mem, ptr};
@@ -24,7 +22,7 @@ use std::ffi::CString;
 use api::glx::Context as GlxContext;
 use api::egl;
 use api::egl::Context as EglContext;
-use api::x11::ffi::glx::Glx;
+use api::glx::ffi::glx::Glx;
 use api::egl::ffi::egl::Egl;
 use api::dlopen;
 
