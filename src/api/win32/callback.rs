@@ -131,6 +131,14 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
             0
         },
 
+        winapi::WM_MOUSELEAVE => {
+            use events::Event::MouseLeft;
+
+            send_event(window, MouseLeft);
+
+            0
+        },
+
         winapi::WM_MOUSEWHEEL => {
             use events::Event::MouseWheel;
             use events::MouseScrollDelta::LineDelta;

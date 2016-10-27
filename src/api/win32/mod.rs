@@ -48,6 +48,7 @@ pub type Cursor = *const winapi::wchar_t;
 /// Contains information about states and the window for the callback.
 #[derive(Clone)]
 pub struct WindowState {
+    pub has_cursor: bool,
     pub cursor: Cursor,
     pub cursor_state: CursorState,
     pub attributes: WindowAttributes

@@ -30,6 +30,11 @@ pub enum Event {
     /// The parameter are the (x,y) coords in pixels relative to the top-left corner of the window.
     MouseMoved(i32, i32),
 
+    /// The cursor has the window.
+    ///
+    /// The `MouseMoved` event implies the cursor has re-entered the window.
+    MouseLeft,
+
     /// A mouse wheel movement or touchpad scroll occurred.
     MouseWheel(MouseScrollDelta, TouchPhase),
 

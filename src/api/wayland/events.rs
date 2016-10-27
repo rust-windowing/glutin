@@ -57,10 +57,10 @@ pub fn translate_event(
                     None
                 }
             }
-            WlPointerEvent::Leave(_, _) => {
+            WlPointerEvent::Leave(_, surface) => {
                 focuses.pointer_on = None;
                 focuses.pointer_at = None;
-                None
+                Some((GlutinEvent::MouseLeft, surface))
             }
             WlPointerEvent::Motion(_, x, y) => {
                 if let Some(surface) = focuses.pointer_on {
