@@ -52,7 +52,8 @@ pub fn translate_event(
                 if known_surfaces.contains(&surface) {
                     focuses.pointer_on = Some(surface);
                     focuses.pointer_at = Some((x, y));
-                    Some((GlutinEvent::MouseMoved(x as i32, y as i32), surface))
+                    // FIXME: Also trigger MouseMoved with x and y?
+                    Some((GlutinEvent::HasMouse(true), surface))
                 } else {
                     None
                 }
@@ -60,7 +61,7 @@ pub fn translate_event(
             WlPointerEvent::Leave(_, surface) => {
                 focuses.pointer_on = None;
                 focuses.pointer_at = None;
-                Some((GlutinEvent::MouseLeft, surface))
+                Some((GlutinEvent::HasMouse(false), surface))
             }
             WlPointerEvent::Motion(_, x, y) => {
                 if let Some(surface) = focuses.pointer_on {

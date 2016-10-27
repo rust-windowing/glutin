@@ -121,7 +121,20 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
         }
 
         winapi::WM_MOUSEMOVE => {
-            use events::Event::MouseMoved;
+            use events::Event::{HasMouse, MouseMoved};
+
+            CONTEXT_STASH.with(|context_stash| {
+                let cstash = context_stash.borrow();
+                let cstash = cstash.as_ref();
+                if let Some(cstash) = cstash {
+                    if let Ok(mut window_state) = cstash.window_state.lock() {
+                        if !window_state.has_cursor {
+                            send_event(window, HasMouse(true));
+                            window_state.has_cursor = true;
+                        }
+                    }
+                }
+            });
 
             let x = winapi::GET_X_LPARAM(lparam) as i32;
             let y = winapi::GET_Y_LPARAM(lparam) as i32;
@@ -132,9 +145,19 @@ pub unsafe extern "system" fn callback(window: winapi::HWND, msg: winapi::UINT,
         },
 
         winapi::WM_MOUSELEAVE => {
-            use events::Event::MouseLeft;
+            use events::Event::HasMouse;
 
-            send_event(window, MouseLeft);
+            CONTEXT_STASH.with(|context_stash| {
+                let cstash = context_stash.borrow();
+                let cstash = cstash.as_ref();
+                if let Some(cstash) = cstash {
+                    if let Ok(mut window_state) = cstash.window_state.lock() {
+                        window_state.has_cursor = false;
+                    }
+                }
+            });
+
+            send_event(window, HasMouse(false));
 
             0
         },
