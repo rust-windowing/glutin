@@ -1,9 +1,5 @@
 #![cfg(target_os = "windows")]
 
-pub use api::win32::{self, MonitorId, WindowProxy};
-
-pub use winit::{get_available_monitors, get_primary_monitor};
-
 use Api;
 use ContextError;
 use CreationError;
@@ -22,6 +18,8 @@ use api::egl::Context as EglContext;
 use std::ffi::CString;
 use std::ops::{Deref, DerefMut};
 use kernel32;
+
+mod window;
 
 /// Stupid wrapper because `*const libc::c_void` doesn't implement `Sync`.
 struct EglWrapper(Egl);
@@ -59,7 +57,7 @@ pub struct PlatformSpecificWindowBuilderAttributes;
 pub struct PlatformSpecificHeadlessBuilderAttributes;
 
 /// The Win32 implementation of the main `Window` object.
-pub struct Window(win32::Window);
+pub struct Window(window::Window);
 
 impl Window {
     /// See the docs in the crate root file.
@@ -71,7 +69,7 @@ impl Window {
         _: &PlatformSpecificWindowBuilderAttributes,
         winit_builder: winit::WindowBuilder,
     ) -> Result<Window, CreationError> {
-        win32::Window::new(
+        window::Window::new(
             window,
             pf_reqs,
             &opengl.clone().map_sharing(|w| &w.0),
@@ -82,17 +80,17 @@ impl Window {
 }
 
 impl Deref for Window {
-    type Target = win32::Window;
+    type Target = window::Window;
 
     #[inline]
-    fn deref(&self) -> &win32::Window {
+    fn deref(&self) -> &window::Window {
         &self.0
     }
 }
 
 impl DerefMut for Window {
     #[inline]
-    fn deref_mut(&mut self) -> &mut win32::Window {
+    fn deref_mut(&mut self) -> &mut window::Window {
         &mut self.0
     }
 }
@@ -100,7 +98,7 @@ impl DerefMut for Window {
 ///
 pub enum HeadlessContext {
     /// A regular window, but invisible.
-    HiddenWindow(win32::Window),
+    HiddenWindow(window::Window),
     /// An EGL pbuffer.
     EglPbuffer(EglContext),
 }
@@ -124,7 +122,7 @@ impl HeadlessContext {
             }
         }
         let winit_builder = winit::WindowBuilder::new().with_visibility(false);
-        let window = try!(win32::Window::new(&WindowAttributes { visible: false, .. Default::default() },
+        let window = try!(window::Window::new(&WindowAttributes { visible: false, .. Default::default() },
                                              pf_reqs, &opengl.clone().map_sharing(|_| unimplemented!()),            //TODO:
                                              EGL.as_ref().map(|w| &w.0),
                                              winit_builder));

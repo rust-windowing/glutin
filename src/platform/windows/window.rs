@@ -22,13 +22,6 @@ use api::egl::Context as EglContext;
 use api::egl::ffi::egl::Egl;
 use api::egl;
 
-pub use winit::{
-    MonitorId,
-    get_available_monitors,
-    get_primary_monitor,
-    WindowProxy,
-};
-
 /// The Win32 implementation of the main `Window` object.
 pub struct Window {
     context: Context,
