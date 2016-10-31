@@ -19,6 +19,9 @@ use std::ffi::CString;
 use std::ops::{Deref, DerefMut};
 use kernel32;
 
+pub use winit::PollEventsIterator;
+pub use winit::WaitEventsIterator;
+
 mod window;
 
 /// Stupid wrapper because `*const libc::c_void` doesn't implement `Sync`.

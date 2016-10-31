@@ -6,10 +6,47 @@ use api::dlopen;
 use api::egl;
 use api::egl::Context as EglContext;
 use wayland_client::egl as wegl;
+use Event;
 
 pub struct Window {
     egl_surface: wegl::WlEglSurface,
     context: EglContext,
+}
+
+pub struct WaitEventsIterator<'a> {
+    window: &'a Window,
+    winit_iterator: winit::WaitEventsIterator<'a>,
+}
+
+impl<'a> Iterator for WaitEventsIterator<'a> {
+    type Item = Event;
+
+    fn next(&mut self) -> Option<Event> {
+        let event = self.winit_iterator.next();
+        match event {
+            Some(Event::Resized(x, y)) => self.window.egl_surface.resize(x as i32, y as i32, 0, 0),
+            _ => {},
+        }
+        event
+    }
+}
+
+pub struct PollEventsIterator<'a> {
+    window: &'a Window,
+    winit_iterator: winit::PollEventsIterator<'a>,
+}
+
+impl<'a> Iterator for PollEventsIterator<'a> {
+    type Item = Event;
+
+    fn next(&mut self) -> Option<Event> {
+        let event = self.winit_iterator.next();
+        match event {
+            Some(Event::Resized(x, y)) => self.window.egl_surface.resize(x as i32, y as i32, 0, 0),
+            _ => {},
+        }
+        event
+    }
 }
 
 impl Window {
@@ -41,6 +78,27 @@ impl Window {
             egl_surface: egl_surface,
             context: context
         })
+    }
+
+    pub fn set_inner_size(&self, x: u32, y: u32, winit_window: &winit::Window) {
+        winit_window.set_inner_size(x, y);
+        self.egl_surface.resize(x as i32, y as i32, 0, 0);
+    }
+
+    #[inline]
+    pub fn wait_events<'a>(&'a self, winit_window: &'a winit::Window) -> WaitEventsIterator {
+        WaitEventsIterator {
+            window: self,
+            winit_iterator: winit_window.wait_events()
+        }
+    }
+
+    #[inline]
+    pub fn poll_events<'a>(&'a self, winit_window: &'a winit::Window) -> PollEventsIterator {
+        PollEventsIterator {
+            window: self,
+            winit_iterator: winit_window.poll_events()
+        }
     }
 }
 

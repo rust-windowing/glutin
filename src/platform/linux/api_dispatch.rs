@@ -11,6 +11,7 @@ use WindowAttributes;
 
 use super::wayland;
 use super::x11;
+use Event;
 
 use winit::os::unix::WindowExt;
 
@@ -25,6 +26,44 @@ pub struct Window {
 enum DisplayServer {
     X(x11::Window),
     Wayland(wayland::Window)
+}
+
+pub enum WaitEventsIterator<'a> {
+    #[doc(hidden)]
+    X(winit::WaitEventsIterator<'a>),
+    #[doc(hidden)]
+    Wayland(wayland::WaitEventsIterator<'a>)
+}
+
+impl<'a> Iterator for WaitEventsIterator<'a> {
+    type Item = Event;
+
+    #[inline]
+    fn next(&mut self) -> Option<Event> {
+        match self {
+            &mut WaitEventsIterator::X(ref mut it) => it.next(),
+            &mut WaitEventsIterator::Wayland(ref mut it) => it.next()
+        }
+    }
+}
+
+pub enum PollEventsIterator<'a> {
+    #[doc(hidden)]
+    X(winit::PollEventsIterator<'a>),
+    #[doc(hidden)]
+    Wayland(wayland::PollEventsIterator<'a>)
+}
+
+impl<'a> Iterator for PollEventsIterator<'a> {
+    type Item = Event;
+
+    #[inline]
+    fn next(&mut self) -> Option<Event> {
+        match self {
+            &mut PollEventsIterator::X(ref mut it) => it.next(),
+            &mut PollEventsIterator::Wayland(ref mut it) => it.next()
+        }
+    }
 }
 
 impl Window {
@@ -105,15 +144,24 @@ impl Window {
     }
 
     pub fn set_inner_size(&self, x: u32, y: u32) {
-        self.winit_window.set_inner_size(x, y)
+        match self.display_server {
+            DisplayServer::X(_) => self.winit_window.set_inner_size(x, y),
+            DisplayServer::Wayland(ref w) => w.set_inner_size(x, y, &self.winit_window)
+        }
     }
 
-    pub fn poll_events(&self) -> winit::PollEventsIterator {
-        self.winit_window.poll_events()
+    pub fn poll_events(&self) -> PollEventsIterator {
+        match self.display_server {
+            DisplayServer::X(_) => PollEventsIterator::X(self.winit_window.poll_events()),
+            DisplayServer::Wayland(ref w) => PollEventsIterator::Wayland(w.poll_events(&self.winit_window)),
+        }
     }
 
-    pub fn wait_events(&self) -> winit::WaitEventsIterator {
-        self.winit_window.wait_events()
+    pub fn wait_events(&self) -> WaitEventsIterator {
+        match self.display_server {
+            DisplayServer::X(_) => WaitEventsIterator::X(self.winit_window.wait_events()),
+            DisplayServer::Wayland(ref w) => WaitEventsIterator::Wayland(w.wait_events(&self.winit_window)),
+        }
     }
 
     pub unsafe fn platform_display(&self) -> *mut libc::c_void {

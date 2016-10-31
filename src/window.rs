@@ -12,8 +12,6 @@ use Window;
 use WindowBuilder;
 
 pub use winit::WindowProxy;
-pub use winit::PollEventsIterator;
-pub use winit::WaitEventsIterator;
 pub use winit::{AvailableMonitorsIter};
 pub use winit::{get_primary_monitor, get_available_monitors};
 pub use winit::{MonitorId};
@@ -22,6 +20,7 @@ use libc;
 use platform;
 
 use winit;
+use Event;
 
 impl<'a> WindowBuilder<'a> {
     /// Initializes a new `WindowBuilder` with default values.
@@ -225,6 +224,39 @@ impl<'a> WindowBuilder<'a> {
     }
 }
 
+/// An iterator for the `wait_events` function.
+pub struct WaitEventsIterator<'a>(platform::WaitEventsIterator<'a>);
+
+impl<'a> Iterator for WaitEventsIterator<'a> {
+    type Item = Event;
+
+    #[inline]
+    fn next(&mut self) -> Option<Event> {
+        self.0.next()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+}
+
+/// An iterator for the `poll_events` function.
+pub struct PollEventsIterator<'a>(platform::PollEventsIterator<'a>);
+
+impl<'a> Iterator for PollEventsIterator<'a> {
+    type Item = Event;
+
+    #[inline]
+    fn next(&mut self) -> Option<Event> {
+        self.0.next()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+}
 
 impl Default for Window {
     #[inline]
@@ -365,8 +397,8 @@ impl Window {
     ///
     /// Contrary to `wait_events`, this function never blocks.
     #[inline]
-    pub fn poll_events(&self) -> winit::PollEventsIterator {
-        self.window.poll_events()
+    pub fn poll_events(&self) -> PollEventsIterator {
+        PollEventsIterator(self.window.poll_events())
     }
 
     /// Returns an iterator that returns events one by one, blocking if necessary until one is
@@ -374,8 +406,8 @@ impl Window {
     ///
     /// The iterator never returns `None`.
     #[inline]
-    pub fn wait_events(&self) -> winit::WaitEventsIterator {
-        self.window.wait_events()
+    pub fn wait_events(&self) -> WaitEventsIterator {
+        WaitEventsIterator(self.window.wait_events())
     }
 
     /// Sets the context as the current context.
