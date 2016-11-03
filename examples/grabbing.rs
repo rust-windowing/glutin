@@ -1,15 +1,8 @@
-#[cfg(target_os = "android")]
-#[macro_use]
-extern crate android_glue;
-
 extern crate glutin;
 
 use glutin::{Event, ElementState};
 
 mod support;
-
-#[cfg(target_os = "android")]
-android_start!(main);
 
 fn main() {
     let window = glutin::WindowBuilder::new().build().unwrap();
