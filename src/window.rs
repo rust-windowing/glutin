@@ -1,23 +1,26 @@
-use std::collections::vec_deque::IntoIter as VecDequeIter;
 use std::default::Default;
 
 use Api;
 use ContextError;
 use CreationError;
-use CursorState;
-use Event;
 use GlContext;
 use GlProfile;
 use GlRequest;
-use MouseCursor;
 use PixelFormat;
 use Robustness;
 use Window;
 use WindowBuilder;
-use native_monitor::NativeMonitorId;
+
+pub use winit::WindowProxy;
+pub use winit::{AvailableMonitorsIter};
+pub use winit::{get_primary_monitor, get_available_monitors};
+pub use winit::{MonitorId};
 
 use libc;
 use platform;
+
+use winit;
+use Event;
 
 impl<'a> WindowBuilder<'a> {
     /// Initializes a new `WindowBuilder` with default values.
@@ -25,9 +28,8 @@ impl<'a> WindowBuilder<'a> {
     pub fn new() -> WindowBuilder<'a> {
         WindowBuilder {
             pf_reqs: Default::default(),
-            window: Default::default(),
+            winit_builder: winit::WindowBuilder::new(),
             opengl: Default::default(),
-            platform_specific: Default::default(),
         }
     }
 
@@ -36,7 +38,7 @@ impl<'a> WindowBuilder<'a> {
     /// Width and height are in pixels.
     #[inline]
     pub fn with_dimensions(mut self, width: u32, height: u32) -> WindowBuilder<'a> {
-        self.window.dimensions = Some((width, height));
+        self.winit_builder = self.winit_builder.with_dimensions(width, height);
         self
     }
     
@@ -45,7 +47,7 @@ impl<'a> WindowBuilder<'a> {
     /// Width and height are in pixels.
     #[inline]
     pub fn with_min_dimensions(mut self, width: u32, height: u32) -> WindowBuilder<'a> {
-        self.window.min_dimensions = Some((width, height));
+        self.winit_builder = self.winit_builder.with_min_dimensions(width, height);
         self
     }
 
@@ -54,14 +56,14 @@ impl<'a> WindowBuilder<'a> {
     /// Width and height are in pixels.
     #[inline]
     pub fn with_max_dimensions(mut self, width: u32, height: u32) -> WindowBuilder<'a> {
-        self.window.max_dimensions = Some((width, height));
+        self.winit_builder = self.winit_builder.with_max_dimensions(width, height);
         self
     }
 
     /// Requests a specific title for the window.
     #[inline]
     pub fn with_title<T: Into<String>>(mut self, title: T) -> WindowBuilder<'a> {
-        self.window.title = title.into();
+        self.winit_builder = self.winit_builder.with_title(title);
         self
     }
 
@@ -70,8 +72,7 @@ impl<'a> WindowBuilder<'a> {
     /// If you don't specify dimensions for the window, it will match the monitor's.
     #[inline]
     pub fn with_fullscreen(mut self, monitor: MonitorId) -> WindowBuilder<'a> {
-        let MonitorId(monitor) = monitor;
-        self.window.monitor = Some(monitor);
+        self.winit_builder = self.winit_builder.with_fullscreen(monitor);
         self
     }
 
@@ -125,7 +126,7 @@ impl<'a> WindowBuilder<'a> {
     /// Sets whether the window will be initially hidden or visible.
     #[inline]
     pub fn with_visibility(mut self, visible: bool) -> WindowBuilder<'a> {
-        self.window.visible = visible;
+        self.winit_builder = self.winit_builder.with_visibility(visible);
         self
     }
 
@@ -180,21 +181,21 @@ impl<'a> WindowBuilder<'a> {
     /// Sets whether the background of the window should be transparent.
     #[inline]
     pub fn with_transparency(mut self, transparent: bool) -> WindowBuilder<'a> {
-        self.window.transparent = transparent;
+        self.winit_builder = self.winit_builder.with_transparency(transparent);
         self
     }
 
     /// Sets whether the window should have a border, a title bar, etc.
     #[inline]
     pub fn with_decorations(mut self, decorations: bool) -> WindowBuilder<'a> {
-        self.window.decorations = decorations;
+        self.winit_builder = self.winit_builder.with_decorations(decorations);
         self
     }
 
     /// Enables multitouch
     #[inline]
     pub fn with_multitouch(mut self) -> WindowBuilder<'a> {
-        self.window.multitouch = true;
+        self.winit_builder = self.winit_builder.with_multitouch();
         self
     }
 
@@ -202,20 +203,15 @@ impl<'a> WindowBuilder<'a> {
     ///
     /// Error should be very rare and only occur in case of permission denied, incompatible system,
     /// out of memory, etc.
-    pub fn build(mut self) -> Result<Window, CreationError> {
-        // resizing the window to the dimensions of the monitor when fullscreen
-        if self.window.dimensions.is_none() && self.window.monitor.is_some() {
-            self.window.dimensions = Some(self.window.monitor.as_ref().unwrap().get_dimensions())
-        }
-
-        // default dimensions
-        if self.window.dimensions.is_none() {
-            self.window.dimensions = Some((1024, 768));
-        }
-
-        // building
-        platform::Window::new(&self.window, &self.pf_reqs, &self.opengl, &self.platform_specific)
-                            .map(|w| Window { window: w })
+    pub fn build(self) -> Result<Window, CreationError> {
+        let w = try!(platform::Window::new(
+            &Default::default(),
+            &self.pf_reqs,
+            &self.opengl,
+            &Default::default(),
+            self.winit_builder,
+        ));
+        Result::Ok(Window{window: w})
     }
 
     /// Builds the window.
@@ -228,6 +224,39 @@ impl<'a> WindowBuilder<'a> {
     }
 }
 
+/// An iterator for the `wait_events` function.
+pub struct WaitEventsIterator<'a>(platform::WaitEventsIterator<'a>);
+
+impl<'a> Iterator for WaitEventsIterator<'a> {
+    type Item = Event;
+
+    #[inline]
+    fn next(&mut self) -> Option<Event> {
+        self.0.next()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+}
+
+/// An iterator for the `poll_events` function.
+pub struct PollEventsIterator<'a>(platform::PollEventsIterator<'a>);
+
+impl<'a> Iterator for PollEventsIterator<'a> {
+    type Item = Event;
+
+    #[inline]
+    fn next(&mut self) -> Option<Event> {
+        self.0.next()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+}
 
 impl Default for Window {
     #[inline]
@@ -339,10 +368,7 @@ impl Window {
     /// Returns `None` if the window no longer exists.
     #[inline]
     pub fn get_inner_size_pixels(&self) -> Option<(u32, u32)> {
-        self.window.get_inner_size().map(|(x, y)| {
-            let hidpi = self.hidpi_factor();
-            ((x as f32 * hidpi) as u32, (y as f32 * hidpi) as u32)
-        })
+        self.window.get_inner_size_pixels()
     }
 
     /// Returns the size in pixels of the window.
@@ -452,10 +478,8 @@ impl Window {
     /// Create a window proxy for this window, that can be freely
     /// passed to different threads.
     #[inline]
-    pub fn create_window_proxy(&self) -> WindowProxy {
-        WindowProxy {
-            proxy: self.window.create_window_proxy()
-        }
+    pub fn create_window_proxy(&self) -> winit::WindowProxy {
+        self.window.create_window_proxy()
     }
 
     /// Sets a resize callback that is called by Mac (and potentially other
@@ -468,7 +492,7 @@ impl Window {
 
     /// Modifies the mouse cursor of the window.
     /// Has no effect on Android.
-    pub fn set_cursor(&self, cursor: MouseCursor) {
+    pub fn set_cursor(&self, cursor: winit::MouseCursor) {
         self.window.set_cursor(cursor);
     }
 
@@ -490,7 +514,7 @@ impl Window {
     ///
     /// Has no effect on Android.
     #[inline]
-    pub fn set_cursor_state(&self, state: CursorState) -> Result<(), String> {
+    pub fn set_cursor_state(&self, state: winit::CursorState) -> Result<(), String> {
         self.window.set_cursor_state(state)
     }
 }
@@ -524,116 +548,5 @@ impl GlContext for Window {
     #[inline]
     fn get_pixel_format(&self) -> PixelFormat {
         self.get_pixel_format()
-    }
-}
-
-/// Represents a thread safe subset of operations that can be called
-/// on a window. This structure can be safely cloned and sent between
-/// threads.
-#[derive(Clone)]
-pub struct WindowProxy {
-    proxy: platform::WindowProxy,
-}
-
-impl WindowProxy {
-    /// Triggers a blocked event loop to wake up. This is
-    /// typically called when another thread wants to wake
-    /// up the blocked rendering thread to cause a refresh.
-    #[inline]
-    pub fn wakeup_event_loop(&self) {
-        self.proxy.wakeup_event_loop();
-    }
-}
-/// An iterator for the `poll_events` function.
-pub struct PollEventsIterator<'a>(platform::PollEventsIterator<'a>);
-
-impl<'a> Iterator for PollEventsIterator<'a> {
-    type Item = Event;
-
-    #[inline]
-    fn next(&mut self) -> Option<Event> {
-        self.0.next()
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.0.size_hint()
-    }
-}
-
-/// An iterator for the `wait_events` function.
-pub struct WaitEventsIterator<'a>(platform::WaitEventsIterator<'a>);
-
-impl<'a> Iterator for WaitEventsIterator<'a> {
-    type Item = Event;
-
-    #[inline]
-    fn next(&mut self) -> Option<Event> {
-        self.0.next()
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.0.size_hint()
-    }
-}
-
-/// An iterator for the list of available monitors.
-// Implementation note: we retreive the list once, then serve each element by one by one.
-// This may change in the future.
-pub struct AvailableMonitorsIter {
-    data: VecDequeIter<platform::MonitorId>,
-}
-
-impl Iterator for AvailableMonitorsIter {
-    type Item = MonitorId;
-
-    #[inline]
-    fn next(&mut self) -> Option<MonitorId> {
-        self.data.next().map(|id| MonitorId(id))
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.data.size_hint()
-    }
-}
-
-/// Returns the list of all available monitors.
-#[inline]
-pub fn get_available_monitors() -> AvailableMonitorsIter {
-    let data = platform::get_available_monitors();
-    AvailableMonitorsIter{ data: data.into_iter() }
-}
-
-/// Returns the primary monitor of the system.
-#[inline]
-pub fn get_primary_monitor() -> MonitorId {
-    MonitorId(platform::get_primary_monitor())
-}
-
-/// Identifier for a monitor.
-pub struct MonitorId(platform::MonitorId);
-
-impl MonitorId {
-    /// Returns a human-readable name of the monitor.
-    #[inline]
-    pub fn get_name(&self) -> Option<String> {
-        let &MonitorId(ref id) = self;
-        id.get_name()
-    }
-
-    /// Returns the native platform identifier for this monitor.
-    #[inline]
-    pub fn get_native_identifier(&self) -> NativeMonitorId {
-        let &MonitorId(ref id) = self;
-        id.get_native_identifier()
-    }
-
-    /// Returns the number of pixels currently displayed on the monitor.
-    #[inline]
-    pub fn get_dimensions(&self) -> (u32, u32) {
-        let &MonitorId(ref id) = self;
-        id.get_dimensions()
     }
 }

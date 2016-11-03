@@ -1,57 +1,83 @@
-#![cfg(target_os = "android")]
-
-extern crate android_glue;
+#![cfg(target_os = "windows")]
 
 use libc;
-
-use CreationError::{self, OsError};
+use std::ptr;
 
 use winit;
 
-use Api;
 use ContextError;
+use CreationError;
 use GlAttributes;
 use GlContext;
+use GlRequest;
+use Api;
 use PixelFormat;
 use PixelFormatRequirements;
 use WindowAttributes;
 
-use api::egl;
+use winapi;
+
+use api::wgl::Context as WglContext;
 use api::egl::Context as EglContext;
+use api::egl::ffi::egl::Egl;
+use api::egl;
 
-mod ffi;
-
+/// The Win32 implementation of the main `Window` object.
 pub struct Window {
-    context: EglContext,
+    context: Context,
     winit_window: winit::Window,
 }
 
-#[derive(Clone, Default)]
-pub struct PlatformSpecificWindowBuilderAttributes;
+unsafe impl Send for Window {}
+unsafe impl Sync for Window {}
 
-#[derive(Clone, Default)]
-pub struct PlatformSpecificHeadlessBuilderAttributes;
+enum Context {
+    Egl(EglContext),
+    Wgl(WglContext),
+}
 
 impl Window {
+    /// See the docs in the crate root file.
     pub fn new(
         _: &WindowAttributes,
         pf_reqs: &PixelFormatRequirements,
         opengl: &GlAttributes<&Window>,
-        _: &PlatformSpecificWindowBuilderAttributes,
+        egl: Option<&Egl>,
         winit_builder: winit::WindowBuilder,
     ) -> Result<Window, CreationError> {
         let winit_window = winit_builder.build().unwrap();
-        let opengl = opengl.clone().map_sharing(|w| &w.context);
-        let native_window = unsafe { android_glue::get_native_window() };
-        if native_window.is_null() {
-            return Err(OsError(format!("Android's native window is null")));
-        }
-        let context = try!(EglContext::new(
-            egl::ffi::egl::Egl,
-            pf_reqs,
-            &opengl,
-            egl::NativeDisplay::Android
-        ).and_then(|p| p.finish(native_window as *const _)));
+        let opengl = opengl.clone().map_sharing(|sharing| {
+            match sharing.context {
+                Context::Wgl(ref c) => c.get_hglrc(),
+                Context::Egl(_) => unimplemented!(),        // FIXME:
+            }
+        });
+        let context = unsafe {
+            let w = winit_window.platform_window() as winapi::HWND;
+            match opengl.version {
+                GlRequest::Specific(Api::OpenGlEs, (_major, _minor)) => {
+                    if let Some(egl) = egl {
+                        if let Ok(c) = EglContext::new(egl.clone(), &pf_reqs, &opengl.clone().map_sharing(|_| unimplemented!()),
+                                                       egl::NativeDisplay::Other(Some(ptr::null())))
+                                                                     .and_then(|p| p.finish(w))
+                        {
+                            Context::Egl(c)
+                        } else {
+                            try!(WglContext::new(&pf_reqs, &opengl, w)
+                                                .map(Context::Wgl))
+                        }
+
+                    } else {
+                        // falling back to WGL, which is always available
+                        try!(WglContext::new(&pf_reqs, &opengl, w)
+                                            .map(Context::Wgl))
+                    }
+                },
+                _ => {
+                    try!(WglContext::new(&pf_reqs, &opengl, w).map(Context::Wgl))
+                }
+            }
+        };
         Ok(Window {
             context: context,
             winit_window: winit_window,
@@ -142,99 +168,52 @@ impl Window {
     }
 }
 
-unsafe impl Send for Window {}
-unsafe impl Sync for Window {}
-
 impl GlContext for Window {
     #[inline]
     unsafe fn make_current(&self) -> Result<(), ContextError> {
-        self.context.make_current()
+        match self.context {
+            Context::Wgl(ref c) => c.make_current(),
+            Context::Egl(ref c) => c.make_current(),
+        }
     }
 
     #[inline]
     fn is_current(&self) -> bool {
-        self.context.is_current()
+        match self.context {
+            Context::Wgl(ref c) => c.is_current(),
+            Context::Egl(ref c) => c.is_current(),
+        }
     }
 
     #[inline]
     fn get_proc_address(&self, addr: &str) -> *const () {
-        self.context.get_proc_address(addr)
+        match self.context {
+            Context::Wgl(ref c) => c.get_proc_address(addr),
+            Context::Egl(ref c) => c.get_proc_address(addr),
+        }
     }
 
     #[inline]
     fn swap_buffers(&self) -> Result<(), ContextError> {
-        self.context.swap_buffers()
+        match self.context {
+            Context::Wgl(ref c) => c.swap_buffers(),
+            Context::Egl(ref c) => c.swap_buffers(),
+        }
     }
 
     #[inline]
     fn get_api(&self) -> Api {
-        self.context.get_api()
+        match self.context {
+            Context::Wgl(ref c) => c.get_api(),
+            Context::Egl(ref c) => c.get_api(),
+        }
     }
 
     #[inline]
     fn get_pixel_format(&self) -> PixelFormat {
-        self.context.get_pixel_format()
-    }
-}
-
-#[derive(Clone)]
-pub struct WindowProxy;
-
-impl WindowProxy {
-    #[inline]
-    pub fn wakeup_event_loop(&self) {
-        unimplemented!()
-    }
-}
-
-pub struct HeadlessContext(EglContext);
-
-impl HeadlessContext {
-    /// See the docs in the crate root file.
-    pub fn new(dimensions: (u32, u32), pf_reqs: &PixelFormatRequirements,
-               opengl: &GlAttributes<&HeadlessContext>,
-               _: &PlatformSpecificHeadlessBuilderAttributes)
-               -> Result<HeadlessContext, CreationError>
-    {
-        let opengl = opengl.clone().map_sharing(|c| &c.0);
-        let context = try!(EglContext::new(egl::ffi::egl::Egl, pf_reqs, &opengl,
-                           egl::NativeDisplay::Android));
-        let context = try!(context.finish_pbuffer(dimensions));     // TODO: 
-        Ok(HeadlessContext(context))
-    }
-}
-
-unsafe impl Send for HeadlessContext {}
-unsafe impl Sync for HeadlessContext {}
-
-impl GlContext for HeadlessContext {
-    #[inline]
-    unsafe fn make_current(&self) -> Result<(), ContextError> {
-        self.0.make_current()
-    }
-
-    #[inline]
-    fn is_current(&self) -> bool {
-        self.0.is_current()
-    }
-
-    #[inline]
-    fn get_proc_address(&self, addr: &str) -> *const () {
-        self.0.get_proc_address(addr)
-    }
-
-    #[inline]
-    fn swap_buffers(&self) -> Result<(), ContextError> {
-        self.0.swap_buffers()
-    }
-
-    #[inline]
-    fn get_api(&self) -> Api {
-        self.0.get_api()
-    }
-
-    #[inline]
-    fn get_pixel_format(&self) -> PixelFormat {
-        self.0.get_pixel_format()
+        match self.context {
+            Context::Wgl(ref c) => c.get_pixel_format(),
+            Context::Egl(ref c) => c.get_pixel_format(),
+        }
     }
 }

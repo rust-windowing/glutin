@@ -1,6 +1,5 @@
 extern crate glutin;
 extern crate libc;
-use glutin::*;
 use std::ptr;
 
 mod gl {
@@ -17,7 +16,7 @@ fn test_headless() {
     let height: i32 = 256;
     let window = glutin::HeadlessRendererBuilder::new(width as u32, height as u32).build().unwrap();
 
-    unsafe { window.make_current() };
+    unsafe { window.make_current().expect("Couldn't make window current") };
 
     let gl = gl::Gl::load_with(|symbol| window.get_proc_address(symbol) as *const _);
 

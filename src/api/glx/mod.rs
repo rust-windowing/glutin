@@ -15,12 +15,23 @@ use Robustness;
 use libc;
 use libc::c_int;
 use std::ffi::{CStr, CString};
-use std::{mem, ptr, slice};
+use std::{mem, ptr};
 
-use api::x11::ffi;
+pub mod ffi {
+    pub use x11_dl::xlib::*;
+    pub use self::glx::types::GLXContext;
 
-use platform::Window as PlatformWindow;
+    /// GLX bindings
+    pub mod glx {
+        include!(concat!(env!("OUT_DIR"), "/glx_bindings.rs"));
+    }
 
+    /// Functions that are not necessarly always available
+    pub mod glx_extra {
+        include!(concat!(env!("OUT_DIR"), "/glx_extra_bindings.rs"));
+    }
+}
+ 
 pub struct Context {
     glx: ffi::glx::Glx,
     display: *mut ffi::Display,
@@ -37,10 +48,14 @@ fn with_c_str<F, T>(s: &str, f: F) -> T where F: FnOnce(*const libc::c_char) -> 
 }
 
 impl Context {
-    pub fn new<'a>(glx: ffi::glx::Glx, xlib: &ffi::Xlib, pf_reqs: &PixelFormatRequirements,
-                   opengl: &'a GlAttributes<&'a Context>, display: *mut ffi::Display,
-                   screen_id: libc::c_int) -> Result<ContextPrototype<'a>, CreationError>
-    {
+    pub fn new<'a>(
+        glx: ffi::glx::Glx,
+        xlib: &ffi::Xlib,
+        pf_reqs: &PixelFormatRequirements,
+        opengl: &'a GlAttributes<&'a Context>,
+        display: *mut ffi::Display,
+        screen_id: libc::c_int,
+) -> Result<ContextPrototype<'a>, CreationError> {
         // This is completely ridiculous, but VirtualBox's OpenGL driver needs some call handled by
         // *it* (i.e. not Mesa) to occur before anything else can happen. That is because
         // VirtualBox's OpenGL driver is going to apply binary patches to Mesa in the DLL

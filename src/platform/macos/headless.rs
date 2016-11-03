@@ -11,7 +11,7 @@ use core_foundation::bundle::{CFBundleGetBundleWithIdentifier, CFBundleGetFuncti
 use cocoa::base::{id, nil};
 use cocoa::appkit::*;
 use PixelFormat;
-use api::cocoa::helpers;
+use super::helpers;
 
 #[derive(Clone, Default)]
 pub struct PlatformSpecificHeadlessBuilderAttributes;
@@ -21,7 +21,7 @@ pub struct HeadlessContext {
 }
 
 impl HeadlessContext {
-    pub fn new((width, height): (u32, u32), pf_reqs: &PixelFormatRequirements,
+    pub fn new((_width, _height): (u32, u32), pf_reqs: &PixelFormatRequirements,
                opengl: &GlAttributes<&HeadlessContext>,
                _: &PlatformSpecificHeadlessBuilderAttributes)
                -> Result<HeadlessContext, CreationError>
