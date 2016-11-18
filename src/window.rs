@@ -130,15 +130,20 @@ impl<'a> WindowBuilder<'a> {
         self
     }
 
-    /// Sets the multisampling level to request.
+    /// Sets the multisampling level to request. A value of `0` indicates that multisampling must not be enabled.
     ///
     /// # Panic
     ///
     /// Will panic if `samples` is not a power of two.
     #[inline]
     pub fn with_multisampling(mut self, samples: u16) -> WindowBuilder<'a> {
-        assert!(samples.is_power_of_two());
-        self.pf_reqs.multisampling = Some(samples);
+        self.pf_reqs.multisampling = match samples {
+            0 => None,
+            _ => {
+                assert!(samples.is_power_of_two());
+                Some(samples)
+            }
+        };
         self
     }
 
