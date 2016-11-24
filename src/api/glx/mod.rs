@@ -228,50 +228,49 @@ impl<'a> ContextPrototype<'a> {
             },
         };
 
+        let interval = if self.opengl.vsync { 1 } else { 0 };
         // vsync
-        if self.opengl.vsync {
-            unsafe { self.glx.MakeCurrent(self.display as *mut _, window, context) };
+        unsafe { self.glx.MakeCurrent(self.display as *mut _, window, context) };
 
-            if extra_functions.SwapIntervalEXT.is_loaded() {
-                // this should be the most common extension
+        if extra_functions.SwapIntervalEXT.is_loaded() {
+            // this should be the most common extension
+            unsafe {
+                extra_functions.SwapIntervalEXT(self.display as *mut _, window, interval);
+            }
+
+            // checking that it worked
+            // TODO: handle this
+            /*if self.builder.strict {
+                let mut swap = unsafe { mem::uninitialized() };
                 unsafe {
-                    extra_functions.SwapIntervalEXT(self.display as *mut _, window, 1);
+                    self.glx.QueryDrawable(self.display as *mut _, window,
+                                           ffi::glx_extra::SWAP_INTERVAL_EXT as i32,
+                                           &mut swap);
                 }
 
-                // checking that it worked
-                // TODO: handle this
-                /*if self.builder.strict {
-                    let mut swap = unsafe { mem::uninitialized() };
-                    unsafe {
-                        self.glx.QueryDrawable(self.display as *mut _, window,
-                                               ffi::glx_extra::SWAP_INTERVAL_EXT as i32,
-                                               &mut swap);
-                    }
-
-                    if swap != 1 {
-                        return Err(CreationError::OsError(format!("Couldn't setup vsync: expected \
-                                                    interval `1` but got `{}`", swap)));
-                    }
-                }*/
-
-            // GLX_MESA_swap_control is not official
-            /*} else if extra_functions.SwapIntervalMESA.is_loaded() {
-                unsafe {
-                    extra_functions.SwapIntervalMESA(1);
-                }*/
-
-            } else if extra_functions.SwapIntervalSGI.is_loaded() {
-                unsafe {
-                    extra_functions.SwapIntervalSGI(1);
+                if swap != 1 {
+                    return Err(CreationError::OsError(format!("Couldn't setup vsync: expected \
+                                                interval `1` but got `{}`", swap)));
                 }
-
-            }/* else if self.builder.strict {
-                // TODO: handle this
-                return Err(CreationError::OsError(format!("Couldn't find any available vsync extension")));
             }*/
 
-            unsafe { self.glx.MakeCurrent(self.display as *mut _, 0, ptr::null()) };
-        }
+        // GLX_MESA_swap_control is not official
+        /*} else if extra_functions.SwapIntervalMESA.is_loaded() {
+            unsafe {
+                extra_functions.SwapIntervalMESA(1);
+            }*/
+
+        } else if extra_functions.SwapIntervalSGI.is_loaded() {
+            unsafe {
+                extra_functions.SwapIntervalSGI(interval);
+            }
+
+        }/* else if self.builder.strict {
+            // TODO: handle this
+            return Err(CreationError::OsError(format!("Couldn't find any available vsync extension")));
+        }*/
+
+        unsafe { self.glx.MakeCurrent(self.display as *mut _, 0, ptr::null()) };
 
         Ok(Context {
             glx: self.glx,
