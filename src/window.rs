@@ -12,9 +12,9 @@ use Window;
 use WindowBuilder;
 
 pub use winit::WindowProxy;
-pub use winit::{AvailableMonitorsIter};
+pub use winit::AvailableMonitorsIter;
 pub use winit::{get_primary_monitor, get_available_monitors};
-pub use winit::{MonitorId};
+pub use winit::MonitorId;
 
 use libc;
 use platform;
@@ -33,6 +33,18 @@ impl<'a> WindowBuilder<'a> {
         }
     }
 
+    /// Initializes a new glutin `WindowBuilder` with the specified
+    /// winit `WindowBuilder` and default values for the other
+    /// parameters.
+    #[inline]
+    pub fn from_winit_builder(winit_builder: winit::WindowBuilder) -> WindowBuilder<'a> {
+        WindowBuilder {
+            pf_reqs: Default::default(),
+            winit_builder: winit_builder,
+            opengl: Default::default(),
+        }
+    }
+
     /// Requests the window to be of specific dimensions.
     ///
     /// Width and height are in pixels.
@@ -41,7 +53,7 @@ impl<'a> WindowBuilder<'a> {
         self.winit_builder = self.winit_builder.with_dimensions(width, height);
         self
     }
-    
+
     /// Sets a minimum dimension size for the window
     ///
     /// Width and height are in pixels.
@@ -209,14 +221,12 @@ impl<'a> WindowBuilder<'a> {
     /// Error should be very rare and only occur in case of permission denied, incompatible system,
     /// out of memory, etc.
     pub fn build(self) -> Result<Window, CreationError> {
-        let w = try!(platform::Window::new(
-            &Default::default(),
-            &self.pf_reqs,
-            &self.opengl,
-            &Default::default(),
-            self.winit_builder,
-        ));
-        Result::Ok(Window{window: w})
+        let w = try!(platform::Window::new(&Default::default(),
+                                           &self.pf_reqs,
+                                           &self.opengl,
+                                           &Default::default(),
+                                           self.winit_builder));
+        Result::Ok(Window { window: w })
     }
 
     /// Builds the window.
@@ -351,7 +361,7 @@ impl Window {
     pub fn get_inner_size(&self) -> Option<(u32, u32)> {
         self.window.get_inner_size()
     }
-    
+
     /// Returns the size in points of the client area of the window.
     ///
     /// The client area is the content of the window, excluding the title bar and borders.

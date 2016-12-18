@@ -58,24 +58,26 @@ impl Window {
                opengl: &GlAttributes<&Window>,
                _pl_attribs: &PlatformSpecificWindowBuilderAttributes,
                winit_builder: winit::WindowBuilder)
-               -> Result<Window, CreationError>
-    {
+               -> Result<Window, CreationError> {
         if opengl.sharing.is_some() {
             unimplemented!()
         }
 
         match opengl.robustness {
-            Robustness::RobustNoResetNotification | Robustness::RobustLoseContextOnReset => {
+            Robustness::RobustNoResetNotification |
+            Robustness::RobustLoseContextOnReset => {
                 return Err(CreationError::RobustnessNotSupported);
-            },
-            _ => ()
+            }
+            _ => (),
         }
 
         let winit_window = winit_builder.build().unwrap();
         let view = winit_window.get_nsview() as id;
         let (context, pf) = match Window::create_context(view, pf_reqs, opengl) {
             Ok((context, pf)) => (context, pf),
-            Err(e) => { return Err(OsError(format!("Couldn't create OpenGL context: {}", e))); },
+            Err(e) => {
+                return Err(OsError(format!("Couldn't create OpenGL context: {}", e)));
+            }
         };
 
         let window = Window {
@@ -87,17 +89,20 @@ impl Window {
         Ok(window)
     }
 
-    fn create_context(view: id, pf_reqs: &PixelFormatRequirements, opengl: &GlAttributes<&Window>)
-                      -> Result<(IdRef, PixelFormat), CreationError>
-    {
+    fn create_context(view: id,
+                      pf_reqs: &PixelFormatRequirements,
+                      opengl: &GlAttributes<&Window>)
+                      -> Result<(IdRef, PixelFormat), CreationError> {
         let attributes = try!(helpers::build_nsattributes(pf_reqs, opengl));
         unsafe {
-            let pixelformat = IdRef::new(NSOpenGLPixelFormat::alloc(nil).initWithAttributes_(&attributes));
+            let pixelformat = IdRef::new(NSOpenGLPixelFormat::alloc(nil)
+                .initWithAttributes_(&attributes));
 
             if let Some(pixelformat) = pixelformat.non_nil() {
 
                 // TODO: Add context sharing
-                let context = IdRef::new(NSOpenGLContext::alloc(nil).initWithFormat_shareContext_(*pixelformat, nil));
+                let context = IdRef::new(NSOpenGLContext::alloc(nil)
+                    .initWithFormat_shareContext_(*pixelformat, nil));
 
                 if let Some(cxt) = context.non_nil() {
                     let pf = {
@@ -148,6 +153,11 @@ impl Window {
 
     pub fn set_title(&self, title: &str) {
         self.winit_window.set_title(title)
+    }
+
+    #[inline]
+    pub fn winit_window(self) -> winit::Window {
+        self.winit_window
     }
 
     pub fn show(&self) {
@@ -254,9 +264,8 @@ impl GlContext for Window {
     fn get_proc_address(&self, addr: &str) -> *const () {
         let symbol_name: CFString = FromStr::from_str(addr).unwrap();
         let framework_name: CFString = FromStr::from_str("com.apple.opengl").unwrap();
-        let framework = unsafe {
-            CFBundleGetBundleWithIdentifier(framework_name.as_concrete_TypeRef())
-        };
+        let framework =
+            unsafe { CFBundleGetBundleWithIdentifier(framework_name.as_concrete_TypeRef()) };
         let symbol = unsafe {
             CFBundleGetFunctionPointerForName(framework, symbol_name.as_concrete_TypeRef())
         };

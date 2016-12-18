@@ -33,25 +33,23 @@ pub struct PlatformSpecificWindowBuilderAttributes;
 pub struct PlatformSpecificHeadlessBuilderAttributes;
 
 impl Window {
-    pub fn new(
-        _: &WindowAttributes,
-        pf_reqs: &PixelFormatRequirements,
-        opengl: &GlAttributes<&Window>,
-        _: &PlatformSpecificWindowBuilderAttributes,
-        winit_builder: winit::WindowBuilder,
-    ) -> Result<Window, CreationError> {
+    pub fn new(_: &WindowAttributes,
+               pf_reqs: &PixelFormatRequirements,
+               opengl: &GlAttributes<&Window>,
+               _: &PlatformSpecificWindowBuilderAttributes,
+               winit_builder: winit::WindowBuilder)
+               -> Result<Window, CreationError> {
         let winit_window = winit_builder.build().unwrap();
         let opengl = opengl.clone().map_sharing(|w| &w.context);
         let native_window = unsafe { android_glue::get_native_window() };
         if native_window.is_null() {
             return Err(OsError(format!("Android's native window is null")));
         }
-        let context = try!(EglContext::new(
-            egl::ffi::egl::Egl,
-            pf_reqs,
-            &opengl,
-            egl::NativeDisplay::Android
-        ).and_then(|p| p.finish(native_window as *const _)));
+        let context = try!(EglContext::new(egl::ffi::egl::Egl,
+                                           pf_reqs,
+                                           &opengl,
+                                           egl::NativeDisplay::Android)
+            .and_then(|p| p.finish(native_window as *const _)));
         Ok(Window {
             context: context,
             winit_window: winit_window,
@@ -111,6 +109,11 @@ impl Window {
 
     pub unsafe fn platform_display(&self) -> *mut libc::c_void {
         self.winit_window.platform_display()
+    }
+
+    #[inline]
+    pub fn winit_window(self) -> winit::Window {
+        self.winit_window
     }
 
     pub unsafe fn platform_window(&self) -> *mut libc::c_void {
@@ -191,15 +194,17 @@ pub struct HeadlessContext(EglContext);
 
 impl HeadlessContext {
     /// See the docs in the crate root file.
-    pub fn new(dimensions: (u32, u32), pf_reqs: &PixelFormatRequirements,
+    pub fn new(dimensions: (u32, u32),
+               pf_reqs: &PixelFormatRequirements,
                opengl: &GlAttributes<&HeadlessContext>,
                _: &PlatformSpecificHeadlessBuilderAttributes)
-               -> Result<HeadlessContext, CreationError>
-    {
+               -> Result<HeadlessContext, CreationError> {
         let opengl = opengl.clone().map_sharing(|c| &c.0);
-        let context = try!(EglContext::new(egl::ffi::egl::Egl, pf_reqs, &opengl,
-                           egl::NativeDisplay::Android));
-        let context = try!(context.finish_pbuffer(dimensions));     // TODO: 
+        let context = try!(EglContext::new(egl::ffi::egl::Egl,
+                                           pf_reqs,
+                                           &opengl,
+                                           egl::NativeDisplay::Android));
+        let context = try!(context.finish_pbuffer(dimensions));     // TODO:
         Ok(HeadlessContext(context))
     }
 }
