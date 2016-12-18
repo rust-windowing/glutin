@@ -112,7 +112,7 @@ impl Window {
     }
 
     #[inline]
-    pub fn winit_window(self) -> winit::Window {
+    pub fn to_winit_window(self) -> winit::Window {
         self.winit_window
     }
 
