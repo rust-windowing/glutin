@@ -474,21 +474,20 @@ impl Window {
         self.window.platform_window()
     }
 
-    /// Converts the window into a winit::Window.
-    /// This is typically only required when integrating with
-    /// other libraries that need this information.
-    #[inline]
-    pub fn into_winit_window(self) -> winit::Window {
-        unimplemented!()
-        // self.window.into_winit_window() 
-    }
-
     /// Borrows the winit::Window inside this window.
     /// This is typically only required when integrating with
     /// other libraries that need this information.
     #[inline]
     pub fn as_winit_window(&self) -> &winit::Window {
        self.window.as_winit_window()
+    }
+
+    /// Mutably borrows the winit::Window inside this window.
+    /// This is typically only required when integrating with
+    /// other libraries that need this information.
+    #[inline]
+    pub fn as_winit_window_mut(&mut self) -> &mut winit::Window {
+       self.window.as_winit_window_mut()
     }
 
     /// Returns the API that is currently provided by this window.

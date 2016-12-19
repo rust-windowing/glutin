@@ -112,13 +112,13 @@ impl Window {
     }
 
     #[inline]
-    pub fn into_winit_window(self) -> winit::Window {
-        self.winit_window
-    }
-
-    #[inline]
     pub fn as_winit_window(&self) -> &winit::Window {
         &self.winit_window
+    }
+ 
+    #[inline]
+    pub fn as_winit_window_mut(&mut self) -> &mut winit::Window {
+        &mut self.winit_window
     }
 
     pub unsafe fn platform_window(&self) -> *mut libc::c_void {
