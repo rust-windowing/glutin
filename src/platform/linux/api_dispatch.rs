@@ -172,6 +172,16 @@ impl Window {
         self.winit_window.platform_window()
     }
 
+    #[inline]
+    pub fn into_winit_window(self) -> winit::Window {
+        self.winit_window
+    }
+
+    #[inline]
+    pub fn as_winit_window(&self) -> &winit::Window {
+        &self.winit_window
+    }
+
     pub fn create_window_proxy(&self) -> winit::WindowProxy {
         self.winit_window.create_window_proxy()
     }

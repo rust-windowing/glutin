@@ -156,8 +156,13 @@ impl Window {
     }
 
     #[inline]
-    pub fn to_winit_window(self) -> winit::Window {
+    pub fn into_winit_window(self) -> winit::Window {
         self.winit_window
+    }
+
+    #[inline]
+    pub fn as_winit_window(&self) -> &winit::Window {
+        &self.winit_window
     }
 
     pub fn show(&self) {
