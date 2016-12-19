@@ -178,10 +178,9 @@ impl Window {
     }
 
     #[inline]
-    pub fn as_winit_window(&mut self) -> &mut winit::Window {
+    pub fn as_winit_window_mut(&mut self) -> &mut winit::Window {
         &mut self.winit_window
     }
-    
 
     pub fn create_window_proxy(&self) -> winit::WindowProxy {
         self.winit_window.create_window_proxy()
