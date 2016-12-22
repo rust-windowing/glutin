@@ -38,13 +38,12 @@ enum Context {
 
 impl Window {
     /// See the docs in the crate root file.
-    pub fn new(
-        _: &WindowAttributes,
-        pf_reqs: &PixelFormatRequirements,
-        opengl: &GlAttributes<&Window>,
-        egl: Option<&Egl>,
-        winit_builder: winit::WindowBuilder,
-    ) -> Result<Window, CreationError> {
+    pub fn new(_: &WindowAttributes,
+               pf_reqs: &PixelFormatRequirements,
+               opengl: &GlAttributes<&Window>,
+               egl: Option<&Egl>,
+               winit_builder: winit::WindowBuilder)
+               -> Result<Window, CreationError> {
         let winit_window = winit_builder.build().unwrap();
         let opengl = opengl.clone().map_sharing(|sharing| {
             match sharing.context {
@@ -57,25 +56,23 @@ impl Window {
             match opengl.version {
                 GlRequest::Specific(Api::OpenGlEs, (_major, _minor)) => {
                     if let Some(egl) = egl {
-                        if let Ok(c) = EglContext::new(egl.clone(), &pf_reqs, &opengl.clone().map_sharing(|_| unimplemented!()),
-                                                       egl::NativeDisplay::Other(Some(ptr::null())))
-                                                                     .and_then(|p| p.finish(w))
-                        {
+                        if let Ok(c) =
+                               EglContext::new(egl.clone(),
+                                               &pf_reqs,
+                                               &opengl.clone().map_sharing(|_| unimplemented!()),
+                                               egl::NativeDisplay::Other(Some(ptr::null())))
+                            .and_then(|p| p.finish(w)) {
                             Context::Egl(c)
                         } else {
-                            try!(WglContext::new(&pf_reqs, &opengl, w)
-                                                .map(Context::Wgl))
+                            try!(WglContext::new(&pf_reqs, &opengl, w).map(Context::Wgl))
                         }
 
                     } else {
                         // falling back to WGL, which is always available
-                        try!(WglContext::new(&pf_reqs, &opengl, w)
-                                            .map(Context::Wgl))
+                        try!(WglContext::new(&pf_reqs, &opengl, w).map(Context::Wgl))
                     }
-                },
-                _ => {
-                    try!(WglContext::new(&pf_reqs, &opengl, w).map(Context::Wgl))
                 }
+                _ => try!(WglContext::new(&pf_reqs, &opengl, w).map(Context::Wgl)),
             }
         };
         Ok(Window {
@@ -86,6 +83,16 @@ impl Window {
 
     pub fn set_title(&self, title: &str) {
         self.winit_window.set_title(title)
+    }
+
+    #[inline]
+    pub fn as_winit_window(&self) -> &winit::Window {
+        &self.winit_window
+    }
+
+    #[inline]
+    pub fn as_winit_window_mut(&mut self) -> &mut winit::Window {
+        &mut self.winit_window
     }
 
     pub fn show(&self) {
