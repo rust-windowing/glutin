@@ -8,6 +8,7 @@ use std::sync::{Arc};
 
 use winit;
 use winit::os::unix::WindowExt;
+use winit::os::unix::WindowBuilderExt;
 
 use Api;
 use ContextError;
@@ -109,10 +110,20 @@ impl Window {
     pub fn new(
         pf_reqs: &PixelFormatRequirements,
         opengl: &GlAttributes<&Window>,
-        winit_window: &winit::Window,
-    ) -> Result<Window, CreationError> {
-        let display = winit_window.get_xlib_xconnection().unwrap();
-        let screen_id = winit_window.get_xlib_screen_id().unwrap() as _;
+        winit_builder: winit::WindowBuilder,
+    ) -> Result<(Window, winit::Window), CreationError> {
+        use api::glx::ffi::Xlib;
+        use winit::NativeMonitorId;
+
+        let xlib = Xlib::open().unwrap();
+        let display = unsafe { (xlib.XOpenDisplay)(ptr::null()) };
+        let screen_id = match winit_builder.window.monitor {
+            Some(ref m) => match m.get_native_identifier() {
+                NativeMonitorId::Numeric(monitor) => monitor as i32,
+                _ => panic!(),
+            },
+            _ => unsafe { (xlib.XDefaultScreen)(display) },
+        };
 
         // start the context building process
         enum Prototype<'a> {
@@ -129,10 +140,10 @@ impl Window {
                 if let Some(ref glx) = backend.glx {
                     Prototype::Glx(try!(GlxContext::new(
                         glx.clone(),
-                        &display.xlib,
+                        &xlib,
                         pf_reqs,
                         &builder_clone_opengl_glx,
-                        display.display,
+                        display,
                         screen_id,
                     )))
                 } else if let Some(ref egl) = backend.egl {
@@ -140,7 +151,7 @@ impl Window {
                             egl.clone(),
                         pf_reqs,
                         &builder_clone_opengl_egl,
-                        egl::NativeDisplay::X11(Some(display.display as *const _)),
+                        egl::NativeDisplay::X11(Some(display as *const _)),
                     )))
                 } else {
                     return Err(CreationError::NotSupported);
@@ -152,7 +163,7 @@ impl Window {
                         egl.clone(),
                         pf_reqs,
                         &builder_clone_opengl_egl,
-                        egl::NativeDisplay::X11(Some(display.display as *const _)),
+                        egl::NativeDisplay::X11(Some(display as *const _)),
                     )))
                 } else {
                     return Err(CreationError::NotSupported);
@@ -172,18 +183,24 @@ impl Window {
                     template.visualid = p.get_native_visual_id() as ffi::VisualID;
 
                     let mut num_visuals = 0;
-                    let vi = (display.xlib.XGetVisualInfo)(display.display, ffi::VisualIDMask,
+                    let vi = (xlib.XGetVisualInfo)(display, ffi::VisualIDMask,
                                                            &mut template, &mut num_visuals);
-                    display.check_errors().expect("Failed to call XGetVisualInfo");
+                    // display.check_errors().expect("Failed to call XGetVisualInfo");
                     assert!(!vi.is_null());
                     assert!(num_visuals == 1);
 
                     let vi_copy = ptr::read(vi as *const _);
-                    (display.xlib.XFree)(vi as *mut _);
+                    (xlib.XFree)(vi as *mut _);
                     vi_copy
                 }
             },
         };
+
+        let winit_window = winit_builder
+            .with_visual(&visual_infos as *const _)
+            .with_screen(screen_id)
+            .build().unwrap();
+        let display = winit_window.get_xlib_xconnection().unwrap();
 
         let xlib_window = winit_window.get_xlib_window().unwrap();
         // finish creating the OpenGL context
@@ -209,11 +226,12 @@ impl Window {
             cmap
         };
 
-        Ok(Window {
+        Ok((Window {
             display: display.clone(),
             context: context,
             colormap: cmap,
-        })
+        },
+        winit_window))
     }
 }
 

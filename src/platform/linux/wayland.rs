@@ -53,31 +53,35 @@ impl Window {
     pub fn new(
         pf_reqs: &PixelFormatRequirements,
         opengl: &GlAttributes<&Window>,
-        winit_window: &winit::Window,
-    ) -> Result<Window, CreationError> {
-        let (w, h) = winit_window.get_inner_size().unwrap();
-        let surface = winit_window.get_wayland_client_surface().unwrap();
-        let egl_surface = wegl::WlEglSurface::new(surface, w as i32, h as i32);
-        let context = {
-            let libegl = unsafe { dlopen::dlopen(b"libEGL.so\0".as_ptr() as *const _, dlopen::RTLD_NOW) };
-            if libegl.is_null() {
-                return Err(CreationError::NotSupported);
+        winit_builder: winit::WindowBuilder,
+    ) -> Result<(Window, winit::Window), CreationError> {
+        let winit_window = winit_builder.build().unwrap();
+        let wayland_window = {
+            let (w, h) = winit_window.get_inner_size().unwrap();
+            let surface = winit_window.get_wayland_client_surface().unwrap();
+            let egl_surface = wegl::WlEglSurface::new(surface, w as i32, h as i32);
+            let context = {
+                let libegl = unsafe { dlopen::dlopen(b"libEGL.so\0".as_ptr() as *const _, dlopen::RTLD_NOW) };
+                if libegl.is_null() {
+                    return Err(CreationError::NotSupported);
+                }
+                let egl = ::api::egl::ffi::egl::Egl::load_with(|sym| {
+                    let sym = CString::new(sym).unwrap();
+                    unsafe { dlopen::dlsym(libegl, sym.as_ptr()) }
+                });
+                try!(EglContext::new(
+                    egl,
+                    pf_reqs, &opengl.clone().map_sharing(|_| unimplemented!()),        // TODO:
+                    egl::NativeDisplay::Wayland(Some(winit_window.get_wayland_display().unwrap())))
+                    .and_then(|p| p.finish(egl_surface.ptr() as *const _))
+                )
+            };
+            Window {
+                egl_surface: egl_surface,
+                context: context,
             }
-            let egl = ::api::egl::ffi::egl::Egl::load_with(|sym| {
-                let sym = CString::new(sym).unwrap();
-                unsafe { dlopen::dlsym(libegl, sym.as_ptr()) }
-            });
-            try!(EglContext::new(
-                egl,
-                pf_reqs, &opengl.clone().map_sharing(|_| unimplemented!()),        // TODO:
-                egl::NativeDisplay::Wayland(Some(winit_window.get_wayland_display().unwrap())))
-                .and_then(|p| p.finish(egl_surface.ptr() as *const _))
-            )
         };
-        Ok(Window {
-            egl_surface: egl_surface,
-            context: context
-        })
+        Ok((wayland_window, winit_window))
     }
 
     pub fn set_inner_size(&self, x: u32, y: u32, winit_window: &winit::Window) {
