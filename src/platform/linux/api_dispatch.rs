@@ -1,5 +1,6 @@
 use libc;
 use winit;
+use wayland_client;
 
 use ContextError;
 use CreationError;
@@ -75,33 +76,39 @@ impl Window {
         _: &PlatformSpecificWindowBuilderAttributes,
         winit_builder: winit::WindowBuilder,
     ) -> Result<Window, CreationError> {
-        let winit_window = winit_builder.build().unwrap();
-        let is_x11 = winit_window.get_xlib_display().is_some();
-        let display_server = if is_x11 {
-            let opengl = opengl.clone().map_sharing(|w| match w.display_server {
-                DisplayServer::X(ref w) => w,
-                _ => panic!()       // TODO: return an error
-            });
-            DisplayServer::X(try!(x11::Window::new(
-                pf_reqs,
-                &opengl,
-                &winit_window,
-            )))
-        } else {
-            let opengl = opengl.clone().map_sharing(|w| match w.display_server {
-                DisplayServer::Wayland(ref w) => w,
-                _ => panic!()       // TODO: return an error
-            });
-            DisplayServer::Wayland(try!(wayland::Window::new(
-                pf_reqs,
-                &opengl,
-                &winit_window,
-            )))
+        let window = match wayland_client::default_connect() {
+            Ok(_) => {
+                let opengl = opengl.clone().map_sharing(|w| match w.display_server {
+                    DisplayServer::Wayland(ref w) => w,
+                    _ => panic!()       // TODO: return an error
+                });
+                let (display_server, winit_window) = try!(wayland::Window::new(
+                    pf_reqs,
+                    &opengl,
+                    winit_builder,
+                ));
+                Window {
+                    display_server: DisplayServer::Wayland(display_server),
+                    winit_window: winit_window,
+                }
+            },
+            Err(_) => {
+                let opengl = opengl.clone().map_sharing(|w| match w.display_server {
+                    DisplayServer::X(ref w) => w,
+                    _ => panic!()       // TODO: return an error
+                });
+                let (display_server, winit_window) = try!(x11::Window::new(
+                    pf_reqs,
+                    &opengl,
+                    winit_builder,
+                ));
+                Window {
+                    display_server: DisplayServer::X(display_server),
+                    winit_window: winit_window,
+                }
+            },
         };
-        Ok(Window {
-            display_server: display_server,
-            winit_window: winit_window,
-        })
+        Ok(window)
     }
 
     pub fn set_title(&self, title: &str) {
