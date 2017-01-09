@@ -192,26 +192,10 @@ impl<'a> ContextPrototype<'a> {
         // creating GL context
         let context = match self.opengl.version {
             GlRequest::Latest => {
-                if let Ok(ctxt) = create_context(&self.glx, &extra_functions, &self.extensions, (3, 2),
-                                                 self.opengl.profile, self.opengl.debug,
-                                                 self.opengl.robustness, share,
-                                                 self.display, self.fb_config, &self.visual_infos)
-                {
-                    ctxt
-                } else if let Ok(ctxt) = create_context(&self.glx, &extra_functions, &self.extensions,
-                                                        (3, 1), self.opengl.profile,
-                                                        self.opengl.debug,
-                                                        self.opengl.robustness, share, self.display,
-                                                        self.fb_config, &self.visual_infos)
-                {
-                    ctxt
-
-                } else {
-                    try!(create_context(&self.glx, &extra_functions, &self.extensions, (1, 0),
-                                        self.opengl.profile, self.opengl.debug,
-                                        self.opengl.robustness,
-                                        share, self.display, self.fb_config, &self.visual_infos))
-                }
+                try!(create_context(&self.glx, &extra_functions, &self.extensions, (255, 255),
+                                     self.opengl.profile, self.opengl.debug,
+                                     self.opengl.robustness, share,
+                                     self.display, self.fb_config, &self.visual_infos))
             },
             GlRequest::Specific(Api::OpenGl, (major, minor)) => {
                 try!(create_context(&self.glx, &extra_functions, &self.extensions, (major, minor),
@@ -294,10 +278,12 @@ fn create_context(glx: &ffi::glx::Glx, extra_functions: &ffi::glx_extra::Glx, ex
         let context = if extensions.split(' ').find(|&i| i == "GLX_ARB_create_context").is_some() {
             let mut attributes = Vec::with_capacity(9);
 
-            attributes.push(ffi::glx_extra::CONTEXT_MAJOR_VERSION_ARB as c_int);
-            attributes.push(version.0 as c_int);
-            attributes.push(ffi::glx_extra::CONTEXT_MINOR_VERSION_ARB as c_int);
-            attributes.push(version.1 as c_int);
+            if version.0 != 255 || version.1 != 255 {
+                attributes.push(ffi::glx_extra::CONTEXT_MAJOR_VERSION_ARB as c_int);
+                attributes.push(version.0 as c_int);
+                attributes.push(ffi::glx_extra::CONTEXT_MINOR_VERSION_ARB as c_int);
+                attributes.push(version.1 as c_int);
+            }
 
             if let Some(profile) = profile {
                 let flag = match profile {
