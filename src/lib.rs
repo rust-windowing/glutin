@@ -106,7 +106,7 @@ pub struct Window {
 }
 
 /// Object that allows you to build windows.
-// #[derive(Clone)]
+#[derive(Clone)]
 pub struct WindowBuilder<'a> {
     winit_builder: winit::WindowBuilder,
 
