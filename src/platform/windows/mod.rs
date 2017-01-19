@@ -32,25 +32,27 @@ lazy_static! {
     // An EGL implementation available on the system.
     static ref EGL: Option<EglWrapper> = {
         // the ATI drivers provide an EGL implementation in their DLLs
-        let dll_name = if cfg!(target_pointer_width = "64") {
+        let ati_dll_name = if cfg!(target_pointer_width = "64") {
             b"atio6axx.dll\0"
         } else {
             b"atioglxx.dll\0"
         };
 
-        let dll = unsafe { kernel32::LoadLibraryA(dll_name.as_ptr() as *const _) };
+        for dll_name in &[b"libEGL.dll\0" as &[u8], ati_dll_name] {
+            let dll = unsafe { kernel32::LoadLibraryA(dll_name.as_ptr() as *const _) };
+            if dll.is_null() {
+                continue;
+            }
 
-        if !dll.is_null() {
             let egl = Egl::load_with(|name| {
                 let name = CString::new(name).unwrap();
                 unsafe { kernel32::GetProcAddress(dll, name.as_ptr()) as *const _ }
             });
 
-            Some(EglWrapper(egl))
-
-        } else {
-            None
+            return Some(EglWrapper(egl))
         }
+
+        None
     };
 }
 
