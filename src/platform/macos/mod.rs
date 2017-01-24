@@ -59,7 +59,7 @@ impl<'a> Iterator for WaitEventsIterator<'a> {
     fn next(&mut self) -> Option<winit::Event> {
         let event = self.winit_iterator.next();
         match event {
-            Some(winit::Event::Resized(_, _)) => self.window.update_context(),
+            Some(winit::Event::Resized(_, _)) => unsafe { self.window.context.update() },
             _ => {},
         }
         event
@@ -77,7 +77,7 @@ impl<'a> Iterator for PollEventsIterator<'a> {
     fn next(&mut self) -> Option<winit::Event> {
         let event = self.winit_iterator.next();
         match event {
-            Some(winit::Event::Resized(_, _)) => self.window.update_context(),
+            Some(winit::Event::Resized(_, _)) => unsafe { self.window.context.update() },
             _ => {},
         }
         event
@@ -183,12 +183,6 @@ impl Window {
             } else {
                 Err(CreationError::NoAvailablePixelFormat)
             }
-        }
-    }
-
-    fn update_context(&self) {
-        unsafe {
-            self.context.update()
         }
     }
 
