@@ -31,7 +31,6 @@ use libc;
 use winit;
 use winit::os::macos::WindowExt;
 pub use winit::{MonitorId, NativeMonitorId, get_available_monitors, get_primary_monitor};
-pub use winit::{PollEventsIterator, WaitEventsIterator};
 pub use self::headless::HeadlessContext;
 pub use self::headless::PlatformSpecificHeadlessBuilderAttributes;
 
@@ -47,6 +46,42 @@ pub struct Window {
     context: IdRef,
     pixel_format: PixelFormat,
     winit_window: winit::Window,
+}
+
+pub struct WaitEventsIterator<'a> {
+    window: &'a Window,
+    winit_iterator: winit::WaitEventsIterator<'a>,
+}
+
+impl<'a> Iterator for WaitEventsIterator<'a> {
+    type Item = winit::Event;
+
+    fn next(&mut self) -> Option<winit::Event> {
+        let event = self.winit_iterator.next();
+        match event {
+            Some(winit::Event::Resized(_, _)) => unsafe { self.window.context.update() },
+            _ => {},
+        }
+        event
+    }
+}
+
+pub struct PollEventsIterator<'a> {
+    window: &'a Window,
+    winit_iterator: winit::PollEventsIterator<'a>,
+}
+
+impl<'a> Iterator for PollEventsIterator<'a> {
+    type Item = winit::Event;
+
+    fn next(&mut self) -> Option<winit::Event> {
+        let event = self.winit_iterator.next();
+        match event {
+            Some(winit::Event::Resized(_, _)) => unsafe { self.window.context.update() },
+            _ => {},
+        }
+        event
+    }
 }
 
 unsafe impl Send for Window {}
@@ -204,12 +239,18 @@ impl Window {
         self.winit_window.set_inner_size(x, y)
     }
 
-    pub fn poll_events(&self) -> winit::PollEventsIterator {
-        self.winit_window.poll_events()
+    pub fn poll_events(&self) -> PollEventsIterator {
+        PollEventsIterator {
+            window: self,
+            winit_iterator: self.winit_window.poll_events()
+        }
     }
 
-    pub fn wait_events(&self) -> winit::WaitEventsIterator {
-        self.winit_window.wait_events()
+    pub fn wait_events(&self) -> WaitEventsIterator {
+        WaitEventsIterator {
+            window: self,
+            winit_iterator: self.winit_window.wait_events()
+        }
     }
 
     pub unsafe fn platform_display(&self) -> *mut libc::c_void {
