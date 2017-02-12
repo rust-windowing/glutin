@@ -14,6 +14,8 @@ use PixelFormat;
 use PixelFormatRequirements;
 use WindowAttributes;
 
+use ::platform::winit;
+
 use std::collections::VecDeque;
 use platform::PlatformSpecificWindowBuilderAttributes;
 
@@ -21,6 +23,7 @@ mod ffi;
 
 pub struct Window {
     context: ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE,
+    winit_window: winit::Window,
 }
 
 pub struct PollEventsIterator<'a> {
@@ -32,6 +35,7 @@ impl<'a> Iterator for PollEventsIterator<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<Event> {
+        // TODO
         None
     }
 }
@@ -45,6 +49,7 @@ impl<'a> Iterator for WaitEventsIterator<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<Event> {
+        // TODO
         None
     }
 }
@@ -61,6 +66,8 @@ impl WindowProxy {
 
 #[derive(Clone)]
 pub struct MonitorId;
+
+pub type AvailableMonitorsIter = VecDeque<MonitorId>;
 
 #[inline]
 pub fn get_available_monitors() -> VecDeque<MonitorId> {
@@ -92,9 +99,12 @@ impl MonitorId {
 }
 
 impl Window {
-    pub fn new(window: &WindowAttributes, pf_reqs: &PixelFormatRequirements,
-               opengl: &GlAttributes<&Window>, _: &PlatformSpecificWindowBuilderAttributes) -> Result<Window, CreationError>
-    {
+    pub fn new(_: &WindowAttributes,
+               pf_reqs: &PixelFormatRequirements,
+               opengl: &GlAttributes<&Window>,
+               _: &PlatformSpecificWindowBuilderAttributes,
+               winit_builder: winit::WindowBuilder)
+                -> Result<Window, CreationError> {
         // getting the default values of attributes
         let mut attributes = unsafe {
             use std::mem;
@@ -126,8 +136,10 @@ impl Window {
 
         // TODO: emscripten_set_webglcontextrestored_callback
 
+        let winit_window = try!(winit_builder.build());
         Ok(Window {
-            context: context
+            context: context,
+            winit_window: winit_window
         })
     }
 
@@ -210,6 +222,7 @@ impl Window {
 
     #[inline]
     pub fn set_window_resize_callback(&mut self, _: Option<fn(u32, u32)>) {
+        // TODO
     }
 
     #[inline]
@@ -229,6 +242,31 @@ impl Window {
     #[inline]
     pub fn set_cursor_position(&self, x: i32, y: i32) -> Result<(), ()> {
         Ok(())
+    }
+
+    #[inline]
+    pub fn get_inner_size_points(&self) -> Option<(u32, u32)> {
+        unimplemented!();
+    }
+
+    #[inline]
+    pub fn get_inner_size_pixels(&self) -> Option<(u32, u32)> {
+        unimplemented!();
+    }
+
+    #[inline]
+    pub fn as_winit_window(&self) -> &winit::Window {
+        &self.winit_window
+    }
+
+    #[inline]
+    pub fn as_winit_window_mut(&mut self) -> &mut winit::Window {
+        &mut self.winit_window
+    }
+
+    #[inline]
+    pub fn hdpi_factor(&self) -> f32 {
+        unimplemented!();
     }
 }
 
@@ -295,3 +333,5 @@ fn error_to_str(code: ffi::EMSCRIPTEN_RESULT) -> &'static str {
         _ => "Undocumented error"
     }
 }
+
+

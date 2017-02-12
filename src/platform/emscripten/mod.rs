@@ -1,5 +1,7 @@
 #![cfg(target_os = "emscripten")]
 
+pub mod winit;
+
 use Api;
 use ContextError;
 use CreationError;

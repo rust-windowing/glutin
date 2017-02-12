@@ -31,7 +31,12 @@ extern crate shared_library;
 
 extern crate libc;
 
+#[cfg(not(target_os = "emscripten"))]
 extern crate winit;
+#[cfg(target_os = "emscripten")]
+mod winit {
+    pub use platform::winit::*;
+}
 
 #[cfg(target_os = "windows")]
 extern crate winapi;
@@ -67,6 +72,8 @@ pub use headless::{HeadlessRendererBuilder, HeadlessContext};
 pub use window::{WindowProxy, PollEventsIterator, WaitEventsIterator};
 pub use window::{AvailableMonitorsIter, MonitorId, get_available_monitors, get_primary_monitor};
 pub use winit::NativeMonitorId;
+#[cfg(target_os = "emscripten")]
+pub use winit::native_monitor;
 
 use std::io;
 

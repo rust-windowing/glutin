@@ -11,6 +11,9 @@ use Robustness;
 use Window;
 use WindowBuilder;
 
+#[cfg(target_os = "emscripten")]
+use platform::winit;
+
 pub use winit::WindowProxy;
 pub use winit::AvailableMonitorsIter;
 pub use winit::{get_primary_monitor, get_available_monitors};
@@ -19,6 +22,7 @@ pub use winit::MonitorId;
 use libc;
 use platform;
 
+#[cfg(not(target_os = "emscripten"))]
 use winit;
 use Event;
 
@@ -238,6 +242,9 @@ impl<'a> WindowBuilder<'a> {
         self.build()
     }
 }
+
+// #[cfg(target_os = "emscripten")]
+// pub use platform::window::WindowBuilder;
 
 /// An iterator for the `wait_events` function.
 pub struct WaitEventsIterator<'a>(platform::WaitEventsIterator<'a>);
