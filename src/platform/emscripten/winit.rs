@@ -1,4 +1,3 @@
-use std::collections::VecDeque;
 use std::path::PathBuf;
 
 use CreationError;
@@ -369,7 +368,7 @@ impl WindowBuilder {
         }
 
         // building
-        Ok(Window::new())
+        Window::new(self)
     }
 
     /// Builds the window.
@@ -385,8 +384,9 @@ impl WindowBuilder {
 pub struct Window;
 
 impl Window {
-    pub fn new() -> Window {
-        Window
+    pub fn new(_: WindowBuilder) -> Result<Window, CreationError> {
+        // TODO: maybe resize the window to builder dimensions
+        Ok(Window)
     }
 }
 
