@@ -14,7 +14,9 @@ use PixelFormat;
 use PixelFormatRequirements;
 use WindowAttributes;
 
-use ::platform::winit;
+use winit;
+pub use winit::WindowProxy;
+
 
 use std::collections::VecDeque;
 use platform::PlatformSpecificWindowBuilderAttributes;
@@ -54,50 +56,6 @@ impl<'a> Iterator for WaitEventsIterator<'a> {
     }
 }
 
-#[derive(Clone)]
-pub struct WindowProxy;
-
-impl WindowProxy {
-    #[inline]
-    pub fn wakeup_event_loop(&self) {
-        unimplemented!()
-    }
-}
-
-#[derive(Clone)]
-pub struct MonitorId;
-
-pub type AvailableMonitorsIter = VecDeque<MonitorId>;
-
-#[inline]
-pub fn get_available_monitors() -> VecDeque<MonitorId> {
-    let mut list = VecDeque::new();
-    list.push_back(MonitorId);
-    list
-}
-
-#[inline]
-pub fn get_primary_monitor() -> MonitorId {
-    MonitorId
-}
-
-impl MonitorId {
-    #[inline]
-    pub fn get_name(&self) -> Option<String> {
-        Some("Canvas".to_owned())
-    }
-
-    #[inline]
-    pub fn get_native_identifier(&self) -> ::native_monitor::NativeMonitorId {
-        ::native_monitor::NativeMonitorId::Unavailable
-    }
-
-    #[inline]
-    pub fn get_dimensions(&self) -> (u32, u32) {
-        unimplemented!()
-    }
-}
-
 impl Window {
     pub fn new(_: &WindowAttributes,
                pf_reqs: &PixelFormatRequirements,
@@ -105,6 +63,8 @@ impl Window {
                _: &PlatformSpecificWindowBuilderAttributes,
                winit_builder: winit::WindowBuilder)
                 -> Result<Window, CreationError> {
+
+        let winit_window = winit_builder.build().unwrap();
         // getting the default values of attributes
         let mut attributes = unsafe {
             use std::mem;
@@ -136,7 +96,6 @@ impl Window {
 
         // TODO: emscripten_set_webglcontextrestored_callback
 
-        let winit_window = try!(winit_builder.build());
         Ok(Window {
             context: context,
             winit_window: winit_window
@@ -202,7 +161,7 @@ impl Window {
 
     #[inline]
     pub fn create_window_proxy(&self) -> WindowProxy {
-        WindowProxy
+        self.winit_window.create_window_proxy()
     }
 
     #[inline]

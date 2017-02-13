@@ -1,7 +1,5 @@
 #![cfg(target_os = "emscripten")]
 
-pub mod winit;
-
 use Api;
 use ContextError;
 use CreationError;
@@ -10,8 +8,8 @@ use GlContext;
 use PixelFormat;
 use PixelFormatRequirements;
 
-pub use api::emscripten::{Window, WindowProxy, MonitorId, get_available_monitors};
-pub use api::emscripten::{get_primary_monitor, WaitEventsIterator, PollEventsIterator};
+pub use api::emscripten::{Window, WindowProxy};
+pub use api::emscripten::{WaitEventsIterator, PollEventsIterator};
 
 pub struct HeadlessContext(Window);
 
