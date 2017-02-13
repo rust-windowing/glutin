@@ -25,7 +25,6 @@ mod ffi;
 
 pub struct Window {
     context: ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE,
-    winit_window: winit::Window,
 }
 
 pub struct PollEventsIterator<'a> {
@@ -61,10 +60,9 @@ impl Window {
                pf_reqs: &PixelFormatRequirements,
                opengl: &GlAttributes<&Window>,
                _: &PlatformSpecificWindowBuilderAttributes,
-               winit_builder: winit::WindowBuilder)
+               _: winit::WindowBuilder)
                 -> Result<Window, CreationError> {
 
-        let winit_window = winit_builder.build().unwrap();
         // getting the default values of attributes
         let mut attributes = unsafe {
             use std::mem;
@@ -98,7 +96,6 @@ impl Window {
 
         Ok(Window {
             context: context,
-            winit_window: winit_window
         })
     }
 
@@ -161,7 +158,7 @@ impl Window {
 
     #[inline]
     pub fn create_window_proxy(&self) -> WindowProxy {
-        self.winit_window.create_window_proxy()
+        unimplemented!()
     }
 
     #[inline]
@@ -205,22 +202,22 @@ impl Window {
 
     #[inline]
     pub fn get_inner_size_points(&self) -> Option<(u32, u32)> {
-        unimplemented!();
+        unimplemented!()
     }
 
     #[inline]
     pub fn get_inner_size_pixels(&self) -> Option<(u32, u32)> {
-        unimplemented!();
+        unimplemented!()
     }
 
     #[inline]
     pub fn as_winit_window(&self) -> &winit::Window {
-        &self.winit_window
+        unimplemented!()
     }
 
     #[inline]
     pub fn as_winit_window_mut(&mut self) -> &mut winit::Window {
-        &mut self.winit_window
+        unimplemented!()
     }
 
     #[inline]
