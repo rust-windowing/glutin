@@ -4,6 +4,9 @@
 
 use libc;
 
+pub const EM_FALSE: EM_BOOL = 0;
+pub const EM_TRUE: EM_BOOL = 1;
+
 pub type EM_BOOL = libc::c_int;
 pub type EM_UTF8 = libc::c_char;
 pub type EMSCRIPTEN_WEBGL_CONTEXT_HANDLE = libc::c_int;
@@ -13,6 +16,59 @@ pub type em_webgl_context_callback = extern fn(libc::c_int, *const libc::c_void,
     -> EM_BOOL;
 
 pub type em_callback_func = unsafe extern fn();
+
+pub const EMSCRIPTEN_EVENT_KEYDOWN: libc::c_int = 2;
+
+// pub const EMSCRIPTEN_EVENT_CLICK: libc::c_int = 4;
+pub const EMSCRIPTEN_EVENT_MOUSEDOWN: libc::c_int = 5;
+pub const EMSCRIPTEN_EVENT_MOUSEUP: libc::c_int = 6;
+pub const EMSCRIPTEN_EVENT_MOUSEMOVE: libc::c_int = 8;
+
+pub const EM_HTML5_SHORT_STRING_LEN_BYTES: usize  = 32;
+
+#[repr(C)]
+pub struct EmscriptenMouseEvent {
+    pub timestamp: libc::c_double,
+    pub screen_x: libc::c_long,
+    pub screen_y: libc::c_long,
+    pub client_x: libc::c_long,
+    pub client_y: libc::c_long,
+    pub ctrl_key: EM_BOOL,
+    pub shift_key: EM_BOOL,
+    pub alt_key: EM_BOOL,
+    pub meta_key: EM_BOOL,
+    pub button: libc::c_ushort,
+    pub buttons: libc::c_ushort,
+    pub movement_x: libc::c_long,
+    pub movement_y: libc::c_long,
+    pub target_x: libc::c_long,
+    pub target_y: libc::c_long,
+    pub canvas_x: libc::c_long,
+    pub canvas_y: libc::c_long,
+    padding: libc::c_long
+}
+
+#[repr(C)]
+pub struct EmscriptenKeyboardEvent {
+  pub key: [EM_UTF8; EM_HTML5_SHORT_STRING_LEN_BYTES],
+  pub code: [EM_UTF8; EM_HTML5_SHORT_STRING_LEN_BYTES],
+  pub location: libc::c_ulong,
+  pub ctrlKey: EM_BOOL,
+  pub shiftKey: EM_BOOL,
+  pub altKey: EM_BOOL,
+  pub metaKey: EM_BOOL,
+  pub repeat: EM_BOOL,
+  pub locale: [EM_UTF8; EM_HTML5_SHORT_STRING_LEN_BYTES],
+  pub charValue: [EM_UTF8; EM_HTML5_SHORT_STRING_LEN_BYTES],
+  pub charCode: libc::c_ulong,
+  pub keyCode: libc::c_ulong,
+  pub which: libc::c_ulong,
+}
+
+pub type em_mouse_callback_func = extern fn(libc::c_int, *const EmscriptenMouseEvent, *mut libc::c_void) 
+    -> EM_BOOL;
+pub type em_keyboard_callback_func = extern fn(libc::c_int, *const EmscriptenKeyboardEvent, *mut libc::c_void)
+    -> EM_BOOL;
 
 #[repr(C)]
 pub struct EmscriptenWebGLContextAttributes {
@@ -83,4 +139,14 @@ extern {
     pub fn emscripten_sleep(delay: libc::c_uint);
 
     pub fn emscripten_set_main_loop(func : em_callback_func, fps : libc::c_int, simulate_infinite_loop : libc::c_int);
+
+
+    pub fn emscripten_set_mousemove_callback(target: *const libc::c_char, user_data: *mut libc::c_void, use_capture: EM_BOOL, callback: em_mouse_callback_func) -> EMSCRIPTEN_RESULT;
+
+    pub fn emscripten_set_mousedown_callback(target: *const libc::c_char, user_data: *mut libc::c_void, use_capture: EM_BOOL, callback: em_mouse_callback_func) -> EMSCRIPTEN_RESULT;
+
+    pub fn emscripten_set_mouseup_callback(target: *const libc::c_char, user_data: *mut libc::c_void, use_capture: EM_BOOL, callback: em_mouse_callback_func) -> EMSCRIPTEN_RESULT;
+
+
+    pub fn emscripten_set_keydown_callback(target: *const libc::c_char, user_data: *mut libc::c_void, use_capture: EM_BOOL, callback: em_keyboard_callback_func) -> EMSCRIPTEN_RESULT;
 }

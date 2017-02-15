@@ -17,14 +17,20 @@ use WindowAttributes;
 use winit;
 pub use winit::WindowProxy;
 
+use ElementState;
+use MouseButton;
+use VirtualKeyCode;
 
+use std::cell::RefCell;
 use std::collections::VecDeque;
+use std::ops::Deref;
 use platform::PlatformSpecificWindowBuilderAttributes;
 
 mod ffi;
 
 pub struct Window {
     context: ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE,
+    events: Box<RefCell<VecDeque<Event>>>,
 }
 
 pub struct PollEventsIterator<'a> {
@@ -36,8 +42,7 @@ impl<'a> Iterator for PollEventsIterator<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<Event> {
-        // TODO
-        None
+        self.window.events.deref().borrow_mut().pop_front()
     }
 }
 
@@ -54,6 +59,8 @@ impl<'a> Iterator for WaitEventsIterator<'a> {
         None
     }
 }
+
+const CANVAS_NAME: &'static str = "#canvas\0";
 
 impl Window {
     pub fn new(_: &WindowAttributes,
@@ -92,10 +99,32 @@ impl Window {
             context
         };
 
+        let events = Box::new(RefCell::new(VecDeque::new()));
+
+        {
+            use std::mem;
+            // TODO: set up more event callbacks
+            unsafe {
+                ffi::emscripten_set_mousemove_callback(CANVAS_NAME.as_ptr(),
+                                              mem::transmute(events.deref()),
+                                              ffi::EM_FALSE,
+                                              mouse_callback);
+                ffi::emscripten_set_mousedown_callback(CANVAS_NAME.as_ptr(),
+                                              mem::transmute(events.deref()),
+                                              ffi::EM_FALSE,
+                                              mouse_callback);
+                ffi::emscripten_set_mouseup_callback(CANVAS_NAME.as_ptr(),
+                                              mem::transmute(events.deref()),
+                                              ffi::EM_FALSE,
+                                              mouse_callback);
+            }
+        }
+
         // TODO: emscripten_set_webglcontextrestored_callback
 
         Ok(Window {
             context: context,
+            events: events,
         })
     }
 
@@ -290,4 +319,45 @@ fn error_to_str(code: ffi::EMSCRIPTEN_RESULT) -> &'static str {
     }
 }
 
+
+extern fn mouse_callback(
+        event_type: libc::c_int,
+        event: *const ffi::EmscriptenMouseEvent,
+        event_queue: *mut libc::c_void) -> ffi::EM_BOOL {
+    // println!("callback {} {:p} {:p} !", event_type, event, event_queue);
+    unsafe {
+        use std::mem;
+        let queue: &RefCell<VecDeque<Event>> = mem::transmute(event_queue);
+        match event_type {
+            ffi::EMSCRIPTEN_EVENT_MOUSEMOVE => {
+                queue.borrow_mut().push_back(Event::MouseMoved(
+                        (*event).client_x as i32,
+                        (*event).client_y as i32));
+            },
+            ffi::EMSCRIPTEN_EVENT_MOUSEDOWN => {
+                queue.borrow_mut().push_back(Event::MouseInput(
+                        ElementState::Pressed,
+                        match (*event).button {
+                            0 => MouseButton::Left,
+                            1 => MouseButton::Middle,
+                            2 => MouseButton::Right,
+                            other => MouseButton::Other(other as u8),
+                        }));
+            },
+            ffi::EMSCRIPTEN_EVENT_MOUSEUP => {
+                queue.borrow_mut().push_back(Event::MouseInput(
+                        ElementState::Released,
+                        match (*event).button {
+                            0 => MouseButton::Left,
+                            1 => MouseButton::Middle,
+                            2 => MouseButton::Right,
+                            other => MouseButton::Other(other as u8),
+                        }));
+            },
+            _ => {
+            }
+        }
+    }
+    ffi::EM_TRUE
+}
 
