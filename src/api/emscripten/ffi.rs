@@ -27,6 +27,11 @@ pub const EMSCRIPTEN_EVENT_MOUSEMOVE: libc::c_int = 8;
 
 pub const EM_HTML5_SHORT_STRING_LEN_BYTES: usize  = 32;
 
+pub const DOM_KEY_LOCATION_STANDARD: libc::c_ulong = 0x00;
+pub const DOM_KEY_LOCATION_LEFT: libc::c_ulong = 0x01;
+pub const DOM_KEY_LOCATION_RIGHT: libc::c_ulong = 0x02;
+pub const DOM_KEY_LOCATION_NUMPAD: libc::c_ulong = 0x03;
+
 #[repr(C)]
 pub struct EmscriptenMouseEvent {
     pub timestamp: libc::c_double,

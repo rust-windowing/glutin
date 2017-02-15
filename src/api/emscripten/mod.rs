@@ -27,6 +27,7 @@ use std::ops::Deref;
 use platform::PlatformSpecificWindowBuilderAttributes;
 
 mod ffi;
+mod keyboard;
 
 pub struct Window {
     context: ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE,
@@ -378,18 +379,21 @@ extern fn keyboard_callback(
     unsafe {
         use std::mem;
         let queue: &RefCell<VecDeque<Event>> = mem::transmute(event_queue);
+        let code = keyboard::key_translate((*event).key);
+        let virtual_key = keyboard::key_translate_virt(
+            (*event).key, (*event).location);
         match event_type {
             ffi::EMSCRIPTEN_EVENT_KEYDOWN => {
                 queue.borrow_mut().push_back(Event::KeyboardInput(
                         ElementState::Pressed,
-                        key_translate((*event).key),
-                        key_translate_virt((*event).key, (*event).location)));
+                        code,
+                        virtual_key));
             },
             ffi::EMSCRIPTEN_EVENT_KEYUP => {
                 queue.borrow_mut().push_back(Event::KeyboardInput(
                         ElementState::Released,
-                        key_translate((*event).key),
-                        key_translate_virt((*event).key, (*event).location)));
+                        code,
+                        virtual_key));
             },
             _ => {
             }
@@ -398,18 +402,3 @@ extern fn keyboard_callback(
     ffi::EM_TRUE
 }
 
-fn key_translate(input: [ffi::EM_UTF8; ffi:: EM_HTML5_SHORT_STRING_LEN_BYTES]) -> u8 {
-    use std::str;
-    let slice = &input[0..input.iter().take_while(|x| **x != 0).count()];
-    let key = str::from_utf8(&slice).unwrap();
-    if key.chars().count() == 1 {
-        key.as_bytes()[0]
-    } else {
-        0
-    }
-}
-
-fn key_translate_virt(input: [ffi::EM_UTF8; ffi:: EM_HTML5_SHORT_STRING_LEN_BYTES], location: libc::c_ulong) -> Option<VirtualKeyCode> {
-    // TODO
-    None
-}
