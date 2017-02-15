@@ -18,6 +18,7 @@ pub type em_webgl_context_callback = extern fn(libc::c_int, *const libc::c_void,
 pub type em_callback_func = unsafe extern fn();
 
 pub const EMSCRIPTEN_EVENT_KEYDOWN: libc::c_int = 2;
+pub const EMSCRIPTEN_EVENT_KEYUP: libc::c_int = 3;
 
 // pub const EMSCRIPTEN_EVENT_CLICK: libc::c_int = 4;
 pub const EMSCRIPTEN_EVENT_MOUSEDOWN: libc::c_int = 5;
@@ -149,4 +150,6 @@ extern {
 
 
     pub fn emscripten_set_keydown_callback(target: *const libc::c_char, user_data: *mut libc::c_void, use_capture: EM_BOOL, callback: em_keyboard_callback_func) -> EMSCRIPTEN_RESULT;
+
+    pub fn emscripten_set_keyup_callback(target: *const libc::c_char, user_data: *mut libc::c_void, use_capture: EM_BOOL, callback: em_keyboard_callback_func) -> EMSCRIPTEN_RESULT;
 }
