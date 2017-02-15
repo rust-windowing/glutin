@@ -334,7 +334,6 @@ extern fn mouse_callback(
         event_type: libc::c_int,
         event: *const ffi::EmscriptenMouseEvent,
         event_queue: *mut libc::c_void) -> ffi::EM_BOOL {
-    // println!("callback {} {:p} {:p} !", event_type, event, event_queue);
     unsafe {
         use std::mem;
         let queue: &RefCell<VecDeque<Event>> = mem::transmute(event_queue);
@@ -375,7 +374,6 @@ extern fn keyboard_callback(
         event_type: libc::c_int,
         event: *const ffi::EmscriptenKeyboardEvent,
         event_queue: *mut libc::c_void) -> ffi::EM_BOOL {
-    println!("keyevent {}", event_type);
     unsafe {
         use std::mem;
         let queue: &RefCell<VecDeque<Event>> = mem::transmute(event_queue);
