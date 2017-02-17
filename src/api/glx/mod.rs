@@ -192,26 +192,29 @@ impl<'a> ContextPrototype<'a> {
         // creating GL context
         let context = match self.opengl.version {
             GlRequest::Latest => {
-                if let Ok(ctxt) = create_context(&self.glx, &extra_functions, &self.extensions, (3, 2),
-                                                 self.opengl.profile, self.opengl.debug,
-                                                 self.opengl.robustness, share,
-                                                 self.display, self.fb_config, &self.visual_infos)
+                let opengl_versions = [(4, 5), (4, 4), (4, 3), (4, 2), (4, 1), (4, 0),
+                                       (3, 3), (3, 2), (3, 1)];
+                let mut ctxt;
+                'outer: loop
                 {
-                    ctxt
-                } else if let Ok(ctxt) = create_context(&self.glx, &extra_functions, &self.extensions,
-                                                        (3, 1), self.opengl.profile,
-                                                        self.opengl.debug,
-                                                        self.opengl.robustness, share, self.display,
-                                                        self.fb_config, &self.visual_infos)
-                {
-                    ctxt
-
-                } else {
-                    try!(create_context(&self.glx, &extra_functions, &self.extensions, (1, 0),
-                                        self.opengl.profile, self.opengl.debug,
-                                        self.opengl.robustness,
-                                        share, self.display, self.fb_config, &self.visual_infos))
+                    for opengl_version in opengl_versions.iter()
+                    {
+                        match create_context(&self.glx, &extra_functions, &self.extensions,
+                                             *opengl_version, self.opengl.profile,
+                                             self.opengl.debug, self.opengl.robustness, share,
+                                             self.display, self.fb_config, &self.visual_infos)
+                        {
+                            Ok(x) => {ctxt = x; break 'outer;},
+                            Err(_) => continue
+                        }
+                    }
+                    ctxt = try!(create_context(&self.glx, &extra_functions, &self.extensions, (1, 0),
+                                               self.opengl.profile, self.opengl.debug,
+                                               self.opengl.robustness, share,
+                                               self.display, self.fb_config, &self.visual_infos));
+                    break;
                 }
+                ctxt
             },
             GlRequest::Specific(Api::OpenGl, (major, minor)) => {
                 try!(create_context(&self.glx, &extra_functions, &self.extensions, (major, minor),
