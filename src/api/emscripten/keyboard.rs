@@ -5,7 +5,6 @@ use VirtualKeyCode;
 use super::ffi;
 
 pub fn key_translate(input: [ffi::EM_UTF8; ffi:: EM_HTML5_SHORT_STRING_LEN_BYTES]) -> u8 {
-    use std::str;
     let slice = &input[0..input.iter().take_while(|x| **x != 0).count()];
     if slice.len() == 1 {
         slice[0]

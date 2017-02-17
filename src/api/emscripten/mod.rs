@@ -19,7 +19,6 @@ pub use winit::WindowProxy;
 
 use ElementState;
 use MouseButton;
-use VirtualKeyCode;
 
 use std::cell::RefCell;
 use std::collections::VecDeque;
@@ -56,8 +55,7 @@ impl<'a> Iterator for WaitEventsIterator<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<Event> {
-        // TODO
-        None
+        unimplemented!()
     }
 }
 
@@ -73,7 +71,7 @@ impl Window {
                 -> Result<Window, CreationError> {
 
         // getting the default values of attributes
-        let mut attributes = unsafe {
+        let attributes = unsafe {
             use std::mem;
             let mut attributes: ffi::EmscriptenWebGLContextAttributes = mem::uninitialized();
             ffi::emscripten_webgl_init_context_attributes(&mut attributes);
