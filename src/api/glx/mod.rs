@@ -199,6 +199,8 @@ impl<'a> ContextPrototype<'a> {
                 let mut ctxt;
                 'outer: loop
                 {
+                    // Try all OpenGL versions in descending order because some non-compliant
+                    // drivers don't return the latest supported version but the one requested
                     for opengl_version in opengl_versions.iter()
                     {
                         match create_context(&self.glx, &extra_functions, &self.extensions, &self.xlib,
