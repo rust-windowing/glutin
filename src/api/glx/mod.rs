@@ -50,7 +50,7 @@ fn with_c_str<F, T>(s: &str, f: F) -> T where F: FnOnce(*const libc::c_char) -> 
 impl Context {
     pub fn new<'a>(
         glx: ffi::glx::Glx,
-        xlib: &ffi::Xlib,
+        xlib: &'a ffi::Xlib,
         pf_reqs: &PixelFormatRequirements,
         opengl: &'a GlAttributes<&'a Context>,
         display: *mut ffi::Display,
@@ -95,6 +95,7 @@ impl Context {
         Ok(ContextPrototype {
             glx: glx,
             extensions: extensions,
+            xlib: xlib,
             opengl: opengl,
             display: display,
             fb_config: fb_config,
@@ -163,6 +164,7 @@ impl Drop for Context {
 pub struct ContextPrototype<'a> {
     glx: ffi::glx::Glx,
     extensions: String,
+    xlib: &'a ffi::Xlib,
     opengl: &'a GlAttributes<&'a Context>,
     display: *mut ffi::Display,
     fb_config: ffi::glx::types::GLXFBConfig,
@@ -199,7 +201,7 @@ impl<'a> ContextPrototype<'a> {
                 {
                     for opengl_version in opengl_versions.iter()
                     {
-                        match create_context(&self.glx, &extra_functions, &self.extensions,
+                        match create_context(&self.glx, &extra_functions, &self.extensions, &self.xlib,
                                              *opengl_version, self.opengl.profile,
                                              self.opengl.debug, self.opengl.robustness, share,
                                              self.display, self.fb_config, &self.visual_infos)
@@ -208,7 +210,7 @@ impl<'a> ContextPrototype<'a> {
                             Err(_) => continue
                         }
                     }
-                    ctxt = try!(create_context(&self.glx, &extra_functions, &self.extensions, (1, 0),
+                    ctxt = try!(create_context(&self.glx, &extra_functions, &self.extensions, &self.xlib, (1, 0),
                                                self.opengl.profile, self.opengl.debug,
                                                self.opengl.robustness, share,
                                                self.display, self.fb_config, &self.visual_infos));
@@ -217,14 +219,14 @@ impl<'a> ContextPrototype<'a> {
                 ctxt
             },
             GlRequest::Specific(Api::OpenGl, (major, minor)) => {
-                try!(create_context(&self.glx, &extra_functions, &self.extensions, (major, minor),
+                try!(create_context(&self.glx, &extra_functions, &self.extensions, &self.xlib, (major, minor),
                                     self.opengl.profile, self.opengl.debug,
                                     self.opengl.robustness, share, self.display, self.fb_config,
                                     &self.visual_infos))
             },
             GlRequest::Specific(_, _) => panic!("Only OpenGL is supported"),
             GlRequest::GlThenGles { opengl_version: (major, minor), .. } => {
-                try!(create_context(&self.glx, &extra_functions, &self.extensions, (major, minor),
+                try!(create_context(&self.glx, &extra_functions, &self.extensions, &self.xlib, (major, minor),
                                     self.opengl.profile, self.opengl.debug,
                                     self.opengl.robustness, share, self.display, self.fb_config,
                                     &self.visual_infos))
@@ -286,7 +288,13 @@ impl<'a> ContextPrototype<'a> {
     }
 }
 
-fn create_context(glx: &ffi::glx::Glx, extra_functions: &ffi::glx_extra::Glx, extensions: &str,
+extern fn x_error_callback(dpy: *mut ffi::Display, err: *mut ffi::XErrorEvent) -> i32
+{
+    0
+}
+
+
+fn create_context(glx: &ffi::glx::Glx, extra_functions: &ffi::glx_extra::Glx, extensions: &str, xlib: &ffi::Xlib,
                   version: (u8, u8), profile: Option<GlProfile>, debug: bool,
                   robustness: Robustness, share: ffi::GLXContext, display: *mut ffi::Display,
                   fb_config: ffi::glx::types::GLXFBConfig,
@@ -294,6 +302,7 @@ fn create_context(glx: &ffi::glx::Glx, extra_functions: &ffi::glx_extra::Glx, ex
                   -> Result<ffi::GLXContext, CreationError>
 {
     unsafe {
+        let old_callback = (xlib.XSetErrorHandler)(Some(x_error_callback));
         let context = if extensions.split(' ').find(|&i| i == "GLX_ARB_create_context").is_some() {
             let mut attributes = Vec::with_capacity(9);
 
@@ -361,6 +370,8 @@ fn create_context(glx: &ffi::glx::Glx, extra_functions: &ffi::glx_extra::Glx, ex
             let visual_infos: *const ffi::XVisualInfo = visual_infos;
             glx.CreateContext(display as *mut _, visual_infos as *mut _, share, 1)
         };
+        
+        (xlib.XSetErrorHandler)(old_callback);
 
         if context.is_null() {
             // TODO: check for errors and return `OpenGlVersionNotSupported`
