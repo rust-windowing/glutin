@@ -338,8 +338,8 @@ extern fn mouse_callback(
         match event_type {
             ffi::EMSCRIPTEN_EVENT_MOUSEMOVE => {
                 queue.borrow_mut().push_back(Event::MouseMoved(
-                        (*event).client_x as i32,
-                        (*event).client_y as i32));
+                        (*event).canvas_x as i32,
+                        (*event).canvas_y as i32));
             },
             ffi::EMSCRIPTEN_EVENT_MOUSEDOWN => {
                 queue.borrow_mut().push_back(Event::MouseInput(
