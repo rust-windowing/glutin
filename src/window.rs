@@ -3,6 +3,7 @@ use std::default::Default;
 use Api;
 use ContextError;
 use CreationError;
+use EventsLoop;
 use GlContext;
 use GlProfile;
 use GlRequest;
@@ -11,16 +12,14 @@ use Robustness;
 use Window;
 use WindowBuilder;
 
-pub use winit::WindowProxy;
 pub use winit::AvailableMonitorsIter;
 pub use winit::{get_primary_monitor, get_available_monitors};
-pub use winit::MonitorId;
+pub use winit::{MonitorId, WindowId};
 
 use libc;
 use platform;
 
 use winit;
-use Event;
 
 impl<'a> WindowBuilder<'a> {
     /// Initializes a new `WindowBuilder` with default values.
@@ -220,8 +219,9 @@ impl<'a> WindowBuilder<'a> {
     ///
     /// Error should be very rare and only occur in case of permission denied, incompatible system,
     /// out of memory, etc.
-    pub fn build(self) -> Result<Window, CreationError> {
-        let w = try!(platform::Window::new(&Default::default(),
+    pub fn build(self, events_loop: &EventsLoop) -> Result<Window, CreationError> {
+        let w = try!(platform::Window::new(&events_loop.events_loop,
+                                           &Default::default(),
                                            &self.pf_reqs,
                                            &self.opengl,
                                            &Default::default(),
@@ -234,49 +234,8 @@ impl<'a> WindowBuilder<'a> {
     /// The context is build in a *strict* way. That means that if the backend couldn't give
     /// you what you requested, an `Err` will be returned.
     #[inline]
-    pub fn build_strict(self) -> Result<Window, CreationError> {
-        self.build()
-    }
-}
-
-/// An iterator for the `wait_events` function.
-pub struct WaitEventsIterator<'a>(platform::WaitEventsIterator<'a>);
-
-impl<'a> Iterator for WaitEventsIterator<'a> {
-    type Item = Event;
-
-    #[inline]
-    fn next(&mut self) -> Option<Event> {
-        self.0.next()
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.0.size_hint()
-    }
-}
-
-/// An iterator for the `poll_events` function.
-pub struct PollEventsIterator<'a>(platform::PollEventsIterator<'a>);
-
-impl<'a> Iterator for PollEventsIterator<'a> {
-    type Item = Event;
-
-    #[inline]
-    fn next(&mut self) -> Option<Event> {
-        self.0.next()
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.0.size_hint()
-    }
-}
-
-impl Default for Window {
-    #[inline]
-    fn default() -> Window {
-        Window::new().unwrap()
+    pub fn build_strict(self, events_loop: &EventsLoop) -> Result<Window, CreationError> {
+        self.build(events_loop)
     }
 }
 
@@ -288,9 +247,9 @@ impl Window {
     /// Error should be very rare and only occur in case of permission denied, incompatible system,
     ///  out of memory, etc.
     #[inline]
-    pub fn new() -> Result<Window, CreationError> {
+    pub fn new(events_loop: &EventsLoop) -> Result<Window, CreationError> {
         let builder = WindowBuilder::new();
-        builder.build()
+        builder.build(events_loop)
     }
 
     /// Modifies the title of the window.
@@ -407,24 +366,6 @@ impl Window {
         self.window.set_inner_size(x, y)
     }
 
-    /// Returns an iterator that poll for the next event in the window's events queue.
-    /// Returns `None` if there is no event in the queue.
-    ///
-    /// Contrary to `wait_events`, this function never blocks.
-    #[inline]
-    pub fn poll_events(&self) -> PollEventsIterator {
-        PollEventsIterator(self.window.poll_events())
-    }
-
-    /// Returns an iterator that returns events one by one, blocking if necessary until one is
-    /// available.
-    ///
-    /// The iterator never returns `None`.
-    #[inline]
-    pub fn wait_events(&self) -> WaitEventsIterator {
-        WaitEventsIterator(self.window.wait_events())
-    }
-
     /// Sets the context as the current context.
     #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
@@ -506,21 +447,6 @@ impl Window {
         self.window.get_pixel_format()
     }
 
-    /// Create a window proxy for this window, that can be freely
-    /// passed to different threads.
-    #[inline]
-    pub fn create_window_proxy(&self) -> winit::WindowProxy {
-        self.window.create_window_proxy()
-    }
-
-    /// Sets a resize callback that is called by Mac (and potentially other
-    /// operating systems) during resize operations. This can be used to repaint
-    /// during window resizing.
-    #[inline]
-    pub fn set_window_resize_callback(&mut self, callback: Option<fn(u32, u32)>) {
-        self.window.set_window_resize_callback(callback);
-    }
-
     /// Modifies the mouse cursor of the window.
     /// Has no effect on Android.
     pub fn set_cursor(&self, cursor: winit::MouseCursor) {
@@ -547,6 +473,11 @@ impl Window {
     #[inline]
     pub fn set_cursor_state(&self, state: winit::CursorState) -> Result<(), String> {
         self.window.set_cursor_state(state)
+    }
+
+    #[inline]
+    pub fn id(&self) -> WindowId {
+        self.window.id()
     }
 }
 

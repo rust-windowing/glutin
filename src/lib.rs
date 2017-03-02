@@ -64,7 +64,7 @@ extern crate wayland_client;
 
 pub use events::*;
 pub use headless::{HeadlessRendererBuilder, HeadlessContext};
-pub use window::{WindowProxy, PollEventsIterator, WaitEventsIterator};
+//pub use window::{WindowProxy, PollEventsIterator, WaitEventsIterator};
 pub use window::{AvailableMonitorsIter, MonitorId, get_available_monitors, get_primary_monitor};
 pub use winit::NativeMonitorId;
 
@@ -83,22 +83,22 @@ pub mod os;
 /// # Example
 ///
 /// ```ignore
-/// let window = Window::new().unwrap();
+/// let window = Window::new(&events_loop).unwrap();
 ///
 /// unsafe { window.make_current() };
 ///
 /// loop {
-///     for event in window.poll_events() {
+///     events_loop.poll_events(|event| {
 ///         match(event) {
 ///             // process events here
 ///             _ => ()
 ///         }
-///     }
+///     });
 ///
 ///     // draw everything here
 ///
 ///     window.swap_buffers();
-///     std::old_io::timer::sleep(17);
+///     std::thread::sleep(std::time::Duration::from_millis(17));
 /// }
 /// ```
 pub struct Window {
@@ -115,6 +115,44 @@ pub struct WindowBuilder<'a> {
 
     // Should be made public once it's stabilized.
     pf_reqs: PixelFormatRequirements,
+}
+
+/// Provides a way to retreive events from the windows that are registered to it.
+// TODO: document usage in multiple threads
+pub struct EventsLoop {
+    events_loop: platform::EventsLoop,
+}
+
+impl EventsLoop {
+    /// Builds a new events loop.
+    pub fn new() -> EventsLoop {
+        EventsLoop {
+            events_loop: platform::EventsLoop::new(),
+        }
+    }
+
+    /// Fetches all the events that are pending, calls the callback function for each of them,
+    /// and returns.
+    #[inline]
+    pub fn poll_events<F>(&self, callback: F)
+        where F: FnMut(Event)
+    {
+        self.events_loop.poll_events(callback)
+    }
+
+    /// Runs forever until `interrupt()` is called. Whenever an event happens, calls the callback.
+    #[inline]
+    pub fn run_forever<F>(&self, callback: F)
+        where F: FnMut(Event)
+    {
+        self.events_loop.run_forever(callback)
+    }
+
+    /// If we called `run_forever()`, stops the process of waiting for events.
+    #[inline]
+    pub fn interrupt(&self) {
+        self.events_loop.interrupt()
+    }
 }
 
 /// Trait that describes objects that have access to an OpenGL context.
