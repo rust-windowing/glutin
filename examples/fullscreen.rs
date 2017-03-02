@@ -24,27 +24,30 @@ fn main() {
         monitor
     };
 
+    let events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new()
         .with_title("Hello world!")
         .with_fullscreen(monitor)
-        .build()
+        .build(&events_loop)
         .unwrap();
 
     let _ = unsafe { window.make_current() };
-
     
     let context = support::load(&window);
 
-    for event in window.wait_events() {
+    events_loop.run_forever(|event| {
+        println!("{:?}", event);
+
         context.draw_frame((0.0, 1.0, 0.0, 1.0));
         let _ = window.swap_buffers();
 
-        println!("{:?}", event);
-
         match event {
-            glutin::Event::Closed => break,
-            glutin::Event::KeyboardInput(_, _, Some(glutin::VirtualKeyCode::Escape)) => break,
-            _ => ()
+            glutin::Event::WindowEvent { event, .. } => match event {
+                glutin::WindowEvent::Closed => events_loop.interrupt(),
+                glutin::WindowEvent::KeyboardInput(_, _, Some(glutin::VirtualKeyCode::Escape)) =>
+                    events_loop.interrupt(),
+                _ => (),
+            },
         }
-    }
+    });
 }
