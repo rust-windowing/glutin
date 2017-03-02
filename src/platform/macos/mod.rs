@@ -23,6 +23,7 @@ use core_foundation::base::TCFType;
 use core_foundation::string::CFString;
 use core_foundation::bundle::{CFBundleGetBundleWithIdentifier, CFBundleGetFunctionPointerForName};
 
+use std;
 use std::str::FromStr;
 use std::ops::Deref;
 
@@ -43,44 +44,67 @@ pub struct PlatformSpecificWindowBuilderAttributes {
 }
 
 pub struct Window {
-    context: IdRef,
+    context: std::sync::Arc<IdRef>,
     pixel_format: PixelFormat,
     winit_window: winit::Window,
 }
 
-pub struct WaitEventsIterator<'a> {
-    window: &'a Window,
-    winit_iterator: winit::WaitEventsIterator<'a>,
+pub struct EventsLoop {
+    winit_events_loop: winit::EventsLoop,
+    window_contexts: std::sync::Mutex<std::collections::HashMap<winit::WindowId, std::sync::Weak<IdRef>>>,
 }
 
-impl<'a> Iterator for WaitEventsIterator<'a> {
-    type Item = winit::Event;
-
-    fn next(&mut self) -> Option<winit::Event> {
-        let event = self.winit_iterator.next();
-        match event {
-            Some(winit::Event::Resized(_, _)) => unsafe { self.window.context.update() },
-            _ => {},
+impl EventsLoop {
+    /// Builds a new events loop.
+    pub fn new() -> EventsLoop {
+        EventsLoop {
+            winit_events_loop: winit::EventsLoop::new(),
+            window_contexts: std::sync::Mutex::new(std::collections::HashMap::new()),
         }
-        event
     }
-}
 
-pub struct PollEventsIterator<'a> {
-    window: &'a Window,
-    winit_iterator: winit::PollEventsIterator<'a>,
-}
-
-impl<'a> Iterator for PollEventsIterator<'a> {
-    type Item = winit::Event;
-
-    fn next(&mut self) -> Option<winit::Event> {
-        let event = self.winit_iterator.next();
-        match event {
-            Some(winit::Event::Resized(_, _)) => unsafe { self.window.context.update() },
-            _ => {},
+    // If a resize event was received for a window, update the GL context for that window but only
+    // if that window is still alive.
+    fn update_context_on_window_resized(&self, event: &winit::Event) {
+        match *event {
+            winit::Event::WindowEvent { window_id, event: winit::WindowEvent::Resized(..) } => {
+                if let Ok(window_contexts) = self.window_contexts.lock() {
+                    if let Some(context) = window_contexts[&window_id].upgrade() {
+                        unsafe { context.update(); }
+                    }
+                }
+            },
+            _ => ()
         }
-        event
+    }
+
+    /// Fetches all the events that are pending, calls the callback function for each of them,
+    /// and returns.
+    #[inline]
+    pub fn poll_events<F>(&self, mut callback: F)
+        where F: FnMut(winit::Event)
+    {
+        self.winit_events_loop.poll_events(|event| {
+            self.update_context_on_window_resized(&event);
+            callback(event);
+        });
+    }
+
+    /// Runs forever until `interrupt()` is called. Whenever an event happens, calls the callback.
+    #[inline]
+    pub fn run_forever<F>(&self, mut callback: F)
+        where F: FnMut(winit::Event)
+    {
+        self.winit_events_loop.run_forever(|event| {
+            self.update_context_on_window_resized(&event);
+            callback(event);
+        })
+    }
+
+    /// If we called `run_forever()`, stops the process of waiting for events.
+    #[inline]
+    pub fn interrupt(&self) {
+        self.winit_events_loop.interrupt()
     }
 }
 
@@ -88,7 +112,8 @@ unsafe impl Send for Window {}
 unsafe impl Sync for Window {}
 
 impl Window {
-    pub fn new(win_attribs: &WindowAttributes,
+    pub fn new(events_loop: &EventsLoop,
+               win_attribs: &WindowAttributes,
                pf_reqs: &PixelFormatRequirements,
                opengl: &GlAttributes<&Window>,
                _pl_attribs: &PlatformSpecificWindowBuilderAttributes,
@@ -106,16 +131,19 @@ impl Window {
             _ => (),
         }
 
-        let winit_attribs = winit_builder.window.clone();
-
-        let winit_window = winit_builder.build().unwrap();
+        let winit_window = winit_builder.build(&events_loop.winit_events_loop).unwrap();
         let view = winit_window.get_nsview() as id;
-        let (context, pf) = match Window::create_context(&winit_attribs, view, pf_reqs, opengl) {
-            Ok((context, pf)) => (context, pf),
+        let (context, pf) = match Window::create_context(view, pf_reqs, opengl, win_attribs.transparent) {
+            Ok((context, pf)) => (std::sync::Arc::new(context), pf),
             Err(e) => {
                 return Err(OsError(format!("Couldn't create OpenGL context: {}", e)));
             }
         };
+
+        // Store a copy of the `context`'s `IdRef` so that we can `update` it on `Resized` events.
+        if let Ok(mut window_contexts) = events_loop.window_contexts.lock() {
+            window_contexts.insert(winit_window.id(), std::sync::Arc::downgrade(&context));
+        }
 
         let window = Window {
             context: context,
@@ -126,10 +154,10 @@ impl Window {
         Ok(window)
     }
 
-    fn create_context(winit_attribs: &winit::WindowAttributes,
-                      view: id,
+    fn create_context(view: id,
                       pf_reqs: &PixelFormatRequirements,
-                      opengl: &GlAttributes<&Window>)
+                      opengl: &GlAttributes<&Window>,
+                      transparent: bool)
                       -> Result<(IdRef, PixelFormat), CreationError> {
         let attributes = try!(helpers::build_nsattributes(pf_reqs, opengl));
         unsafe {
@@ -177,7 +205,7 @@ impl Window {
                     let value = if opengl.vsync { 1 } else { 0 };
                     cxt.setValues_forParameter_(&value, appkit::NSOpenGLContextParameter::NSOpenGLCPSwapInterval);
 
-                    if winit_attribs.transparent {
+                    if transparent {
                         let mut opacity = 0;
                         CGLSetParameter(cxt.CGLContextObj() as *mut _, kCGLCPSurfaceOpacity, &mut opacity);
                     }
@@ -247,34 +275,14 @@ impl Window {
         self.winit_window.set_inner_size(x, y)
     }
 
-    pub fn poll_events(&self) -> PollEventsIterator {
-        PollEventsIterator {
-            window: self,
-            winit_iterator: self.winit_window.poll_events()
-        }
-    }
-
-    pub fn wait_events(&self) -> WaitEventsIterator {
-        WaitEventsIterator {
-            window: self,
-            winit_iterator: self.winit_window.wait_events()
-        }
-    }
-
+    #[allow(deprecated)]
     pub unsafe fn platform_display(&self) -> *mut libc::c_void {
         self.winit_window.platform_display()
     }
 
+    #[allow(deprecated)]
     pub unsafe fn platform_window(&self) -> *mut libc::c_void {
         self.winit_window.platform_window()
-    }
-
-    pub fn create_window_proxy(&self) -> winit::WindowProxy {
-        self.winit_window.create_window_proxy()
-    }
-
-    pub fn set_window_resize_callback(&mut self, callback: Option<fn(u32, u32)>) {
-        self.winit_window.set_window_resize_callback(callback);
     }
 
     pub fn set_cursor(&self, cursor: winit::MouseCursor) {
@@ -292,12 +300,16 @@ impl Window {
     pub fn set_cursor_state(&self, state: winit::CursorState) -> Result<(), String> {
         self.winit_window.set_cursor_state(state)
     }
+
+    pub fn id(&self) -> winit::WindowId {
+        self.winit_window.id()
+    }
 }
 
 impl GlContext for Window {
     #[inline]
     unsafe fn make_current(&self) -> Result<(), ContextError> {
-        let _: () = msg_send![*self.context, update];
+        let _: () = msg_send![**self.context, update];
         self.context.makeCurrentContext();
         Ok(())
     }
@@ -307,7 +319,7 @@ impl GlContext for Window {
         unsafe {
             let current = NSOpenGLContext::currentContext(nil);
             if current != nil {
-                let is_equal: BOOL = msg_send![current, isEqual:*self.context];
+                let is_equal: BOOL = msg_send![current, isEqual:**self.context];
                 is_equal != NO
             } else {
                 false
