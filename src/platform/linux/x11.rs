@@ -3,7 +3,7 @@ pub use winit::os::unix::x11::{XError, XNotSupported, XConnection};
 use api::glx::ffi;
 
 use CreationError;
-use std::{mem, ptr};
+use std::{mem, ptr, fmt, error};
 use std::sync::{Arc};
 
 use winit;
@@ -28,6 +28,21 @@ use api::egl::Context as EglContext;
 use api::glx::ffi::glx::Glx;
 use api::egl::ffi::egl::Egl;
 use api::dlopen;
+
+#[derive(Debug)]
+struct NoX11Connection;
+
+impl error::Error for NoX11Connection {
+    fn description(&self) -> &str {
+        "failed to get x11 connection"
+    }
+}
+
+impl fmt::Display for NoX11Connection {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(error::Error::description(self))
+    }
+}
 
 struct GlxOrEgl {
     glx: Option<Glx>,
@@ -114,7 +129,10 @@ impl Window {
         opengl: &GlAttributes<&Window>,
         winit_builder: winit::WindowBuilder,
     ) -> Result<(Window, winit::Window), CreationError> {
-        let display = get_x11_xconnection().unwrap();
+        let display = match get_x11_xconnection() {
+            Some(display) => display,
+            None => return Err(CreationError::NoBackendAvailable(Box::new(NoX11Connection))),
+        };
         let screen_id = match winit_builder.window.monitor {
             Some(ref m) => match m.get_native_identifier() {
                 NativeMonitorId::Numeric(monitor) => monitor as i32,
