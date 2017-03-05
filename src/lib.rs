@@ -175,7 +175,11 @@ impl CreationError {
 
 impl std::fmt::Display for CreationError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        formatter.write_str(self.to_string())
+        formatter.write_str(self.to_string())?;
+        if let Some(err) = std::error::Error::cause(self) {
+            write!(formatter, ": {}", err)?;
+        }
+        Ok(())
     }
 }
 
