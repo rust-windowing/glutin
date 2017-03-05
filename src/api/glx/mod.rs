@@ -490,7 +490,6 @@ unsafe fn choose_fbconfig(glx: &ffi::glx::Glx, extensions: &str, xlib: &ffi::Xli
         let mut num_configs = 1;
         let configs = glx.ChooseFBConfig(display as *mut _, screen_id, descriptor.as_ptr(),
                                         &mut num_configs);
-        println!("Num configs found: {}", num_configs);
         if configs.is_null() { return Err(()); }
         if num_configs == 0 { return Err(()); }
 
@@ -498,6 +497,7 @@ unsafe fn choose_fbconfig(glx: &ffi::glx::Glx, extensions: &str, xlib: &ffi::Xli
             let configs = slice::from_raw_parts(configs, num_configs as usize);
             configs.iter().find(|&config| {
                 let vi = glx.GetVisualFromFBConfig(display as *mut _, *config);
+                // Transparency was requested, so only choose configs with 32 bits for RGBA.
                 let found = !vi.is_null() && (*vi).depth == 32;
                 (xlib.XFree)(vi as *mut _);
 
