@@ -13,7 +13,7 @@ use os::macos::ActivationPolicy;
 
 use objc::runtime::{BOOL, NO};
 
-use cgl::{CGLEnable, kCGLCECrashOnRemovedFunctions};
+use cgl::{CGLEnable, kCGLCECrashOnRemovedFunctions, CGLSetParameter, kCGLCPSurfaceOpacity};
 
 use cocoa::base::{id, nil};
 use cocoa::foundation::NSAutoreleasePool;
@@ -106,9 +106,11 @@ impl Window {
             _ => (),
         }
 
+        let winit_attribs = winit_builder.window.clone();
+
         let winit_window = winit_builder.build().unwrap();
         let view = winit_window.get_nsview() as id;
-        let (context, pf) = match Window::create_context(view, pf_reqs, opengl) {
+        let (context, pf) = match Window::create_context(&winit_attribs, view, pf_reqs, opengl) {
             Ok((context, pf)) => (context, pf),
             Err(e) => {
                 return Err(OsError(format!("Couldn't create OpenGL context: {}", e)));
@@ -124,7 +126,8 @@ impl Window {
         Ok(window)
     }
 
-    fn create_context(view: id,
+    fn create_context(winit_attribs: &winit::WindowAttributes,
+                      view: id,
                       pf_reqs: &PixelFormatRequirements,
                       opengl: &GlAttributes<&Window>)
                       -> Result<(IdRef, PixelFormat), CreationError> {
@@ -173,6 +176,11 @@ impl Window {
                     cxt.setView_(view);
                     let value = if opengl.vsync { 1 } else { 0 };
                     cxt.setValues_forParameter_(&value, appkit::NSOpenGLContextParameter::NSOpenGLCPSwapInterval);
+
+                    if winit_attribs.transparent {
+                        let mut opacity = 0;
+                        CGLSetParameter(cxt.CGLContextObj() as *mut _, kCGLCPSurfaceOpacity, &mut opacity);
+                    }
 
                     CGLEnable(cxt.CGLContextObj() as *mut _, kCGLCECrashOnRemovedFunctions);
 

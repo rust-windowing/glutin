@@ -15,7 +15,7 @@ use Robustness;
 use libc;
 use libc::c_int;
 use std::ffi::{CStr, CString};
-use std::{mem, ptr};
+use std::{mem, ptr, slice};
 
 pub mod ffi {
     pub use x11_dl::xlib::*;
@@ -55,6 +55,7 @@ impl Context {
         opengl: &'a GlAttributes<&'a Context>,
         display: *mut ffi::Display,
         screen_id: libc::c_int,
+        transparent: bool,
 ) -> Result<ContextPrototype<'a>, CreationError> {
         // This is completely ridiculous, but VirtualBox's OpenGL driver needs some call handled by
         // *it* (i.e. not Mesa) to occur before anything else can happen. That is because
@@ -77,7 +78,7 @@ impl Context {
 
         // finding the pixel format we want
         let (fb_config, pixel_format) = unsafe {
-            try!(choose_fbconfig(&glx, &extensions, xlib, display, screen_id, pf_reqs)
+            try!(choose_fbconfig(&glx, &extensions, xlib, display, screen_id, pf_reqs, transparent)
                                           .map_err(|_| CreationError::NoAvailablePixelFormat))
         };
 
@@ -387,7 +388,7 @@ fn create_context(glx: &ffi::glx::Glx, extra_functions: &ffi::glx_extra::Glx, ex
 /// Enumerates all available FBConfigs
 unsafe fn choose_fbconfig(glx: &ffi::glx::Glx, extensions: &str, xlib: &ffi::Xlib,
                           display: *mut ffi::Display, screen_id: libc::c_int,
-                          reqs: &PixelFormatRequirements)
+                          reqs: &PixelFormatRequirements, transparent: bool)
                           -> Result<(ffi::glx::types::GLXFBConfig, PixelFormat), ()>
 {
     let descriptor = {
@@ -487,13 +488,32 @@ unsafe fn choose_fbconfig(glx: &ffi::glx::Glx, extensions: &str, xlib: &ffi::Xli
     // calling glXChooseFBConfig
     let fb_config = {
         let mut num_configs = 1;
-        let result = glx.ChooseFBConfig(display as *mut _, screen_id, descriptor.as_ptr(),
+        let configs = glx.ChooseFBConfig(display as *mut _, screen_id, descriptor.as_ptr(),
                                         &mut num_configs);
-        if result.is_null() { return Err(()); }
+        if configs.is_null() { return Err(()); }
         if num_configs == 0 { return Err(()); }
-        let val = *result;
-        (xlib.XFree)(result as *mut _);
-        val
+
+        let config = if transparent {
+            let configs = slice::from_raw_parts(configs, num_configs as usize);
+            configs.iter().find(|&config| {
+                let vi = glx.GetVisualFromFBConfig(display as *mut _, *config);
+                // Transparency was requested, so only choose configs with 32 bits for RGBA.
+                let found = !vi.is_null() && (*vi).depth == 32;
+                (xlib.XFree)(vi as *mut _);
+
+                found
+            })
+        } else {
+            Some(&*configs)
+        };
+
+        (xlib.XFree)(configs as *mut _);
+
+        if let Some(&conf) = config {
+            conf
+        } else {
+            return Err(());
+        }
     };
 
     let get_attrib = |attrib: c_int| -> i32 {

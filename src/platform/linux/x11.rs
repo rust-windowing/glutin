@@ -161,6 +161,7 @@ impl Window {
                         &builder_clone_opengl_glx,
                         display.display,
                         screen_id,
+                        winit_builder.window.transparent,
                     )))
                 } else if let Some(ref egl) = backend.egl {
                     Prototype::Egl(try!(EglContext::new(
