@@ -113,7 +113,7 @@ unsafe impl Sync for Window {}
 
 impl Window {
     pub fn new(events_loop: &EventsLoop,
-               win_attribs: &WindowAttributes,
+               _win_attribs: &WindowAttributes,
                pf_reqs: &PixelFormatRequirements,
                opengl: &GlAttributes<&Window>,
                _pl_attribs: &PlatformSpecificWindowBuilderAttributes,
@@ -131,9 +131,10 @@ impl Window {
             _ => (),
         }
 
+        let transparent = winit_builder.window.transparent;
         let winit_window = winit_builder.build(&events_loop.winit_events_loop).unwrap();
         let view = winit_window.get_nsview() as id;
-        let (context, pf) = match Window::create_context(view, pf_reqs, opengl, win_attribs.transparent) {
+        let (context, pf) = match Window::create_context(view, pf_reqs, opengl, transparent) {
             Ok((context, pf)) => (std::sync::Arc::new(context), pf),
             Err(e) => {
                 return Err(OsError(format!("Couldn't create OpenGL context: {}", e)));
