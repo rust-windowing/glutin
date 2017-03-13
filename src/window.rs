@@ -221,8 +221,7 @@ impl<'a> WindowBuilder<'a> {
     /// Error should be very rare and only occur in case of permission denied, incompatible system,
     /// out of memory, etc.
     pub fn build(self) -> Result<Window, CreationError> {
-        let w = try!(platform::Window::new(&Default::default(),
-                                           &self.pf_reqs,
+        let w = try!(platform::Window::new(&self.pf_reqs,
                                            &self.opengl,
                                            &Default::default(),
                                            self.winit_builder));

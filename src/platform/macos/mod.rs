@@ -88,8 +88,7 @@ unsafe impl Send for Window {}
 unsafe impl Sync for Window {}
 
 impl Window {
-    pub fn new(win_attribs: &WindowAttributes,
-               pf_reqs: &PixelFormatRequirements,
+    pub fn new(pf_reqs: &PixelFormatRequirements,
                opengl: &GlAttributes<&Window>,
                _pl_attribs: &PlatformSpecificWindowBuilderAttributes,
                winit_builder: winit::WindowBuilder)
