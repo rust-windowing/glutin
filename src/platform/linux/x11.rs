@@ -125,6 +125,7 @@ impl Drop for Window {
 
 impl Window {
     pub fn new(
+        events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         opengl: &GlAttributes<&Window>,
         winit_builder: winit::WindowBuilder,
@@ -216,7 +217,7 @@ impl Window {
         let winit_window = winit_builder
             .with_x11_visual(&visual_infos as *const _)
             .with_x11_screen(screen_id)
-            .build().unwrap();
+            .build(events_loop).unwrap();
 
         let xlib_window = winit_window.get_xlib_window().unwrap();
         // finish creating the OpenGL context
