@@ -18,7 +18,7 @@ fn main() {
         match event {
             glutin::Event::WindowEvent { event, .. } => match event {
 
-                glutin::WindowEvent::KeyboardInput(glutin::ElementState::Pressed, _, _) => {
+                glutin::WindowEvent::KeyboardInput(glutin::ElementState::Pressed, _, _, _) => {
                     if grabbed {
                         grabbed = false;
                         window.set_cursor_state(glutin::CursorState::Normal)
