@@ -1,3 +1,5 @@
+use std::sync::{Mutex, Weak, Arc};
+use std::collections::HashMap;
 use std::ffi::CString;
 use winit;
 use winit::os::unix::WindowExt;
@@ -6,56 +8,87 @@ use api::dlopen;
 use api::egl;
 use api::egl::Context as EglContext;
 use wayland_client::egl as wegl;
-use Event;
+use {Event, WindowEvent};
 
 pub struct Window {
-    egl_surface: wegl::WlEglSurface,
+    egl_surface: Arc<wegl::WlEglSurface>,
     context: EglContext,
 }
 
-pub struct WaitEventsIterator<'a> {
-    window: &'a Window,
-    winit_iterator: winit::WaitEventsIterator<'a>,
+
+pub struct EventsLoop {
+    winit_events_loop: winit::EventsLoop,
+    egl_surfaces: Mutex<HashMap<winit::WindowId, Weak<wegl::WlEglSurface>>>,
 }
 
-impl<'a> Iterator for WaitEventsIterator<'a> {
-    type Item = Event;
-
-    fn next(&mut self) -> Option<Event> {
-        let event = self.winit_iterator.next();
-        match event {
-            Some(Event::Resized(x, y)) => self.window.egl_surface.resize(x as i32, y as i32, 0, 0),
-            _ => {},
+impl EventsLoop {
+    /// Builds a new events loop.
+    pub fn new(events_loop: winit::EventsLoop) -> EventsLoop {
+        EventsLoop {
+            winit_events_loop: events_loop,
+            egl_surfaces: Mutex::new(HashMap::new()),
         }
-        event
     }
-}
 
-pub struct PollEventsIterator<'a> {
-    window: &'a Window,
-    winit_iterator: winit::PollEventsIterator<'a>,
-}
-
-impl<'a> Iterator for PollEventsIterator<'a> {
-    type Item = Event;
-
-    fn next(&mut self) -> Option<Event> {
-        let event = self.winit_iterator.next();
-        match event {
-            Some(Event::Resized(x, y)) => self.window.egl_surface.resize(x as i32, y as i32, 0, 0),
-            _ => {},
+    fn resize_surface(&self, window_id: winit::WindowId, x: u32, y: u32) {
+        if let Ok(egl_surfaces) = self.egl_surfaces.lock() {
+            if let Some(surface) = egl_surfaces[&window_id].upgrade() {
+                surface.resize(x as i32, y as i32, 0, 0)
+            }
         }
-        event
+    }
+
+    fn insert_window(&self,
+                     window_id: winit::WindowId,
+                     egl_surface: &Arc<wegl::WlEglSurface>)
+    {
+        if let Ok(mut my_surfaces) = self.egl_surfaces.lock() {
+            my_surfaces.insert(window_id, Arc::downgrade(egl_surface));
+        }
+    }
+
+    /// Fetches all the events that are pending, calls the callback function for each of them,
+    /// and returns.
+    #[inline]
+    pub fn poll_events<F>(&self, mut callback: F)
+        where F: FnMut(Event)
+    {
+        self.winit_events_loop.poll_events(|event| {
+            if let Event::WindowEvent { window_id, event: WindowEvent::Resized(x, y) } = event {
+                self.resize_surface(window_id, x, y)
+            }
+            callback(event);
+        })
+    }
+
+    /// Runs forever until `interrupt()` is called. Whenever an event happens, calls the callback.
+    #[inline]
+    pub fn run_forever<F>(&self, mut callback: F)
+        where F: FnMut(Event)
+    {
+        self.winit_events_loop.run_forever(|event| {
+            if let Event::WindowEvent { window_id, event: WindowEvent::Resized(x, y) } = event {
+                self.resize_surface(window_id, x, y)
+            }
+            callback(event);
+        })
+    }
+
+    /// If we called `run_forever()`, stops the process of waiting for events.
+    #[inline]
+    pub fn interrupt(&self) {
+        self.winit_events_loop.interrupt()
     }
 }
 
 impl Window {
     pub fn new(
+        events_loop: &EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         opengl: &GlAttributes<&Window>,
         winit_builder: winit::WindowBuilder,
     ) -> Result<(Window, winit::Window), CreationError> {
-        let winit_window = winit_builder.build().unwrap();
+        let winit_window = winit_builder.build(&events_loop.winit_events_loop).unwrap();
         let wayland_window = {
             let (w, h) = winit_window.get_inner_size().unwrap();
             let surface = winit_window.get_wayland_client_surface().unwrap();
@@ -77,32 +110,18 @@ impl Window {
                 )
             };
             Window {
-                egl_surface: egl_surface,
+                egl_surface: Arc::new(egl_surface),
                 context: context,
             }
         };
+        // Store a copy of the `context`'s `IdRef` so that we can `update` it on `Resized` events.
+        events_loop.insert_window(winit_window.id(), &wayland_window.egl_surface);
         Ok((wayland_window, winit_window))
     }
 
     pub fn set_inner_size(&self, x: u32, y: u32, winit_window: &winit::Window) {
         winit_window.set_inner_size(x, y);
         self.egl_surface.resize(x as i32, y as i32, 0, 0);
-    }
-
-    #[inline]
-    pub fn wait_events<'a>(&'a self, winit_window: &'a winit::Window) -> WaitEventsIterator {
-        WaitEventsIterator {
-            window: self,
-            winit_iterator: winit_window.wait_events()
-        }
-    }
-
-    #[inline]
-    pub fn poll_events<'a>(&'a self, winit_window: &'a winit::Window) -> PollEventsIterator {
-        PollEventsIterator {
-            window: self,
-            winit_iterator: winit_window.poll_events()
-        }
     }
 }
 

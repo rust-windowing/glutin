@@ -31,7 +31,7 @@ fn main() {
     events_loop.run_forever(|event| {
         match event {
             glutin::Event::WindowEvent { event, .. } => match event {
-                glutin::WindowEvent::KeyboardInput(glutin::ElementState::Pressed, _, _) => {
+                glutin::WindowEvent::KeyboardInput(glutin::ElementState::Pressed, _, _, _) => {
                     println!("Setting cursor to \"{:?}\"", cursors[cursor_idx]);
                     window.set_cursor(cursors[cursor_idx]);
                     if cursor_idx < cursors.len() - 1 {

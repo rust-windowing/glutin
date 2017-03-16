@@ -44,7 +44,7 @@ fn main() {
         match event {
             glutin::Event::WindowEvent { event, .. } => match event {
                 glutin::WindowEvent::Closed => events_loop.interrupt(),
-                glutin::WindowEvent::KeyboardInput(_, _, Some(glutin::VirtualKeyCode::Escape)) =>
+                glutin::WindowEvent::KeyboardInput(_, _, Some(glutin::VirtualKeyCode::Escape), _) =>
                     events_loop.interrupt(),
                 _ => (),
             },
