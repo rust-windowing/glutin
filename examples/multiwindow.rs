@@ -11,13 +11,17 @@ fn main() {
 
     let mut num_windows = 3;
 
+    let _ = unsafe { window1.make_current() };
     let context1 = support::load(&window1);
+    let _ = unsafe { window2.make_current() };
     let context2 = support::load(&window2);
+    let _ = unsafe { window3.make_current() };
     let context3 = support::load(&window3);
 
     fn draw_to_window(window: &glutin::Window, context: &support::Context, color: (f32, f32, f32, f32)) {
         let _ = unsafe { window.make_current() };
         context.draw_frame(color);
+        let _ = window.swap_buffers();
     }
 
     events_loop.run_forever(|event| {
