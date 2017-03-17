@@ -64,7 +64,6 @@ extern crate wayland_client;
 
 pub use events::*;
 pub use headless::{HeadlessRendererBuilder, HeadlessContext};
-//pub use window::{WindowProxy, PollEventsIterator, WaitEventsIterator};
 pub use window::{AvailableMonitorsIter, MonitorId, get_available_monitors, get_primary_monitor};
 pub use winit::NativeMonitorId;
 
