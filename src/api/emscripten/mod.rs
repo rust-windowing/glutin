@@ -64,8 +64,8 @@ const DOCUMENT_NAME: &'static str = "#document\0";
 
 impl Window {
     pub fn new(_: &WindowAttributes,
-               pf_reqs: &PixelFormatRequirements,
-               opengl: &GlAttributes<&Window>,
+               _pf_reqs: &PixelFormatRequirements,
+               _opengl: &GlAttributes<&Window>,
                _: &PlatformSpecificWindowBuilderAttributes,
                _: winit::WindowBuilder)
                 -> Result<Window, CreationError> {
@@ -219,11 +219,11 @@ impl Window {
     }
 
     #[inline]
-    pub fn set_cursor(&self, cursor: MouseCursor) {
+    pub fn set_cursor(&self, _cursor: MouseCursor) {
     }
 
     #[inline]
-    pub fn set_cursor_state(&self, state: CursorState) -> Result<(), String> {
+    pub fn set_cursor_state(&self, _state: CursorState) -> Result<(), String> {
         Ok(())
     }
 
@@ -233,7 +233,7 @@ impl Window {
     }
 
     #[inline]
-    pub fn set_cursor_position(&self, x: i32, y: i32) -> Result<(), ()> {
+    pub fn set_cursor_position(&self, _x: i32, _y: i32) -> Result<(), ()> {
         Ok(())
     }
 
