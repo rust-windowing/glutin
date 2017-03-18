@@ -157,4 +157,6 @@ extern {
     pub fn emscripten_set_keydown_callback(target: *const libc::c_char, user_data: *mut libc::c_void, use_capture: EM_BOOL, callback: em_keyboard_callback_func) -> EMSCRIPTEN_RESULT;
 
     pub fn emscripten_set_keyup_callback(target: *const libc::c_char, user_data: *mut libc::c_void, use_capture: EM_BOOL, callback: em_keyboard_callback_func) -> EMSCRIPTEN_RESULT;
+
+    pub fn emscripten_get_device_pixel_ratio() -> f64;
 }
