@@ -67,7 +67,7 @@ impl Window {
                _pf_reqs: &PixelFormatRequirements,
                _opengl: &GlAttributes<&Window>,
                _: &PlatformSpecificWindowBuilderAttributes,
-               _: winit::WindowBuilder)
+               window_builder: winit::WindowBuilder)
                 -> Result<Window, CreationError> {
 
         // getting the default values of attributes
@@ -130,10 +130,24 @@ impl Window {
 
         // TODO: emscripten_set_webglcontextrestored_callback
 
-        Ok(Window {
+        let window = Window {
             context: context,
             events: events,
-        })
+        };
+
+        if window_builder.window.monitor.is_some() {
+            use std::ptr;
+            unsafe {
+                em_try(ffi::emscripten_request_fullscreen(ptr::null(), ffi::EM_TRUE))
+                    .map_err(|e| ::CreationError::OsError(e))?;
+                em_try(ffi::emscripten_set_fullscreenchange_callback(ptr::null(), 0 as *mut libc::c_void, ffi::EM_FALSE, Some(fullscreen_callback)))
+                    .map_err(|e| ::CreationError::OsError(e))?;
+            }
+        } else if let Some((w, h)) = window_builder.window.dimensions {
+            window.set_inner_size(w, h);
+        }
+
+        Ok(window)
     }
 
     #[inline]
@@ -295,7 +309,9 @@ impl GlContext for Window {
 
 impl Drop for Window {
     fn drop(&mut self) {
+        use std::ptr;
         unsafe {
+            ffi::emscripten_set_fullscreenchange_callback(ptr::null(), 0 as *mut libc::c_void, ffi::EM_FALSE, None);
             ffi::emscripten_exit_fullscreen();
             ffi::emscripten_webgl_destroy_context(self.context);
         }
@@ -319,6 +335,12 @@ fn error_to_str(code: ffi::EMSCRIPTEN_RESULT) -> &'static str {
     }
 }
 
+fn em_try(res: ffi::EMSCRIPTEN_RESULT) -> Result<(), String> {
+    match res {
+        ffi::EMSCRIPTEN_RESULT_SUCCESS | ffi::EMSCRIPTEN_RESULT_DEFERRED => Ok(()),
+        r @ _ => Err(error_to_str(r).to_string()),
+    }
+}
 
 extern fn mouse_callback(
         event_type: libc::c_int,
@@ -390,3 +412,14 @@ extern fn keyboard_callback(
     ffi::EM_TRUE
 }
 
+// In case of fullscreen window this method will request fullscreen on change
+#[allow(non_snake_case)]
+unsafe extern "C" fn fullscreen_callback(
+    _eventType: libc::c_int,
+    _fullscreenChangeEvent: *const ffi::EmscriptenFullscreenChangeEvent,
+    _userData: *mut libc::c_void) -> ffi::EM_BOOL
+{
+    use std::ptr;
+    ffi::emscripten_request_fullscreen(ptr::null(), ffi::EM_TRUE);
+    ffi::EM_FALSE
+}

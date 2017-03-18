@@ -17,6 +17,28 @@ pub type em_webgl_context_callback = extern fn(libc::c_int, *const libc::c_void,
 
 pub type em_callback_func = unsafe extern fn();
 
+pub type em_fullscreenchange_callback_func = Option<unsafe extern "C" fn(
+    eventType: ::libc::c_int,
+    fullscreenChangeEvent: *const EmscriptenFullscreenChangeEvent,
+    userData: *mut ::libc::c_void) -> EM_BOOL>;
+
+#[repr(C)]
+pub struct EmscriptenFullscreenChangeEvent {
+    pub isFullscreen: ::libc::c_int,
+    pub fullscreenEnabled: ::libc::c_int,
+    pub nodeName: [::libc::c_char; 128usize],
+    pub id: [::libc::c_char; 128usize],
+    pub elementWidth: ::libc::c_int,
+    pub elementHeight: ::libc::c_int,
+    pub screenWidth: ::libc::c_int,
+    pub screenHeight: ::libc::c_int,
+}
+#[test]
+fn bindgen_test_layout_EmscriptenFullscreenChangeEvent() {
+    assert_eq!(::std::mem::size_of::<EmscriptenFullscreenChangeEvent>(), 280usize);
+    assert_eq!(::std::mem::align_of::<EmscriptenFullscreenChangeEvent>(), 4usize);
+}
+
 pub const EMSCRIPTEN_EVENT_KEYDOWN: libc::c_int = 2;
 pub const EMSCRIPTEN_EVENT_KEYUP: libc::c_int = 3;
 
@@ -157,4 +179,6 @@ extern {
     pub fn emscripten_set_canvas_size(width: libc::c_int, height: libc::c_int);
 
     pub fn emscripten_get_canvas_size(width: *mut libc::c_int, height: *mut libc::c_int, isFullscreen: *mut libc::c_int);
+
+    pub fn emscripten_set_fullscreenchange_callback(target: *const libc::c_char, userData: *mut libc::c_void, useCapture: EM_BOOL, callback: em_fullscreenchange_callback_func) -> EMSCRIPTEN_RESULT;
 }
