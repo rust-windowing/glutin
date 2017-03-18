@@ -151,17 +151,13 @@ impl Window {
 
     pub fn get_inner_size(&self) -> Option<(u32, u32)> {
         unsafe {
-            use std::{mem, ptr};
+            use std::mem;
             let mut width = mem::uninitialized();
             let mut height = mem::uninitialized();
+            let mut fullscreen = mem::uninitialized();
 
-            if ffi::emscripten_get_element_css_size(ptr::null(), &mut width, &mut height)
-                != ffi::EMSCRIPTEN_RESULT_SUCCESS
-            {
-                None
-            } else {
-                Some((width as u32, height as u32))
-            }
+            ffi::emscripten_get_canvas_size(&mut width, &mut height, &mut fullscreen);
+            Some((width as u32, height as u32))
         }
     }
 
@@ -172,11 +168,7 @@ impl Window {
 
     #[inline]
     pub fn set_inner_size(&self, width: u32, height: u32) {
-        unsafe {
-            use std::ptr;
-            ffi::emscripten_set_element_css_size(ptr::null(), width as libc::c_double, height
-                as libc::c_double);
-        }
+        unsafe { ffi::emscripten_set_canvas_size(width as i32, height as i32); }
     }
 
     #[inline]
@@ -244,7 +236,7 @@ impl Window {
 
     #[inline]
     pub fn get_inner_size_pixels(&self) -> Option<(u32, u32)> {
-        unimplemented!()
+        self.get_inner_size()
     }
 
     #[inline]

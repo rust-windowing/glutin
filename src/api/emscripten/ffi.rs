@@ -136,12 +136,6 @@ extern {
 
     pub fn emscripten_exit_fullscreen() -> EMSCRIPTEN_RESULT;
 
-    pub fn emscripten_set_element_css_size(target: *const libc::c_char, width: libc::c_double,
-        height: libc::c_double) -> EMSCRIPTEN_RESULT;
-
-    pub fn emscripten_get_element_css_size(target: *const libc::c_char, width: *mut libc::c_double,
-        height: *mut libc::c_double) -> EMSCRIPTEN_RESULT;
-
     pub fn emscripten_sleep(delay: libc::c_uint);
 
     pub fn emscripten_set_main_loop(func : em_callback_func, fps : libc::c_int, simulate_infinite_loop : libc::c_int);
@@ -159,4 +153,8 @@ extern {
     pub fn emscripten_set_keyup_callback(target: *const libc::c_char, user_data: *mut libc::c_void, use_capture: EM_BOOL, callback: em_keyboard_callback_func) -> EMSCRIPTEN_RESULT;
 
     pub fn emscripten_get_device_pixel_ratio() -> f64;
+
+    pub fn emscripten_set_canvas_size(width: libc::c_int, height: libc::c_int);
+
+    pub fn emscripten_get_canvas_size(width: *mut libc::c_int, height: *mut libc::c_int, isFullscreen: *mut libc::c_int);
 }
