@@ -23,9 +23,10 @@ use core_foundation::base::TCFType;
 use core_foundation::string::CFString;
 use core_foundation::bundle::{CFBundleGetBundleWithIdentifier, CFBundleGetFunctionPointerForName};
 
-use std;
+use std::collections::HashMap;
 use std::str::FromStr;
 use std::ops::Deref;
+use std::sync::{Arc, Mutex, Weak};
 
 use libc;
 
@@ -44,14 +45,26 @@ pub struct PlatformSpecificWindowBuilderAttributes {
 }
 
 pub struct Window {
-    context: std::sync::Arc<IdRef>,
-    pixel_format: PixelFormat,
+    // A handle to the GL context associated with this window.
+    context: Arc<Context>,
+    // The Window must store a handle to the map in order to remove its own context when dropped.
+    contexts: Arc<ContextMap>,
     winit_window: winit::Window,
 }
 
 pub struct EventsLoop {
     winit_events_loop: winit::EventsLoop,
-    window_contexts: std::sync::Mutex<std::collections::HashMap<winit::WindowId, std::sync::Weak<IdRef>>>,
+    window_contexts: Mutex<Weak<ContextMap>>,
+}
+
+struct Context {
+    // NSOpenGLContext
+    gl: IdRef,
+    pixel_format: PixelFormat,
+}
+
+struct ContextMap {
+    map: Mutex<HashMap<winit::WindowId, Weak<Context>>>,
 }
 
 impl EventsLoop {
@@ -59,22 +72,34 @@ impl EventsLoop {
     pub fn new() -> EventsLoop {
         EventsLoop {
             winit_events_loop: winit::EventsLoop::new(),
-            window_contexts: std::sync::Mutex::new(std::collections::HashMap::new()),
+            window_contexts: Mutex::new(Weak::new()),
         }
     }
 
-    // If a resize event was received for a window, update the GL context for that window but only
-    // if that window is still alive.
-    fn update_context_on_window_resized(&self, event: &winit::Event) {
+    fn handle_event(&self, event: &winit::Event) {
         match *event {
-            winit::Event::WindowEvent { window_id, event: winit::WindowEvent::Resized(..) } => {
-                if let Ok(window_contexts) = self.window_contexts.lock() {
-                    if let Some(context) = window_contexts[&window_id].upgrade() {
-                        unsafe { context.update(); }
+            winit::Event::WindowEvent { window_id, ref event } => match *event {
+
+                // If a `Resized` event was received for a window, update the GL context for that
+                // window but only if that window is still alive.
+                winit::WindowEvent::Resized(..) => {
+                    if let Some(window_contexts) = self.window_contexts.lock().unwrap().upgrade() {
+                        if let Some(context) = window_contexts.map.lock().unwrap()[&window_id].upgrade() {
+                            unsafe { context.gl.update(); }
+                        }
                     }
-                }
+                },
+
+                // If a `Closed` event was received for a window, remove the associated context
+                // from the map.
+                winit::WindowEvent::Closed => {
+                    if let Some(window_contexts) = self.window_contexts.lock().unwrap().upgrade() {
+                        window_contexts.map.lock().unwrap().remove(&window_id);
+                    }
+                },
+
+                _ => (),
             },
-            _ => ()
         }
     }
 
@@ -85,7 +110,7 @@ impl EventsLoop {
         where F: FnMut(winit::Event)
     {
         self.winit_events_loop.poll_events(|event| {
-            self.update_context_on_window_resized(&event);
+            self.handle_event(&event);
             callback(event);
         });
     }
@@ -96,7 +121,7 @@ impl EventsLoop {
         where F: FnMut(winit::Event)
     {
         self.winit_events_loop.run_forever(|event| {
-            self.update_context_on_window_resized(&event);
+            self.handle_event(&event);
             callback(event);
         })
     }
@@ -112,13 +137,14 @@ unsafe impl Send for Window {}
 unsafe impl Sync for Window {}
 
 impl Window {
+
     pub fn new(events_loop: &EventsLoop,
                _win_attribs: &WindowAttributes,
                pf_reqs: &PixelFormatRequirements,
                opengl: &GlAttributes<&Window>,
                _pl_attribs: &PlatformSpecificWindowBuilderAttributes,
                winit_builder: winit::WindowBuilder)
-               -> Result<Window, CreationError> {
+               -> Result<Self, CreationError> {
         if opengl.sharing.is_some() {
             unimplemented!()
         }
@@ -133,94 +159,34 @@ impl Window {
 
         let transparent = winit_builder.window.transparent;
         let winit_window = winit_builder.build(&events_loop.winit_events_loop).unwrap();
+        let window_id = winit_window.id();
         let view = winit_window.get_nsview() as id;
-        let (context, pf) = match Window::create_context(view, pf_reqs, opengl, transparent) {
-            Ok((context, pf)) => (std::sync::Arc::new(context), pf),
+        let context = match Context::new(view, pf_reqs, opengl, transparent) {
+            Ok(context) => Arc::new(context),
             Err(e) => {
                 return Err(OsError(format!("Couldn't create OpenGL context: {}", e)));
             }
         };
+        let weak_context = Arc::downgrade(&context);
 
-        // Store a copy of the `context`'s `IdRef` so that we can `update` it on `Resized` events.
-        if let Ok(mut window_contexts) = events_loop.window_contexts.lock() {
-            window_contexts.insert(winit_window.id(), std::sync::Arc::downgrade(&context));
-        }
-
-        let window = Window {
+        let new_window = |window_contexts| Window {
             context: context,
-            pixel_format: pf,
             winit_window: winit_window,
+            contexts: window_contexts,
         };
 
-        Ok(window)
-    }
-
-    fn create_context(view: id,
-                      pf_reqs: &PixelFormatRequirements,
-                      opengl: &GlAttributes<&Window>,
-                      transparent: bool)
-                      -> Result<(IdRef, PixelFormat), CreationError> {
-        let attributes = try!(helpers::build_nsattributes(pf_reqs, opengl));
-        unsafe {
-            let pixelformat = IdRef::new(NSOpenGLPixelFormat::alloc(nil)
-                .initWithAttributes_(&attributes));
-
-            if let Some(pixelformat) = pixelformat.non_nil() {
-
-                // TODO: Add context sharing
-                let context = IdRef::new(NSOpenGLContext::alloc(nil)
-                    .initWithFormat_shareContext_(*pixelformat, nil));
-
-                if let Some(cxt) = context.non_nil() {
-                    let pf = {
-                        let get_attr = |attrib: appkit::NSOpenGLPixelFormatAttribute| -> i32 {
-                            let mut value = 0;
-
-                            NSOpenGLPixelFormat::getValues_forAttribute_forVirtualScreen_(
-                                *pixelformat,
-                                &mut value,
-                                attrib,
-                                NSOpenGLContext::currentVirtualScreen(*cxt));
-
-                            value
-                        };
-
-                        PixelFormat {
-                            hardware_accelerated: get_attr(appkit::NSOpenGLPFAAccelerated) != 0,
-                            color_bits: (get_attr(appkit::NSOpenGLPFAColorSize) - get_attr(appkit::NSOpenGLPFAAlphaSize)) as u8,
-                            alpha_bits: get_attr(appkit::NSOpenGLPFAAlphaSize) as u8,
-                            depth_bits: get_attr(appkit::NSOpenGLPFADepthSize) as u8,
-                            stencil_bits: get_attr(appkit::NSOpenGLPFAStencilSize) as u8,
-                            stereoscopy: get_attr(appkit::NSOpenGLPFAStereo) != 0,
-                            double_buffer: get_attr(appkit::NSOpenGLPFADoubleBuffer) != 0,
-                            multisampling: if get_attr(appkit::NSOpenGLPFAMultisample) > 0 {
-                                Some(get_attr(appkit::NSOpenGLPFASamples) as u16)
-                            } else {
-                                None
-                            },
-                            srgb: true,
-                        }
-                    };
-
-                    cxt.setView_(view);
-                    let value = if opengl.vsync { 1 } else { 0 };
-                    cxt.setValues_forParameter_(&value, appkit::NSOpenGLContextParameter::NSOpenGLCPSwapInterval);
-
-                    if transparent {
-                        let mut opacity = 0;
-                        CGLSetParameter(cxt.CGLContextObj() as *mut _, kCGLCPSurfaceOpacity, &mut opacity);
-                    }
-
-                    CGLEnable(cxt.CGLContextObj() as *mut _, kCGLCECrashOnRemovedFunctions);
-
-                    Ok((cxt, pf))
-                } else {
-                    Err(CreationError::NotSupported)
-                }
-            } else {
-                Err(CreationError::NoAvailablePixelFormat)
-            }
+        // If a `ContextMap` exists, insert the context for this new window and return it.
+        if let Some(window_contexts) = events_loop.window_contexts.lock().unwrap().upgrade() {
+            window_contexts.map.lock().unwrap().insert(window_id, weak_context);
+            return Ok(new_window(window_contexts));
         }
+
+        // If there is not yet a `ContextMap`, this must be the first window so we must create it.
+        let mut map = HashMap::new();
+        map.insert(window_id, weak_context);
+        let window_contexts = Arc::new(ContextMap { map: Mutex::new(map) });
+        *events_loop.window_contexts.lock().unwrap() = Arc::downgrade(&window_contexts);
+        Ok(new_window(window_contexts))
     }
 
     pub fn set_title(&self, title: &str) {
@@ -307,11 +273,88 @@ impl Window {
     }
 }
 
+impl Drop for Window {
+    fn drop(&mut self) {
+        self.contexts.map.lock().unwrap().remove(&self.id());
+    }
+}
+
+impl Context {
+    fn new(view: id,
+           pf_reqs: &PixelFormatRequirements,
+           opengl: &GlAttributes<&Window>,
+           transparent: bool) -> Result<Self, CreationError>
+    {
+        let attributes = try!(helpers::build_nsattributes(pf_reqs, opengl));
+        unsafe {
+            let pixelformat = IdRef::new(NSOpenGLPixelFormat::alloc(nil)
+                .initWithAttributes_(&attributes));
+
+            if let Some(pixelformat) = pixelformat.non_nil() {
+
+                // TODO: Add context sharing
+                let context = IdRef::new(NSOpenGLContext::alloc(nil)
+                    .initWithFormat_shareContext_(*pixelformat, nil));
+
+                if let Some(cxt) = context.non_nil() {
+                    let pf = {
+                        let get_attr = |attrib: appkit::NSOpenGLPixelFormatAttribute| -> i32 {
+                            let mut value = 0;
+
+                            NSOpenGLPixelFormat::getValues_forAttribute_forVirtualScreen_(
+                                *pixelformat,
+                                &mut value,
+                                attrib,
+                                NSOpenGLContext::currentVirtualScreen(*cxt));
+
+                            value
+                        };
+
+                        PixelFormat {
+                            hardware_accelerated: get_attr(appkit::NSOpenGLPFAAccelerated) != 0,
+                            color_bits: (get_attr(appkit::NSOpenGLPFAColorSize) - get_attr(appkit::NSOpenGLPFAAlphaSize)) as u8,
+                            alpha_bits: get_attr(appkit::NSOpenGLPFAAlphaSize) as u8,
+                            depth_bits: get_attr(appkit::NSOpenGLPFADepthSize) as u8,
+                            stencil_bits: get_attr(appkit::NSOpenGLPFAStencilSize) as u8,
+                            stereoscopy: get_attr(appkit::NSOpenGLPFAStereo) != 0,
+                            double_buffer: get_attr(appkit::NSOpenGLPFADoubleBuffer) != 0,
+                            multisampling: if get_attr(appkit::NSOpenGLPFAMultisample) > 0 {
+                                Some(get_attr(appkit::NSOpenGLPFASamples) as u16)
+                            } else {
+                                None
+                            },
+                            srgb: true,
+                        }
+                    };
+
+                    cxt.setView_(view);
+                    let value = if opengl.vsync { 1 } else { 0 };
+                    cxt.setValues_forParameter_(&value, appkit::NSOpenGLContextParameter::NSOpenGLCPSwapInterval);
+
+                    if transparent {
+                        let mut opacity = 0;
+                        CGLSetParameter(cxt.CGLContextObj() as *mut _, kCGLCPSurfaceOpacity, &mut opacity);
+                    }
+
+                    CGLEnable(cxt.CGLContextObj() as *mut _, kCGLCECrashOnRemovedFunctions);
+
+                    Ok(Context { gl: cxt, pixel_format: pf })
+                } else {
+                    Err(CreationError::NotSupported)
+                }
+            } else {
+                Err(CreationError::NoAvailablePixelFormat)
+            }
+        }
+    }
+}
+
+
 impl GlContext for Window {
     #[inline]
     unsafe fn make_current(&self) -> Result<(), ContextError> {
-        let _: () = msg_send![**self.context, update];
-        self.context.makeCurrentContext();
+        let _: () = msg_send![*self.context.gl, update];
+        self.context.gl.makeCurrentContext();
         Ok(())
     }
 
@@ -320,7 +363,7 @@ impl GlContext for Window {
         unsafe {
             let current = NSOpenGLContext::currentContext(nil);
             if current != nil {
-                let is_equal: BOOL = msg_send![current, isEqual:**self.context];
+                let is_equal: BOOL = msg_send![current, isEqual:*self.context.gl];
                 is_equal != NO
             } else {
                 false
@@ -343,7 +386,7 @@ impl GlContext for Window {
     fn swap_buffers(&self) -> Result<(), ContextError> {
         unsafe {
             let pool = NSAutoreleasePool::new(nil);
-            self.context.flushBuffer();
+            self.context.gl.flushBuffer();
             let _: () = msg_send![pool, release];
         }
         Ok(())
@@ -356,7 +399,7 @@ impl GlContext for Window {
 
     #[inline]
     fn get_pixel_format(&self) -> PixelFormat {
-        self.pixel_format.clone()
+        self.context.pixel_format.clone()
     }
 }
 
