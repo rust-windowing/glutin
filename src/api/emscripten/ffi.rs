@@ -39,6 +39,18 @@ fn bindgen_test_layout_EmscriptenFullscreenChangeEvent() {
     assert_eq!(::std::mem::align_of::<EmscriptenFullscreenChangeEvent>(), 4usize);
 }
 
+#[repr(C)]
+pub struct EmscriptenPointerlockChangeEvent {
+    pub isActive: ::libc::c_int,
+    pub nodeName: [::libc::c_char; 128usize],
+    pub id: [::libc::c_char; 128usize],
+}
+#[test]
+fn bindgen_test_layout_EmscriptenPointerlockChangeEvent() {
+    assert_eq!(::std::mem::size_of::<EmscriptenPointerlockChangeEvent>(), 260usize);
+    assert_eq!(::std::mem::align_of::<EmscriptenPointerlockChangeEvent>(), 4usize);
+}
+
 pub const EMSCRIPTEN_EVENT_KEYDOWN: libc::c_int = 2;
 pub const EMSCRIPTEN_EVENT_KEYUP: libc::c_int = 3;
 
@@ -98,6 +110,8 @@ pub type em_mouse_callback_func = extern fn(libc::c_int, *const EmscriptenMouseE
 pub type em_keyboard_callback_func = extern fn(libc::c_int, *const EmscriptenKeyboardEvent, *mut libc::c_void)
     -> EM_BOOL;
 
+pub type em_pointerlockchange_callback_func = Option<unsafe extern "C" fn(eventType: libc::c_int, pointerlockChangeEvent: *const EmscriptenPointerlockChangeEvent, userData: *mut libc::c_void) -> EM_BOOL>;
+
 #[repr(C)]
 pub struct EmscriptenWebGLContextAttributes {
     pub alpha: EM_BOOL,
@@ -152,6 +166,10 @@ extern {
     // note: this function is not documented but is used by the ports of glfw, SDL and EGL
     pub fn emscripten_GetProcAddress(name: *const libc::c_char) -> *const libc::c_void;
 
+    pub fn emscripten_request_pointerlock(target: *const libc::c_char,
+        deferUntilInEventHandler: EM_BOOL) -> EMSCRIPTEN_RESULT;
+
+    pub fn emscripten_exit_pointerlock() -> EMSCRIPTEN_RESULT;
 
     pub fn emscripten_request_fullscreen(target: *const libc::c_char,
         deferUntilInEventHandler: EM_BOOL) -> EMSCRIPTEN_RESULT;
@@ -181,4 +199,10 @@ extern {
     pub fn emscripten_get_canvas_size(width: *mut libc::c_int, height: *mut libc::c_int, isFullscreen: *mut libc::c_int);
 
     pub fn emscripten_set_fullscreenchange_callback(target: *const libc::c_char, userData: *mut libc::c_void, useCapture: EM_BOOL, callback: em_fullscreenchange_callback_func) -> EMSCRIPTEN_RESULT;
+
+    pub fn emscripten_set_pointerlockchange_callback(target: *const libc::c_char, userData: *mut libc::c_void, useCapture: EM_BOOL, callback: em_pointerlockchange_callback_func) -> EMSCRIPTEN_RESULT;
+
+    pub fn emscripten_hide_mouse();
+
+    pub fn emscripten_asm_const(code: *const libc::c_char);
 }

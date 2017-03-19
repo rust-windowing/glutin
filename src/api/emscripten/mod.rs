@@ -29,6 +29,7 @@ mod ffi;
 mod keyboard;
 
 pub struct Window {
+    cursor_state: RefCell<::CursorState>,
     context: ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE,
     events: Box<RefCell<VecDeque<Event>>>,
 }
@@ -131,6 +132,7 @@ impl Window {
         // TODO: emscripten_set_webglcontextrestored_callback
 
         let window = Window {
+            cursor_state: RefCell::new(::CursorState::Normal),
             context: context,
             events: events,
         };
@@ -229,8 +231,41 @@ impl Window {
     }
 
     #[inline]
-    pub fn set_cursor_state(&self, _state: CursorState) -> Result<(), String> {
-        Ok(())
+    pub fn set_cursor_state(&self, state: CursorState) -> Result<(), String> {
+        use std::ptr;
+        unsafe {
+            use ::CursorState::*;
+
+            let mut old_state = self.cursor_state.borrow_mut();
+            if state == *old_state {
+                return Ok(());
+            }
+
+            // Set or unset grab callback
+            match state {
+                Hide | Normal => em_try(ffi::emscripten_set_pointerlockchange_callback(ptr::null(), 0 as *mut libc::c_void, ffi::EM_FALSE, None))?,
+                Grab => em_try(ffi::emscripten_set_pointerlockchange_callback(ptr::null(), 0 as *mut libc::c_void, ffi::EM_FALSE, Some(pointerlockchange_callback)))?,
+            }
+
+            // Go back to normal cursor state
+            match *old_state {
+                Hide => show_mouse(),
+                Grab => em_try(ffi::emscripten_exit_pointerlock())?,
+                Normal => (),
+            }
+
+            // Set cursor from normal cursor state
+            match state {
+                Hide => ffi::emscripten_hide_mouse(),
+                Grab => em_try(ffi::emscripten_request_pointerlock(ptr::null(), ffi::EM_TRUE))?,
+                Normal => (),
+            }
+
+            // Update
+            *old_state = state;
+
+            Ok(())
+        }
     }
 
     #[inline]
@@ -422,4 +457,35 @@ unsafe extern "C" fn fullscreen_callback(
     use std::ptr;
     ffi::emscripten_request_fullscreen(ptr::null(), ffi::EM_TRUE);
     ffi::EM_FALSE
+}
+
+// In case of pointer grabbed this method will request pointer lock on change
+#[allow(non_snake_case)]
+unsafe extern "C" fn pointerlockchange_callback(
+    _eventType: libc::c_int,
+    _pointerlockChangeEvent: *const ffi::EmscriptenPointerlockChangeEvent,
+    _userData: *mut libc::c_void) -> ffi::EM_BOOL
+{
+    use std::ptr;
+    ffi::emscripten_request_pointerlock(ptr::null(), ffi::EM_TRUE);
+    ffi::EM_FALSE
+}
+
+fn show_mouse() {
+    // Hide mouse hasn't show mouse equivalent.
+    // There is a pull request on emscripten that hasn't been merged #4616
+    // that contains:
+    //
+    // var styleSheet = document.styleSheets[0];
+    // var rules = styleSheet.cssRules;
+    // for (var i = 0; i < rules.length; i++) {
+    //   if (rules[i].cssText.substr(0, 6) == 'canvas') {
+    //     styleSheet.deleteRule(i);
+    //     i--;
+    //   }
+    // }
+    // styleSheet.insertRule('canvas.emscripten { border: none; cursor: auto; }', 0);
+    unsafe {
+            ffi::emscripten_asm_const(b"var styleSheet = document.styleSheets[0]; var rules = styleSheet.cssRules; for (var i = 0; i < rules.length; i++) { if (rules[i].cssText.substr(0, 6) == 'canvas') { styleSheet.deleteRule(i); i--; } } styleSheet.insertRule('canvas.emscripten { border: none; cursor: auto; }', 0);\0" as *const u8);
+    }
 }
