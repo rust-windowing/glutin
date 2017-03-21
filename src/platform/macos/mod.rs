@@ -67,6 +67,9 @@ struct ContextMap {
     map: Mutex<HashMap<winit::WindowId, Weak<Context>>>,
 }
 
+unsafe impl Send for ContextMap {}
+unsafe impl Sync for ContextMap {}
+
 impl EventsLoop {
     /// Builds a new events loop.
     pub fn new() -> EventsLoop {
