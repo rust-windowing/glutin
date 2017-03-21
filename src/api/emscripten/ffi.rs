@@ -17,6 +17,40 @@ pub type em_webgl_context_callback = extern fn(libc::c_int, *const libc::c_void,
 
 pub type em_callback_func = unsafe extern fn();
 
+pub type em_fullscreenchange_callback_func = Option<unsafe extern "C" fn(
+    eventType: ::libc::c_int,
+    fullscreenChangeEvent: *const EmscriptenFullscreenChangeEvent,
+    userData: *mut ::libc::c_void) -> EM_BOOL>;
+
+#[repr(C)]
+pub struct EmscriptenFullscreenChangeEvent {
+    pub isFullscreen: ::libc::c_int,
+    pub fullscreenEnabled: ::libc::c_int,
+    pub nodeName: [::libc::c_char; 128usize],
+    pub id: [::libc::c_char; 128usize],
+    pub elementWidth: ::libc::c_int,
+    pub elementHeight: ::libc::c_int,
+    pub screenWidth: ::libc::c_int,
+    pub screenHeight: ::libc::c_int,
+}
+#[test]
+fn bindgen_test_layout_EmscriptenFullscreenChangeEvent() {
+    assert_eq!(::std::mem::size_of::<EmscriptenFullscreenChangeEvent>(), 280usize);
+    assert_eq!(::std::mem::align_of::<EmscriptenFullscreenChangeEvent>(), 4usize);
+}
+
+#[repr(C)]
+pub struct EmscriptenPointerlockChangeEvent {
+    pub isActive: ::libc::c_int,
+    pub nodeName: [::libc::c_char; 128usize],
+    pub id: [::libc::c_char; 128usize],
+}
+#[test]
+fn bindgen_test_layout_EmscriptenPointerlockChangeEvent() {
+    assert_eq!(::std::mem::size_of::<EmscriptenPointerlockChangeEvent>(), 260usize);
+    assert_eq!(::std::mem::align_of::<EmscriptenPointerlockChangeEvent>(), 4usize);
+}
+
 pub const EMSCRIPTEN_EVENT_KEYDOWN: libc::c_int = 2;
 pub const EMSCRIPTEN_EVENT_KEYUP: libc::c_int = 3;
 
@@ -76,6 +110,8 @@ pub type em_mouse_callback_func = extern fn(libc::c_int, *const EmscriptenMouseE
 pub type em_keyboard_callback_func = extern fn(libc::c_int, *const EmscriptenKeyboardEvent, *mut libc::c_void)
     -> EM_BOOL;
 
+pub type em_pointerlockchange_callback_func = Option<unsafe extern "C" fn(eventType: libc::c_int, pointerlockChangeEvent: *const EmscriptenPointerlockChangeEvent, userData: *mut libc::c_void) -> EM_BOOL>;
+
 #[repr(C)]
 pub struct EmscriptenWebGLContextAttributes {
     pub alpha: EM_BOOL,
@@ -130,17 +166,15 @@ extern {
     // note: this function is not documented but is used by the ports of glfw, SDL and EGL
     pub fn emscripten_GetProcAddress(name: *const libc::c_char) -> *const libc::c_void;
 
+    pub fn emscripten_request_pointerlock(target: *const libc::c_char,
+        deferUntilInEventHandler: EM_BOOL) -> EMSCRIPTEN_RESULT;
+
+    pub fn emscripten_exit_pointerlock() -> EMSCRIPTEN_RESULT;
 
     pub fn emscripten_request_fullscreen(target: *const libc::c_char,
         deferUntilInEventHandler: EM_BOOL) -> EMSCRIPTEN_RESULT;
 
     pub fn emscripten_exit_fullscreen() -> EMSCRIPTEN_RESULT;
-
-    pub fn emscripten_set_element_css_size(target: *const libc::c_char, width: libc::c_double,
-        height: libc::c_double) -> EMSCRIPTEN_RESULT;
-
-    pub fn emscripten_get_element_css_size(target: *const libc::c_char, width: *mut libc::c_double,
-        height: *mut libc::c_double) -> EMSCRIPTEN_RESULT;
 
     pub fn emscripten_sleep(delay: libc::c_uint);
 
@@ -157,4 +191,18 @@ extern {
     pub fn emscripten_set_keydown_callback(target: *const libc::c_char, user_data: *mut libc::c_void, use_capture: EM_BOOL, callback: em_keyboard_callback_func) -> EMSCRIPTEN_RESULT;
 
     pub fn emscripten_set_keyup_callback(target: *const libc::c_char, user_data: *mut libc::c_void, use_capture: EM_BOOL, callback: em_keyboard_callback_func) -> EMSCRIPTEN_RESULT;
+
+    pub fn emscripten_get_device_pixel_ratio() -> f64;
+
+    pub fn emscripten_set_canvas_size(width: libc::c_int, height: libc::c_int);
+
+    pub fn emscripten_get_canvas_size(width: *mut libc::c_int, height: *mut libc::c_int, isFullscreen: *mut libc::c_int);
+
+    pub fn emscripten_set_fullscreenchange_callback(target: *const libc::c_char, userData: *mut libc::c_void, useCapture: EM_BOOL, callback: em_fullscreenchange_callback_func) -> EMSCRIPTEN_RESULT;
+
+    pub fn emscripten_set_pointerlockchange_callback(target: *const libc::c_char, userData: *mut libc::c_void, useCapture: EM_BOOL, callback: em_pointerlockchange_callback_func) -> EMSCRIPTEN_RESULT;
+
+    pub fn emscripten_hide_mouse();
+
+    pub fn emscripten_asm_const(code: *const libc::c_char);
 }

@@ -29,6 +29,7 @@ mod ffi;
 mod keyboard;
 
 pub struct Window {
+    cursor_state: RefCell<::CursorState>,
     context: ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE,
     events: Box<RefCell<VecDeque<Event>>>,
 }
@@ -64,10 +65,10 @@ const DOCUMENT_NAME: &'static str = "#document\0";
 
 impl Window {
     pub fn new(_: &WindowAttributes,
-               pf_reqs: &PixelFormatRequirements,
-               opengl: &GlAttributes<&Window>,
+               _pf_reqs: &PixelFormatRequirements,
+               _opengl: &GlAttributes<&Window>,
                _: &PlatformSpecificWindowBuilderAttributes,
-               _: winit::WindowBuilder)
+               window_builder: winit::WindowBuilder)
                 -> Result<Window, CreationError> {
 
         // getting the default values of attributes
@@ -130,10 +131,25 @@ impl Window {
 
         // TODO: emscripten_set_webglcontextrestored_callback
 
-        Ok(Window {
+        let window = Window {
+            cursor_state: RefCell::new(::CursorState::Normal),
             context: context,
             events: events,
-        })
+        };
+
+        if window_builder.window.monitor.is_some() {
+            use std::ptr;
+            unsafe {
+                em_try(ffi::emscripten_request_fullscreen(ptr::null(), ffi::EM_TRUE))
+                    .map_err(|e| ::CreationError::OsError(e))?;
+                em_try(ffi::emscripten_set_fullscreenchange_callback(ptr::null(), 0 as *mut libc::c_void, ffi::EM_FALSE, Some(fullscreen_callback)))
+                    .map_err(|e| ::CreationError::OsError(e))?;
+            }
+        } else if let Some((w, h)) = window_builder.window.dimensions {
+            window.set_inner_size(w, h);
+        }
+
+        Ok(window)
     }
 
     #[inline]
@@ -151,17 +167,13 @@ impl Window {
 
     pub fn get_inner_size(&self) -> Option<(u32, u32)> {
         unsafe {
-            use std::{mem, ptr};
+            use std::mem;
             let mut width = mem::uninitialized();
             let mut height = mem::uninitialized();
+            let mut fullscreen = mem::uninitialized();
 
-            if ffi::emscripten_get_element_css_size(ptr::null(), &mut width, &mut height)
-                != ffi::EMSCRIPTEN_RESULT_SUCCESS
-            {
-                None
-            } else {
-                Some((width as u32, height as u32))
-            }
+            ffi::emscripten_get_canvas_size(&mut width, &mut height, &mut fullscreen);
+            Some((width as u32, height as u32))
         }
     }
 
@@ -172,11 +184,7 @@ impl Window {
 
     #[inline]
     pub fn set_inner_size(&self, width: u32, height: u32) {
-        unsafe {
-            use std::ptr;
-            ffi::emscripten_set_element_css_size(ptr::null(), width as libc::c_double, height
-                as libc::c_double);
-        }
+        unsafe { ffi::emscripten_set_canvas_size(width as i32, height as i32); }
     }
 
     #[inline]
@@ -219,21 +227,54 @@ impl Window {
     }
 
     #[inline]
-    pub fn set_cursor(&self, cursor: MouseCursor) {
+    pub fn set_cursor(&self, _cursor: MouseCursor) {
     }
 
     #[inline]
     pub fn set_cursor_state(&self, state: CursorState) -> Result<(), String> {
-        Ok(())
+        use std::ptr;
+        unsafe {
+            use ::CursorState::*;
+
+            let mut old_state = self.cursor_state.borrow_mut();
+            if state == *old_state {
+                return Ok(());
+            }
+
+            // Set or unset grab callback
+            match state {
+                Hide | Normal => em_try(ffi::emscripten_set_pointerlockchange_callback(ptr::null(), 0 as *mut libc::c_void, ffi::EM_FALSE, None))?,
+                Grab => em_try(ffi::emscripten_set_pointerlockchange_callback(ptr::null(), 0 as *mut libc::c_void, ffi::EM_FALSE, Some(pointerlockchange_callback)))?,
+            }
+
+            // Go back to normal cursor state
+            match *old_state {
+                Hide => show_mouse(),
+                Grab => em_try(ffi::emscripten_exit_pointerlock())?,
+                Normal => (),
+            }
+
+            // Set cursor from normal cursor state
+            match state {
+                Hide => ffi::emscripten_hide_mouse(),
+                Grab => em_try(ffi::emscripten_request_pointerlock(ptr::null(), ffi::EM_TRUE))?,
+                Normal => (),
+            }
+
+            // Update
+            *old_state = state;
+
+            Ok(())
+        }
     }
 
     #[inline]
     pub fn hidpi_factor(&self) -> f32 {
-        1.0
+        unsafe { ffi::emscripten_get_device_pixel_ratio() as f32 }
     }
 
     #[inline]
-    pub fn set_cursor_position(&self, x: i32, y: i32) -> Result<(), ()> {
+    pub fn set_cursor_position(&self, _x: i32, _y: i32) -> Result<(), ()> {
         Ok(())
     }
 
@@ -244,7 +285,7 @@ impl Window {
 
     #[inline]
     pub fn get_inner_size_pixels(&self) -> Option<(u32, u32)> {
-        unimplemented!()
+        self.get_inner_size()
     }
 
     #[inline]
@@ -259,7 +300,7 @@ impl Window {
 
     #[inline]
     pub fn hdpi_factor(&self) -> f32 {
-        unimplemented!();
+        self.hidpi_factor()
     }
 }
 
@@ -303,7 +344,9 @@ impl GlContext for Window {
 
 impl Drop for Window {
     fn drop(&mut self) {
+        use std::ptr;
         unsafe {
+            ffi::emscripten_set_fullscreenchange_callback(ptr::null(), 0 as *mut libc::c_void, ffi::EM_FALSE, None);
             ffi::emscripten_exit_fullscreen();
             ffi::emscripten_webgl_destroy_context(self.context);
         }
@@ -327,6 +370,12 @@ fn error_to_str(code: ffi::EMSCRIPTEN_RESULT) -> &'static str {
     }
 }
 
+fn em_try(res: ffi::EMSCRIPTEN_RESULT) -> Result<(), String> {
+    match res {
+        ffi::EMSCRIPTEN_RESULT_SUCCESS | ffi::EMSCRIPTEN_RESULT_DEFERRED => Ok(()),
+        r @ _ => Err(error_to_str(r).to_string()),
+    }
+}
 
 extern fn mouse_callback(
         event_type: libc::c_int,
@@ -398,3 +447,45 @@ extern fn keyboard_callback(
     ffi::EM_TRUE
 }
 
+// In case of fullscreen window this method will request fullscreen on change
+#[allow(non_snake_case)]
+unsafe extern "C" fn fullscreen_callback(
+    _eventType: libc::c_int,
+    _fullscreenChangeEvent: *const ffi::EmscriptenFullscreenChangeEvent,
+    _userData: *mut libc::c_void) -> ffi::EM_BOOL
+{
+    use std::ptr;
+    ffi::emscripten_request_fullscreen(ptr::null(), ffi::EM_TRUE);
+    ffi::EM_FALSE
+}
+
+// In case of pointer grabbed this method will request pointer lock on change
+#[allow(non_snake_case)]
+unsafe extern "C" fn pointerlockchange_callback(
+    _eventType: libc::c_int,
+    _pointerlockChangeEvent: *const ffi::EmscriptenPointerlockChangeEvent,
+    _userData: *mut libc::c_void) -> ffi::EM_BOOL
+{
+    use std::ptr;
+    ffi::emscripten_request_pointerlock(ptr::null(), ffi::EM_TRUE);
+    ffi::EM_FALSE
+}
+
+fn show_mouse() {
+    // Hide mouse hasn't show mouse equivalent.
+    // There is a pull request on emscripten that hasn't been merged #4616
+    // that contains:
+    //
+    // var styleSheet = document.styleSheets[0];
+    // var rules = styleSheet.cssRules;
+    // for (var i = 0; i < rules.length; i++) {
+    //   if (rules[i].cssText.substr(0, 6) == 'canvas') {
+    //     styleSheet.deleteRule(i);
+    //     i--;
+    //   }
+    // }
+    // styleSheet.insertRule('canvas.emscripten { border: none; cursor: auto; }', 0);
+    unsafe {
+            ffi::emscripten_asm_const(b"var styleSheet = document.styleSheets[0]; var rules = styleSheet.cssRules; for (var i = 0; i < rules.length; i++) { if (rules[i].cssText.substr(0, 6) == 'canvas') { styleSheet.deleteRule(i); i--; } } styleSheet.insertRule('canvas.emscripten { border: none; cursor: auto; }', 0);\0" as *const u8);
+    }
+}
