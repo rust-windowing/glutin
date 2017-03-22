@@ -21,7 +21,7 @@ use ElementState;
 use MouseButton;
 
 use std::cell::RefCell;
-use std::collections::VecDeque;
+use std::collections::{VecDeque, BTreeMap};
 use std::ops::Deref;
 use platform::PlatformSpecificWindowBuilderAttributes;
 
@@ -126,6 +126,22 @@ impl Window {
                                             mem::transmute(events.deref()),
                                             ffi::EM_FALSE,
                                             keyboard_callback);
+                ffi::emscripten_set_touchstart_callback(CANVAS_NAME.as_ptr(),
+                                            mem::transmute(events.deref()),
+                                            ffi::EM_FALSE,
+                                            Some(touch_callback));
+                ffi::emscripten_set_touchend_callback(CANVAS_NAME.as_ptr(),
+                                            mem::transmute(events.deref()),
+                                            ffi::EM_FALSE,
+                                            Some(touch_callback));
+                ffi::emscripten_set_touchmove_callback(CANVAS_NAME.as_ptr(),
+                                            mem::transmute(events.deref()),
+                                            ffi::EM_FALSE,
+                                            Some(touch_callback));
+                ffi::emscripten_set_touchcancel_callback(CANVAS_NAME.as_ptr(),
+                                            mem::transmute(events.deref()),
+                                            ffi::EM_FALSE,
+                                            Some(touch_callback));
             }
         }
 
@@ -443,6 +459,79 @@ extern fn keyboard_callback(
             _ => {
             }
         }
+    }
+    ffi::EM_TRUE
+}
+
+thread_local! {
+    static ACTIVE_TOUCHES: RefCell<BTreeMap<libc::c_long,(i32, i32)>> = RefCell::new(BTreeMap::new());
+}
+
+extern fn touch_callback(
+        event_type: libc::c_int,
+        event: *const ffi::EmscriptenTouchEvent,
+        event_queue: *mut libc::c_void) -> ffi::EM_BOOL {
+    unsafe {
+        use std::mem;
+
+        ACTIVE_TOUCHES.with(|active_touches| {
+            let mut active_touches = active_touches.borrow_mut();
+            let queue: &RefCell<VecDeque<Event>> = mem::transmute(event_queue);
+            let mut queue = queue.borrow_mut();
+
+            match event_type {
+                ffi::EMSCRIPTEN_EVENT_TOUCHSTART => {
+                    // Check for all new identifier
+                    for touch in 0..(*event).numTouches as usize {
+                        let touch = (*event).touches[touch];
+                        if !active_touches.contains_key(&touch.identifier) {
+                            active_touches.insert(touch.identifier, (touch.canvasX, touch.canvasY));
+                            queue.push_back(Event::Touch( winit::Touch {
+                                phase: winit::TouchPhase::Started,
+                                location: (touch.canvasX as f64, touch.canvasY as f64),
+                                id: touch.identifier as u64,
+                            }))
+                        }
+                    }
+                },
+                ffi::EMSCRIPTEN_EVENT_TOUCHEND | ffi::EMSCRIPTEN_EVENT_TOUCHCANCEL => {
+                    // Check for event that are not onTarget
+                    let phase = match event_type {
+                        ffi::EMSCRIPTEN_EVENT_TOUCHEND => winit::TouchPhase::Ended,
+                        ffi::EMSCRIPTEN_EVENT_TOUCHCANCEL => winit::TouchPhase::Cancelled,
+                        _ => unreachable!(),
+                    };
+                    for touch in 0..(*event).numTouches  as usize {
+                        let touch = (*event).touches[touch];
+                        if touch.onTarget == 0 {
+                            active_touches.remove(&touch.identifier);
+                            queue.push_back(Event::Touch( winit::Touch {
+                                phase: phase,
+                                location: (touch.canvasX as f64, touch.canvasY as f64),
+                                id: touch.identifier as u64,
+                            }))
+                        }
+                    }
+                }
+                ffi::EMSCRIPTEN_EVENT_TOUCHMOVE => {
+                    // check for all event that have changed coordinates
+                    for touch in 0..(*event).numTouches  as usize {
+                        let touch = (*event).touches[touch];
+                        if let Some(active_touch) = active_touches.get_mut(&touch.identifier) {
+                            if active_touch.0 != touch.canvasX || active_touch.1 != touch.canvasY {
+                                *active_touch = (touch.canvasX, touch.canvasY);
+                                queue.push_back(Event::Touch( winit::Touch {
+                                    phase: winit::TouchPhase::Moved,
+                                    location: (touch.canvasX as f64, touch.canvasY as f64),
+                                    id: touch.identifier as u64,
+                                }))
+                            }
+                        }
+                    }
+                }
+                _ => ()
+            }
+        });
     }
     ffi::EM_TRUE
 }
