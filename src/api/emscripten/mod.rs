@@ -28,10 +28,15 @@ use platform::PlatformSpecificWindowBuilderAttributes;
 mod ffi;
 mod keyboard;
 
+pub struct InnerWindow {
+    cursor_state: ::CursorState,
+    events: VecDeque<Event>,
+    active_touches: BTreeMap<libc::c_long, (i32, i32)>,
+}
+
 pub struct Window {
-    cursor_state: RefCell<::CursorState>,
+    inner: Box<RefCell<InnerWindow>>,
     context: ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE,
-    events: Box<RefCell<VecDeque<Event>>>,
 }
 
 pub struct PollEventsIterator<'a> {
@@ -43,7 +48,7 @@ impl<'a> Iterator for PollEventsIterator<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<Event> {
-        self.window.events.deref().borrow_mut().pop_front()
+        self.window.inner.deref().borrow_mut().events.pop_front()
     }
 }
 
@@ -100,58 +105,64 @@ impl Window {
             context
         };
 
-        let events = Box::new(RefCell::new(VecDeque::new()));
+
+        let window = Window {
+            inner: Box::new(RefCell::new(InnerWindow {
+                events: VecDeque::new(),
+                cursor_state: ::CursorState::Normal,
+                active_touches: BTreeMap::new(),
+            })),
+            context: context,
+        };
 
         {
             use std::mem;
             // TODO: set up more event callbacks
             unsafe {
                 ffi::emscripten_set_mousemove_callback(CANVAS_NAME.as_ptr(),
-                                              mem::transmute(events.deref()),
+                                              mem::transmute(window.inner.deref()),
                                               ffi::EM_FALSE,
                                               mouse_callback);
                 ffi::emscripten_set_mousedown_callback(CANVAS_NAME.as_ptr(),
-                                              mem::transmute(events.deref()),
+                                              mem::transmute(window.inner.deref()),
                                               ffi::EM_FALSE,
                                               mouse_callback);
                 ffi::emscripten_set_mouseup_callback(CANVAS_NAME.as_ptr(),
-                                              mem::transmute(events.deref()),
+                                              mem::transmute(window.inner.deref()),
                                               ffi::EM_FALSE,
                                               mouse_callback);
                 ffi::emscripten_set_keydown_callback(DOCUMENT_NAME.as_ptr(),
-                                            mem::transmute(events.deref()),
+                                            mem::transmute(window.inner.deref()),
                                             ffi::EM_FALSE,
                                             keyboard_callback);
                 ffi::emscripten_set_keyup_callback(DOCUMENT_NAME.as_ptr(),
-                                            mem::transmute(events.deref()),
+                                            mem::transmute(window.inner.deref()),
                                             ffi::EM_FALSE,
                                             keyboard_callback);
                 ffi::emscripten_set_touchstart_callback(CANVAS_NAME.as_ptr(),
-                                            mem::transmute(events.deref()),
+                                            mem::transmute(window.inner.deref()),
                                             ffi::EM_FALSE,
                                             Some(touch_callback));
                 ffi::emscripten_set_touchend_callback(CANVAS_NAME.as_ptr(),
-                                            mem::transmute(events.deref()),
+                                            mem::transmute(window.inner.deref()),
                                             ffi::EM_FALSE,
                                             Some(touch_callback));
                 ffi::emscripten_set_touchmove_callback(CANVAS_NAME.as_ptr(),
-                                            mem::transmute(events.deref()),
+                                            mem::transmute(window.inner.deref()),
                                             ffi::EM_FALSE,
                                             Some(touch_callback));
                 ffi::emscripten_set_touchcancel_callback(CANVAS_NAME.as_ptr(),
-                                            mem::transmute(events.deref()),
+                                            mem::transmute(window.inner.deref()),
                                             ffi::EM_FALSE,
                                             Some(touch_callback));
+                ffi::emscripten_set_pointerlockchange_callback(CANVAS_NAME.as_ptr(),
+                                            mem::transmute(window.inner.deref()),
+                                            ffi::EM_FALSE,
+                                            Some(pointerlockchange_callback));
             }
         }
 
         // TODO: emscripten_set_webglcontextrestored_callback
-
-        let window = Window {
-            cursor_state: RefCell::new(::CursorState::Normal),
-            context: context,
-            events: events,
-        };
 
         if window_builder.window.monitor.is_some() {
             use std::ptr;
@@ -252,15 +263,9 @@ impl Window {
         unsafe {
             use ::CursorState::*;
 
-            let mut old_state = self.cursor_state.borrow_mut();
+            let ref mut old_state = self.inner.borrow_mut().cursor_state;
             if state == *old_state {
                 return Ok(());
-            }
-
-            // Set or unset grab callback
-            match state {
-                Hide | Normal => em_try(ffi::emscripten_set_pointerlockchange_callback(ptr::null(), 0 as *mut libc::c_void, ffi::EM_FALSE, None))?,
-                Grab => em_try(ffi::emscripten_set_pointerlockchange_callback(ptr::null(), 0 as *mut libc::c_void, ffi::EM_FALSE, Some(pointerlockchange_callback)))?,
             }
 
             // Go back to normal cursor state
@@ -362,6 +367,7 @@ impl Drop for Window {
     fn drop(&mut self) {
         use std::ptr;
         unsafe {
+            ffi::emscripten_set_pointerlockchange_callback(ptr::null(), 0 as *mut libc::c_void, ffi::EM_FALSE, None);
             ffi::emscripten_set_fullscreenchange_callback(ptr::null(), 0 as *mut libc::c_void, ffi::EM_FALSE, None);
             ffi::emscripten_exit_fullscreen();
             ffi::emscripten_webgl_destroy_context(self.context);
@@ -396,18 +402,39 @@ fn em_try(res: ffi::EMSCRIPTEN_RESULT) -> Result<(), String> {
 extern fn mouse_callback(
         event_type: libc::c_int,
         event: *const ffi::EmscriptenMouseEvent,
-        event_queue: *mut libc::c_void) -> ffi::EM_BOOL {
+        user_data: *mut libc::c_void) -> ffi::EM_BOOL {
     unsafe {
         use std::mem;
-        let queue: &RefCell<VecDeque<Event>> = mem::transmute(event_queue);
+        use std::ptr;
+
+        let inner_window: &RefCell<InnerWindow> = mem::transmute(user_data);
+        let mut inner_window = inner_window.borrow_mut();
+
         match event_type {
             ffi::EMSCRIPTEN_EVENT_MOUSEMOVE => {
-                queue.borrow_mut().push_back(Event::MouseMoved(
-                        (*event).canvas_x as i32,
-                        (*event).canvas_y as i32));
+                // send relative move if cursor is grabbed
+                match inner_window.cursor_state {
+                    ::CursorState::Grab => inner_window.events.push_back(
+                        Event::MouseMoved(
+                            (*event).movement_x as i32,
+                            (*event).movement_y as i32)),
+                    _ => inner_window.events.push_back(
+                        Event::MouseMoved(
+                            (*event).canvas_x as i32,
+                            (*event).canvas_y as i32)),
+                }
             },
             ffi::EMSCRIPTEN_EVENT_MOUSEDOWN => {
-                queue.borrow_mut().push_back(Event::MouseInput(
+                // call pointerlock if needed
+                if let ::CursorState::Grab = inner_window.cursor_state {
+                    let mut pointerlock_status: ffi::EmscriptenPointerlockChangeEvent = mem::uninitialized();
+                    ffi::emscripten_get_pointerlock_status(&mut pointerlock_status);
+                    if pointerlock_status.isActive == ffi::EM_FALSE {
+                        ffi::emscripten_request_pointerlock(ptr::null(), ffi::EM_TRUE);
+                    }
+                }
+
+                inner_window.events.push_back(Event::MouseInput(
                         ElementState::Pressed,
                         match (*event).button {
                             0 => MouseButton::Left,
@@ -417,7 +444,7 @@ extern fn mouse_callback(
                         }));
             },
             ffi::EMSCRIPTEN_EVENT_MOUSEUP => {
-                queue.borrow_mut().push_back(Event::MouseInput(
+                inner_window.events.push_back(Event::MouseInput(
                         ElementState::Released,
                         match (*event).button {
                             0 => MouseButton::Left,
@@ -436,22 +463,24 @@ extern fn mouse_callback(
 extern fn keyboard_callback(
         event_type: libc::c_int,
         event: *const ffi::EmscriptenKeyboardEvent,
-        event_queue: *mut libc::c_void) -> ffi::EM_BOOL {
+        user_data: *mut libc::c_void) -> ffi::EM_BOOL {
     unsafe {
         use std::mem;
-        let queue: &RefCell<VecDeque<Event>> = mem::transmute(event_queue);
+        let inner_window: &RefCell<InnerWindow> = mem::transmute(user_data);
+        let mut inner_window = inner_window.borrow_mut();
+
         let code = keyboard::key_translate((*event).key);
         let virtual_key = keyboard::key_translate_virt(
             (*event).key, (*event).location);
         match event_type {
             ffi::EMSCRIPTEN_EVENT_KEYDOWN => {
-                queue.borrow_mut().push_back(Event::KeyboardInput(
+                inner_window.events.push_back(Event::KeyboardInput(
                         ElementState::Pressed,
                         code,
                         virtual_key));
             },
             ffi::EMSCRIPTEN_EVENT_KEYUP => {
-                queue.borrow_mut().push_back(Event::KeyboardInput(
+                inner_window.events.push_back(Event::KeyboardInput(
                         ElementState::Released,
                         code,
                         virtual_key));
@@ -463,75 +492,77 @@ extern fn keyboard_callback(
     ffi::EM_TRUE
 }
 
-thread_local! {
-    static ACTIVE_TOUCHES: RefCell<BTreeMap<libc::c_long,(i32, i32)>> = RefCell::new(BTreeMap::new());
-}
-
 extern fn touch_callback(
         event_type: libc::c_int,
         event: *const ffi::EmscriptenTouchEvent,
-        event_queue: *mut libc::c_void) -> ffi::EM_BOOL {
+        user_data: *mut libc::c_void) -> ffi::EM_BOOL {
     unsafe {
         use std::mem;
 
-        ACTIVE_TOUCHES.with(|active_touches| {
-            let mut active_touches = active_touches.borrow_mut();
-            let queue: &RefCell<VecDeque<Event>> = mem::transmute(event_queue);
-            let mut queue = queue.borrow_mut();
+        let inner_window: &RefCell<InnerWindow> = mem::transmute(user_data);
+        let mut inner_window = inner_window.borrow_mut();
 
-            match event_type {
-                ffi::EMSCRIPTEN_EVENT_TOUCHSTART => {
-                    // Check for all new identifier
-                    for touch in 0..(*event).numTouches as usize {
-                        let touch = (*event).touches[touch];
-                        if !active_touches.contains_key(&touch.identifier) {
-                            active_touches.insert(touch.identifier, (touch.canvasX, touch.canvasY));
-                            queue.push_back(Event::Touch( winit::Touch {
-                                phase: winit::TouchPhase::Started,
-                                location: (touch.canvasX as f64, touch.canvasY as f64),
-                                id: touch.identifier as u64,
-                            }))
-                        }
-                    }
-                },
-                ffi::EMSCRIPTEN_EVENT_TOUCHEND | ffi::EMSCRIPTEN_EVENT_TOUCHCANCEL => {
-                    // Check for event that are not onTarget
-                    let phase = match event_type {
-                        ffi::EMSCRIPTEN_EVENT_TOUCHEND => winit::TouchPhase::Ended,
-                        ffi::EMSCRIPTEN_EVENT_TOUCHCANCEL => winit::TouchPhase::Cancelled,
-                        _ => unreachable!(),
-                    };
-                    for touch in 0..(*event).numTouches  as usize {
-                        let touch = (*event).touches[touch];
-                        if touch.onTarget == 0 {
-                            active_touches.remove(&touch.identifier);
-                            queue.push_back(Event::Touch( winit::Touch {
-                                phase: phase,
-                                location: (touch.canvasX as f64, touch.canvasY as f64),
-                                id: touch.identifier as u64,
-                            }))
-                        }
+        match event_type {
+            ffi::EMSCRIPTEN_EVENT_TOUCHSTART => {
+                // Check for all new identifier
+                for touch in 0..(*event).numTouches as usize {
+                    let touch = (*event).touches[touch];
+                    if !inner_window.active_touches.contains_key(&touch.identifier) {
+                        inner_window.active_touches.insert(touch.identifier, (touch.canvasX, touch.canvasY));
+                        inner_window.events.push_back(Event::Touch( winit::Touch {
+                            phase: winit::TouchPhase::Started,
+                            location: (touch.canvasX as f64, touch.canvasY as f64),
+                            id: touch.identifier as u64,
+                        }))
                     }
                 }
-                ffi::EMSCRIPTEN_EVENT_TOUCHMOVE => {
-                    // check for all event that have changed coordinates
-                    for touch in 0..(*event).numTouches  as usize {
-                        let touch = (*event).touches[touch];
-                        if let Some(active_touch) = active_touches.get_mut(&touch.identifier) {
-                            if active_touch.0 != touch.canvasX || active_touch.1 != touch.canvasY {
-                                *active_touch = (touch.canvasX, touch.canvasY);
-                                queue.push_back(Event::Touch( winit::Touch {
-                                    phase: winit::TouchPhase::Moved,
-                                    location: (touch.canvasX as f64, touch.canvasY as f64),
-                                    id: touch.identifier as u64,
-                                }))
-                            }
-                        }
+            },
+            ffi::EMSCRIPTEN_EVENT_TOUCHEND | ffi::EMSCRIPTEN_EVENT_TOUCHCANCEL => {
+                // Check for event that are not onTarget
+                let phase = match event_type {
+                    ffi::EMSCRIPTEN_EVENT_TOUCHEND => winit::TouchPhase::Ended,
+                    ffi::EMSCRIPTEN_EVENT_TOUCHCANCEL => winit::TouchPhase::Cancelled,
+                    _ => unreachable!(),
+                };
+                for touch in 0..(*event).numTouches  as usize {
+                    let touch = (*event).touches[touch];
+                    if touch.onTarget == 0 {
+                        inner_window.active_touches.remove(&touch.identifier);
+                        inner_window.events.push_back(Event::Touch( winit::Touch {
+                            phase: phase,
+                            location: (touch.canvasX as f64, touch.canvasY as f64),
+                            id: touch.identifier as u64,
+                        }))
                     }
                 }
-                _ => ()
             }
-        });
+            ffi::EMSCRIPTEN_EVENT_TOUCHMOVE => {
+                // check for all event that have changed coordinates
+                for touch in 0..(*event).numTouches  as usize {
+                    let touch = (*event).touches[touch];
+
+                    let diff = if let Some(active_touch) = inner_window.active_touches.get_mut(&touch.identifier) {
+                        if active_touch.0 != touch.canvasX || active_touch.1 != touch.canvasY {
+                            *active_touch = (touch.canvasX, touch.canvasY);
+                            true
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    };
+
+                    if diff {
+                        inner_window.events.push_back(Event::Touch( winit::Touch {
+                            phase: winit::TouchPhase::Moved,
+                            location: (touch.canvasX as f64, touch.canvasY as f64),
+                            id: touch.identifier as u64,
+                        }))
+                    }
+                }
+            }
+            _ => ()
+        }
     }
     ffi::EM_TRUE
 }
@@ -552,11 +583,20 @@ unsafe extern "C" fn fullscreen_callback(
 #[allow(non_snake_case)]
 unsafe extern "C" fn pointerlockchange_callback(
     _eventType: libc::c_int,
-    _pointerlockChangeEvent: *const ffi::EmscriptenPointerlockChangeEvent,
-    _userData: *mut libc::c_void) -> ffi::EM_BOOL
+    pointerlockChangeEvent: *const ffi::EmscriptenPointerlockChangeEvent,
+    user_data: *mut libc::c_void) -> ffi::EM_BOOL
 {
+    use std::mem;
     use std::ptr;
-    ffi::emscripten_request_pointerlock(ptr::null(), ffi::EM_TRUE);
+
+    let inner_window: &RefCell<InnerWindow> = mem::transmute(user_data);
+    let inner_window = inner_window.borrow();
+
+    if let ::CursorState::Grab = inner_window.cursor_state {
+        if (*pointerlockChangeEvent).isActive == ffi::EM_FALSE {
+            ffi::emscripten_request_pointerlock(ptr::null(), ffi::EM_TRUE);
+        }
+    }
     ffi::EM_FALSE
 }
 

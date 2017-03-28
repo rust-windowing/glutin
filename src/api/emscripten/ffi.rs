@@ -227,6 +227,8 @@ extern {
 
     pub fn emscripten_exit_pointerlock() -> EMSCRIPTEN_RESULT;
 
+    pub fn emscripten_get_pointerlock_status(pointerlockStatus: *mut EmscriptenPointerlockChangeEvent) -> EMSCRIPTEN_RESULT;
+
     pub fn emscripten_request_fullscreen(target: *const libc::c_char,
         deferUntilInEventHandler: EM_BOOL) -> EMSCRIPTEN_RESULT;
 
