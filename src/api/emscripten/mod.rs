@@ -120,21 +120,21 @@ impl Window {
             // TODO: set up more event callbacks
             unsafe {
                 em_try(ffi::emscripten_set_mousemove_callback(CANVAS_NAME.as_ptr(),
-                                              mem::transmute(window.inner.deref()),
-                                              ffi::EM_FALSE,
-                                              mouse_callback))
+                                            mem::transmute(window.inner.deref()),
+                                            ffi::EM_FALSE,
+                                            mouse_callback))
                     .map_err(|e| ::CreationError::OsError(
                             format!("Error while calling emscripten_set_mousemove_callback: {}", e)))?;
                 em_try(ffi::emscripten_set_mousedown_callback(CANVAS_NAME.as_ptr(),
-                                              mem::transmute(window.inner.deref()),
-                                              ffi::EM_FALSE,
-                                              mouse_callback))
+                                            mem::transmute(window.inner.deref()),
+                                            ffi::EM_FALSE,
+                                            mouse_callback))
                     .map_err(|e| ::CreationError::OsError(
                             format!("Error while calling emscripten_set_mousedown_callback: {}", e)))?;
                 em_try(ffi::emscripten_set_mouseup_callback(CANVAS_NAME.as_ptr(),
-                                              mem::transmute(window.inner.deref()),
-                                              ffi::EM_FALSE,
-                                              mouse_callback))
+                                            mem::transmute(window.inner.deref()),
+                                            ffi::EM_FALSE,
+                                            mouse_callback))
                     .map_err(|e| ::CreationError::OsError(
                             format!("Error while calling emscripten_set_mouseup_callback: {}", e)))?;
                 em_try(ffi::emscripten_set_keydown_callback(DOCUMENT_NAME.as_ptr(),
