@@ -119,46 +119,66 @@ impl Window {
             use std::mem;
             // TODO: set up more event callbacks
             unsafe {
-                ffi::emscripten_set_mousemove_callback(CANVAS_NAME.as_ptr(),
+                em_try(ffi::emscripten_set_mousemove_callback(CANVAS_NAME.as_ptr(),
                                               mem::transmute(window.inner.deref()),
                                               ffi::EM_FALSE,
-                                              mouse_callback);
-                ffi::emscripten_set_mousedown_callback(CANVAS_NAME.as_ptr(),
+                                              mouse_callback))
+                    .map_err(|e| ::CreationError::OsError(
+                            format!("Error while calling emscripten_set_mousemove_callback: {}", e)))?;
+                em_try(ffi::emscripten_set_mousedown_callback(CANVAS_NAME.as_ptr(),
                                               mem::transmute(window.inner.deref()),
                                               ffi::EM_FALSE,
-                                              mouse_callback);
-                ffi::emscripten_set_mouseup_callback(CANVAS_NAME.as_ptr(),
+                                              mouse_callback))
+                    .map_err(|e| ::CreationError::OsError(
+                            format!("Error while calling emscripten_set_mousedown_callback: {}", e)))?;
+                em_try(ffi::emscripten_set_mouseup_callback(CANVAS_NAME.as_ptr(),
                                               mem::transmute(window.inner.deref()),
                                               ffi::EM_FALSE,
-                                              mouse_callback);
-                ffi::emscripten_set_keydown_callback(DOCUMENT_NAME.as_ptr(),
+                                              mouse_callback))
+                    .map_err(|e| ::CreationError::OsError(
+                            format!("Error while calling emscripten_set_mouseup_callback: {}", e)))?;
+                em_try(ffi::emscripten_set_keydown_callback(DOCUMENT_NAME.as_ptr(),
                                             mem::transmute(window.inner.deref()),
                                             ffi::EM_FALSE,
-                                            keyboard_callback);
-                ffi::emscripten_set_keyup_callback(DOCUMENT_NAME.as_ptr(),
+                                            keyboard_callback))
+                    .map_err(|e| ::CreationError::OsError(
+                            format!("Error while calling emscripten_set_keydown_callback: {}", e)))?;
+                em_try(ffi::emscripten_set_keyup_callback(DOCUMENT_NAME.as_ptr(),
                                             mem::transmute(window.inner.deref()),
                                             ffi::EM_FALSE,
-                                            keyboard_callback);
-                ffi::emscripten_set_touchstart_callback(CANVAS_NAME.as_ptr(),
+                                            keyboard_callback))
+                    .map_err(|e| ::CreationError::OsError(
+                            format!("Error while calling emscripten_set_keyup_callback: {}", e)))?;
+                em_try(ffi::emscripten_set_touchstart_callback(CANVAS_NAME.as_ptr(),
                                             mem::transmute(window.inner.deref()),
                                             ffi::EM_FALSE,
-                                            Some(touch_callback));
-                ffi::emscripten_set_touchend_callback(CANVAS_NAME.as_ptr(),
+                                            Some(touch_callback)))
+                    .map_err(|e| ::CreationError::OsError(
+                            format!("Error while calling emscripten_set_touchstart_callback: {}", e)))?;
+                em_try(ffi::emscripten_set_touchend_callback(CANVAS_NAME.as_ptr(),
                                             mem::transmute(window.inner.deref()),
                                             ffi::EM_FALSE,
-                                            Some(touch_callback));
-                ffi::emscripten_set_touchmove_callback(CANVAS_NAME.as_ptr(),
+                                            Some(touch_callback)))
+                    .map_err(|e| ::CreationError::OsError(
+                            format!("Error while calling emscripten_set_touchend_callback: {}", e)))?;
+                em_try(ffi::emscripten_set_touchmove_callback(CANVAS_NAME.as_ptr(),
                                             mem::transmute(window.inner.deref()),
                                             ffi::EM_FALSE,
-                                            Some(touch_callback));
-                ffi::emscripten_set_touchcancel_callback(CANVAS_NAME.as_ptr(),
+                                            Some(touch_callback)))
+                    .map_err(|e| ::CreationError::OsError(
+                            format!("Error while calling emscripten_set_touchmove_callback: {}", e)))?;
+                em_try(ffi::emscripten_set_touchcancel_callback(CANVAS_NAME.as_ptr(),
                                             mem::transmute(window.inner.deref()),
                                             ffi::EM_FALSE,
-                                            Some(touch_callback));
-                ffi::emscripten_set_pointerlockchange_callback(CANVAS_NAME.as_ptr(),
+                                            Some(touch_callback)))
+                    .map_err(|e| ::CreationError::OsError(
+                            format!("Error while calling emscripten_set_touchcancel_callback: {}", e)))?;
+                em_try(ffi::emscripten_set_pointerlockchange_callback(CANVAS_NAME.as_ptr(),
                                             mem::transmute(window.inner.deref()),
                                             ffi::EM_FALSE,
-                                            Some(pointerlockchange_callback));
+                                            Some(pointerlockchange_callback)))
+                    .map_err(|e| ::CreationError::OsError(
+                            format!("Error while calling emscripten_set_pointerlockchange_callback: {}", e)))?;
             }
         }
 
@@ -168,9 +188,9 @@ impl Window {
             use std::ptr;
             unsafe {
                 em_try(ffi::emscripten_request_fullscreen(ptr::null(), ffi::EM_TRUE))
-                    .map_err(|e| ::CreationError::OsError(e))?;
+                    .map_err(|e| ::CreationError::OsError(format!("Error while calling emscripten_request_fullscreen: {}", e)))?;
                 em_try(ffi::emscripten_set_fullscreenchange_callback(ptr::null(), 0 as *mut libc::c_void, ffi::EM_FALSE, Some(fullscreen_callback)))
-                    .map_err(|e| ::CreationError::OsError(e))?;
+                    .map_err(|e| ::CreationError::OsError(format!("Error while calling emscripten_set_fullscreenchange_callback: {}", e)))?;
             }
         } else if let Some((w, h)) = window_builder.window.dimensions {
             window.set_inner_size(w, h);
@@ -271,14 +291,16 @@ impl Window {
             // Go back to normal cursor state
             match *old_state {
                 Hide => show_mouse(),
-                Grab => em_try(ffi::emscripten_exit_pointerlock())?,
+                Grab => em_try(ffi::emscripten_exit_pointerlock())
+                    .map_err(|e| format!("Error while calling emscripten_exit_pointerlock: {}", e))?,
                 Normal => (),
             }
 
             // Set cursor from normal cursor state
             match state {
                 Hide => ffi::emscripten_hide_mouse(),
-                Grab => em_try(ffi::emscripten_request_pointerlock(ptr::null(), ffi::EM_TRUE))?,
+                Grab => em_try(ffi::emscripten_request_pointerlock(ptr::null(), ffi::EM_TRUE))
+                    .map_err(|e| format!("Error while calling emscripten_request_pointerlock: {}", e))?,
                 Normal => (),
             }
 
