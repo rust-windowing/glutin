@@ -450,9 +450,10 @@ extern fn mouse_callback(
                 // call pointerlock if needed
                 if let ::CursorState::Grab = inner_window.cursor_state {
                     let mut pointerlock_status: ffi::EmscriptenPointerlockChangeEvent = mem::uninitialized();
-                    ffi::emscripten_get_pointerlock_status(&mut pointerlock_status);
-                    if pointerlock_status.isActive == ffi::EM_FALSE {
-                        ffi::emscripten_request_pointerlock(ptr::null(), ffi::EM_TRUE);
+                    if ffi::emscripten_get_pointerlock_status(&mut pointerlock_status) == ffi::EMSCRIPTEN_RESULT_SUCCESS {
+                        if pointerlock_status.isActive == ffi::EM_FALSE {
+                            ffi::emscripten_request_pointerlock(ptr::null(), ffi::EM_TRUE);
+                        }
                     }
                 }
 
