@@ -598,7 +598,7 @@ unsafe extern "C" fn fullscreen_callback(
 {
     use std::ptr;
     ffi::emscripten_request_fullscreen(ptr::null(), ffi::EM_TRUE);
-    ffi::EM_FALSE
+    ffi::EM_TRUE
 }
 
 // In case of pointer grabbed this method will request pointer lock on change
@@ -619,7 +619,7 @@ unsafe extern "C" fn pointerlockchange_callback(
             ffi::emscripten_request_pointerlock(ptr::null(), ffi::EM_TRUE);
         }
     }
-    ffi::EM_FALSE
+    ffi::EM_TRUE
 }
 
 fn show_mouse() {
