@@ -59,6 +59,11 @@ pub const EMSCRIPTEN_EVENT_MOUSEDOWN: libc::c_int = 5;
 pub const EMSCRIPTEN_EVENT_MOUSEUP: libc::c_int = 6;
 pub const EMSCRIPTEN_EVENT_MOUSEMOVE: libc::c_int = 8;
 
+pub const EMSCRIPTEN_EVENT_TOUCHSTART: libc::c_int = 22;
+pub const EMSCRIPTEN_EVENT_TOUCHEND: libc::c_int = 23;
+pub const EMSCRIPTEN_EVENT_TOUCHMOVE: libc::c_int = 24;
+pub const EMSCRIPTEN_EVENT_TOUCHCANCEL: libc::c_int = 25;
+
 pub const EM_HTML5_SHORT_STRING_LEN_BYTES: usize  = 32;
 
 pub const DOM_KEY_LOCATION_STANDARD: libc::c_ulong = 0x00;
@@ -112,6 +117,8 @@ pub type em_keyboard_callback_func = extern fn(libc::c_int, *const EmscriptenKey
 
 pub type em_pointerlockchange_callback_func = Option<unsafe extern "C" fn(eventType: libc::c_int, pointerlockChangeEvent: *const EmscriptenPointerlockChangeEvent, userData: *mut libc::c_void) -> EM_BOOL>;
 
+pub type em_touch_callback_func = Option<unsafe extern "C" fn(eventType: libc::c_int, touchEvent: *const EmscriptenTouchEvent, userData: *mut libc::c_void) -> EM_BOOL>;
+
 #[repr(C)]
 pub struct EmscriptenWebGLContextAttributes {
     pub alpha: EM_BOOL,
@@ -125,6 +132,55 @@ pub struct EmscriptenWebGLContextAttributes {
     pub majorVersion: libc::c_int,
     pub minorVersion: libc::c_int,
     pub enableExtensionsByDefault: EM_BOOL,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy)]
+pub struct EmscriptenTouchPoint {
+    pub identifier: libc::c_long,
+    pub screenX: libc::c_long,
+    pub screenY: libc::c_long,
+    pub clientX: libc::c_long,
+    pub clientY: libc::c_long,
+    pub pageX: libc::c_long,
+    pub pageY: libc::c_long,
+    pub isChanged: libc::c_int,
+    pub onTarget: libc::c_int,
+    pub targetX: libc::c_long,
+    pub targetY: libc::c_long,
+    pub canvasX: libc::c_long,
+    pub canvasY: libc::c_long,
+}
+
+#[test]
+fn bindgen_test_layout_EmscriptenTouchPoint() {
+    assert_eq!(::std::mem::size_of::<EmscriptenTouchPoint>() , 96usize);
+    assert_eq!(::std::mem::align_of::<EmscriptenTouchPoint>() , 8usize);
+}
+
+impl Clone for EmscriptenTouchPoint {
+    fn clone(&self) -> Self { *self }
+}
+
+#[repr(C)]
+#[derive(Debug, Copy)]
+pub struct EmscriptenTouchEvent {
+    pub numTouches: libc::c_int,
+    pub ctrlKey: libc::c_int,
+    pub shiftKey: libc::c_int,
+    pub altKey: libc::c_int,
+    pub metaKey: libc::c_int,
+    pub touches: [EmscriptenTouchPoint; 32usize],
+}
+
+#[test]
+fn bindgen_test_layout_EmscriptenTouchEvent() {
+    assert_eq!(::std::mem::size_of::<EmscriptenTouchEvent>() , 3096usize);
+    assert_eq!(::std::mem::align_of::<EmscriptenTouchEvent>() , 8usize);
+}
+
+impl Clone for EmscriptenTouchEvent {
+    fn clone(&self) -> Self { *self }
 }
 
 // values for EMSCRIPTEN_RESULT
@@ -171,6 +227,8 @@ extern {
 
     pub fn emscripten_exit_pointerlock() -> EMSCRIPTEN_RESULT;
 
+    pub fn emscripten_get_pointerlock_status(pointerlockStatus: *mut EmscriptenPointerlockChangeEvent) -> EMSCRIPTEN_RESULT;
+
     pub fn emscripten_request_fullscreen(target: *const libc::c_char,
         deferUntilInEventHandler: EM_BOOL) -> EMSCRIPTEN_RESULT;
 
@@ -205,4 +263,12 @@ extern {
     pub fn emscripten_hide_mouse();
 
     pub fn emscripten_asm_const(code: *const libc::c_char);
+
+    pub fn emscripten_set_touchstart_callback(target: *const libc::c_char, userData: *mut libc::c_void, useCapture: EM_BOOL, callback: em_touch_callback_func) -> EMSCRIPTEN_RESULT;
+
+    pub fn emscripten_set_touchend_callback(target: *const libc::c_char, userData: *mut libc::c_void, useCapture: EM_BOOL, callback: em_touch_callback_func) -> EMSCRIPTEN_RESULT;
+
+    pub fn emscripten_set_touchmove_callback(target: *const libc::c_char, userData: *mut libc::c_void, useCapture: EM_BOOL, callback: em_touch_callback_func) -> EMSCRIPTEN_RESULT;
+
+    pub fn emscripten_set_touchcancel_callback(target: *const libc::c_char, userData: *mut libc::c_void, useCapture: EM_BOOL, callback: em_touch_callback_func) -> EMSCRIPTEN_RESULT;
 }
