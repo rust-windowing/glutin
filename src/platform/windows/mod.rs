@@ -68,14 +68,12 @@ impl Window {
     /// See the docs in the crate root file.
     #[inline]
     pub fn new(
-        window: &WindowAttributes,
         pf_reqs: &PixelFormatRequirements,
         opengl: &GlAttributes<&Window>,
         _: &PlatformSpecificWindowBuilderAttributes,
         winit_builder: winit::WindowBuilder,
     ) -> Result<Window, CreationError> {
         window::Window::new(
-            window,
             pf_reqs,
             &opengl.clone().map_sharing(|w| &w.0),
             EGL.as_ref().map(|w| &w.0),
@@ -127,10 +125,9 @@ impl HeadlessContext {
             }
         }
         let winit_builder = winit::WindowBuilder::new().with_visibility(false);
-        let window = try!(window::Window::new(&WindowAttributes { visible: false, .. Default::default() },
-                                             pf_reqs, &opengl.clone().map_sharing(|_| unimplemented!()),            //TODO:
-                                             EGL.as_ref().map(|w| &w.0),
-                                             winit_builder));
+        let window = try!(window::Window::new(pf_reqs, &opengl.clone().map_sharing(|_| unimplemented!()),            //TODO:
+                                              EGL.as_ref().map(|w| &w.0),
+                                              winit_builder));
         Ok(HeadlessContext::HiddenWindow(window))
     }
 }

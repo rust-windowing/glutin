@@ -70,7 +70,6 @@ impl<'a> Iterator for PollEventsIterator<'a> {
 impl Window {
     #[inline]
     pub fn new(
-        _: &WindowAttributes,
         pf_reqs: &PixelFormatRequirements,
         opengl: &GlAttributes<&Window>,
         _: &PlatformSpecificWindowBuilderAttributes,

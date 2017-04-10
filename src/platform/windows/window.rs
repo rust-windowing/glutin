@@ -38,8 +38,7 @@ enum Context {
 
 impl Window {
     /// See the docs in the crate root file.
-    pub fn new(_: &WindowAttributes,
-               pf_reqs: &PixelFormatRequirements,
+    pub fn new(pf_reqs: &PixelFormatRequirements,
                opengl: &GlAttributes<&Window>,
                egl: Option<&Egl>,
                winit_builder: winit::WindowBuilder)
