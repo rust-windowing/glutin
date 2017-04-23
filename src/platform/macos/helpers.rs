@@ -16,7 +16,7 @@ pub fn build_nsattributes<T>(pf_reqs: &PixelFormatRequirements, opengl: &GlAttri
         // https://github.com/rust-lang/rust/pull/27050
 
         (GlRequest::Latest, _, Some(GlProfile::Compatibility)) => NSOpenGLProfileVersionLegacy as u32,
-        (GlRequest::Latest, _, _) => {
+        (GlRequest::Latest, _, _) => unsafe {
             if NSAppKitVersionNumber.floor() >= NSAppKitVersionNumber10_9 {
                 NSOpenGLProfileVersion4_1Core as u32
             } else if NSAppKitVersionNumber.floor() >= NSAppKitVersionNumber10_7 {

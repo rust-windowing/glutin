@@ -10,9 +10,9 @@ use PixelFormatRequirements;
 
 use api::osmesa::{self, OsMesaContext};
 
-pub use self::api_dispatch::{Window};
+pub use self::api_dispatch::{Window, EventsLoop};
 pub use self::api_dispatch::PlatformSpecificWindowBuilderAttributes;
-pub use self::api_dispatch::{WaitEventsIterator, PollEventsIterator};
+
 mod api_dispatch;
 mod wayland;
 mod x11;
