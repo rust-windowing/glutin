@@ -33,13 +33,14 @@ pub struct PlatformSpecificWindowBuilderAttributes;
 pub struct PlatformSpecificHeadlessBuilderAttributes;
 
 impl Window {
-    pub fn new(_: &WindowAttributes,
+    pub fn new(events_loop: &winit::EventsLoop,
+               _: &WindowAttributes,
                pf_reqs: &PixelFormatRequirements,
                opengl: &GlAttributes<&Window>,
                _: &PlatformSpecificWindowBuilderAttributes,
                winit_builder: winit::WindowBuilder)
                -> Result<Window, CreationError> {
-        let winit_window = winit_builder.build().unwrap();
+        let winit_window = winit_builder.build(events_loop).unwrap();
         let opengl = opengl.clone().map_sharing(|w| &w.context);
         let native_window = unsafe { android_glue::get_native_window() };
         if native_window.is_null() {
@@ -99,14 +100,6 @@ impl Window {
         self.winit_window.set_inner_size(x, y)
     }
 
-    pub fn poll_events(&self) -> winit::PollEventsIterator {
-        self.winit_window.poll_events()
-    }
-
-    pub fn wait_events(&self) -> winit::WaitEventsIterator {
-        self.winit_window.wait_events()
-    }
-
     pub unsafe fn platform_display(&self) -> *mut libc::c_void {
         self.winit_window.platform_display()
     }
@@ -123,14 +116,6 @@ impl Window {
 
     pub unsafe fn platform_window(&self) -> *mut libc::c_void {
         self.winit_window.platform_window()
-    }
-
-    pub fn create_window_proxy(&self) -> winit::WindowProxy {
-        self.winit_window.create_window_proxy()
-    }
-
-    pub fn set_window_resize_callback(&mut self, callback: Option<fn(u32, u32)>) {
-        self.winit_window.set_window_resize_callback(callback);
     }
 
     pub fn set_cursor(&self, cursor: winit::MouseCursor) {
@@ -182,16 +167,6 @@ impl GlContext for Window {
     #[inline]
     fn get_pixel_format(&self) -> PixelFormat {
         self.context.get_pixel_format()
-    }
-}
-
-#[derive(Clone)]
-pub struct WindowProxy;
-
-impl WindowProxy {
-    #[inline]
-    pub fn wakeup_event_loop(&self) {
-        unimplemented!()
     }
 }
 

@@ -36,15 +36,59 @@ enum Context {
     Wgl(WglContext),
 }
 
+pub struct EventsLoop {
+    winit_events_loop: winit::EventsLoop,
+}
+
+impl EventsLoop {
+
+    /// Builds a new events loop.
+    pub fn new() -> Self {
+        EventsLoop {
+            winit_events_loop: winit::EventsLoop::new(),
+        }
+    }
+
+    /// Fetches all the events that are pending, calls the callback function for each of them,
+    /// and returns.
+    #[inline]
+    pub fn poll_events<F>(&self, mut callback: F)
+        where F: FnMut(winit::Event)
+    {
+        self.winit_events_loop.poll_events(|event| {
+            callback(event);
+        });
+    }
+
+    /// Runs forever until `interrupt()` is called. Whenever an event happens, calls the callback.
+    #[inline]
+    pub fn run_forever<F>(&self, mut callback: F)
+        where F: FnMut(winit::Event)
+    {
+        self.winit_events_loop.run_forever(|event| {
+            callback(event);
+        })
+    }
+
+    /// If we called `run_forever()`, stops the process of waiting for events.
+    #[inline]
+    pub fn interrupt(&self) {
+        self.winit_events_loop.interrupt()
+    }
+
+}
+
 impl Window {
+
     /// See the docs in the crate root file.
-    pub fn new(_: &WindowAttributes,
+    pub fn new(events_loop: &EventsLoop,
+               _: &WindowAttributes,
                pf_reqs: &PixelFormatRequirements,
                opengl: &GlAttributes<&Window>,
                egl: Option<&Egl>,
                winit_builder: winit::WindowBuilder)
                -> Result<Window, CreationError> {
-        let winit_window = winit_builder.build().unwrap();
+        let winit_window = winit_builder.build(&events_loop.winit_events_loop).unwrap();
         let opengl = opengl.clone().map_sharing(|sharing| {
             match sharing.context {
                 Context::Wgl(ref c) => c.get_hglrc(),
@@ -75,6 +119,7 @@ impl Window {
                 _ => try!(WglContext::new(&pf_reqs, &opengl, w).map(Context::Wgl)),
             }
         };
+
         Ok(Window {
             context: context,
             winit_window: winit_window,
@@ -134,28 +179,12 @@ impl Window {
         self.winit_window.set_inner_size(x, y)
     }
 
-    pub fn poll_events(&self) -> winit::PollEventsIterator {
-        self.winit_window.poll_events()
-    }
-
-    pub fn wait_events(&self) -> winit::WaitEventsIterator {
-        self.winit_window.wait_events()
-    }
-
     pub unsafe fn platform_display(&self) -> *mut libc::c_void {
         self.winit_window.platform_display()
     }
 
     pub unsafe fn platform_window(&self) -> *mut libc::c_void {
         self.winit_window.platform_window()
-    }
-
-    pub fn create_window_proxy(&self) -> winit::WindowProxy {
-        self.winit_window.create_window_proxy()
-    }
-
-    pub fn set_window_resize_callback(&mut self, callback: Option<fn(u32, u32)>) {
-        self.winit_window.set_window_resize_callback(callback);
     }
 
     pub fn set_cursor(&self, cursor: winit::MouseCursor) {
@@ -172,6 +201,10 @@ impl Window {
 
     pub fn set_cursor_state(&self, state: winit::CursorState) -> Result<(), String> {
         self.winit_window.set_cursor_state(state)
+    }
+
+    pub fn id(&self) -> winit::WindowId {
+        self.winit_window.id()
     }
 }
 

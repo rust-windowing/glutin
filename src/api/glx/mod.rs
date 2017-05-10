@@ -15,7 +15,7 @@ use Robustness;
 use libc;
 use libc::c_int;
 use std::ffi::{CStr, CString};
-use std::{mem, ptr};
+use std::{mem, ptr, slice};
 
 pub mod ffi {
     pub use x11_dl::xlib::*;
@@ -50,11 +50,12 @@ fn with_c_str<F, T>(s: &str, f: F) -> T where F: FnOnce(*const libc::c_char) -> 
 impl Context {
     pub fn new<'a>(
         glx: ffi::glx::Glx,
-        xlib: &ffi::Xlib,
+        xlib: &'a ffi::Xlib,
         pf_reqs: &PixelFormatRequirements,
         opengl: &'a GlAttributes<&'a Context>,
         display: *mut ffi::Display,
         screen_id: libc::c_int,
+        transparent: bool,
 ) -> Result<ContextPrototype<'a>, CreationError> {
         // This is completely ridiculous, but VirtualBox's OpenGL driver needs some call handled by
         // *it* (i.e. not Mesa) to occur before anything else can happen. That is because
@@ -77,7 +78,7 @@ impl Context {
 
         // finding the pixel format we want
         let (fb_config, pixel_format) = unsafe {
-            try!(choose_fbconfig(&glx, &extensions, xlib, display, screen_id, pf_reqs)
+            try!(choose_fbconfig(&glx, &extensions, xlib, display, screen_id, pf_reqs, transparent)
                                           .map_err(|_| CreationError::NoAvailablePixelFormat))
         };
 
@@ -95,6 +96,7 @@ impl Context {
         Ok(ContextPrototype {
             glx: glx,
             extensions: extensions,
+            xlib: xlib,
             opengl: opengl,
             display: display,
             fb_config: fb_config,
@@ -163,6 +165,7 @@ impl Drop for Context {
 pub struct ContextPrototype<'a> {
     glx: ffi::glx::Glx,
     extensions: String,
+    xlib: &'a ffi::Xlib,
     opengl: &'a GlAttributes<&'a Context>,
     display: *mut ffi::Display,
     fb_config: ffi::glx::types::GLXFBConfig,
@@ -192,36 +195,41 @@ impl<'a> ContextPrototype<'a> {
         // creating GL context
         let context = match self.opengl.version {
             GlRequest::Latest => {
-                if let Ok(ctxt) = create_context(&self.glx, &extra_functions, &self.extensions, (3, 2),
-                                                 self.opengl.profile, self.opengl.debug,
-                                                 self.opengl.robustness, share,
-                                                 self.display, self.fb_config, &self.visual_infos)
+                let opengl_versions = [(4, 5), (4, 4), (4, 3), (4, 2), (4, 1), (4, 0),
+                                       (3, 3), (3, 2), (3, 1)];
+                let mut ctxt;
+                'outer: loop
                 {
-                    ctxt
-                } else if let Ok(ctxt) = create_context(&self.glx, &extra_functions, &self.extensions,
-                                                        (3, 1), self.opengl.profile,
-                                                        self.opengl.debug,
-                                                        self.opengl.robustness, share, self.display,
-                                                        self.fb_config, &self.visual_infos)
-                {
-                    ctxt
-
-                } else {
-                    try!(create_context(&self.glx, &extra_functions, &self.extensions, (1, 0),
-                                        self.opengl.profile, self.opengl.debug,
-                                        self.opengl.robustness,
-                                        share, self.display, self.fb_config, &self.visual_infos))
+                    // Try all OpenGL versions in descending order because some non-compliant
+                    // drivers don't return the latest supported version but the one requested
+                    for opengl_version in opengl_versions.iter()
+                    {
+                        match create_context(&self.glx, &extra_functions, &self.extensions, &self.xlib,
+                                             *opengl_version, self.opengl.profile,
+                                             self.opengl.debug, self.opengl.robustness, share,
+                                             self.display, self.fb_config, &self.visual_infos)
+                        {
+                            Ok(x) => {ctxt = x; break 'outer;},
+                            Err(_) => continue
+                        }
+                    }
+                    ctxt = try!(create_context(&self.glx, &extra_functions, &self.extensions, &self.xlib, (1, 0),
+                                               self.opengl.profile, self.opengl.debug,
+                                               self.opengl.robustness, share,
+                                               self.display, self.fb_config, &self.visual_infos));
+                    break;
                 }
+                ctxt
             },
             GlRequest::Specific(Api::OpenGl, (major, minor)) => {
-                try!(create_context(&self.glx, &extra_functions, &self.extensions, (major, minor),
+                try!(create_context(&self.glx, &extra_functions, &self.extensions, &self.xlib, (major, minor),
                                     self.opengl.profile, self.opengl.debug,
                                     self.opengl.robustness, share, self.display, self.fb_config,
                                     &self.visual_infos))
             },
             GlRequest::Specific(_, _) => panic!("Only OpenGL is supported"),
             GlRequest::GlThenGles { opengl_version: (major, minor), .. } => {
-                try!(create_context(&self.glx, &extra_functions, &self.extensions, (major, minor),
+                try!(create_context(&self.glx, &extra_functions, &self.extensions, &self.xlib, (major, minor),
                                     self.opengl.profile, self.opengl.debug,
                                     self.opengl.robustness, share, self.display, self.fb_config,
                                     &self.visual_infos))
@@ -283,7 +291,13 @@ impl<'a> ContextPrototype<'a> {
     }
 }
 
-fn create_context(glx: &ffi::glx::Glx, extra_functions: &ffi::glx_extra::Glx, extensions: &str,
+extern fn x_error_callback(dpy: *mut ffi::Display, err: *mut ffi::XErrorEvent) -> i32
+{
+    0
+}
+
+
+fn create_context(glx: &ffi::glx::Glx, extra_functions: &ffi::glx_extra::Glx, extensions: &str, xlib: &ffi::Xlib,
                   version: (u8, u8), profile: Option<GlProfile>, debug: bool,
                   robustness: Robustness, share: ffi::GLXContext, display: *mut ffi::Display,
                   fb_config: ffi::glx::types::GLXFBConfig,
@@ -291,6 +305,7 @@ fn create_context(glx: &ffi::glx::Glx, extra_functions: &ffi::glx_extra::Glx, ex
                   -> Result<ffi::GLXContext, CreationError>
 {
     unsafe {
+        let old_callback = (xlib.XSetErrorHandler)(Some(x_error_callback));
         let context = if extensions.split(' ').find(|&i| i == "GLX_ARB_create_context").is_some() {
             let mut attributes = Vec::with_capacity(9);
 
@@ -358,6 +373,8 @@ fn create_context(glx: &ffi::glx::Glx, extra_functions: &ffi::glx_extra::Glx, ex
             let visual_infos: *const ffi::XVisualInfo = visual_infos;
             glx.CreateContext(display as *mut _, visual_infos as *mut _, share, 1)
         };
+        
+        (xlib.XSetErrorHandler)(old_callback);
 
         if context.is_null() {
             // TODO: check for errors and return `OpenGlVersionNotSupported`
@@ -371,7 +388,7 @@ fn create_context(glx: &ffi::glx::Glx, extra_functions: &ffi::glx_extra::Glx, ex
 /// Enumerates all available FBConfigs
 unsafe fn choose_fbconfig(glx: &ffi::glx::Glx, extensions: &str, xlib: &ffi::Xlib,
                           display: *mut ffi::Display, screen_id: libc::c_int,
-                          reqs: &PixelFormatRequirements)
+                          reqs: &PixelFormatRequirements, transparent: bool)
                           -> Result<(ffi::glx::types::GLXFBConfig, PixelFormat), ()>
 {
     let descriptor = {
@@ -471,13 +488,32 @@ unsafe fn choose_fbconfig(glx: &ffi::glx::Glx, extensions: &str, xlib: &ffi::Xli
     // calling glXChooseFBConfig
     let fb_config = {
         let mut num_configs = 1;
-        let result = glx.ChooseFBConfig(display as *mut _, screen_id, descriptor.as_ptr(),
+        let configs = glx.ChooseFBConfig(display as *mut _, screen_id, descriptor.as_ptr(),
                                         &mut num_configs);
-        if result.is_null() { return Err(()); }
+        if configs.is_null() { return Err(()); }
         if num_configs == 0 { return Err(()); }
-        let val = *result;
-        (xlib.XFree)(result as *mut _);
-        val
+
+        let config = if transparent {
+            let configs = slice::from_raw_parts(configs, num_configs as usize);
+            configs.iter().find(|&config| {
+                let vi = glx.GetVisualFromFBConfig(display as *mut _, *config);
+                // Transparency was requested, so only choose configs with 32 bits for RGBA.
+                let found = !vi.is_null() && (*vi).depth == 32;
+                (xlib.XFree)(vi as *mut _);
+
+                found
+            })
+        } else {
+            Some(&*configs)
+        };
+
+        (xlib.XFree)(configs as *mut _);
+
+        if let Some(&conf) = config {
+            conf
+        } else {
+            return Err(());
+        }
     };
 
     let get_attrib = |attrib: c_int| -> i32 {

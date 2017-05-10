@@ -24,65 +24,80 @@ pub struct Window {
     winit_window: winit::Window,
 }
 
+pub enum EventsLoop {
+    X(winit::EventsLoop),
+    Wayland(wayland::EventsLoop)
+}
+
+impl EventsLoop {
+    /// Builds a new events loop.
+    pub fn new() -> EventsLoop {
+        let winit_events_loop = winit::EventsLoop::new();
+        // Ideally, winit would expose an API telling us wether we are
+        // in Wayland mode or X11 mode
+        if wayland_client::default_connect().is_ok() {
+            EventsLoop::Wayland(wayland::EventsLoop::new(winit_events_loop))
+        } else {
+            EventsLoop::X(winit_events_loop)
+        }
+    }
+
+    /// Fetches all the events that are pending, calls the callback function for each of them,
+    /// and returns.
+    #[inline]
+    pub fn poll_events<F>(&self, callback: F)
+        where F: FnMut(Event)
+    {
+        match *self {
+            EventsLoop::X(ref evlp) => evlp.poll_events(callback),
+            EventsLoop::Wayland(ref evlp) => evlp.poll_events(callback)
+        }
+    }
+
+    /// Runs forever until `interrupt()` is called. Whenever an event happens, calls the callback.
+    #[inline]
+    pub fn run_forever<F>(&self, callback: F)
+        where F: FnMut(Event)
+    {
+        match *self {
+            EventsLoop::X(ref evlp) => evlp.run_forever(callback),
+            EventsLoop::Wayland(ref evlp) => evlp.run_forever(callback)
+        }
+    }
+
+    /// If we called `run_forever()`, stops the process of waiting for events.
+    #[inline]
+    pub fn interrupt(&self) {
+        match *self {
+            EventsLoop::X(ref evlp) => evlp.interrupt(),
+            EventsLoop::Wayland(ref evlp) => evlp.interrupt()
+        }
+    }
+}
+
 enum DisplayServer {
     X(x11::Window),
     Wayland(wayland::Window)
 }
 
-pub enum WaitEventsIterator<'a> {
-    #[doc(hidden)]
-    X(winit::WaitEventsIterator<'a>),
-    #[doc(hidden)]
-    Wayland(wayland::WaitEventsIterator<'a>)
-}
-
-impl<'a> Iterator for WaitEventsIterator<'a> {
-    type Item = Event;
-
-    #[inline]
-    fn next(&mut self) -> Option<Event> {
-        match self {
-            &mut WaitEventsIterator::X(ref mut it) => it.next(),
-            &mut WaitEventsIterator::Wayland(ref mut it) => it.next()
-        }
-    }
-}
-
-pub enum PollEventsIterator<'a> {
-    #[doc(hidden)]
-    X(winit::PollEventsIterator<'a>),
-    #[doc(hidden)]
-    Wayland(wayland::PollEventsIterator<'a>)
-}
-
-impl<'a> Iterator for PollEventsIterator<'a> {
-    type Item = Event;
-
-    #[inline]
-    fn next(&mut self) -> Option<Event> {
-        match self {
-            &mut PollEventsIterator::X(ref mut it) => it.next(),
-            &mut PollEventsIterator::Wayland(ref mut it) => it.next()
-        }
-    }
-}
-
 impl Window {
     #[inline]
     pub fn new(
+        events_loop: &EventsLoop,
         _: &WindowAttributes,
         pf_reqs: &PixelFormatRequirements,
         opengl: &GlAttributes<&Window>,
         _: &PlatformSpecificWindowBuilderAttributes,
         winit_builder: winit::WindowBuilder,
     ) -> Result<Window, CreationError> {
-        let window = match wayland_client::default_connect() {
-            Ok(_) => {
+        let window = match *events_loop {
+            EventsLoop::Wayland(ref evlp) => {
                 let opengl = opengl.clone().map_sharing(|w| match w.display_server {
                     DisplayServer::Wayland(ref w) => w,
                     _ => panic!()       // TODO: return an error
                 });
                 let (display_server, winit_window) = try!(wayland::Window::new(
+                    evlp,
                     pf_reqs,
                     &opengl,
                     winit_builder,
@@ -92,12 +107,13 @@ impl Window {
                     winit_window: winit_window,
                 }
             },
-            Err(_) => {
+            EventsLoop::X(ref evlp) => {
                 let opengl = opengl.clone().map_sharing(|w| match w.display_server {
                     DisplayServer::X(ref w) => w,
                     _ => panic!()       // TODO: return an error
                 });
                 let (display_server, winit_window) = try!(x11::Window::new(
+                    evlp,
                     pf_reqs,
                     &opengl,
                     winit_builder,
@@ -109,6 +125,10 @@ impl Window {
             },
         };
         Ok(window)
+    }
+
+    pub fn id(&self) -> winit::WindowId {
+        self.winit_window.id()
     }
 
     pub fn set_title(&self, title: &str) {
@@ -157,20 +177,6 @@ impl Window {
         }
     }
 
-    pub fn poll_events(&self) -> PollEventsIterator {
-        match self.display_server {
-            DisplayServer::X(_) => PollEventsIterator::X(self.winit_window.poll_events()),
-            DisplayServer::Wayland(ref w) => PollEventsIterator::Wayland(w.poll_events(&self.winit_window)),
-        }
-    }
-
-    pub fn wait_events(&self) -> WaitEventsIterator {
-        match self.display_server {
-            DisplayServer::X(_) => WaitEventsIterator::X(self.winit_window.wait_events()),
-            DisplayServer::Wayland(ref w) => WaitEventsIterator::Wayland(w.wait_events(&self.winit_window)),
-        }
-    }
-
     pub unsafe fn platform_display(&self) -> *mut libc::c_void {
         self.winit_window.platform_display()
     }
@@ -187,14 +193,6 @@ impl Window {
     #[inline]
     pub fn as_winit_window_mut(&mut self) -> &mut winit::Window {
         &mut self.winit_window
-    }
-
-    pub fn create_window_proxy(&self) -> winit::WindowProxy {
-        self.winit_window.create_window_proxy()
-    }
-
-    pub fn set_window_resize_callback(&mut self, callback: Option<fn(u32, u32)>) {
-        self.winit_window.set_window_resize_callback(callback);
     }
 
     pub fn set_cursor(&self, cursor: winit::MouseCursor) {

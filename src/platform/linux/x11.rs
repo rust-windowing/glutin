@@ -3,7 +3,7 @@ pub use winit::os::unix::x11::{XError, XNotSupported, XConnection};
 use api::glx::ffi;
 
 use CreationError;
-use std::{mem, ptr};
+use std::{mem, ptr, fmt, error};
 use std::sync::{Arc};
 
 use winit;
@@ -28,6 +28,21 @@ use api::egl::Context as EglContext;
 use api::glx::ffi::glx::Glx;
 use api::egl::ffi::egl::Egl;
 use api::dlopen;
+
+#[derive(Debug)]
+struct NoX11Connection;
+
+impl error::Error for NoX11Connection {
+    fn description(&self) -> &str {
+        "failed to get x11 connection"
+    }
+}
+
+impl fmt::Display for NoX11Connection {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(error::Error::description(self))
+    }
+}
 
 struct GlxOrEgl {
     glx: Option<Glx>,
@@ -110,11 +125,15 @@ impl Drop for Window {
 
 impl Window {
     pub fn new(
+        events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         opengl: &GlAttributes<&Window>,
         winit_builder: winit::WindowBuilder,
     ) -> Result<(Window, winit::Window), CreationError> {
-        let display = get_x11_xconnection().unwrap();
+        let display = match get_x11_xconnection() {
+            Some(display) => display,
+            None => return Err(CreationError::NoBackendAvailable(Box::new(NoX11Connection))),
+        };
         let screen_id = match winit_builder.window.monitor {
             Some(ref m) => match m.get_native_identifier() {
                 NativeMonitorId::Numeric(monitor) => monitor as i32,
@@ -143,6 +162,7 @@ impl Window {
                         &builder_clone_opengl_glx,
                         display.display,
                         screen_id,
+                        winit_builder.window.transparent,
                     )))
                 } else if let Some(ref egl) = backend.egl {
                     Prototype::Egl(try!(EglContext::new(
@@ -197,7 +217,7 @@ impl Window {
         let winit_window = winit_builder
             .with_x11_visual(&visual_infos as *const _)
             .with_x11_screen(screen_id)
-            .build().unwrap();
+            .build(events_loop).unwrap();
 
         let xlib_window = winit_window.get_xlib_window().unwrap();
         // finish creating the OpenGL context

@@ -1,1 +1,1 @@
-pub use winit::{Event, TouchPhase, Touch, ScanCode, ElementState, MouseButton, MouseScrollDelta, VirtualKeyCode};
+pub use winit::{Event, WindowEvent, TouchPhase, Touch, ScanCode, ElementState, MouseButton, MouseScrollDelta, VirtualKeyCode};
