@@ -507,13 +507,14 @@ unsafe fn choose_fbconfig(glx: &ffi::glx::Glx, extensions: &str, xlib: &ffi::Xli
             Some(&*configs)
         };
 
-        (xlib.XFree)(configs as *mut _);
-
-        if let Some(&conf) = config {
-            conf
+        let res = if let Some(&conf) = config {
+            Ok(conf)
         } else {
-            return Err(());
-        }
+            Err(())
+        };
+
+        (xlib.XFree)(configs as *mut _);
+        res?
     };
 
     let get_attrib = |attrib: c_int| -> i32 {
