@@ -57,6 +57,10 @@ impl Window {
         })
     }
 
+    pub fn id(&self) -> winit::WindowId {
+        self.winit_window.id()
+    }
+
     pub fn set_title(&self, title: &str) {
         self.winit_window.set_title(title)
     }
