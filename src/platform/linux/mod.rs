@@ -23,6 +23,12 @@ pub struct PlatformSpecificHeadlessBuilderAttributes;
 pub struct HeadlessContext(OsMesaContext);
 
 impl HeadlessContext {
+    fn from(mesa: OsMesaContext) -> Self {
+        HeadlessContext(mesa)
+    }
+}
+
+impl HeadlessContext {
     pub fn new(dimensions: (u32, u32), pf_reqs: &PixelFormatRequirements,
                opengl: &GlAttributes<&HeadlessContext>,
                _: &PlatformSpecificHeadlessBuilderAttributes)
@@ -30,13 +36,7 @@ impl HeadlessContext {
     {
         let opengl = opengl.clone().map_sharing(|c| &c.0);
 
-        match OsMesaContext::new(dimensions, pf_reqs, &opengl) {
-            Ok(c) => return Ok(HeadlessContext(c)),
-            Err(osmesa::OsMesaCreationError::NotSupported) => (),
-            Err(osmesa::OsMesaCreationError::CreationError(e)) => return Err(e),
-        };
-
-        Err(CreationError::NotSupported)
+        OsMesaContext::new(dimensions, pf_reqs, &opengl).map(HeadlessContext::from)
     }
 }
 

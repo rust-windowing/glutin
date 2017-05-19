@@ -2,6 +2,11 @@
 
 extern crate osmesa_sys;
 
+use std::error::Error;
+use std::ffi::CString;
+use std::fmt::{Debug, Display, Error as FormatError, Formatter};
+use std::{mem, ptr};
+
 use Api;
 use ContextError;
 use CreationError;
@@ -13,8 +18,6 @@ use PixelFormat;
 use PixelFormatRequirements;
 use Robustness;
 use libc;
-use std::{mem, ptr};
-use std::ffi::CString;
 
 pub struct OsMesaContext {
     context: osmesa_sys::OSMesaContext,
@@ -23,27 +26,51 @@ pub struct OsMesaContext {
     height: u32,
 }
 
-pub enum OsMesaCreationError {
-    CreationError(CreationError),
-    NotSupported,
+#[derive(Debug)]
+struct NoEsOrWebGlSupported;
+
+impl Display for NoEsOrWebGlSupported {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), FormatError> {
+        write!(f, "OsMesa only works with desktop OpenGL; OpenGL ES or WebGL are not supported")
+    }
 }
 
-impl From<CreationError> for OsMesaCreationError {
-    #[inline]
-    fn from(e: CreationError) -> OsMesaCreationError {
-        OsMesaCreationError::CreationError(e)
+impl Error for NoEsOrWebGlSupported {
+    fn description(&self) -> &str {
+        "OsMesa only works with desktop OpenGL"
+    }
+}
+
+#[derive(Debug)]
+struct LoadingError(String);
+
+impl LoadingError {
+    fn new<D: Debug>(d: D) -> Self {
+        LoadingError(format!("{:?}", d))
+    }
+}
+
+impl Display for LoadingError {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), FormatError> {
+        write!(f, "Failed to load OsMesa dynamic library: {}", self.0)
+    }
+}
+
+impl Error for LoadingError {
+    fn description(&self) -> &str {
+        "The library or a symbol of it could not be loaded"
     }
 }
 
 impl OsMesaContext {
     pub fn new(dimensions: (u32, u32), _pf_reqs: &PixelFormatRequirements,
-               opengl: &GlAttributes<&OsMesaContext>) -> Result<OsMesaContext, OsMesaCreationError>
+               opengl: &GlAttributes<&OsMesaContext>) -> Result<OsMesaContext, CreationError>
     {
-        if let Err(_) = osmesa_sys::OsMesa::try_loading() {
-            return Err(OsMesaCreationError::NotSupported);
-        }
+        osmesa_sys::OsMesa::try_loading()
+            .map_err(LoadingError::new)
+            .map_err(|e| CreationError::NoBackendAvailable(Box::new(e)))?;
 
-        if opengl.sharing.is_some() { unimplemented!() }        // TODO: proper error
+        if opengl.sharing.is_some() { panic!("Context sharing not possible with OsMesa") }
 
         match opengl.robustness {
             Robustness::RobustNoResetNotification | Robustness::RobustLoseContextOnReset => {
@@ -77,10 +104,9 @@ impl OsMesaContext {
                 attribs.push(osmesa_sys::OSMESA_CONTEXT_MINOR_VERSION);
                 attribs.push(minor as libc::c_int);
             },
-            GlRequest::Specific(Api::OpenGlEs, _) => {
-                return Err(OsMesaCreationError::NotSupported);
+            GlRequest::Specific(Api::OpenGlEs, _) | GlRequest::Specific(Api::WebGl, _) => {
+                return Err(CreationError::NoBackendAvailable(Box::new(NoEsOrWebGlSupported)));
             },
-            GlRequest::Specific(_, _) => return Err(OsMesaCreationError::NotSupported),
             GlRequest::GlThenGles { opengl_version: (major, minor), .. } => {
                 attribs.push(osmesa_sys::OSMESA_CONTEXT_MAJOR_VERSION);
                 attribs.push(major as libc::c_int);
@@ -100,7 +126,7 @@ impl OsMesaContext {
             context: unsafe {
                 let ctxt = osmesa_sys::OSMesaCreateContextAttribs(attribs.as_ptr(), ptr::null_mut());
                 if ctxt.is_null() {
-                    return Err(CreationError::OsError("OSMesaCreateContextAttribs failed".to_string()).into());
+                    return Err(CreationError::OsError("OSMesaCreateContextAttribs failed".to_string()));
                 }
                 ctxt
             }

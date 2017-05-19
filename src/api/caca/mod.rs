@@ -2,7 +2,7 @@
 #![allow(unused_variables, dead_code)]
 
 use libc;
-use api::osmesa::{OsMesaContext, OsMesaCreationError};
+use api::osmesa::{OsMesaContext};
 
 use Api;
 use ContextError;
@@ -99,13 +99,8 @@ impl Window {
     {
         let opengl = opengl.clone().map_sharing(|w| &w.opengl);
 
-        let opengl = match OsMesaContext::new(window.dimensions.unwrap_or((800, 600)), pf_reqs,
-                                              &opengl)
-        {
-            Err(OsMesaCreationError::NotSupported) => return Err(CreationError::NotSupported),
-            Err(OsMesaCreationError::CreationError(e)) => return Err(e),
-            Ok(c) => c
-        };
+        let opengl = OsMesaContext::new(window.dimensions.unwrap_or((800, 600)), pf_reqs,
+                                        &opengl)?;
 
         let opengl_dimensions = opengl.get_dimensions();
 
