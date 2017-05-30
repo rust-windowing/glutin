@@ -15,29 +15,31 @@ fn main() {
     let mut grabbed = false;
 
     events_loop.run_forever(|event| {
+        use glutin::{CursorState, WindowEvent, ElementState};
         match event {
             glutin::Event::WindowEvent { event, .. } => match event {
 
-                glutin::WindowEvent::KeyboardInput(glutin::ElementState::Pressed, _, _, _) => {
+                WindowEvent::KeyboardInput { input, .. } if ElementState::Pressed == input.state => {
                     if grabbed {
                         grabbed = false;
-                        window.set_cursor_state(glutin::CursorState::Normal)
+                        window.set_cursor_state(CursorState::Normal)
                               .ok().expect("could not ungrab mouse cursor");
                     } else {
                         grabbed = true;
-                        window.set_cursor_state(glutin::CursorState::Grab)
+                        window.set_cursor_state(CursorState::Grab)
                               .ok().expect("could not grab mouse cursor");
                     }
                 },
 
-                glutin::WindowEvent::Closed => events_loop.interrupt(),
+                WindowEvent::Closed => events_loop.interrupt(),
 
-                a @ glutin::WindowEvent::MouseMoved(_, _) => {
+                a @ WindowEvent::MouseMoved { .. } => {
                     println!("{:?}", a);
                 },
 
                 _ => (),
             },
+            _ => (),
         }
 
         context.draw_frame((0.0, 1.0, 0.0, 1.0));

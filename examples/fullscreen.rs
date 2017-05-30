@@ -36,6 +36,7 @@ fn main() {
     let context = support::load(&window);
 
     events_loop.run_forever(|event| {
+        use glutin::{WindowEvent, VirtualKeyCode};
         println!("{:?}", event);
 
         context.draw_frame((0.0, 1.0, 0.0, 1.0));
@@ -43,11 +44,15 @@ fn main() {
 
         match event {
             glutin::Event::WindowEvent { event, .. } => match event {
-                glutin::WindowEvent::Closed => events_loop.interrupt(),
-                glutin::WindowEvent::KeyboardInput(_, _, Some(glutin::VirtualKeyCode::Escape), _) =>
-                    events_loop.interrupt(),
+                WindowEvent::Closed => events_loop.interrupt(),
+                WindowEvent::KeyboardInput { input, .. } => {
+                    if let Some(VirtualKeyCode::Escape) = input.virtual_keycode {
+                        events_loop.interrupt();
+                    }
+                },
                 _ => (),
             },
+            _ => (),
         }
     });
 }

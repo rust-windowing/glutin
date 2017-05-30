@@ -29,9 +29,11 @@ fn main() {
     let mut cursor_idx = 0;
 
     events_loop.run_forever(|event| {
-        match event {
-            glutin::Event::WindowEvent { event, .. } => match event {
-                glutin::WindowEvent::KeyboardInput(glutin::ElementState::Pressed, _, _, _) => {
+        use glutin::{Event, WindowEvent, ElementState};
+        if let Event::WindowEvent { event, .. } = event {
+            match event {
+
+                WindowEvent::KeyboardInput { input, .. } => if let ElementState::Pressed = input.state {
                     println!("Setting cursor to \"{:?}\"", cursors[cursor_idx]);
                     window.set_cursor(cursors[cursor_idx]);
                     if cursor_idx < cursors.len() - 1 {
@@ -40,9 +42,11 @@ fn main() {
                         cursor_idx = 0;
                     }
                 },
-                glutin::WindowEvent::Closed => events_loop.interrupt(),
+
+                WindowEvent::Closed => events_loop.interrupt(),
+
                 _ => (),
-            },
+            }
         }
 
         context.draw_frame((0.0, 1.0, 0.0, 1.0));
