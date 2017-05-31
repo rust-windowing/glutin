@@ -91,8 +91,8 @@ impl Window {
         let winit_window = winit_builder.build(&events_loop.winit_events_loop).unwrap();
         let wayland_window = {
             let (w, h) = winit_window.get_inner_size().unwrap();
-            let surface = winit_window.get_wayland_client_surface().unwrap();
-            let egl_surface = wegl::WlEglSurface::new(surface, w as i32, h as i32);
+            let surface = winit_window.get_wayland_surface().unwrap();
+            let egl_surface = unsafe { wegl::WlEglSurface::new_from_raw(surface as *mut _, w as i32, h as i32) };
             let context = {
                 let libegl = unsafe { dlopen::dlopen(b"libEGL.so\0".as_ptr() as *const _, dlopen::RTLD_NOW) };
                 if libegl.is_null() {
