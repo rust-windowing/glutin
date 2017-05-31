@@ -14,7 +14,7 @@ build = "build.rs"
 lazy_static = "0.2.0"
 libc = "0.2"
 shared_library = "0.1.0"
-winit = "0.6.3"
+winit = "0.6.4"
 
 [build-dependencies]
 gl_generator = "0.5"
