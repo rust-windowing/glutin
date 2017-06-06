@@ -1,0 +1,10 @@
+dependencies:
+    override:
+        - curl -sS https://static.rust-lang.org/rustup.sh | sudo bash
+        - sudo apt-get install libXxf86vm-dev libosmesa6-dev
+
+test:
+    override:
+        - cargo build --verbose
+        - cargo test --no-run --verbose
+        - cargo test --verbose --features "headless" --no-default-features
