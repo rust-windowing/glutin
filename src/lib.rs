@@ -445,7 +445,7 @@ impl Default for PixelFormatRequirements {
             alpha_bits: Some(8),
             depth_bits: Some(24),
             stencil_bits: Some(8),
-            double_buffer: None,
+            double_buffer: Some(true),
             multisampling: None,
             stereoscopy: false,
             srgb: false,
