@@ -55,6 +55,7 @@ pub fn build_nsattributes<T>(pf_reqs: &PixelFormatRequirements, opengl: &GlAttri
         NSOpenGLPFAAlphaSize as u32, alpha_depth as u32,
         NSOpenGLPFADepthSize as u32, pf_reqs.depth_bits.unwrap_or(24) as u32,
         NSOpenGLPFAStencilSize as u32, pf_reqs.stencil_bits.unwrap_or(8) as u32,
+        NSOpenGLPFAAllowOfflineRenderers as u32,
         NSOpenGLPFAOpenGLProfile as u32, profile,
     ];
 
