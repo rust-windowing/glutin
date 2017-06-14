@@ -5,7 +5,6 @@
 use ContextError;
 use CreationError;
 use GlAttributes;
-use GlContext;
 use GlRequest;
 use PixelFormat;
 use PixelFormatRequirements;
@@ -161,9 +160,12 @@ impl Context {
     /// This function initializes some things and chooses the pixel format.
     ///
     /// To finish the process, you must call `.finish(window)` on the `ContextPrototype`.
-    pub fn new<'a>(egl: ffi::egl::Egl, pf_reqs: &PixelFormatRequirements,
-                   opengl: &'a GlAttributes<&'a Context>, native_display: NativeDisplay)
-                   -> Result<ContextPrototype<'a>, CreationError>
+    pub fn new<'a>(
+        egl: ffi::egl::Egl,
+        pf_reqs: &PixelFormatRequirements,
+        opengl: &'a GlAttributes<&'a Context>,
+        native_display: NativeDisplay,
+    ) -> Result<ContextPrototype<'a>, CreationError>
     {
         if opengl.sharing.is_some() {
             unimplemented!()
@@ -264,10 +266,8 @@ impl Context {
             pixel_format: pixel_format,
         })
     }
-}
 
-impl GlContext for Context {
-    unsafe fn make_current(&self) -> Result<(), ContextError> {
+    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
         let ret = self.egl.MakeCurrent(self.display, self.surface, self.surface, self.context);
 
         if ret == 0 {
@@ -282,11 +282,11 @@ impl GlContext for Context {
     }
 
     #[inline]
-    fn is_current(&self) -> bool {
+    pub fn is_current(&self) -> bool {
         unsafe { self.egl.GetCurrentContext() == self.context }
     }
 
-    fn get_proc_address(&self, addr: &str) -> *const () {
+    pub fn get_proc_address(&self, addr: &str) -> *const () {
         let addr = CString::new(addr.as_bytes()).unwrap();
         let addr = addr.as_ptr();
         unsafe {
@@ -295,7 +295,7 @@ impl GlContext for Context {
     }
 
     #[inline]
-    fn swap_buffers(&self) -> Result<(), ContextError> {
+    pub fn swap_buffers(&self) -> Result<(), ContextError> {
         let ret = unsafe {
             self.egl.SwapBuffers(self.display, self.surface)
         };
@@ -312,12 +312,12 @@ impl GlContext for Context {
     }
 
     #[inline]
-    fn get_api(&self) -> Api {
+    pub fn get_api(&self) -> Api {
         self.api
     }
 
     #[inline]
-    fn get_pixel_format(&self) -> PixelFormat {
+    pub fn get_pixel_format(&self) -> PixelFormat {
         self.pixel_format.clone()
     }
 }

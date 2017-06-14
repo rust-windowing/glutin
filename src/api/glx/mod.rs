@@ -3,7 +3,6 @@
 use ContextError;
 use CreationError;
 use GlAttributes;
-use GlContext;
 use GlProfile;
 use GlRequest;
 use Api;
@@ -56,7 +55,8 @@ impl Context {
         display: *mut ffi::Display,
         screen_id: libc::c_int,
         transparent: bool,
-) -> Result<ContextPrototype<'a>, CreationError> {
+    ) -> Result<ContextPrototype<'a>, CreationError>
+    {
         // This is completely ridiculous, but VirtualBox's OpenGL driver needs some call handled by
         // *it* (i.e. not Mesa) to occur before anything else can happen. That is because
         // VirtualBox's OpenGL driver is going to apply binary patches to Mesa in the DLL
@@ -104,10 +104,8 @@ impl Context {
             pixel_format: pixel_format,
         })
     }
-}
 
-impl GlContext for Context {
-    unsafe fn make_current(&self) -> Result<(), ContextError> {
+    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
         // TODO: glutin needs some internal changes for proper error recovery
         let res = self.glx.MakeCurrent(self.display as *mut _, self.window, self.context);
         if res == 0 {
@@ -117,11 +115,11 @@ impl GlContext for Context {
     }
 
     #[inline]
-    fn is_current(&self) -> bool {
+    pub fn is_current(&self) -> bool {
         unsafe { self.glx.GetCurrentContext() == self.context }
     }
 
-    fn get_proc_address(&self, addr: &str) -> *const () {
+    pub fn get_proc_address(&self, addr: &str) -> *const () {
         let addr = CString::new(addr.as_bytes()).unwrap();
         let addr = addr.as_ptr();
         unsafe {
@@ -130,19 +128,19 @@ impl GlContext for Context {
     }
 
     #[inline]
-    fn swap_buffers(&self) -> Result<(), ContextError> {
+    pub fn swap_buffers(&self) -> Result<(), ContextError> {
         // TODO: glutin needs some internal changes for proper error recovery
         unsafe { self.glx.SwapBuffers(self.display as *mut _, self.window); }
         Ok(())
     }
 
     #[inline]
-    fn get_api(&self) -> ::Api {
+    pub fn get_api(&self) -> ::Api {
         ::Api::OpenGl
     }
 
     #[inline]
-    fn get_pixel_format(&self) -> PixelFormat {
+    pub fn get_pixel_format(&self) -> PixelFormat {
         self.pixel_format.clone()
     }
 }
@@ -197,7 +195,7 @@ impl<'a> ContextPrototype<'a> {
             GlRequest::Latest => {
                 let opengl_versions = [(4, 5), (4, 4), (4, 3), (4, 2), (4, 1), (4, 0),
                                        (3, 3), (3, 2), (3, 1)];
-                let mut ctxt;
+                let ctxt;
                 'outer: loop
                 {
                     // Try all OpenGL versions in descending order because some non-compliant
@@ -209,7 +207,10 @@ impl<'a> ContextPrototype<'a> {
                                              self.opengl.debug, self.opengl.robustness, share,
                                              self.display, self.fb_config, &self.visual_infos)
                         {
-                            Ok(x) => {ctxt = x; break 'outer;},
+                            Ok(x) => {
+                                ctxt = x;
+                                break 'outer;
+                            },
                             Err(_) => continue
                         }
                     }
@@ -291,7 +292,7 @@ impl<'a> ContextPrototype<'a> {
     }
 }
 
-extern fn x_error_callback(dpy: *mut ffi::Display, err: *mut ffi::XErrorEvent) -> i32
+extern fn x_error_callback(_dpy: *mut ffi::Display, _err: *mut ffi::XErrorEvent) -> i32
 {
     0
 }

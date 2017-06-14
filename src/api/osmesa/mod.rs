@@ -11,7 +11,6 @@ use Api;
 use ContextError;
 use CreationError;
 use GlAttributes;
-use GlContext;
 use GlProfile;
 use GlRequest;
 use PixelFormat;
@@ -63,8 +62,11 @@ impl Error for LoadingError {
 }
 
 impl OsMesaContext {
-    pub fn new(dimensions: (u32, u32), _pf_reqs: &PixelFormatRequirements,
-               opengl: &GlAttributes<&OsMesaContext>) -> Result<OsMesaContext, CreationError>
+    pub fn new(
+        dimensions: (u32, u32),
+        _pf_reqs: &PixelFormatRequirements,
+        opengl: &GlAttributes<&OsMesaContext>,
+    ) -> Result<OsMesaContext, CreationError>
     {
         osmesa_sys::OsMesa::try_loading()
             .map_err(LoadingError::new)
@@ -143,16 +145,8 @@ impl OsMesaContext {
         (self.width, self.height)
     }
 
-    #[allow(dead_code)]
-    // TODO: can we remove this without causing havoc?
     #[inline]
-    pub fn set_window_resize_callback(&mut self, _: Option<fn(u32, u32)>) {
-    }
-}
-
-impl GlContext for OsMesaContext {
-    #[inline]
-    unsafe fn make_current(&self) -> Result<(), ContextError> {
+    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
         let ret = osmesa_sys::OSMesaMakeCurrent(self.context, self.buffer.as_ptr()
                                                 as *mut _, 0x1401, self.width
                                                 as libc::c_int, self.height as libc::c_int);
@@ -167,11 +161,11 @@ impl GlContext for OsMesaContext {
     }
 
     #[inline]
-    fn is_current(&self) -> bool {
+    pub fn is_current(&self) -> bool {
         unsafe { osmesa_sys::OSMesaGetCurrentContext() == self.context }
     }
 
-    fn get_proc_address(&self, addr: &str) -> *const () {
+    pub fn get_proc_address(&self, addr: &str) -> *const () {
         unsafe {
             let c_str = CString::new(addr.as_bytes().to_vec()).unwrap();
             mem::transmute(osmesa_sys::OSMesaGetProcAddress(mem::transmute(c_str.as_ptr())))
@@ -179,17 +173,17 @@ impl GlContext for OsMesaContext {
     }
 
     #[inline]
-    fn swap_buffers(&self) -> Result<(), ContextError> {
+    pub fn swap_buffers(&self) -> Result<(), ContextError> {
         Ok(())
     }
 
     #[inline]
-    fn get_api(&self) -> Api {
+    pub fn get_api(&self) -> Api {
         Api::OpenGl
     }
 
     #[inline]
-    fn get_pixel_format(&self) -> PixelFormat {
+    pub fn get_pixel_format(&self) -> PixelFormat {
         unimplemented!();
     }
 }
