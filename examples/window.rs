@@ -18,9 +18,6 @@ fn main() {
 
     let gl = support::load(&context);
 
-                gl.draw_frame((0.0, 1.0, 0.0, 1.0));
-                let _ = context.swap_buffers();
-
     events_loop.run_forever(|event| {
         println!("{:?}", event);
 
