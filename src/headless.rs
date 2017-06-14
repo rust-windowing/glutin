@@ -4,7 +4,6 @@ use CreationError;
 use GlAttributes;
 use GlProfile;
 use GlRequest;
-use GlContext;
 use PixelFormat;
 use PixelFormatRequirements;
 use Robustness;
@@ -127,38 +126,12 @@ impl HeadlessContext {
     }
 
     #[inline]
-    pub fn set_window_resize_callback(&mut self, _: Option<fn(u32, u32)>) {
-    }
-}
-
-impl GlContext for HeadlessContext {
-    #[inline]
-    unsafe fn make_current(&self) -> Result<(), ContextError> {
-        self.context.make_current()
-    }
-
-    #[inline]
-    fn is_current(&self) -> bool {
-        self.context.is_current()
-    }
-
-    #[inline]
-    fn get_proc_address(&self, addr: &str) -> *const () {
-        self.context.get_proc_address(addr)
-    }
-
-    #[inline]
-    fn swap_buffers(&self) -> Result<(), ContextError> {
+    pub fn swap_buffers(&self) -> Result<(), ContextError> {
         self.context.swap_buffers()
     }
 
     #[inline]
-    fn get_api(&self) -> Api {
-        self.context.get_api()
-    }
-
-    #[inline]
-    fn get_pixel_format(&self) -> PixelFormat {
+    pub fn get_pixel_format(&self) -> PixelFormat {
         self.context.get_pixel_format()
     }
 }
