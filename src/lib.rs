@@ -24,6 +24,7 @@
 //! By default only `window` is enabled.
 
 #[cfg(target_os = "windows")]
+#[macro_use]
 extern crate lazy_static;
 
 #[macro_use]
@@ -79,8 +80,8 @@ pub mod os;
 ///
 /// # Example
 ///
-/// ```
-/// #extern crate glutin;
+/// ```ignore
+/// let events_loop = glutin::winit::EventsLoop::new();
 /// let window = glutin::winit::WindowBuilder::new(&events_loop).unwrap();
 /// let context = glutin::ContextBuilder::new(&window).unwrap();
 ///
