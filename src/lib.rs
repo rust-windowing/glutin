@@ -80,13 +80,15 @@ pub mod os;
 /// # Example
 ///
 /// ```
-/// let window = Window::new(&events_loop).unwrap();
+/// #extern crate glutin;
+/// let window = glutin::winit::WindowBuilder::new(&events_loop).unwrap();
+/// let context = glutin::ContextBuilder::new(&window).unwrap();
 ///
-/// unsafe { window.make_current() };
+/// unsafe { context.make_current().unwrap() };
 ///
 /// loop {
 ///     events_loop.poll_events(|event| {
-///         match(event) {
+///         match event {
 ///             // process events here
 ///             _ => ()
 ///         }
@@ -94,7 +96,7 @@ pub mod os;
 ///
 ///     // draw everything here
 ///
-///     window.swap_buffers();
+///     context.swap_buffers();
 ///     std::thread::sleep(std::time::Duration::from_millis(17));
 /// }
 /// ```
