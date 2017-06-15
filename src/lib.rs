@@ -212,6 +212,17 @@ impl<'a> ContextBuilder<'a> {
         self
     }
 
+    /// Sets whether or not the `Context` should be transparent.
+    ///
+    /// TODO: It would be nicer if we could inherit this information from the `Window` when `build`
+    /// is called, however `Window` currently does not have any methods for returning whether or
+    /// not it is currently transparent.
+    #[inline]
+    pub fn with_transparency(mut self, transparent: bool) -> Self {
+        self.gl_attr.transparent = transparent;
+        self
+    }
+
     /// Creates a new OpenGL context.
     ///
     /// Error should be very rare and only occur in case of permission denied, incompatible system,
