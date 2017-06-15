@@ -20,10 +20,6 @@ fn main() {
 
     events_loop.run_forever(|event| {
         println!("{:?}", event);
-
-        gl.draw_frame((0.0, 1.0, 0.0, 1.0));
-        let _ = context.swap_buffers();
-
         match event {
             glutin::winit::Event::WindowEvent { event, .. } => match event {
                 glutin::winit::WindowEvent::Closed => events_loop.interrupt(),
@@ -32,5 +28,8 @@ fn main() {
             },
             _ => ()
         }
+
+        gl.draw_frame((0.0, 1.0, 0.0, 1.0));
+        let _ = context.swap_buffers();
     });
 }
