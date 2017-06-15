@@ -11,27 +11,17 @@ use winit;
 use Api;
 use ContextError;
 use GlAttributes;
-use GlContext;
 use PixelFormat;
 use PixelFormatRequirements;
-use WindowAttributes;
 
 use api::egl;
 use api::egl::Context as EglContext;
 
 mod ffi;
 
-pub struct Window {
-    context: EglContext,
-    winit_window: winit::Window,
-}
-
 pub struct Context {
     egl_context: EglContext,
 }
-
-#[derive(Clone, Default)]
-pub struct PlatformSpecificWindowBuilderAttributes;
 
 #[derive(Clone, Default)]
 pub struct PlatformSpecificHeadlessBuilderAttributes;
@@ -40,10 +30,10 @@ impl Context {
     pub fn new(
         _window: &winit::Window,
         pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context>,
+        gl_attr: &GlAttributes<&Self>,
     ) -> Result<Self, CreationError>
     {
-        let gl_attr = gl_attr.clone().map_sharing(|w| &w.context);
+        let gl_attr = gl_attr.clone().map_sharing(|c| &c.egl_context);
         let native_window = unsafe { android_glue::get_native_window() };
         if native_window.is_null() {
             return Err(OsError(format!("Android's native window is null")));
@@ -88,54 +78,54 @@ impl Context {
 
 pub struct HeadlessContext(EglContext);
 
+unsafe impl Send for HeadlessContext {}
+unsafe impl Sync for HeadlessContext {}
+
 impl HeadlessContext {
     /// See the docs in the crate root file.
-    pub fn new(dimensions: (u32, u32),
-               pf_reqs: &PixelFormatRequirements,
-               opengl: &GlAttributes<&HeadlessContext>,
-               _: &PlatformSpecificHeadlessBuilderAttributes)
-               -> Result<HeadlessContext, CreationError> {
-        let opengl = opengl.clone().map_sharing(|c| &c.0);
+    pub fn new(
+        dimensions: (u32, u32),
+        pf_reqs: &PixelFormatRequirements,
+        gl_attr: &GlAttributes<&HeadlessContext>,
+        _: &PlatformSpecificHeadlessBuilderAttributes,
+    ) -> Result<Self, CreationError>
+    {
+        let gl_attr = gl_attr.clone().map_sharing(|c| &c.0);
         let context = try!(EglContext::new(egl::ffi::egl::Egl,
                                            pf_reqs,
-                                           &opengl,
+                                           &gl_attr,
                                            egl::NativeDisplay::Android));
         let context = try!(context.finish_pbuffer(dimensions));     // TODO:
         Ok(HeadlessContext(context))
     }
-}
 
-unsafe impl Send for HeadlessContext {}
-unsafe impl Sync for HeadlessContext {}
-
-impl GlContext for HeadlessContext {
     #[inline]
-    unsafe fn make_current(&self) -> Result<(), ContextError> {
+    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
         self.0.make_current()
     }
 
     #[inline]
-    fn is_current(&self) -> bool {
+    pub fn is_current(&self) -> bool {
         self.0.is_current()
     }
 
     #[inline]
-    fn get_proc_address(&self, addr: &str) -> *const () {
+    pub fn get_proc_address(&self, addr: &str) -> *const () {
         self.0.get_proc_address(addr)
     }
 
     #[inline]
-    fn swap_buffers(&self) -> Result<(), ContextError> {
+    pub fn swap_buffers(&self) -> Result<(), ContextError> {
         self.0.swap_buffers()
     }
 
     #[inline]
-    fn get_api(&self) -> Api {
+    pub fn get_api(&self) -> Api {
         self.0.get_api()
     }
 
     #[inline]
-    fn get_pixel_format(&self) -> PixelFormat {
+    pub fn get_pixel_format(&self) -> PixelFormat {
         self.0.get_pixel_format()
     }
 }
