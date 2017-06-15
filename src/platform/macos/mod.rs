@@ -1,15 +1,11 @@
 #![cfg(target_os = "macos")]
 
 use CreationError;
-use CreationError::OsError;
 use ContextError;
 use GlAttributes;
-use GlContext;
 use PixelFormat;
 use PixelFormatRequirements;
 use Robustness;
-use WindowAttributes;
-use os::macos::ActivationPolicy;
 
 use objc::runtime::{BOOL, NO};
 
@@ -23,12 +19,8 @@ use core_foundation::base::TCFType;
 use core_foundation::string::CFString;
 use core_foundation::bundle::{CFBundleGetBundleWithIdentifier, CFBundleGetFunctionPointerForName};
 
-use std::collections::HashMap;
 use std::str::FromStr;
 use std::ops::Deref;
-use std::sync::{Arc, Mutex, Weak};
-
-use libc;
 
 use winit;
 use winit::os::macos::WindowExt;
@@ -38,11 +30,6 @@ pub use self::headless::PlatformSpecificHeadlessBuilderAttributes;
 
 mod headless;
 mod helpers;
-
-#[derive(Clone, Default)]
-pub struct PlatformSpecificWindowBuilderAttributes {
-    pub activation_policy: ActivationPolicy,
-}
 
 pub struct Context {
     // NSOpenGLContext
@@ -70,7 +57,6 @@ impl Context {
             _ => (),
         }
 
-        let window_id = window.id();
         let view = window.get_nsview() as id;
 
         let attributes = try!(helpers::build_nsattributes(pf_reqs, gl_attr));
@@ -85,7 +71,7 @@ impl Context {
             // TODO: Add context sharing
             let gl_context = IdRef::new(NSOpenGLContext::alloc(nil)
                 .initWithFormat_shareContext_(*pixel_format, nil));
-            let gl_context = match context.non_nil() {
+            let gl_context = match gl_context.non_nil() {
                 Some(gl_context) => gl_context,
                 None => return Err(CreationError::NotSupported),
             };
@@ -134,7 +120,7 @@ impl Context {
     }
 
     pub fn resize(&self, _width: u32, _height: u32) {
-        self.gl.update();
+        unsafe { self.gl.update(); }
     }
 
     #[inline]
