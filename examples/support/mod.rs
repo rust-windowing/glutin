@@ -66,11 +66,10 @@ pub fn load(context: &glutin::Context) -> Gl {
 }
 
 impl Gl {
-    pub fn draw_frame(&self, color: (f32, f32, f32, f32)) {
+    pub fn draw_frame(&self, color: [f32; 4]) {
         unsafe {
-            self.gl.ClearColor(color.0, color.1, color.2, color.3);
+            self.gl.ClearColor(color[0], color[1], color[2], color[3]);
             self.gl.Clear(gl::COLOR_BUFFER_BIT);
-
             self.gl.DrawArrays(gl::TRIANGLES, 0, 3);
         }
     }

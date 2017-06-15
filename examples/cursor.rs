@@ -1,19 +1,22 @@
 extern crate glutin;
 
-use glutin::MouseCursor;
+use glutin::winit::{self, MouseCursor};
 
 mod support;
 
 fn main() {
-    let events_loop = glutin::EventsLoop::new();
-    let window = glutin::WindowBuilder::new()
+    let events_loop = winit::EventsLoop::new();
+    let window = winit::WindowBuilder::new()
         .with_title("A fantastic window!")
         .build(&events_loop)
         .unwrap();
+    let context = glutin::ContextBuilder::new()
+        .build(&window)
+        .unwrap();
 
-    unsafe { window.make_current().unwrap() };
+    unsafe { context.make_current().unwrap() };
 
-    let context = support::load(&window);
+    let gl = support::load(&context);
     let cursors = [
         MouseCursor::Default, MouseCursor::Crosshair, MouseCursor::Hand, MouseCursor::Arrow,
         MouseCursor::Move, MouseCursor::Text, MouseCursor::Wait, MouseCursor::Help,
@@ -30,8 +33,8 @@ fn main() {
 
     events_loop.run_forever(|event| {
         match event {
-            glutin::Event::WindowEvent { event, .. } => match event {
-                glutin::WindowEvent::KeyboardInput(glutin::ElementState::Pressed, _, _, _) => {
+            winit::Event::WindowEvent { event, .. } => match event {
+                winit::WindowEvent::KeyboardInput(winit::ElementState::Pressed, _, _, _) => {
                     println!("Setting cursor to \"{:?}\"", cursors[cursor_idx]);
                     window.set_cursor(cursors[cursor_idx]);
                     if cursor_idx < cursors.len() - 1 {
@@ -40,12 +43,13 @@ fn main() {
                         cursor_idx = 0;
                     }
                 },
-                glutin::WindowEvent::Closed => events_loop.interrupt(),
+                winit::WindowEvent::Closed => events_loop.interrupt(),
+                winit::WindowEvent::Resized(w, h) => context.resize(w, h),
                 _ => (),
             },
         }
 
-        context.draw_frame((0.0, 1.0, 0.0, 1.0));
-        window.swap_buffers().unwrap();
+        gl.draw_frame([0.0, 1.0, 0.0, 1.0]);
+        context.swap_buffers().unwrap();
     });
 }

@@ -29,7 +29,7 @@ fn main() {
             _ => ()
         }
 
-        gl.draw_frame((0.0, 1.0, 0.0, 1.0));
+        gl.draw_frame([0.0, 1.0, 0.0, 1.0]);
         let _ = context.swap_buffers();
     });
 }
