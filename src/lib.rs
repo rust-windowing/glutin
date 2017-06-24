@@ -160,6 +160,13 @@ impl<'a> ContextBuilder<'a> {
         self
     }
 
+    /// Share the display lists with the given `Context`.
+    #[inline]
+    pub fn with_shared_lists(mut self, other: &'a Context) -> Self {
+        self.gl_attr.sharing = Some(other);
+        self
+    }
+
     /// Sets the multisampling level to request. A value of `0` indicates that multisampling must
     /// not be enabled.
     ///
