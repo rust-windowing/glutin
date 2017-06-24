@@ -3,7 +3,7 @@ extern crate glutin;
 mod support;
 
 fn main() {
-    let events_loop = glutin::winit::EventsLoop::new();
+    let mut events_loop = glutin::winit::EventsLoop::new();
 
     struct Window {
         _window: glutin::winit::Window,
@@ -33,7 +33,7 @@ fn main() {
                     if windows.remove(&window_id).is_some() {
                         println!("Window with ID {:?} has been closed", window_id);
                         if windows.is_empty() {
-                            events_loop.interrupt();
+                            return glutin::winit::ControlFlow::Break;
                         }
                     }
                 },
@@ -49,5 +49,7 @@ fn main() {
             window.gl.draw_frame(color);
             let _ = window.context.swap_buffers();
         }
+
+        glutin::winit::ControlFlow::Continue
     });
 }

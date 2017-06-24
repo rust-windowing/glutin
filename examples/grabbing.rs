@@ -5,7 +5,7 @@ use glutin::winit;
 mod support;
 
 fn main() {
-    let events_loop = winit::EventsLoop::new();
+    let mut events_loop = winit::EventsLoop::new();
     let window = winit::WindowBuilder::new()
         .with_title("glutin - Cursor grabbing test")
         .build(&events_loop)
@@ -20,31 +20,34 @@ fn main() {
     let mut grabbed = false;
 
     events_loop.run_forever(|event| {
+        use glutin::winit::{CursorState, WindowEvent, ElementState};
         match event {
             winit::Event::WindowEvent { event, .. } => match event {
 
-                winit::WindowEvent::KeyboardInput(winit::ElementState::Pressed, _, _, _) => {
+                WindowEvent::KeyboardInput { input, .. } if ElementState::Pressed == input.state => {
                     if grabbed {
                         grabbed = false;
-                        window.set_cursor_state(winit::CursorState::Normal)
+                        window.set_cursor_state(CursorState::Normal)
                               .ok().expect("could not ungrab mouse cursor");
                     } else {
                         grabbed = true;
-                        window.set_cursor_state(winit::CursorState::Grab)
+                        window.set_cursor_state(CursorState::Grab)
                               .ok().expect("could not grab mouse cursor");
                     }
                 },
 
-                winit::WindowEvent::Closed => events_loop.interrupt(),
+                winit::WindowEvent::Closed => return winit::ControlFlow::Break,
                 winit::WindowEvent::Resized(w, h) => context.resize(w, h),
-                a @ winit::WindowEvent::MouseMoved(_, _) => {
+                a @ winit::WindowEvent::MouseMoved { .. } => {
                     println!("{:?}", a);
                 },
                 _ => (),
             },
+            _ => (),
         }
 
         gl.draw_frame([0.0, 1.0, 0.0, 1.0]);
         let _ = context.swap_buffers();
+        winit::ControlFlow::Continue
     });
 }

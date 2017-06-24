@@ -3,7 +3,7 @@ extern crate glutin;
 mod support;
 
 fn main() {
-    let events_loop = glutin::winit::EventsLoop::new();
+    let mut events_loop = glutin::winit::EventsLoop::new();
     let window = glutin::winit::WindowBuilder::new()
         .with_title("A fantastic window!")
         .build(&events_loop)
@@ -22,7 +22,7 @@ fn main() {
         println!("{:?}", event);
         match event {
             glutin::winit::Event::WindowEvent { event, .. } => match event {
-                glutin::winit::WindowEvent::Closed => events_loop.interrupt(),
+                glutin::winit::WindowEvent::Closed => return glutin::winit::ControlFlow::Break,
                 glutin::winit::WindowEvent::Resized(w, h) => context.resize(w, h),
                 _ => (),
             },
@@ -31,5 +31,6 @@ fn main() {
 
         gl.draw_frame([0.0, 1.0, 0.0, 1.0]);
         let _ = context.swap_buffers();
+        glutin::winit::ControlFlow::Continue
     });
 }

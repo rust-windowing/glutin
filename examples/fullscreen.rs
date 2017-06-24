@@ -26,7 +26,7 @@ fn main() {
         monitor
     };
 
-    let events_loop = winit::EventsLoop::new();
+    let mut events_loop = winit::EventsLoop::new();
     let window = winit::WindowBuilder::new()
         .with_title("Hello world!")
         .with_fullscreen(monitor)
@@ -41,18 +41,24 @@ fn main() {
     let gl = support::load(&context);
 
     events_loop.run_forever(|event| {
+        use glutin::winit::{ControlFlow, Event, WindowEvent, VirtualKeyCode};
         println!("{:?}", event);
         match event {
-            winit::Event::WindowEvent { event, .. } => match event {
-                winit::WindowEvent::Closed => events_loop.interrupt(),
-                winit::WindowEvent::Resized(w, h) => context.resize(w, h),
-                winit::WindowEvent::KeyboardInput(_, _, Some(winit::VirtualKeyCode::Escape), _) =>
-                    events_loop.interrupt(),
+            Event::WindowEvent { event, .. } => match event {
+                WindowEvent::Closed => return ControlFlow::Break,
+                WindowEvent::Resized(w, h) => context.resize(w, h),
+                WindowEvent::KeyboardInput { input, .. } => {
+                    if let Some(VirtualKeyCode::Escape) = input.virtual_keycode {
+                        return ControlFlow::Break;
+                    }
+                },
                 _ => (),
             },
+            _ => (),
         }
 
         gl.draw_frame([0.0, 1.0, 0.0, 1.0]);
         let _ = context.swap_buffers();
+        ControlFlow::Continue
     });
 }

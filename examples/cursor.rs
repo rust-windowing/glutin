@@ -5,7 +5,7 @@ use glutin::winit::{self, MouseCursor};
 mod support;
 
 fn main() {
-    let events_loop = winit::EventsLoop::new();
+    let mut events_loop = winit::EventsLoop::new();
     let window = winit::WindowBuilder::new()
         .with_title("A fantastic window!")
         .build(&events_loop)
@@ -32,9 +32,11 @@ fn main() {
     let mut cursor_idx = 0;
 
     events_loop.run_forever(|event| {
-        match event {
-            winit::Event::WindowEvent { event, .. } => match event {
-                winit::WindowEvent::KeyboardInput(winit::ElementState::Pressed, _, _, _) => {
+        use glutin::winit::{Event, WindowEvent, ElementState};
+        if let Event::WindowEvent { event, .. } = event {
+            match event {
+
+                WindowEvent::KeyboardInput { input, .. } => if let ElementState::Pressed = input.state {
                     println!("Setting cursor to \"{:?}\"", cursors[cursor_idx]);
                     window.set_cursor(cursors[cursor_idx]);
                     if cursor_idx < cursors.len() - 1 {
@@ -43,13 +45,14 @@ fn main() {
                         cursor_idx = 0;
                     }
                 },
-                winit::WindowEvent::Closed => events_loop.interrupt(),
+                winit::WindowEvent::Closed => return winit::ControlFlow::Break,
                 winit::WindowEvent::Resized(w, h) => context.resize(w, h),
                 _ => (),
-            },
+            }
         }
 
         gl.draw_frame([0.0, 1.0, 0.0, 1.0]);
         context.swap_buffers().unwrap();
+        winit::ControlFlow::Continue
     });
 }
