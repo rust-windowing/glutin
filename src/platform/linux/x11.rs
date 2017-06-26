@@ -124,13 +124,7 @@ impl Context {
         };
 
         // Get the screen_id for the current window.
-        //
-        // TODO: re-add this when the `get_monitor_id` method is added.
-        // let screen_id = match window.get_monitor_id().get_native_identifier() {
-        //     winit::NativeMonitorId::Numeric(monitor) => monitor as i32,
-        //     _ => unreachable!(),
-        // };
-        let screen_id = unsafe { (display.xlib.XDefaultScreen)(display.display) };
+        let screen_id = window.get_xlib_screen_id().expect("expected x11 window") as i32;
 
         // start the context building process
         enum Prototype<'a> {
