@@ -154,9 +154,11 @@ impl<'a> ContextBuilder<'a> {
     }
 
     /// Requests that the window has vsync enabled.
+    ///
+    /// By default, vsync is not enabled.
     #[inline]
-    pub fn with_vsync(mut self) -> Self {
-        self.gl_attr.vsync = true;
+    pub fn with_vsync(mut self, vsync: bool) -> Self {
+        self.gl_attr.vsync = vsync;
         self
     }
 
