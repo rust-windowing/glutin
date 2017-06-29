@@ -14,14 +14,13 @@ pub struct Context {
 }
 
 impl Context {
-
     pub fn new(
         window: &winit::Window,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<Self, CreationError>
     {
-        let (w, h) = window.get_inner_size().unwrap();
+        let (w, h) = window.get_inner_size_points().unwrap();
         let surface = window.get_wayland_surface().unwrap();
         let egl_surface = unsafe { wegl::WlEglSurface::new_from_raw(surface as *mut _, w as i32, h as i32) };
         let context = {
