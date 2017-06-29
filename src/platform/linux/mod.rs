@@ -15,7 +15,6 @@ pub enum Context {
 }
 
 impl Context {
-
     #[inline]
     pub fn new(
         window: &winit::Window,
@@ -23,28 +22,29 @@ impl Context {
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<Self, CreationError>
     {
-
-        if wayland_client::default_connect().is_ok() {
-            if let Some(&Context::X(_)) = gl_attr.sharing {
-                let msg = "Cannot share a wayland context with an X11 context";
-                return Err(CreationError::PlatformSpecific(msg.into()));
+        match wayland_client::default_connect() {
+            Ok(_) => {
+                if let Some(&Context::X(_)) = gl_attr.sharing {
+                    let msg = "Cannot share a wayland context with an X11 context";
+                    return Err(CreationError::PlatformSpecific(msg.into()));
+                }
+                let gl_attr = gl_attr.clone().map_sharing(|ctxt| match ctxt {
+                    &Context::X(_) => unreachable!(),
+                    &Context::Wayland(ref ctxt) => ctxt,
+                });
+                Ok(Context::Wayland(try!(wayland::Context::new(window, pf_reqs, &gl_attr))))
+            },
+            Err(_) => {
+                if let Some(&Context::Wayland(_)) = gl_attr.sharing {
+                    let msg = "Cannot share a X11 context with an wayland context";
+                    return Err(CreationError::PlatformSpecific(msg.into()));
+                }
+                let gl_attr = gl_attr.clone().map_sharing(|ctxt| match ctxt {
+                    &Context::Wayland(_) => unreachable!(),
+                    &Context::X(ref ctxt) => ctxt,
+                });
+                Ok(Context::X(try!(x11::Context::new(window, pf_reqs, &gl_attr))))
             }
-            let gl_attr = gl_attr.clone().map_sharing(|ctxt| match ctxt {
-                &Context::X(_) => unreachable!(),
-                &Context::Wayland(ref ctxt) => ctxt,
-            });
-            Ok(Context::Wayland(try!(wayland::Context::new(window, pf_reqs, &gl_attr))))
-
-        } else {
-            if let Some(&Context::Wayland(_)) = gl_attr.sharing {
-                let msg = "Cannot share a X11 context with an wayland context";
-                return Err(CreationError::PlatformSpecific(msg.into()));
-            }
-            let gl_attr = gl_attr.clone().map_sharing(|ctxt| match ctxt {
-                &Context::Wayland(_) => unreachable!(),
-                &Context::X(ref ctxt) => ctxt,
-            });
-            Ok(Context::X(try!(x11::Context::new(window, pf_reqs, &gl_attr))))
         }
     }
 
