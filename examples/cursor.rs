@@ -35,8 +35,9 @@ fn main() {
         use glutin::winit::{Event, WindowEvent, ElementState};
         if let Event::WindowEvent { event, .. } = event {
             match event {
-
-                WindowEvent::KeyboardInput { input, .. } => if let ElementState::Pressed = input.state {
+                WindowEvent::KeyboardInput {
+                    input: winit::KeyboardInput { state: ElementState::Pressed, .. }, ..
+                } => {
                     println!("Setting cursor to \"{:?}\"", cursors[cursor_idx]);
                     window.set_cursor(cursors[cursor_idx]);
                     if cursor_idx < cursors.len() - 1 {
