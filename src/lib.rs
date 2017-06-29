@@ -214,10 +214,12 @@ impl<'a> ContextBuilder<'a> {
         self
     }
 
-    /// Sets whether sRGB should be enabled on the window. `None` means "I don't care".
+    /// Sets whether sRGB should be enabled on the window.
+    ///
+    /// The default value is `false`.
     #[inline]
-    pub fn with_srgb(mut self, srgb_enabled: Option<bool>) -> Self {
-        self.pf_reqs.srgb = srgb_enabled.unwrap_or(false);
+    pub fn with_srgb(mut self, srgb_enabled: bool) -> Self {
+        self.pf_reqs.srgb = srgb_enabled;
         self
     }
 
