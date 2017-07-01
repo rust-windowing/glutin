@@ -133,7 +133,7 @@ impl Window {
             }
         };
         // Store a copy of the `context`'s `IdRef` so that we can `update` it on `Resized` events.
-        events_loop.borrow().insert_window(winit_window.id(), &wayland_window.egl_surface);
+        events_loop.insert_window(winit_window.id(), &wayland_window.egl_surface);
         Ok((wayland_window, winit_window))
     }
 

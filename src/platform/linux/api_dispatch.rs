@@ -47,7 +47,7 @@ impl EventsLoop {
     /// and returns.
     #[inline]
     pub fn poll_events<F>(&mut self, callback: F)
-        where F: FnMut(Event) -> ControlFlow
+        where F: FnMut(Event)
     {
         match *self {
             EventsLoop::X(ref evlp) => evlp.poll_events(callback),
