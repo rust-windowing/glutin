@@ -42,9 +42,7 @@ fn main() {
         let _ = window.swap_buffers();
 
         match event {
-            glutin::Event::WindowEvent { event: glutin::WindowEvent::Closed, .. } => {
-                glutin::ControlFlow::Break
-            }
+            glutin::Event::WindowEvent { event: glutin::WindowEvent::Closed, .. } |
             glutin::Event::WindowEvent { event: glutin::WindowEvent::KeyboardInput { input: glutin::KeyboardInput { virtual_keycode: Some(glutin::VirtualKeyCode::Escape), .. }, .. }, .. } => {
                 glutin::ControlFlow::Break
             },
