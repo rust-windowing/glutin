@@ -8,6 +8,7 @@ use winit;
 use ContextError;
 use ControlFlow;
 use CreationError;
+use EventsLoopClosed;
 use GlAttributes;
 use GlContext;
 use GlRequest;
@@ -71,12 +72,29 @@ impl EventsLoop {
         })
     }
 
-    /// If we called `run_forever()`, stops the process of waiting for events.
+    /// Creates an EventsLoopProxy that can be used to wake up the EventsLoop from another thread.
     #[inline]
-    pub fn interrupt(&self) {
-        self.winit_events_loop.interrupt()
+    pub fn create_proxy(&self) -> EventsLoopProxy {
+        let proxy = self.winit_events_loop.create_proxy();
+        EventsLoopProxy { proxy: proxy }
     }
 
+}
+
+pub struct EventsLoopProxy {
+    proxy: winit::EventsLoopProxy,
+}
+
+impl EventsLoopProxy {
+    /// Wake up the EventsLoop from which this proxy was created.
+    ///
+    /// This causes the EventsLoop to emit an Awakened event.
+    ///
+    /// Returns an Err if the associated EventsLoop no longer exists.
+    #[inline]
+    pub fn wakeup(&self) -> Result<(), EventsLoopClosed> {
+        self.proxy.wakeup()
+    }
 }
 
 impl Window {

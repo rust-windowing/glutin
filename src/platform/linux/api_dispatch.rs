@@ -4,6 +4,7 @@ use wayland_client;
 
 use ContextError;
 use CreationError;
+use EventsLoopClosed;
 use GlAttributes;
 use GlContext;
 use PixelFormat;
@@ -62,6 +63,35 @@ impl EventsLoop {
         match *self {
             EventsLoop::X(ref evlp) => evlp.run_forever(callback),
             EventsLoop::Wayland(ref evlp) => evlp.run_forever(callback)
+        }
+    }
+
+    /// Creates an EventsLoopProxy that can be used to wake up the EventsLoop from another thread.
+    #[inline]
+    pub fn create_proxy(&self) -> EventsLoopProxy {
+        match *self {
+            EventsLoop::X(ref events_loop) => EventsLoopProxy::X(events_loop.create_proxy()),
+            EventsLoop::Wayland(ref events_loop) => EventsLoopProxy::Wayland(events_loop.create_proxy()),
+        }
+    }
+}
+
+pub enum EventsLoopProxy {
+    X(winit::EventsLoopProxy),
+    Wayland(wayland::EventsLoopProxy),
+}
+
+impl EventsLoopProxy {
+    /// Wake up the EventsLoop from which this proxy was created.
+    ///
+    /// This causes the EventsLoop to emit an Awakened event.
+    ///
+    /// Returns an Err if the associated EventsLoop no longer exists.
+    #[inline]
+    pub fn wakeup(&self) -> Result<(), EventsLoopClosed> {
+        match *self {
+            X(ref proxy) => self.proxy.wakeup(),
+            Wayland(ref proxy) => self.proxy.wakeup(),
         }
     }
 }

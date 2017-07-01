@@ -3,6 +3,7 @@
 use CreationError;
 use CreationError::OsError;
 use ContextError;
+use EventsLoopClosed;
 use GlAttributes;
 use GlContext;
 use PixelFormat;
@@ -58,6 +59,10 @@ pub struct EventsLoop {
     // and simultaneously borrowing `self` immutably in `handle_event`.
     winit_events_loop: RefCell<winit::EventsLoop>,
     window_contexts: Mutex<Weak<ContextMap>>,
+}
+
+pub struct EventsLoopProxy {
+    proxy: winit::EventsLoopProxy,
 }
 
 struct Context {
@@ -132,6 +137,25 @@ impl EventsLoop {
             self.handle_event(&event);
             callback(event)
         })
+    }
+
+    /// Creates an EventsLoopProxy that can be used to wake up the EventsLoop from another thread.
+    #[inline]
+    pub fn create_proxy(&self) -> EventsLoopProxy {
+        let proxy = self.winit_events_loop.borrow().create_proxy();
+        EventsLoopProxy { proxy: proxy }
+    }
+}
+
+impl EventsLoopProxy {
+    /// Wake up the EventsLoop from which this proxy was created.
+    ///
+    /// This causes the EventsLoop to emit an Awakened event.
+    ///
+    /// Returns an Err if the associated EventsLoop no longer exists.
+    #[inline]
+    pub fn wakeup(&self) -> Result<(), EventsLoopClosed> {
+        self.proxy.wakeup()
     }
 }
 

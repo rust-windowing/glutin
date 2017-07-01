@@ -73,6 +73,29 @@ impl EventsLoop {
             callback(event);
         })
     }
+
+    /// Creates an EventsLoopProxy that can be used to wake up the EventsLoop from another thread.
+    #[inline]
+    pub fn create_proxy(&self) -> EventsLoopProxy {
+        let proxy = self.winit_events_loop.borrow().create_proxy();
+        EventsLoopProxy { proxy: proxy }
+    }
+}
+
+impl EventsLoopProxy {
+    /// Wake up the EventsLoop from which this proxy was created.
+    ///
+    /// This causes the EventsLoop to emit an Awakened event.
+    ///
+    /// Returns an Err if the associated EventsLoop no longer exists.
+    #[inline]
+    pub fn wakeup(&self) -> Result<(), EventsLoopClosed> {
+        self.proxy.wakeup()
+    }
+}
+
+pub struct EventsLoopProxy {
+    proxy: winit::EventsLoopProxy,
 }
 
 impl Window {

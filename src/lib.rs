@@ -65,7 +65,7 @@ extern crate wayland_client;
 pub use events::*;
 pub use headless::{HeadlessRendererBuilder, HeadlessContext};
 pub use window::{AvailableMonitorsIter, MonitorId, WindowId, get_available_monitors, get_primary_monitor};
-pub use winit::{ControlFlow, NativeMonitorId};
+pub use winit::{ControlFlow, EventsLoopClosed, NativeMonitorId};
 
 use std::io;
 
@@ -145,6 +145,29 @@ impl EventsLoop {
         where F: FnMut(Event) -> ControlFlow
     {
         self.events_loop.run_forever(callback)
+    }
+
+    /// Creates an EventsLoopProxy that can be used to wake up the EventsLoop from another thread.
+    #[inline]
+    pub fn create_proxy(&self) -> EventsLoopProxy {
+        let proxy = self.events_loop.create_proxy();
+        EventsLoopProxy { proxy: proxy }
+    }
+}
+
+pub struct EventsLoopProxy {
+    proxy: platform::EventsLoopProxy,
+}
+
+impl EventsLoopProxy {
+    /// Wake up the EventsLoop from which this proxy was created.
+    ///
+    /// This causes the EventsLoop to emit an Awakened event.
+    ///
+    /// Returns an Err if the associated EventsLoop no longer exists.
+    #[inline]
+    pub fn wakeup(&self) -> Result<(), EventsLoopClosed> {
+        self.proxy.wakeup()
     }
 }
 
