@@ -3,7 +3,7 @@ extern crate glutin;
 mod support;
 
 fn main() {
-    let events_loop = glutin::EventsLoop::new();
+    let mut events_loop = glutin::EventsLoop::new();
 
     let window1 = glutin::WindowBuilder::new().build(&events_loop).unwrap();
     let window2 = glutin::WindowBuilder::new().build(&events_loop).unwrap();
@@ -41,7 +41,7 @@ fn main() {
 
                 num_windows -= 1;
                 if num_windows == 0 {
-                    events_loop.interrupt();
+                    return glutin::ControlFlow::Break;
                 }
             },
             _ => (),
@@ -50,5 +50,7 @@ fn main() {
         draw_to_window(&window1, &context1, (0.0, 1.0, 0.0, 1.0));
         draw_to_window(&window2, &context2, (0.0, 0.0, 1.0, 1.0));
         draw_to_window(&window3, &context3, (1.0, 0.0, 0.0, 1.0));
+
+        glutin::ControlFlow::Continue
     });
 }

@@ -3,7 +3,7 @@ extern crate glutin;
 mod support;
 
 fn main() {
-    let events_loop = glutin::EventsLoop::new();
+    let mut events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new()
         .with_title("glutin - Cursor grabbing test")
         .build(&events_loop)
@@ -18,7 +18,7 @@ fn main() {
         match event {
             glutin::Event::WindowEvent { event, .. } => match event {
 
-                glutin::WindowEvent::KeyboardInput(glutin::ElementState::Pressed, _, _, _) => {
+                glutin::WindowEvent::KeyboardInput { input: glutin::KeyboardInput { state: glutin::ElementState::Pressed, .. }, .. } => {
                     if grabbed {
                         grabbed = false;
                         window.set_cursor_state(glutin::CursorState::Normal)
@@ -30,17 +30,19 @@ fn main() {
                     }
                 },
 
-                glutin::WindowEvent::Closed => events_loop.interrupt(),
+                glutin::WindowEvent::Closed => return glutin::ControlFlow::Break,
 
-                a @ glutin::WindowEvent::MouseMoved(_, _) => {
+                a @ glutin::WindowEvent::MouseMoved { .. } => {
                     println!("{:?}", a);
                 },
 
-                _ => (),
+                _ => ()
             },
+            _ => (),
         }
 
         context.draw_frame((0.0, 1.0, 0.0, 1.0));
         let _ = window.swap_buffers();
+        glutin::ControlFlow::Continue
     });
 }

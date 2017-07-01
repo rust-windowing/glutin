@@ -24,7 +24,7 @@ fn main() {
         monitor
     };
 
-    let events_loop = glutin::EventsLoop::new();
+    let mut events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new()
         .with_title("Hello world!")
         .with_fullscreen(monitor)
@@ -42,12 +42,13 @@ fn main() {
         let _ = window.swap_buffers();
 
         match event {
-            glutin::Event::WindowEvent { event, .. } => match event {
-                glutin::WindowEvent::Closed => events_loop.interrupt(),
-                glutin::WindowEvent::KeyboardInput(_, _, Some(glutin::VirtualKeyCode::Escape), _) =>
-                    events_loop.interrupt(),
-                _ => (),
+            glutin::Event::WindowEvent { event: glutin::WindowEvent::Closed, .. } => {
+                glutin::ControlFlow::Break
+            }
+            glutin::Event::WindowEvent { event: glutin::WindowEvent::KeyboardInput { input: glutin::KeyboardInput { virtual_keycode: Some(glutin::VirtualKeyCode::Escape), .. }, .. }, .. } => {
+                glutin::ControlFlow::Break
             },
+            _ => glutin::ControlFlow::Continue
         }
     });
 }
