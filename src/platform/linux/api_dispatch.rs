@@ -12,7 +12,7 @@ use WindowAttributes;
 
 use super::wayland;
 use super::x11;
-use Event;
+use {ControlFlow, Event};
 
 use winit::os::unix::WindowExt;
 
@@ -57,20 +57,11 @@ impl EventsLoop {
     /// Runs forever until `interrupt()` is called. Whenever an event happens, calls the callback.
     #[inline]
     pub fn run_forever<F>(&self, callback: F)
-        where F: FnMut(Event)
+        where F: FnMut(Event) -> ControlFlow
     {
         match *self {
             EventsLoop::X(ref evlp) => evlp.run_forever(callback),
             EventsLoop::Wayland(ref evlp) => evlp.run_forever(callback)
-        }
-    }
-
-    /// If we called `run_forever()`, stops the process of waiting for events.
-    #[inline]
-    pub fn interrupt(&self) {
-        match *self {
-            EventsLoop::X(ref evlp) => evlp.interrupt(),
-            EventsLoop::Wayland(ref evlp) => evlp.interrupt()
         }
     }
 }

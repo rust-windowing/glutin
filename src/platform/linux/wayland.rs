@@ -8,7 +8,7 @@ use api::dlopen;
 use api::egl;
 use api::egl::Context as EglContext;
 use wayland_client::egl as wegl;
-use {Event, WindowEvent};
+use {ControlFlow, Event, WindowEvent};
 
 pub struct Window {
     egl_surface: Arc<wegl::WlEglSurface>,
@@ -57,14 +57,14 @@ impl EventsLoop {
             if let Event::WindowEvent { window_id, event: WindowEvent::Resized(x, y) } = event {
                 self.resize_surface(window_id, x, y)
             }
-            callback(event);
+            callback(event)
         })
     }
 
     /// Runs forever until `interrupt()` is called. Whenever an event happens, calls the callback.
     #[inline]
     pub fn run_forever<F>(&self, mut callback: F)
-        where F: FnMut(Event)
+        where F: FnMut(Event) -> ControlFlow
     {
         self.winit_events_loop.run_forever(|event| {
             if let Event::WindowEvent { window_id, event: WindowEvent::Resized(x, y) } = event {
@@ -72,12 +72,6 @@ impl EventsLoop {
             }
             callback(event);
         })
-    }
-
-    /// If we called `run_forever()`, stops the process of waiting for events.
-    #[inline]
-    pub fn interrupt(&self) {
-        self.winit_events_loop.interrupt()
     }
 }
 

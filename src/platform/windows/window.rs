@@ -6,6 +6,7 @@ use std::ptr;
 use winit;
 
 use ContextError;
+use ControlFlow;
 use CreationError;
 use GlAttributes;
 use GlContext;
@@ -52,7 +53,7 @@ impl EventsLoop {
     /// Fetches all the events that are pending, calls the callback function for each of them,
     /// and returns.
     #[inline]
-    pub fn poll_events<F>(&self, mut callback: F)
+    pub fn poll_events<F>(&mut self, mut callback: F)
         where F: FnMut(winit::Event)
     {
         self.winit_events_loop.poll_events(|event| {
@@ -62,11 +63,11 @@ impl EventsLoop {
 
     /// Runs forever until `interrupt()` is called. Whenever an event happens, calls the callback.
     #[inline]
-    pub fn run_forever<F>(&self, mut callback: F)
-        where F: FnMut(winit::Event)
+    pub fn run_forever<F>(&mut self, mut callback: F)
+        where F: FnMut(winit::Event) -> ControlFlow
     {
         self.winit_events_loop.run_forever(|event| {
-            callback(event);
+            callback(event)
         })
     }
 

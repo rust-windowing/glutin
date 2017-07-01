@@ -65,7 +65,7 @@ extern crate wayland_client;
 pub use events::*;
 pub use headless::{HeadlessRendererBuilder, HeadlessContext};
 pub use window::{AvailableMonitorsIter, MonitorId, WindowId, get_available_monitors, get_primary_monitor};
-pub use winit::NativeMonitorId;
+pub use winit::{ControlFlow, NativeMonitorId};
 
 use std::io;
 
@@ -133,7 +133,7 @@ impl EventsLoop {
     /// Fetches all the events that are pending, calls the callback function for each of them,
     /// and returns.
     #[inline]
-    pub fn poll_events<F>(&self, callback: F)
+    pub fn poll_events<F>(&mut self, callback: F)
         where F: FnMut(Event)
     {
         self.events_loop.poll_events(callback)
@@ -141,16 +141,10 @@ impl EventsLoop {
 
     /// Runs forever until `interrupt()` is called. Whenever an event happens, calls the callback.
     #[inline]
-    pub fn run_forever<F>(&self, callback: F)
-        where F: FnMut(Event)
+    pub fn run_forever<F>(&mut self, callback: F)
+        where F: FnMut(Event) -> ControlFlow
     {
         self.events_loop.run_forever(callback)
-    }
-
-    /// If we called `run_forever()`, stops the process of waiting for events.
-    #[inline]
-    pub fn interrupt(&self) {
-        self.events_loop.interrupt()
     }
 }
 

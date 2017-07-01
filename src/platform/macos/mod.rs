@@ -23,6 +23,7 @@ use core_foundation::base::TCFType;
 use core_foundation::string::CFString;
 use core_foundation::bundle::{CFBundleGetBundleWithIdentifier, CFBundleGetFunctionPointerForName};
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::ops::Deref;
@@ -30,7 +31,7 @@ use std::sync::{Arc, Mutex, Weak};
 
 use libc;
 
-use winit;
+use winit::{self, ControlFlow};
 use winit::os::macos::WindowExt;
 pub use winit::{MonitorId, NativeMonitorId, get_available_monitors, get_primary_monitor};
 pub use self::headless::HeadlessContext;
@@ -53,7 +54,9 @@ pub struct Window {
 }
 
 pub struct EventsLoop {
-    winit_events_loop: winit::EventsLoop,
+    // `winit_events_loop` is wrapped in a refcell to avoid borrowing `self` mutably in `poll_events` or `run_forever`
+    // and simultaneously borrowing `self` immutably in `handle_event`.
+    winit_events_loop: RefCell<winit::EventsLoop>,
     window_contexts: Mutex<Weak<ContextMap>>,
 }
 
@@ -74,7 +77,7 @@ impl EventsLoop {
     /// Builds a new events loop.
     pub fn new() -> EventsLoop {
         EventsLoop {
-            winit_events_loop: winit::EventsLoop::new(),
+            winit_events_loop: RefCell::new(winit::EventsLoop::new()),
             window_contexts: Mutex::new(Weak::new()),
         }
     }
@@ -103,36 +106,32 @@ impl EventsLoop {
 
                 _ => (),
             },
+            winit::Event::DeviceEvent { .. } => (), // FIXME: Should this be handled??
+            winit::Event::Awakened => (), // FIXME: Should this be handled??
         }
     }
 
     /// Fetches all the events that are pending, calls the callback function for each of them,
     /// and returns.
     #[inline]
-    pub fn poll_events<F>(&self, mut callback: F)
+    pub fn poll_events<F>(&mut self, mut callback: F)
         where F: FnMut(winit::Event)
     {
-        self.winit_events_loop.poll_events(|event| {
+        self.winit_events_loop.borrow_mut().poll_events(|event| {
             self.handle_event(&event);
-            callback(event);
+            callback(event)
         });
     }
 
     /// Runs forever until `interrupt()` is called. Whenever an event happens, calls the callback.
     #[inline]
-    pub fn run_forever<F>(&self, mut callback: F)
-        where F: FnMut(winit::Event)
+    pub fn run_forever<F>(&mut self, mut callback: F)
+        where F: FnMut(winit::Event) -> ControlFlow
     {
-        self.winit_events_loop.run_forever(|event| {
+        self.winit_events_loop.borrow_mut().run_forever(|event| {
             self.handle_event(&event);
-            callback(event);
+            callback(event)
         })
-    }
-
-    /// If we called `run_forever()`, stops the process of waiting for events.
-    #[inline]
-    pub fn interrupt(&self) {
-        self.winit_events_loop.interrupt()
     }
 }
 
@@ -161,7 +160,7 @@ impl Window {
         }
 
         let transparent = winit_builder.window.transparent;
-        let winit_window = winit_builder.build(&events_loop.winit_events_loop).unwrap();
+        let winit_window = winit_builder.build(&*events_loop.winit_events_loop.borrow()).unwrap();
         let window_id = winit_window.id();
         let view = winit_window.get_nsview() as id;
         let context = match Context::new(view, pf_reqs, opengl, transparent) {
