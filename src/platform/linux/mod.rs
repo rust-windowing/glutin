@@ -10,7 +10,7 @@ use PixelFormatRequirements;
 
 use api::osmesa::{self, OsMesaContext};
 
-pub use self::api_dispatch::{Window, EventsLoop};
+pub use self::api_dispatch::{Window, EventsLoop, EventsLoopProxy};
 pub use self::api_dispatch::PlatformSpecificWindowBuilderAttributes;
 
 mod api_dispatch;

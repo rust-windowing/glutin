@@ -4,7 +4,6 @@ use wayland_client;
 
 use ContextError;
 use CreationError;
-use EventsLoopClosed;
 use GlAttributes;
 use GlContext;
 use PixelFormat;
