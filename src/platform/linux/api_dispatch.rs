@@ -49,8 +49,8 @@ impl EventsLoop {
         where F: FnMut(Event)
     {
         match *self {
-            EventsLoop::X(ref evlp) => evlp.poll_events(callback),
-            EventsLoop::Wayland(ref evlp) => evlp.poll_events(callback)
+            EventsLoop::X(ref mut evlp) => evlp.poll_events(callback),
+            EventsLoop::Wayland(ref mut evlp) => evlp.poll_events(callback)
         }
     }
 
@@ -60,8 +60,8 @@ impl EventsLoop {
         where F: FnMut(Event) -> ControlFlow
     {
         match *self {
-            EventsLoop::X(ref evlp) => evlp.run_forever(callback),
-            EventsLoop::Wayland(ref evlp) => evlp.run_forever(callback)
+            EventsLoop::X(ref mut evlp) => evlp.run_forever(callback),
+            EventsLoop::Wayland(ref mut evlp) => evlp.run_forever(callback)
         }
     }
 
