@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::sync::{Mutex, Weak, Arc};
 use std::collections::HashMap;
 use std::ffi::CString;
@@ -17,7 +18,7 @@ pub struct Window {
 
 
 pub struct EventsLoop {
-    winit_events_loop: winit::EventsLoop,
+    winit_events_loop: RefCell<winit::EventsLoop>,
     egl_surfaces: Mutex<HashMap<winit::WindowId, Weak<wegl::WlEglSurface>>>,
 }
 
@@ -25,7 +26,7 @@ impl EventsLoop {
     /// Builds a new events loop.
     pub fn new(events_loop: winit::EventsLoop) -> EventsLoop {
         EventsLoop {
-            winit_events_loop: events_loop,
+            winit_events_loop: RefCell::new(events_loop),
             egl_surfaces: Mutex::new(HashMap::new()),
         }
     }
@@ -50,10 +51,10 @@ impl EventsLoop {
     /// Fetches all the events that are pending, calls the callback function for each of them,
     /// and returns.
     #[inline]
-    pub fn poll_events<F>(&self, mut callback: F)
+    pub fn poll_events<F>(&mut self, mut callback: F)
         where F: FnMut(Event)
     {
-        self.winit_events_loop.poll_events(|event| {
+        self.winit_events_loop.borrow_mut().poll_events(|event| {
             if let Event::WindowEvent { window_id, event: WindowEvent::Resized(x, y) } = event {
                 self.resize_surface(window_id, x, y)
             }
@@ -63,10 +64,10 @@ impl EventsLoop {
 
     /// Runs forever until `interrupt()` is called. Whenever an event happens, calls the callback.
     #[inline]
-    pub fn run_forever<F>(&self, mut callback: F)
+    pub fn run_forever<F>(&mut self, mut callback: F)
         where F: FnMut(Event) -> ControlFlow
     {
-        self.winit_events_loop.run_forever(|event| {
+        self.winit_events_loop.borrow_mut().run_forever(|event| {
             if let Event::WindowEvent { window_id, event: WindowEvent::Resized(x, y) } = event {
                 self.resize_surface(window_id, x, y)
             }
