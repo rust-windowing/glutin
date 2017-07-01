@@ -9,7 +9,7 @@ use api::dlopen;
 use api::egl;
 use api::egl::Context as EglContext;
 use wayland_client::egl as wegl;
-use {ControlFlow, Event, WindowEvent};
+use {ControlFlow, Event, WindowEvent, EventsLoopClosed};
 
 pub struct Window {
     egl_surface: Arc<wegl::WlEglSurface>,
@@ -71,7 +71,7 @@ impl EventsLoop {
             if let Event::WindowEvent { window_id, event: WindowEvent::Resized(x, y) } = event {
                 self.resize_surface(window_id, x, y)
             }
-            callback(event);
+            callback(event)
         })
     }
 
@@ -81,6 +81,10 @@ impl EventsLoop {
         let proxy = self.winit_events_loop.borrow().create_proxy();
         EventsLoopProxy { proxy: proxy }
     }
+}
+
+pub struct EventsLoopProxy {
+    proxy: winit::EventsLoopProxy,
 }
 
 impl EventsLoopProxy {
@@ -95,10 +99,6 @@ impl EventsLoopProxy {
     }
 }
 
-pub struct EventsLoopProxy {
-    proxy: winit::EventsLoopProxy,
-}
-
 impl Window {
     pub fn new(
         events_loop: &EventsLoop,
@@ -106,7 +106,7 @@ impl Window {
         opengl: &GlAttributes<&Window>,
         winit_builder: winit::WindowBuilder,
     ) -> Result<(Window, winit::Window), CreationError> {
-        let winit_window = winit_builder.build(&events_loop.winit_events_loop).unwrap();
+        let winit_window = winit_builder.build(&*events_loop.winit_events_loop.borrow()).unwrap();
         let wayland_window = {
             let (w, h) = winit_window.get_inner_size().unwrap();
             let surface = winit_window.get_wayland_surface().unwrap();
@@ -133,7 +133,7 @@ impl Window {
             }
         };
         // Store a copy of the `context`'s `IdRef` so that we can `update` it on `Resized` events.
-        events_loop.insert_window(winit_window.id(), &wayland_window.egl_surface);
+        events_loop.borrow().insert_window(winit_window.id(), &wayland_window.egl_surface);
         Ok((wayland_window, winit_window))
     }
 

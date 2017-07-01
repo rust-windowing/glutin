@@ -19,7 +19,7 @@ use std::ffi::CString;
 use std::ops::{Deref, DerefMut};
 use kernel32;
 
-pub use self::window::EventsLoop;
+pub use self::window::{EventsLoop, EventsLoopProxy};
 
 mod window;
 

@@ -3,7 +3,6 @@ use winit;
 use wayland_client;
 
 use ContextError;
-use ControlFlow;
 use CreationError;
 use EventsLoopClosed;
 use GlAttributes;
@@ -14,7 +13,7 @@ use WindowAttributes;
 
 use super::wayland;
 use super::x11;
-use {ControlFlow, Event};
+use {ControlFlow, Event, EventsLoopClosed};
 
 use winit::os::unix::WindowExt;
 
@@ -91,8 +90,8 @@ impl EventsLoopProxy {
     #[inline]
     pub fn wakeup(&self) -> Result<(), EventsLoopClosed> {
         match *self {
-            X(ref proxy) => self.proxy.wakeup(),
-            Wayland(ref proxy) => self.proxy.wakeup(),
+            EventsLoopProxy::X(ref proxy) => proxy.wakeup(),
+            EventsLoopProxy::Wayland(ref proxy) => proxy.wakeup(),
         }
     }
 }
