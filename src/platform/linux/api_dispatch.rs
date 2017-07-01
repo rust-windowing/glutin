@@ -3,6 +3,7 @@ use winit;
 use wayland_client;
 
 use ContextError;
+use ControlFlow;
 use CreationError;
 use EventsLoopClosed;
 use GlAttributes;
@@ -46,8 +47,8 @@ impl EventsLoop {
     /// Fetches all the events that are pending, calls the callback function for each of them,
     /// and returns.
     #[inline]
-    pub fn poll_events<F>(&self, callback: F)
-        where F: FnMut(Event)
+    pub fn poll_events<F>(&mut self, callback: F)
+        where F: FnMut(Event) -> ControlFlow
     {
         match *self {
             EventsLoop::X(ref evlp) => evlp.poll_events(callback),
@@ -57,7 +58,7 @@ impl EventsLoop {
 
     /// Runs forever until `interrupt()` is called. Whenever an event happens, calls the callback.
     #[inline]
-    pub fn run_forever<F>(&self, callback: F)
+    pub fn run_forever<F>(&mut self, callback: F)
         where F: FnMut(Event) -> ControlFlow
     {
         match *self {
