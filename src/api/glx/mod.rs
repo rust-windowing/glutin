@@ -55,6 +55,7 @@ impl Context {
         display: *mut ffi::Display,
         screen_id: libc::c_int,
         transparent: bool,
+        window_visual_info: ffi::glx::types::XVisualInfo,
     ) -> Result<ContextPrototype<'a>, CreationError>
     {
         // This is completely ridiculous, but VirtualBox's OpenGL driver needs some call handled by
@@ -82,16 +83,8 @@ impl Context {
                                           .map_err(|_| CreationError::NoAvailablePixelFormat))
         };
 
-        // getting the visual infos
-        let visual_infos: ffi::glx::types::XVisualInfo = unsafe {
-            let vi = glx.GetVisualFromFBConfig(display as *mut _, fb_config);
-            if vi.is_null() {
-                return Err(CreationError::OsError(format!("glxGetVisualFromFBConfig failed")));
-            }
-            let vi_copy = ptr::read(vi as *const _);
-            (xlib.XFree)(vi as *mut _);
-            vi_copy
-        };
+        // From `ffi::glx::types::XVisualInfo` to `ffi::VisualInfo`
+        let visual_info: ffi::XVisualInfo = unsafe { mem::transmute(window_visual_info) };
 
         Ok(ContextPrototype {
             glx: glx,
@@ -100,7 +93,7 @@ impl Context {
             opengl: opengl,
             display: display,
             fb_config: fb_config,
-            visual_infos: unsafe { mem::transmute(visual_infos) },
+            visual_infos: visual_info,
             pixel_format: pixel_format,
         })
     }

@@ -110,6 +110,28 @@ impl Drop for Context {
     }
 }
 
+unsafe fn x_visual_info(x_conn: &XConnection, visual_id: ffi::VisualID)
+    -> ffi::glx::types::XVisualInfo
+{
+    let mut template: ffi::XVisualInfo = mem::zeroed();
+    template.visualid = visual_id;
+    let mut num_visuals = 0;
+    let visual_info =
+        (x_conn.xlib.XGetVisualInfo)(x_conn.display,
+                                     ffi::VisualIDMask,
+                                     &mut template,
+                                     &mut num_visuals);
+
+    x_conn.check_errors().expect("Failed to call XGetVisualInfo");
+    assert!(!visual_info.is_null());
+    assert!(num_visuals == 1, "Expected 1 matching visual structure, found {}", num_visuals);
+
+    // Copy the XVisualInfo onto the stack.
+    let copy = ptr::read(visual_info as *const _);
+    (x_conn.xlib.XFree)(visual_info as *mut _);
+    copy
+}
+
 impl Context {
 
     pub fn new(
@@ -125,6 +147,24 @@ impl Context {
 
         // Get the screen_id for the current window.
         let screen_id = window.get_xlib_screen_id().expect("expected x11 window") as i32;
+
+        // Get the XWindow for the window.
+        let x_window = window.get_xlib_window().expect("expected x11 window");
+
+        // In order to use the existing window with a GL context, we must create the GL context
+        // using the existing window's `Visual` so that they are compatible.
+        let visual_info: ffi::glx::types::XVisualInfo = unsafe {
+            // Retrieve the window attributes for the `Visual*`
+            let mut window_attributes = mem::uninitialized();
+            (display.xlib.XGetWindowAttributes)(display.display, x_window as _, &mut window_attributes);
+            display.check_errors().expect("Failed to call XGetWindowAttributes");
+
+            // Use the `Visual*` to retrieve the `VisualID`.
+            let visual_id = (display.xlib.XVisualIDFromVisual)(window_attributes.visual);
+
+            // Use the `VisualID` to get the `XVisualInfo`.
+            x_visual_info(&display, visual_id)
+        };
 
         // start the context building process
         enum Prototype<'a> {
@@ -150,6 +190,7 @@ impl Context {
                         display.display,
                         screen_id,
                         gl_attr.transparent,
+                        visual_info,
                     )))
                 } else if let Some(ref egl) = backend.egl {
                     let native_display = egl::NativeDisplay::X11(Some(display.display as *const _));
@@ -185,31 +226,19 @@ impl Context {
             Prototype::Glx(ref p) => p.get_visual_infos().clone(),
             Prototype::Egl(ref p) => {
                 unsafe {
-                    let mut template: ffi::XVisualInfo = mem::zeroed();
-                    template.visualid = p.get_native_visual_id() as ffi::VisualID;
-
-                    let mut num_visuals = 0;
-                    let vi = (display.xlib.XGetVisualInfo)(display.display, ffi::VisualIDMask,
-                                                           &mut template, &mut num_visuals);
-                    display.check_errors().expect("Failed to call XGetVisualInfo");
-                    assert!(!vi.is_null());
-                    assert!(num_visuals == 1);
-
-                    let vi_copy = ptr::read(vi as *const _);
-                    (display.xlib.XFree)(vi as *mut _);
-                    vi_copy
+                    let vi = x_visual_info(&display, p.get_native_visual_id() as ffi::VisualID);
+                    mem::transmute(vi) // From `ffi::glx::types::XVisualInfo` to `ffi::VisualInfo`
                 }
             },
         };
 
-        let xlib_window = window.get_xlib_window().unwrap();
         // finish creating the OpenGL context
         let context = match context {
             Prototype::Glx(ctxt) => {
-                GlContext::Glx(try!(ctxt.finish(xlib_window as _)))
+                GlContext::Glx(try!(ctxt.finish(x_window as _)))
             },
             Prototype::Egl(ctxt) => {
-                GlContext::Egl(try!(ctxt.finish(xlib_window)))
+                GlContext::Egl(try!(ctxt.finish(x_window)))
             },
         };
 
