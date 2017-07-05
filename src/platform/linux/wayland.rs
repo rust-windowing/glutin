@@ -15,11 +15,13 @@ pub struct Context {
 
 impl Context {
     pub fn new(
-        window: &winit::Window,
+        window_builder: winit::WindowBuilder,
+        events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-    ) -> Result<Self, CreationError>
+    ) -> Result<(winit::Window, Self), CreationError>
     {
+        let window = try!(window_builder.build(events_loop));
         let (w, h) = window.get_inner_size_points().unwrap();
         let surface = window.get_wayland_surface().unwrap();
         let egl_surface = unsafe { wegl::WlEglSurface::new_from_raw(surface as *mut _, w as i32, h as i32) };
@@ -37,10 +39,11 @@ impl Context {
             EglContext::new(egl, pf_reqs, &gl_attr, native_display)
                 .and_then(|p| p.finish(egl_surface.ptr() as *const _))?
         };
-        Ok(Context {
+        let context = Context {
             egl_surface: Arc::new(egl_surface),
             context: context,
-        })
+        };
+        Ok((window, context))
     }
 
     pub fn resize(&self, width: u32, height: u32) {

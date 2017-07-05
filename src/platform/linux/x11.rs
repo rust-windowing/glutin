@@ -4,7 +4,7 @@ use std::{mem, ptr, fmt, error};
 use std::sync::Arc;
 
 use winit;
-use winit::os::unix::{WindowExt, get_x11_xconnection};
+use winit::os::unix::{WindowExt, WindowBuilderExt, get_x11_xconnection};
 
 use {Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat, PixelFormatRequirements};
 
@@ -113,18 +113,25 @@ impl Drop for Context {
 impl Context {
 
     pub fn new(
-        window: &winit::Window,
+        window_builder: winit::WindowBuilder,
+        events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-    ) -> Result<Self, CreationError>
+    ) -> Result<(winit::Window, Self), CreationError>
     {
         let display = match get_x11_xconnection() {
             Some(display) => display,
             None => return Err(CreationError::NoBackendAvailable(Box::new(NoX11Connection))),
         };
 
-        // Get the screen_id for the current window.
-        let screen_id = window.get_xlib_screen_id().expect("expected x11 window") as i32;
+        // Get the screen_id for the window being built.
+        let screen_id = match window_builder.window.monitor {
+            Some(ref m) => match m.get_native_identifier() {
+                winit::NativeMonitorId::Numeric(monitor) => monitor as i32,
+                _ => panic!("Non-`Numeric` X11 `NativeMonitorId` (X11 expects `Numeric`)"),
+            },
+            _ => unsafe { (display.xlib.XDefaultScreen)(display.display) },
+        };
 
         // start the context building process
         enum Prototype<'a> {
@@ -149,7 +156,7 @@ impl Context {
                         &builder_clone_opengl_glx,
                         display.display,
                         screen_id,
-                        gl_attr.transparent,
+                        window_builder.window.transparent,
                     )))
                 } else if let Some(ref egl) = backend.egl {
                     let native_display = egl::NativeDisplay::X11(Some(display.display as *const _));
@@ -202,6 +209,13 @@ impl Context {
             },
         };
 
+        let window = try! {
+            window_builder
+                .with_x11_visual(&visual_infos as *const _)
+                .with_x11_screen(screen_id)
+                .build(events_loop)
+        };
+
         let xlib_window = window.get_xlib_window().unwrap();
         // finish creating the OpenGL context
         let context = match context {
@@ -226,11 +240,13 @@ impl Context {
             cmap
         };
 
-        Ok(Context {
+        let context = Context {
             display: display.clone(),
             context: context,
             colormap: cmap,
-        })
+        };
+
+        Ok((window, context))
     }
 
     #[inline]

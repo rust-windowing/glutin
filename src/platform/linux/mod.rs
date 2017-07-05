@@ -17,10 +17,11 @@ pub enum Context {
 impl Context {
     #[inline]
     pub fn new(
-        window: &winit::Window,
+        window_builder: winit::WindowBuilder,
+        events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-    ) -> Result<Self, CreationError>
+    ) -> Result<(winit::Window, Self), CreationError>
     {
         match wayland_client::default_connect() {
             Ok(_) => {
@@ -32,7 +33,8 @@ impl Context {
                     &Context::X(_) => unreachable!(),
                     &Context::Wayland(ref ctxt) => ctxt,
                 });
-                Ok(Context::Wayland(try!(wayland::Context::new(window, pf_reqs, &gl_attr))))
+                wayland::Context::new(window_builder, events_loop, pf_reqs, &gl_attr)
+                    .map(|(window, context)| (window, Context::Wayland(context)))
             },
             Err(_) => {
                 if let Some(&Context::Wayland(_)) = gl_attr.sharing {
@@ -43,7 +45,8 @@ impl Context {
                     &Context::Wayland(_) => unreachable!(),
                     &Context::X(ref ctxt) => ctxt,
                 });
-                Ok(Context::X(try!(x11::Context::new(window, pf_reqs, &gl_attr))))
+                x11::Context::new(window_builder, events_loop, pf_reqs, &gl_attr)
+                    .map(|(window, context)| (window, Context::X(context)))
             }
         }
     }
