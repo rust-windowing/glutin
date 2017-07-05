@@ -28,11 +28,13 @@ pub struct PlatformSpecificHeadlessBuilderAttributes;
 
 impl Context {
     pub fn new(
-        _window: &winit::Window,
+        window_builder: winit::WindowBuilder,
+        events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Self>,
-    ) -> Result<Self, CreationError>
+    ) -> Result<(winit::Window, Self), CreationError>
     {
+        let window = try!(window_builder.build(events_loop));
         let gl_attr = gl_attr.clone().map_sharing(|c| &c.egl_context);
         let native_window = unsafe { android_glue::get_native_window() };
         if native_window.is_null() {
@@ -42,7 +44,8 @@ impl Context {
         let native_display = egl::NativeDisplay::Android;
         let context = try!(EglContext::new(egl, pf_reqs, &gl_attr, native_display)
             .and_then(|p| p.finish(native_window as *const _)));
-        Ok(Context { egl_context: context })
+        let context = Context { egl_context: context };
+        Ok((window, context))
     }
 
     #[inline]
