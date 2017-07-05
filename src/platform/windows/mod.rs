@@ -123,14 +123,11 @@ impl HeadlessContext {
             }
         }
         let events_loop = winit::EventsLoop::new();
-        let window = winit::WindowBuilder::new()
-            .with_visibility(false)
-            .build(&events_loop)
-            .unwrap();
+        let window_builder = winit::WindowBuilder::new().with_visibility(false);
         let gl_attr = &gl_attr.clone().map_sharing(|_| unimplemented!());
         let egl = EGL.as_ref().map(|w| &w.0);
-        let context = try!(context::Context::new(&window, pf_reqs, gl_attr, egl));
-        Ok(HeadlessContext::HiddenWindow(events_loop, window, context))
+        context::Context::new(window_builder, &events_loop, pf_reqs, gl_attr, egl)
+            .map(|(window, context)| HeadlessContext::HiddenWindow(events_loop, window, context))
     }
 
     #[inline]
