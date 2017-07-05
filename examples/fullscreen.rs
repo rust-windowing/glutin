@@ -27,13 +27,11 @@ fn main() {
     };
 
     let mut events_loop = winit::EventsLoop::new();
-    let window = winit::WindowBuilder::new()
+    let window_builder = winit::WindowBuilder::new()
         .with_title("Hello world!")
-        .with_fullscreen(monitor)
-        .build(&events_loop)
-        .unwrap();
-    let context = glutin::ContextBuilder::new()
-        .build(&window)
+        .with_fullscreen(monitor);
+    let (_window, context) = glutin::ContextBuilder::new()
+        .build(window_builder, &events_loop)
         .unwrap();
 
     let _ = unsafe { context.make_current() };

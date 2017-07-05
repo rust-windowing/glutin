@@ -4,12 +4,10 @@ mod support;
 
 fn main() {
     let mut events_loop = glutin::winit::EventsLoop::new();
-    let window = glutin::winit::WindowBuilder::new()
-        .with_title("A fantastic window!")
-        .build(&events_loop)
-        .unwrap();
-    let context = glutin::ContextBuilder::new()
-        .build(&window)
+    let window_builder = glutin::winit::WindowBuilder::new()
+        .with_title("A fantastic window!");
+    let (_window, context) = glutin::ContextBuilder::new()
+        .build(window_builder, &events_loop)
         .unwrap();
 
     let _ = unsafe { context.make_current() };

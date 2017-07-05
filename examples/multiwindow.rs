@@ -13,8 +13,9 @@ fn main() {
 
     let mut windows = std::collections::HashMap::new();
     for _ in 0..3 {
-        let window = glutin::winit::WindowBuilder::new().build(&events_loop).unwrap();
-        let context = glutin::ContextBuilder::new().build(&window).unwrap();
+        let (window, context) = glutin::ContextBuilder::new()
+            .build(glutin::winit::WindowBuilder::new(), &events_loop)
+            .unwrap();
         let _ = unsafe { context.make_current() };
         let gl = support::load(&context);
         let window_id = window.id();
