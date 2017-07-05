@@ -225,23 +225,14 @@ impl<'a> ContextBuilder<'a> {
         self
     }
 
-    /// Sets whether or not the `Context` should be transparent.
-    ///
-    /// TODO: It would be nicer if we could inherit this information from the `Window` when `build`
-    /// is called, however `Window` currently does not have any methods for returning whether or
-    /// not it is currently transparent.
-    #[inline]
-    pub fn with_transparency(mut self, transparent: bool) -> Self {
-        self.gl_attr.transparent = transparent;
-        self
-    }
-
     /// Creates a new OpenGL context.
     ///
     /// Error should be very rare and only occur in case of permission denied, incompatible system,
     /// out of memory, etc.
-    pub fn build(self, window: &winit::Window) -> Result<Context, CreationError> {
-        Context::new(window, &self.pf_reqs, &self.gl_attr)
+    pub fn build(self, window_builder: winit::WindowBuilder, events_loop: &winit::EventsLoop)
+        -> Result<(winit::Window, Context), CreationError>
+    {
+        Context::new(window_builder, events_loop, &self.pf_reqs, &self.gl_attr)
     }
 }
 
@@ -249,14 +240,15 @@ impl Context {
 
     // Called by `ContextBuilder::build`.
     fn new(
-        window: &winit::Window,
+        window_builder: winit::WindowBuilder,
+        events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-    ) -> Result<Self, CreationError>
+    ) -> Result<(winit::Window, Self), CreationError>
     {
         let gl_attr = gl_attr.clone().map_sharing(|ctxt| &ctxt.context);
-        platform::Context::new(window, pf_reqs, &gl_attr)
-            .map(|context| Context { context: context })
+        platform::Context::new(window_builder, events_loop, pf_reqs, &gl_attr)
+            .map(|(window, context)| (window, Context { context: context }))
     }
 
     /// Resize the GL context.
@@ -319,6 +311,7 @@ pub enum CreationError {
     OpenGlVersionNotSupported,
     NoAvailablePixelFormat,
     PlatformSpecific(String),
+    Window(winit::CreationError),
 }
 
 impl CreationError {
@@ -334,6 +327,7 @@ impl CreationError {
             CreationError::NoAvailablePixelFormat => "Couldn't find any pixel format that matches \
                                                       the criterias.",
             CreationError::PlatformSpecific(ref text) => &text,
+            CreationError::Window(ref err) => std::error::Error::description(err),
         }
     }
 }
@@ -356,8 +350,15 @@ impl std::error::Error for CreationError {
     fn cause(&self) -> Option<&std::error::Error> {
         match *self {
             CreationError::NoBackendAvailable(ref err) => Some(&**err),
+            CreationError::Window(ref err) => Some(err),
             _ => None
         }
+    }
+}
+
+impl From<winit::CreationError> for CreationError {
+    fn from(err: winit::CreationError) -> Self {
+        CreationError::Window(err)
     }
 }
 
@@ -614,11 +615,6 @@ pub struct GlAttributes<S> {
     ///
     /// The default is `false`.
     pub vsync: bool,
-
-    /// Whether or not the `GlContext` should be transparent.
-    ///
-    /// The default is `false`.
-    pub transparent: bool,
 }
 
 impl<S> GlAttributes<S> {
@@ -632,7 +628,6 @@ impl<S> GlAttributes<S> {
             debug: self.debug,
             robustness: self.robustness,
             vsync: self.vsync,
-            transparent: self.transparent,
         }
     }
 }
@@ -647,7 +642,6 @@ impl<S> Default for GlAttributes<S> {
             debug: cfg!(debug_assertions),
             robustness: Robustness::NotRobust,
             vsync: false,
-            transparent: false,
         }
     }
 }
