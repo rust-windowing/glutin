@@ -40,11 +40,15 @@ pub struct Context {
 impl Context {
 
     pub fn new(
-        window: &winit::Window,
+        window_builder: winit::WindowBuilder,
+        events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-    ) -> Result<Self, CreationError>
+    ) -> Result<(winit::Window, Self), CreationError>
     {
+        let transparent = window_builder.window.transparent;
+        let window = try!(window_builder.build(events_loop));
+
         if gl_attr.sharing.is_some() {
             unimplemented!()
         }
@@ -108,14 +112,15 @@ impl Context {
             let value = if gl_attr.vsync { 1 } else { 0 };
             gl_context.setValues_forParameter_(&value, appkit::NSOpenGLContextParameter::NSOpenGLCPSwapInterval);
 
-            if gl_attr.transparent {
+            if transparent {
                 let mut opacity = 0;
                 CGLSetParameter(gl_context.CGLContextObj() as *mut _, kCGLCPSurfaceOpacity, &mut opacity);
             }
 
             CGLEnable(gl_context.CGLContextObj() as *mut _, kCGLCECrashOnRemovedFunctions);
 
-            Ok(Context { gl: gl_context, pixel_format: pixel_format })
+            let context = Context { gl: gl_context, pixel_format: pixel_format };
+            Ok((window, context))
         }
     }
 
