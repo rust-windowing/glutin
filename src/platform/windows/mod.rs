@@ -63,16 +63,18 @@ impl Context {
     /// See the docs in the crate root file.
     #[inline]
     pub fn new(
-        window: &winit::Window,
+        window_builder: winit::WindowBuilder,
+        events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         opengl: &GlAttributes<&Self>,
-    ) -> Result<Self, CreationError> {
+    ) -> Result<(winit::Window, Self), CreationError> {
         context::Context::new(
-            window,
+            window_builder,
+            events_loop,
             pf_reqs,
             &opengl.clone().map_sharing(|w| &w.0),
             EGL.as_ref().map(|w| &w.0),
-        ).map(|c| Context(c))
+        ).map(|(w, c)| (w, Context(c)))
     }
 }
 

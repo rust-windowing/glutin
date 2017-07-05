@@ -32,19 +32,21 @@ impl Context {
 
     /// See the docs in the crate root file.
     pub fn new(
-        window: &winit::Window,
+        window_builder: winit::WindowBuilder,
+        events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Self>,
         egl: Option<&Egl>,
-    ) -> Result<Self, CreationError>
+    ) -> Result<(winit::Window, Self), CreationError>
     {
+        let window = try!(window_builder.build(events_loop));
         let gl_attr = gl_attr.clone().map_sharing(|ctxt| {
             match *ctxt {
                 Context::Wgl(ref c) => c.get_hglrc(),
                 Context::Egl(_) => unimplemented!(),        // FIXME:
             }
         });
-        unsafe {
+        let context_result = unsafe {
             let w = window.platform_window() as winapi::HWND;
             match gl_attr.version {
                 GlRequest::Specific(Api::OpenGlEs, (_major, _minor)) => {
@@ -67,7 +69,8 @@ impl Context {
                 }
                 _ => WglContext::new(&pf_reqs, &gl_attr, w).map(Context::Wgl),
             }
-        }
+        };
+        context_result.map(|context| (window, context))
     }
 
     pub fn resize(&self, _width: u32, _height: u32) {
