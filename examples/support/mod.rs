@@ -8,12 +8,12 @@ mod gl {
     include!(concat!(env!("OUT_DIR"), "/test_gl_bindings.rs"));
 }
 
-pub struct Context {
+pub struct Gl {
     gl: gl::Gl
 }
 
-pub fn load(window: &glutin::Window) -> Context {
-    let gl = gl::Gl::load_with(|ptr| window.get_proc_address(ptr) as *const _);
+pub fn load(context: &glutin::Context) -> Gl {
+    let gl = gl::Gl::load_with(|ptr| context.get_proc_address(ptr) as *const _);
 
     let version = unsafe {
         let data = CStr::from_ptr(gl.GetString(gl::VERSION) as *const _).to_bytes().to_vec();
@@ -62,15 +62,14 @@ pub fn load(window: &glutin::Window) -> Context {
         gl.EnableVertexAttribArray(color_attrib as gl::types::GLuint);
     }
 
-    Context { gl: gl }
+    Gl { gl: gl }
 }
 
-impl Context {
-    pub fn draw_frame(&self, color: (f32, f32, f32, f32)) {
+impl Gl {
+    pub fn draw_frame(&self, color: [f32; 4]) {
         unsafe {
-            self.gl.ClearColor(color.0, color.1, color.2, color.3);
+            self.gl.ClearColor(color[0], color[1], color[2], color[3]);
             self.gl.Clear(gl::COLOR_BUFFER_BIT);
-
             self.gl.DrawArrays(gl::TRIANGLES, 0, 3);
         }
     }

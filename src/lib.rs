@@ -23,6 +23,7 @@
 //!
 //! By default only `window` is enabled.
 
+#[cfg(target_os = "windows")]
 #[macro_use]
 extern crate lazy_static;
 
@@ -31,7 +32,7 @@ extern crate shared_library;
 
 extern crate libc;
 
-extern crate winit;
+pub extern crate winit;
 
 #[cfg(target_os = "windows")]
 extern crate winapi;
@@ -56,39 +57,38 @@ extern crate cocoa;
 extern crate core_foundation;
 #[cfg(target_os = "macos")]
 extern crate core_graphics;
-#[cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "openbsd"))]
+#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "dragonfly", target_os = "openbsd"))]
 extern crate x11_dl;
 #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "dragonfly", target_os = "openbsd"))]
-#[macro_use(wayland_env)]
 extern crate wayland_client;
 
-pub use events::*;
 pub use headless::{HeadlessRendererBuilder, HeadlessContext};
-pub use window::{AvailableMonitorsIter, MonitorId, WindowId, get_available_monitors, get_primary_monitor};
-pub use winit::NativeMonitorId;
 
 use std::io;
 
 mod api;
 mod platform;
-mod events;
 mod headless;
-mod window;
 
 pub mod os;
 
-/// Represents an OpenGL context and the Window or environment around it.
+/// Represents an OpenGL context.
+///
+/// A `Context` is normally associated with a single window, however `Context`s can be *shared*
+/// between multiple windows.
 ///
 /// # Example
 ///
 /// ```ignore
-/// let window = Window::new(&events_loop).unwrap();
+/// let events_loop = glutin::winit::EventsLoop::new();
+/// let window = glutin::winit::WindowBuilder::new(&events_loop).unwrap();
+/// let context = glutin::ContextBuilder::new(&window).unwrap();
 ///
-/// unsafe { window.make_current() };
+/// unsafe { context.make_current().unwrap() };
 ///
 /// loop {
 ///     events_loop.poll_events(|event| {
-///         match(event) {
+///         match event {
 ///             // process events here
 ///             _ => ()
 ///         }
@@ -96,90 +96,216 @@ pub mod os;
 ///
 ///     // draw everything here
 ///
-///     window.swap_buffers();
+///     context.swap_buffers();
 ///     std::thread::sleep(std::time::Duration::from_millis(17));
 /// }
 /// ```
-pub struct Window {
-    window: platform::Window,
+pub struct Context {
+    context: platform::Context,
 }
 
-/// Object that allows you to build windows.
-#[derive(Clone)]
-pub struct WindowBuilder<'a> {
-    winit_builder: winit::WindowBuilder,
-
+/// Object that allows you to build `Context`s.
+pub struct ContextBuilder<'a> {
     /// The attributes to use to create the context.
-    pub opengl: GlAttributes<&'a platform::Window>,
-
+    pub gl_attr: GlAttributes<&'a Context>,
     // Should be made public once it's stabilized.
     pf_reqs: PixelFormatRequirements,
 }
 
-/// Provides a way to retreive events from the windows that are registered to it.
-// TODO: document usage in multiple threads
-pub struct EventsLoop {
-    events_loop: platform::EventsLoop,
-}
+impl<'a> ContextBuilder<'a> {
 
-impl EventsLoop {
-    /// Builds a new events loop.
-    pub fn new() -> EventsLoop {
-        EventsLoop {
-            events_loop: platform::EventsLoop::new(),
+    /// Initializes a new `ContextBuilder` with default values.
+    pub fn new() -> Self {
+        ContextBuilder {
+            pf_reqs: std::default::Default::default(),
+            gl_attr: std::default::Default::default(),
         }
     }
 
-    /// Fetches all the events that are pending, calls the callback function for each of them,
-    /// and returns.
+    /// Sets how the backend should choose the OpenGL API and version.
     #[inline]
-    pub fn poll_events<F>(&self, callback: F)
-        where F: FnMut(Event)
-    {
-        self.events_loop.poll_events(callback)
+    pub fn with_gl(mut self, request: GlRequest) -> Self {
+        self.gl_attr.version = request;
+        self
     }
 
-    /// Runs forever until `interrupt()` is called. Whenever an event happens, calls the callback.
+    /// Sets the desired OpenGL context profile.
     #[inline]
-    pub fn run_forever<F>(&self, callback: F)
-        where F: FnMut(Event)
-    {
-        self.events_loop.run_forever(callback)
+    pub fn with_gl_profile(mut self, profile: GlProfile) -> Self {
+        self.gl_attr.profile = Some(profile);
+        self
     }
 
-    /// If we called `run_forever()`, stops the process of waiting for events.
+    /// Sets the *debug* flag for the OpenGL context.
+    ///
+    /// The default value for this flag is `cfg!(debug_assertions)`, which means that it's enabled
+    /// when you run `cargo build` and disabled when you run `cargo build --release`.
     #[inline]
-    pub fn interrupt(&self) {
-        self.events_loop.interrupt()
+    pub fn with_gl_debug_flag(mut self, flag: bool) -> Self {
+        self.gl_attr.debug = flag;
+        self
+    }
+
+    /// Sets the robustness of the OpenGL context. See the docs of `Robustness`.
+    #[inline]
+    pub fn with_gl_robustness(mut self, robustness: Robustness) -> Self {
+        self.gl_attr.robustness = robustness;
+        self
+    }
+
+    /// Requests that the window has vsync enabled.
+    ///
+    /// By default, vsync is not enabled.
+    #[inline]
+    pub fn with_vsync(mut self, vsync: bool) -> Self {
+        self.gl_attr.vsync = vsync;
+        self
+    }
+
+    /// Share the display lists with the given `Context`.
+    #[inline]
+    pub fn with_shared_lists(mut self, other: &'a Context) -> Self {
+        self.gl_attr.sharing = Some(other);
+        self
+    }
+
+    /// Sets the multisampling level to request. A value of `0` indicates that multisampling must
+    /// not be enabled.
+    ///
+    /// # Panic
+    ///
+    /// Will panic if `samples` is not a power of two.
+    #[inline]
+    pub fn with_multisampling(mut self, samples: u16) -> Self {
+        self.pf_reqs.multisampling = match samples {
+            0 => None,
+            _ => {
+                assert!(samples.is_power_of_two());
+                Some(samples)
+            }
+        };
+        self
+    }
+
+    /// Sets the number of bits in the depth buffer.
+    #[inline]
+    pub fn with_depth_buffer(mut self, bits: u8) -> Self {
+        self.pf_reqs.depth_bits = Some(bits);
+        self
+    }
+
+    /// Sets the number of bits in the stencil buffer.
+    #[inline]
+    pub fn with_stencil_buffer(mut self, bits: u8) -> Self {
+        self.pf_reqs.stencil_bits = Some(bits);
+        self
+    }
+
+    /// Sets the number of bits in the color buffer.
+    #[inline]
+    pub fn with_pixel_format(mut self, color_bits: u8, alpha_bits: u8) -> Self {
+        self.pf_reqs.color_bits = Some(color_bits);
+        self.pf_reqs.alpha_bits = Some(alpha_bits);
+        self
+    }
+
+    /// Request the backend to be stereoscopic.
+    #[inline]
+    pub fn with_stereoscopy(mut self) -> Self {
+        self.pf_reqs.stereoscopy = true;
+        self
+    }
+
+    /// Sets whether sRGB should be enabled on the window.
+    ///
+    /// The default value is `false`.
+    #[inline]
+    pub fn with_srgb(mut self, srgb_enabled: bool) -> Self {
+        self.pf_reqs.srgb = srgb_enabled;
+        self
+    }
+
+    /// Sets whether or not the `Context` should be transparent.
+    ///
+    /// TODO: It would be nicer if we could inherit this information from the `Window` when `build`
+    /// is called, however `Window` currently does not have any methods for returning whether or
+    /// not it is currently transparent.
+    #[inline]
+    pub fn with_transparency(mut self, transparent: bool) -> Self {
+        self.gl_attr.transparent = transparent;
+        self
+    }
+
+    /// Creates a new OpenGL context.
+    ///
+    /// Error should be very rare and only occur in case of permission denied, incompatible system,
+    /// out of memory, etc.
+    pub fn build(self, window: &winit::Window) -> Result<Context, CreationError> {
+        Context::new(window, &self.pf_reqs, &self.gl_attr)
     }
 }
 
-/// Trait that describes objects that have access to an OpenGL context.
-pub trait GlContext {
+impl Context {
+
+    // Called by `ContextBuilder::build`.
+    fn new(
+        window: &winit::Window,
+        pf_reqs: &PixelFormatRequirements,
+        gl_attr: &GlAttributes<&Context>,
+    ) -> Result<Self, CreationError>
+    {
+        let gl_attr = gl_attr.clone().map_sharing(|ctxt| &ctxt.context);
+        platform::Context::new(window, pf_reqs, &gl_attr)
+            .map(|context| Context { context: context })
+    }
+
+    /// Resize the GL context.
+    ///
+    /// Some platforms (macos, wayland) require being manually updated when their window or
+    /// surface is resized.
+    ///
+    /// When using glutin with winit, the easiest way of doing this is to call this method for each
+    /// `Resized` window event that is received with the width and height given by the event.
+    pub fn resize(&self, width: u32, height: u32) {
+        self.context.resize(width, height);
+    }
+
     /// Sets the context as the current context.
-    unsafe fn make_current(&self) -> Result<(), ContextError>;
+    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
+        self.context.make_current()
+    }
 
     /// Returns true if this context is the current one in this thread.
-    fn is_current(&self) -> bool;
+    pub fn is_current(&self) -> bool {
+        self.context.is_current()
+    }
 
     /// Returns the address of an OpenGL function.
-    fn get_proc_address(&self, addr: &str) -> *const ();
+    pub fn get_proc_address(&self, addr: &str) -> *const () {
+        self.context.get_proc_address(addr)
+    }
 
     /// Swaps the buffers in case of double or triple buffering.
     ///
-    /// You should call this function every time you have finished rendering, or the image
-    /// may not be displayed on the screen.
+    /// You should call this function every time you have finished rendering, or the image may not
+    /// be displayed on the screen.
     ///
     /// **Warning**: if you enabled vsync, this function will block until the next time the screen
     /// is refreshed. However drivers can choose to override your vsync settings, which means that
     /// you can't know in advance whether `swap_buffers` will block or not.
-    fn swap_buffers(&self) -> Result<(), ContextError>;
+    pub fn swap_buffers(&self) -> Result<(), ContextError> {
+        self.context.swap_buffers()
+    }
 
     /// Returns the OpenGL API being used.
-    fn get_api(&self) -> Api;
+    pub fn get_api(&self) -> Api {
+        self.context.get_api()
+    }
 
     /// Returns the pixel format of the main framebuffer of the context.
-    fn get_pixel_format(&self) -> PixelFormat;
+    pub fn get_pixel_format(&self) -> PixelFormat {
+        self.context.get_pixel_format()
+    }
 }
 
 /// Error that can happen while creating a window or a headless renderer.
@@ -192,6 +318,7 @@ pub enum CreationError {
     RobustnessNotSupported,
     OpenGlVersionNotSupported,
     NoAvailablePixelFormat,
+    PlatformSpecific(String),
 }
 
 impl CreationError {
@@ -206,6 +333,7 @@ impl CreationError {
                                                          supported.",
             CreationError::NoAvailablePixelFormat => "Couldn't find any pixel format that matches \
                                                       the criterias.",
+            CreationError::PlatformSpecific(ref text) => &text,
         }
     }
 }
@@ -366,10 +494,6 @@ pub enum ReleaseBehavior {
     Flush,
 }
 
-pub use winit::MouseCursor;
-
-pub use winit::CursorState;
-
 /// Describes a possible format. Unused.
 #[allow(missing_docs)]
 #[derive(Debug, Clone)]
@@ -454,8 +578,6 @@ impl Default for PixelFormatRequirements {
     }
 }
 
-pub use winit::WindowAttributes; // TODO
-
 /// Attributes to use when creating an OpenGL context.
 #[derive(Clone)]
 pub struct GlAttributes<S> {
@@ -492,6 +614,11 @@ pub struct GlAttributes<S> {
     ///
     /// The default is `false`.
     pub vsync: bool,
+
+    /// Whether or not the `GlContext` should be transparent.
+    ///
+    /// The default is `false`.
+    pub transparent: bool,
 }
 
 impl<S> GlAttributes<S> {
@@ -505,6 +632,7 @@ impl<S> GlAttributes<S> {
             debug: self.debug,
             robustness: self.robustness,
             vsync: self.vsync,
+            transparent: self.transparent,
         }
     }
 }
@@ -519,6 +647,7 @@ impl<S> Default for GlAttributes<S> {
             debug: cfg!(debug_assertions),
             robustness: Robustness::NotRobust,
             vsync: false,
+            transparent: false,
         }
     }
 }

@@ -1,158 +1,79 @@
-use std::sync::{Mutex, Weak, Arc};
-use std::collections::HashMap;
+use std::sync::Arc;
 use std::ffi::CString;
 use winit;
 use winit::os::unix::WindowExt;
-use {ContextError, CreationError, GlAttributes, GlContext, PixelFormat, PixelFormatRequirements};
+use {ContextError, CreationError, GlAttributes, PixelFormat, PixelFormatRequirements};
 use api::dlopen;
 use api::egl;
 use api::egl::Context as EglContext;
 use wayland_client::egl as wegl;
-use {Event, WindowEvent};
 
-pub struct Window {
+pub struct Context {
     egl_surface: Arc<wegl::WlEglSurface>,
     context: EglContext,
 }
 
-
-pub struct EventsLoop {
-    winit_events_loop: winit::EventsLoop,
-    egl_surfaces: Mutex<HashMap<winit::WindowId, Weak<wegl::WlEglSurface>>>,
-}
-
-impl EventsLoop {
-    /// Builds a new events loop.
-    pub fn new(events_loop: winit::EventsLoop) -> EventsLoop {
-        EventsLoop {
-            winit_events_loop: events_loop,
-            egl_surfaces: Mutex::new(HashMap::new()),
-        }
-    }
-
-    fn resize_surface(&self, window_id: winit::WindowId, x: u32, y: u32) {
-        if let Ok(egl_surfaces) = self.egl_surfaces.lock() {
-            if let Some(surface) = egl_surfaces[&window_id].upgrade() {
-                surface.resize(x as i32, y as i32, 0, 0)
-            }
-        }
-    }
-
-    fn insert_window(&self,
-                     window_id: winit::WindowId,
-                     egl_surface: &Arc<wegl::WlEglSurface>)
-    {
-        if let Ok(mut my_surfaces) = self.egl_surfaces.lock() {
-            my_surfaces.insert(window_id, Arc::downgrade(egl_surface));
-        }
-    }
-
-    /// Fetches all the events that are pending, calls the callback function for each of them,
-    /// and returns.
-    #[inline]
-    pub fn poll_events<F>(&self, mut callback: F)
-        where F: FnMut(Event)
-    {
-        self.winit_events_loop.poll_events(|event| {
-            if let Event::WindowEvent { window_id, event: WindowEvent::Resized(x, y) } = event {
-                self.resize_surface(window_id, x, y)
-            }
-            callback(event);
-        })
-    }
-
-    /// Runs forever until `interrupt()` is called. Whenever an event happens, calls the callback.
-    #[inline]
-    pub fn run_forever<F>(&self, mut callback: F)
-        where F: FnMut(Event)
-    {
-        self.winit_events_loop.run_forever(|event| {
-            if let Event::WindowEvent { window_id, event: WindowEvent::Resized(x, y) } = event {
-                self.resize_surface(window_id, x, y)
-            }
-            callback(event);
-        })
-    }
-
-    /// If we called `run_forever()`, stops the process of waiting for events.
-    #[inline]
-    pub fn interrupt(&self) {
-        self.winit_events_loop.interrupt()
-    }
-}
-
-impl Window {
+impl Context {
     pub fn new(
-        events_loop: &EventsLoop,
+        window: &winit::Window,
         pf_reqs: &PixelFormatRequirements,
-        opengl: &GlAttributes<&Window>,
-        winit_builder: winit::WindowBuilder,
-    ) -> Result<(Window, winit::Window), CreationError> {
-        let winit_window = winit_builder.build(&events_loop.winit_events_loop).unwrap();
-        let wayland_window = {
-            let (w, h) = winit_window.get_inner_size().unwrap();
-            let surface = winit_window.get_wayland_surface().unwrap();
-            let egl_surface = unsafe { wegl::WlEglSurface::new_from_raw(surface as *mut _, w as i32, h as i32) };
-            let context = {
-                let libegl = unsafe { dlopen::dlopen(b"libEGL.so\0".as_ptr() as *const _, dlopen::RTLD_NOW) };
-                if libegl.is_null() {
-                    return Err(CreationError::NotSupported);
-                }
-                let egl = ::api::egl::ffi::egl::Egl::load_with(|sym| {
-                    let sym = CString::new(sym).unwrap();
-                    unsafe { dlopen::dlsym(libegl, sym.as_ptr()) }
-                });
-                try!(EglContext::new(
-                    egl,
-                    pf_reqs, &opengl.clone().map_sharing(|_| unimplemented!()),        // TODO:
-                    egl::NativeDisplay::Wayland(Some(winit_window.get_wayland_display().unwrap())))
-                    .and_then(|p| p.finish(egl_surface.ptr() as *const _))
-                )
-            };
-            Window {
-                egl_surface: Arc::new(egl_surface),
-                context: context,
+        gl_attr: &GlAttributes<&Context>,
+    ) -> Result<Self, CreationError>
+    {
+        let (w, h) = window.get_inner_size_points().unwrap();
+        let surface = window.get_wayland_surface().unwrap();
+        let egl_surface = unsafe { wegl::WlEglSurface::new_from_raw(surface as *mut _, w as i32, h as i32) };
+        let context = {
+            let libegl = unsafe { dlopen::dlopen(b"libEGL.so\0".as_ptr() as *const _, dlopen::RTLD_NOW) };
+            if libegl.is_null() {
+                return Err(CreationError::NotSupported);
             }
+            let egl = ::api::egl::ffi::egl::Egl::load_with(|sym| {
+                let sym = CString::new(sym).unwrap();
+                unsafe { dlopen::dlsym(libegl, sym.as_ptr()) }
+            });
+            let gl_attr = gl_attr.clone().map_sharing(|_| unimplemented!()); // TODO
+            let native_display = egl::NativeDisplay::Wayland(Some(window.get_wayland_display().unwrap()));
+            EglContext::new(egl, pf_reqs, &gl_attr, native_display)
+                .and_then(|p| p.finish(egl_surface.ptr() as *const _))?
         };
-        // Store a copy of the `context`'s `IdRef` so that we can `update` it on `Resized` events.
-        events_loop.insert_window(winit_window.id(), &wayland_window.egl_surface);
-        Ok((wayland_window, winit_window))
+        Ok(Context {
+            egl_surface: Arc::new(egl_surface),
+            context: context,
+        })
     }
 
-    pub fn set_inner_size(&self, x: u32, y: u32, winit_window: &winit::Window) {
-        winit_window.set_inner_size(x, y);
-        self.egl_surface.resize(x as i32, y as i32, 0, 0);
+    pub fn resize(&self, width: u32, height: u32) {
+        self.egl_surface.resize(width as i32, height as i32, 0, 0);
     }
-}
 
-impl GlContext for Window {
     #[inline]
-    unsafe fn make_current(&self) -> Result<(), ContextError> {
+    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
         self.context.make_current()
     }
 
     #[inline]
-    fn is_current(&self) -> bool {
+    pub fn is_current(&self) -> bool {
         self.context.is_current()
     }
 
     #[inline]
-    fn get_proc_address(&self, addr: &str) -> *const () {
+    pub fn get_proc_address(&self, addr: &str) -> *const () {
         self.context.get_proc_address(addr)
     }
 
     #[inline]
-    fn swap_buffers(&self) -> Result<(), ContextError> {
+    pub fn swap_buffers(&self) -> Result<(), ContextError> {
         self.context.swap_buffers()
     }
 
     #[inline]
-    fn get_api(&self) -> ::Api {
+    pub fn get_api(&self) -> ::Api {
         self.context.get_api()
     }
 
     #[inline]
-    fn get_pixel_format(&self) -> PixelFormat {
+    pub fn get_pixel_format(&self) -> PixelFormat {
         self.context.get_pixel_format().clone()
     }
 }
