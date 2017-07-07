@@ -18,21 +18,23 @@ pub struct Window {
 
 
 pub struct EventsLoop {
-    winit_events_loop: RefCell<winit::EventsLoop>,
-    egl_surfaces: Mutex<HashMap<winit::WindowId, Weak<wegl::WlEglSurface>>>,
+    winit_events_loop: winit::EventsLoop,
+    egl_surfaces: Mutex<SurfaceMap>,
 }
+
+type SurfaceMap = HashMap<winit::WindowId, Weak<wegl::WlEglSurface>>;
 
 impl EventsLoop {
     /// Builds a new events loop.
     pub fn new(events_loop: winit::EventsLoop) -> EventsLoop {
         EventsLoop {
-            winit_events_loop: RefCell::new(events_loop),
+            winit_events_loop: events_loop,
             egl_surfaces: Mutex::new(HashMap::new()),
         }
     }
 
-    fn resize_surface(&self, window_id: winit::WindowId, x: u32, y: u32) {
-        if let Ok(egl_surfaces) = self.egl_surfaces.lock() {
+    fn resize_surface(egl_surfaces: &Mutex<SurfaceMap>, window_id: winit::WindowId, x: u32, y: u32) {
+        if let Ok(egl_surfaces) = egl_surfaces.lock() {
             if let Some(surface) = egl_surfaces[&window_id].upgrade() {
                 surface.resize(x as i32, y as i32, 0, 0)
             }
@@ -54,9 +56,10 @@ impl EventsLoop {
     pub fn poll_events<F>(&mut self, mut callback: F)
         where F: FnMut(Event)
     {
-        self.winit_events_loop.borrow_mut().poll_events(|event| {
+        let ref egl_surfaces = self.egl_surfaces;
+        self.winit_events_loop.poll_events(|event| {
             if let Event::WindowEvent { window_id, event: WindowEvent::Resized(x, y) } = event {
-                self.resize_surface(window_id, x, y)
+                EventsLoop::resize_surface(egl_surfaces, window_id, x, y)
             }
             callback(event)
         })
@@ -67,9 +70,10 @@ impl EventsLoop {
     pub fn run_forever<F>(&mut self, mut callback: F)
         where F: FnMut(Event) -> ControlFlow
     {
-        self.winit_events_loop.borrow_mut().run_forever(|event| {
+        let ref egl_surfaces = self.egl_surfaces;
+        self.winit_events_loop.run_forever(|event| {
             if let Event::WindowEvent { window_id, event: WindowEvent::Resized(x, y) } = event {
-                self.resize_surface(window_id, x, y)
+                EventsLoop::resize_surface(egl_surfaces, window_id, x, y)
             }
             callback(event)
         })
@@ -78,7 +82,7 @@ impl EventsLoop {
     /// Creates an EventsLoopProxy that can be used to wake up the EventsLoop from another thread.
     #[inline]
     pub fn create_proxy(&self) -> EventsLoopProxy {
-        let proxy = self.winit_events_loop.borrow().create_proxy();
+        let proxy = self.winit_events_loop.create_proxy();
         EventsLoopProxy { proxy: proxy }
     }
 }
@@ -106,7 +110,7 @@ impl Window {
         opengl: &GlAttributes<&Window>,
         winit_builder: winit::WindowBuilder,
     ) -> Result<(Window, winit::Window), CreationError> {
-        let winit_window = winit_builder.build(&*events_loop.winit_events_loop.borrow()).unwrap();
+        let winit_window = winit_builder.build(&events_loop.winit_events_loop).unwrap();
         let wayland_window = {
             let (w, h) = winit_window.get_inner_size().unwrap();
             let surface = winit_window.get_wayland_surface().unwrap();

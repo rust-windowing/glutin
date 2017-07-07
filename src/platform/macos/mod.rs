@@ -24,7 +24,6 @@ use core_foundation::base::TCFType;
 use core_foundation::string::CFString;
 use core_foundation::bundle::{CFBundleGetBundleWithIdentifier, CFBundleGetFunctionPointerForName};
 
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::ops::Deref;
@@ -55,9 +54,7 @@ pub struct Window {
 }
 
 pub struct EventsLoop {
-    // `winit_events_loop` is wrapped in a refcell to avoid borrowing `self` mutably in `poll_events` or `run_forever`
-    // and simultaneously borrowing `self` immutably in `handle_event`.
-    winit_events_loop: RefCell<winit::EventsLoop>,
+    winit_events_loop: winit::EventsLoop,
     window_contexts: Mutex<Weak<ContextMap>>,
 }
 
@@ -82,19 +79,19 @@ impl EventsLoop {
     /// Builds a new events loop.
     pub fn new() -> EventsLoop {
         EventsLoop {
-            winit_events_loop: RefCell::new(winit::EventsLoop::new()),
+            winit_events_loop: winit::EventsLoop::new(),
             window_contexts: Mutex::new(Weak::new()),
         }
     }
 
-    fn handle_event(&self, event: &winit::Event) {
+    fn handle_event(window_contexts: &Mutex<Weak<ContextMap>>, event: &winit::Event) {
         match *event {
             winit::Event::WindowEvent { window_id, ref event } => match *event {
 
                 // If a `Resized` event was received for a window, update the GL context for that
                 // window but only if that window is still alive.
                 winit::WindowEvent::Resized(..) => {
-                    if let Some(window_contexts) = self.window_contexts.lock().unwrap().upgrade() {
+                    if let Some(window_contexts) = window_contexts.lock().unwrap().upgrade() {
                         if let Some(context) = window_contexts.map.lock().unwrap()[&window_id].upgrade() {
                             unsafe { context.gl.update(); }
                         }
@@ -104,7 +101,7 @@ impl EventsLoop {
                 // If a `Closed` event was received for a window, remove the associated context
                 // from the map.
                 winit::WindowEvent::Closed => {
-                    if let Some(window_contexts) = self.window_contexts.lock().unwrap().upgrade() {
+                    if let Some(window_contexts) = window_contexts.lock().unwrap().upgrade() {
                         window_contexts.map.lock().unwrap().remove(&window_id);
                     }
                 },
@@ -121,8 +118,9 @@ impl EventsLoop {
     pub fn poll_events<F>(&mut self, mut callback: F)
         where F: FnMut(winit::Event)
     {
-        self.winit_events_loop.borrow_mut().poll_events(|event| {
-            self.handle_event(&event);
+        let ref window_contexts = self.window_contexts;
+        self.winit_events_loop.poll_events(|event| {
+            EventsLoop::handle_event(&window_contexts, &event);
             callback(event)
         });
     }
@@ -132,8 +130,9 @@ impl EventsLoop {
     pub fn run_forever<F>(&mut self, mut callback: F)
         where F: FnMut(winit::Event) -> ControlFlow
     {
-        self.winit_events_loop.borrow_mut().run_forever(|event| {
-            self.handle_event(&event);
+        let ref window_contexts = self.window_contexts;
+        self.winit_events_loop.run_forever(|event| {
+            EventsLoop::handle_event(&window_contexts, &event);
             callback(event)
         })
     }
@@ -141,7 +140,7 @@ impl EventsLoop {
     /// Creates an EventsLoopProxy that can be used to wake up the EventsLoop from another thread.
     #[inline]
     pub fn create_proxy(&self) -> EventsLoopProxy {
-        let proxy = self.winit_events_loop.borrow().create_proxy();
+        let proxy = self.winit_events_loop.create_proxy();
         EventsLoopProxy { proxy: proxy }
     }
 }
@@ -183,7 +182,7 @@ impl Window {
         }
 
         let transparent = winit_builder.window.transparent;
-        let winit_window = winit_builder.build(&*events_loop.winit_events_loop.borrow()).unwrap();
+        let winit_window = winit_builder.build(&events_loop.winit_events_loop).unwrap();
         let window_id = winit_window.id();
         let view = winit_window.get_nsview() as id;
         let context = match Context::new(view, pf_reqs, opengl, transparent) {
