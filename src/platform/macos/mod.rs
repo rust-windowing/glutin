@@ -111,8 +111,7 @@ impl EventsLoop {
 
                 _ => (),
             },
-            winit::Event::DeviceEvent { .. } => (), // FIXME: Should this be handled??
-            winit::Event::Awakened => (), // FIXME: Should this be handled??
+            _ => (),
         }
     }
 
