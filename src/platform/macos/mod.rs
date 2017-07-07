@@ -3,6 +3,7 @@
 use CreationError;
 use CreationError::OsError;
 use ContextError;
+use EventsLoopClosed;
 use GlAttributes;
 use GlContext;
 use PixelFormat;
@@ -30,7 +31,7 @@ use std::sync::{Arc, Mutex, Weak};
 
 use libc;
 
-use winit;
+use winit::{self, ControlFlow};
 use winit::os::macos::WindowExt;
 pub use winit::{MonitorId, NativeMonitorId, get_available_monitors, get_primary_monitor};
 pub use self::headless::HeadlessContext;
@@ -57,6 +58,10 @@ pub struct EventsLoop {
     window_contexts: Mutex<Weak<ContextMap>>,
 }
 
+pub struct EventsLoopProxy {
+    proxy: winit::EventsLoopProxy,
+}
+
 struct Context {
     // NSOpenGLContext
     gl: IdRef,
@@ -79,14 +84,14 @@ impl EventsLoop {
         }
     }
 
-    fn handle_event(&self, event: &winit::Event) {
+    fn handle_event(window_contexts: &Mutex<Weak<ContextMap>>, event: &winit::Event) {
         match *event {
             winit::Event::WindowEvent { window_id, ref event } => match *event {
 
                 // If a `Resized` event was received for a window, update the GL context for that
                 // window but only if that window is still alive.
                 winit::WindowEvent::Resized(..) => {
-                    if let Some(window_contexts) = self.window_contexts.lock().unwrap().upgrade() {
+                    if let Some(window_contexts) = window_contexts.lock().unwrap().upgrade() {
                         if let Some(context) = window_contexts.map.lock().unwrap()[&window_id].upgrade() {
                             unsafe { context.gl.update(); }
                         }
@@ -96,43 +101,59 @@ impl EventsLoop {
                 // If a `Closed` event was received for a window, remove the associated context
                 // from the map.
                 winit::WindowEvent::Closed => {
-                    if let Some(window_contexts) = self.window_contexts.lock().unwrap().upgrade() {
+                    if let Some(window_contexts) = window_contexts.lock().unwrap().upgrade() {
                         window_contexts.map.lock().unwrap().remove(&window_id);
                     }
                 },
 
                 _ => (),
             },
+            _ => (),
         }
     }
 
     /// Fetches all the events that are pending, calls the callback function for each of them,
     /// and returns.
     #[inline]
-    pub fn poll_events<F>(&self, mut callback: F)
+    pub fn poll_events<F>(&mut self, mut callback: F)
         where F: FnMut(winit::Event)
     {
+        let ref window_contexts = self.window_contexts;
         self.winit_events_loop.poll_events(|event| {
-            self.handle_event(&event);
-            callback(event);
+            EventsLoop::handle_event(&window_contexts, &event);
+            callback(event)
         });
     }
 
     /// Runs forever until `interrupt()` is called. Whenever an event happens, calls the callback.
     #[inline]
-    pub fn run_forever<F>(&self, mut callback: F)
-        where F: FnMut(winit::Event)
+    pub fn run_forever<F>(&mut self, mut callback: F)
+        where F: FnMut(winit::Event) -> ControlFlow
     {
+        let ref window_contexts = self.window_contexts;
         self.winit_events_loop.run_forever(|event| {
-            self.handle_event(&event);
-            callback(event);
+            EventsLoop::handle_event(&window_contexts, &event);
+            callback(event)
         })
     }
 
-    /// If we called `run_forever()`, stops the process of waiting for events.
+    /// Creates an EventsLoopProxy that can be used to wake up the EventsLoop from another thread.
     #[inline]
-    pub fn interrupt(&self) {
-        self.winit_events_loop.interrupt()
+    pub fn create_proxy(&self) -> EventsLoopProxy {
+        let proxy = self.winit_events_loop.create_proxy();
+        EventsLoopProxy { proxy: proxy }
+    }
+}
+
+impl EventsLoopProxy {
+    /// Wake up the EventsLoop from which this proxy was created.
+    ///
+    /// This causes the EventsLoop to emit an Awakened event.
+    ///
+    /// Returns an Err if the associated EventsLoop no longer exists.
+    #[inline]
+    pub fn wakeup(&self) -> Result<(), EventsLoopClosed> {
+        self.proxy.wakeup()
     }
 }
 

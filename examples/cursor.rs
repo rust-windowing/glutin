@@ -5,7 +5,7 @@ use glutin::MouseCursor;
 mod support;
 
 fn main() {
-    let events_loop = glutin::EventsLoop::new();
+    let mut events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new()
         .with_title("A fantastic window!")
         .build(&events_loop)
@@ -31,7 +31,7 @@ fn main() {
     events_loop.run_forever(|event| {
         match event {
             glutin::Event::WindowEvent { event, .. } => match event {
-                glutin::WindowEvent::KeyboardInput(glutin::ElementState::Pressed, _, _, _) => {
+                glutin::WindowEvent::KeyboardInput { input: glutin::KeyboardInput { state: glutin::ElementState::Pressed, .. }, .. } => {
                     println!("Setting cursor to \"{:?}\"", cursors[cursor_idx]);
                     window.set_cursor(cursors[cursor_idx]);
                     if cursor_idx < cursors.len() - 1 {
@@ -40,12 +40,14 @@ fn main() {
                         cursor_idx = 0;
                     }
                 },
-                glutin::WindowEvent::Closed => events_loop.interrupt(),
+                glutin::WindowEvent::Closed => return glutin::ControlFlow::Break,
                 _ => (),
             },
+            _ => (),
         }
 
         context.draw_frame((0.0, 1.0, 0.0, 1.0));
         window.swap_buffers().unwrap();
+        glutin::ControlFlow::Continue
     });
 }

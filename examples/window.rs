@@ -3,7 +3,7 @@ extern crate glutin;
 mod support;
 
 fn main() {
-    let events_loop = glutin::EventsLoop::new();
+    let mut events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new()
         .with_title("A fantastic window!")
         .build(&events_loop)
@@ -22,9 +22,10 @@ fn main() {
         let _ = window.swap_buffers();
 
         match event {
-            glutin::Event::WindowEvent { event: glutin::WindowEvent::Closed, .. } =>
-                events_loop.interrupt(),
-            _ => ()
+            glutin::Event::WindowEvent { event: glutin::WindowEvent::Closed, .. } => {
+                glutin::ControlFlow::Break
+            }
+            _ => glutin::ControlFlow::Continue,
         }
     });
 }

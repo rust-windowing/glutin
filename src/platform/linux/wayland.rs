@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::sync::{Mutex, Weak, Arc};
 use std::collections::HashMap;
 use std::ffi::CString;
@@ -8,7 +9,7 @@ use api::dlopen;
 use api::egl;
 use api::egl::Context as EglContext;
 use wayland_client::egl as wegl;
-use {Event, WindowEvent};
+use {ControlFlow, Event, WindowEvent, EventsLoopClosed};
 
 pub struct Window {
     egl_surface: Arc<wegl::WlEglSurface>,
@@ -18,8 +19,10 @@ pub struct Window {
 
 pub struct EventsLoop {
     winit_events_loop: winit::EventsLoop,
-    egl_surfaces: Mutex<HashMap<winit::WindowId, Weak<wegl::WlEglSurface>>>,
+    egl_surfaces: Mutex<SurfaceMap>,
 }
+
+type SurfaceMap = HashMap<winit::WindowId, Weak<wegl::WlEglSurface>>;
 
 impl EventsLoop {
     /// Builds a new events loop.
@@ -30,8 +33,8 @@ impl EventsLoop {
         }
     }
 
-    fn resize_surface(&self, window_id: winit::WindowId, x: u32, y: u32) {
-        if let Ok(egl_surfaces) = self.egl_surfaces.lock() {
+    fn resize_surface(egl_surfaces: &Mutex<SurfaceMap>, window_id: winit::WindowId, x: u32, y: u32) {
+        if let Ok(egl_surfaces) = egl_surfaces.lock() {
             if let Some(surface) = egl_surfaces[&window_id].upgrade() {
                 surface.resize(x as i32, y as i32, 0, 0)
             }
@@ -50,34 +53,53 @@ impl EventsLoop {
     /// Fetches all the events that are pending, calls the callback function for each of them,
     /// and returns.
     #[inline]
-    pub fn poll_events<F>(&self, mut callback: F)
+    pub fn poll_events<F>(&mut self, mut callback: F)
         where F: FnMut(Event)
     {
+        let ref egl_surfaces = self.egl_surfaces;
         self.winit_events_loop.poll_events(|event| {
             if let Event::WindowEvent { window_id, event: WindowEvent::Resized(x, y) } = event {
-                self.resize_surface(window_id, x, y)
+                EventsLoop::resize_surface(egl_surfaces, window_id, x, y)
             }
-            callback(event);
+            callback(event)
         })
     }
 
     /// Runs forever until `interrupt()` is called. Whenever an event happens, calls the callback.
     #[inline]
-    pub fn run_forever<F>(&self, mut callback: F)
-        where F: FnMut(Event)
+    pub fn run_forever<F>(&mut self, mut callback: F)
+        where F: FnMut(Event) -> ControlFlow
     {
+        let ref egl_surfaces = self.egl_surfaces;
         self.winit_events_loop.run_forever(|event| {
             if let Event::WindowEvent { window_id, event: WindowEvent::Resized(x, y) } = event {
-                self.resize_surface(window_id, x, y)
+                EventsLoop::resize_surface(egl_surfaces, window_id, x, y)
             }
-            callback(event);
+            callback(event)
         })
     }
 
-    /// If we called `run_forever()`, stops the process of waiting for events.
+    /// Creates an EventsLoopProxy that can be used to wake up the EventsLoop from another thread.
     #[inline]
-    pub fn interrupt(&self) {
-        self.winit_events_loop.interrupt()
+    pub fn create_proxy(&self) -> EventsLoopProxy {
+        let proxy = self.winit_events_loop.create_proxy();
+        EventsLoopProxy { proxy: proxy }
+    }
+}
+
+pub struct EventsLoopProxy {
+    proxy: winit::EventsLoopProxy,
+}
+
+impl EventsLoopProxy {
+    /// Wake up the EventsLoop from which this proxy was created.
+    ///
+    /// This causes the EventsLoop to emit an Awakened event.
+    ///
+    /// Returns an Err if the associated EventsLoop no longer exists.
+    #[inline]
+    pub fn wakeup(&self) -> Result<(), EventsLoopClosed> {
+        self.proxy.wakeup()
     }
 }
 

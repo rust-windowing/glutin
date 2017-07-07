@@ -6,7 +6,9 @@ use std::ptr;
 use winit;
 
 use ContextError;
+use ControlFlow;
 use CreationError;
+use EventsLoopClosed;
 use GlAttributes;
 use GlContext;
 use GlRequest;
@@ -52,7 +54,7 @@ impl EventsLoop {
     /// Fetches all the events that are pending, calls the callback function for each of them,
     /// and returns.
     #[inline]
-    pub fn poll_events<F>(&self, mut callback: F)
+    pub fn poll_events<F>(&mut self, mut callback: F)
         where F: FnMut(winit::Event)
     {
         self.winit_events_loop.poll_events(|event| {
@@ -62,20 +64,37 @@ impl EventsLoop {
 
     /// Runs forever until `interrupt()` is called. Whenever an event happens, calls the callback.
     #[inline]
-    pub fn run_forever<F>(&self, mut callback: F)
-        where F: FnMut(winit::Event)
+    pub fn run_forever<F>(&mut self, mut callback: F)
+        where F: FnMut(winit::Event) -> ControlFlow
     {
         self.winit_events_loop.run_forever(|event| {
-            callback(event);
+            callback(event)
         })
     }
 
-    /// If we called `run_forever()`, stops the process of waiting for events.
+    /// Creates an EventsLoopProxy that can be used to wake up the EventsLoop from another thread.
     #[inline]
-    pub fn interrupt(&self) {
-        self.winit_events_loop.interrupt()
+    pub fn create_proxy(&self) -> EventsLoopProxy {
+        let proxy = self.winit_events_loop.create_proxy();
+        EventsLoopProxy { proxy: proxy }
     }
 
+}
+
+pub struct EventsLoopProxy {
+    proxy: winit::EventsLoopProxy,
+}
+
+impl EventsLoopProxy {
+    /// Wake up the EventsLoop from which this proxy was created.
+    ///
+    /// This causes the EventsLoop to emit an Awakened event.
+    ///
+    /// Returns an Err if the associated EventsLoop no longer exists.
+    #[inline]
+    pub fn wakeup(&self) -> Result<(), EventsLoopClosed> {
+        self.proxy.wakeup()
+    }
 }
 
 impl Window {

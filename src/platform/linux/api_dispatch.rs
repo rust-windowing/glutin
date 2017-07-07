@@ -12,7 +12,7 @@ use WindowAttributes;
 
 use super::wayland;
 use super::x11;
-use Event;
+use {ControlFlow, Event, EventsLoopClosed};
 
 use winit::os::unix::WindowExt;
 
@@ -45,32 +45,52 @@ impl EventsLoop {
     /// Fetches all the events that are pending, calls the callback function for each of them,
     /// and returns.
     #[inline]
-    pub fn poll_events<F>(&self, callback: F)
+    pub fn poll_events<F>(&mut self, callback: F)
         where F: FnMut(Event)
     {
         match *self {
-            EventsLoop::X(ref evlp) => evlp.poll_events(callback),
-            EventsLoop::Wayland(ref evlp) => evlp.poll_events(callback)
+            EventsLoop::X(ref mut evlp) => evlp.poll_events(callback),
+            EventsLoop::Wayland(ref mut evlp) => evlp.poll_events(callback)
         }
     }
 
     /// Runs forever until `interrupt()` is called. Whenever an event happens, calls the callback.
     #[inline]
-    pub fn run_forever<F>(&self, callback: F)
-        where F: FnMut(Event)
+    pub fn run_forever<F>(&mut self, callback: F)
+        where F: FnMut(Event) -> ControlFlow
     {
         match *self {
-            EventsLoop::X(ref evlp) => evlp.run_forever(callback),
-            EventsLoop::Wayland(ref evlp) => evlp.run_forever(callback)
+            EventsLoop::X(ref mut evlp) => evlp.run_forever(callback),
+            EventsLoop::Wayland(ref mut evlp) => evlp.run_forever(callback)
         }
     }
 
-    /// If we called `run_forever()`, stops the process of waiting for events.
+    /// Creates an EventsLoopProxy that can be used to wake up the EventsLoop from another thread.
     #[inline]
-    pub fn interrupt(&self) {
+    pub fn create_proxy(&self) -> EventsLoopProxy {
         match *self {
-            EventsLoop::X(ref evlp) => evlp.interrupt(),
-            EventsLoop::Wayland(ref evlp) => evlp.interrupt()
+            EventsLoop::X(ref events_loop) => EventsLoopProxy::X(events_loop.create_proxy()),
+            EventsLoop::Wayland(ref events_loop) => EventsLoopProxy::Wayland(events_loop.create_proxy()),
+        }
+    }
+}
+
+pub enum EventsLoopProxy {
+    X(winit::EventsLoopProxy),
+    Wayland(wayland::EventsLoopProxy),
+}
+
+impl EventsLoopProxy {
+    /// Wake up the EventsLoop from which this proxy was created.
+    ///
+    /// This causes the EventsLoop to emit an Awakened event.
+    ///
+    /// Returns an Err if the associated EventsLoop no longer exists.
+    #[inline]
+    pub fn wakeup(&self) -> Result<(), EventsLoopClosed> {
+        match *self {
+            EventsLoopProxy::X(ref proxy) => proxy.wakeup(),
+            EventsLoopProxy::Wayland(ref proxy) => proxy.wakeup(),
         }
     }
 }
