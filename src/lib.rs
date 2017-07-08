@@ -1,19 +1,21 @@
 //! The purpose of this library is to provide an OpenGL context on as many platforms as possible.
 //!
-//! # Building a Context
+//! # Building a GlWindow
 //!
-//! Individual `Context`s are designed to be associated with and work alongside `Window`s.
-//! Due to some operating-system-specific quirks, glutin requires control over the order of
-//! creation of the `Context` and `Window`. Here is an example of building a Context:
+//! A `GlWindow` is composed of a `Window` and an OpenGL `Context`. Due to some
+//! operating-system-specific quirks, glutin requires control over the order of creation of the
+//! `Context` and `Window`. Here is an example of building a GlWindow:
 //!
-//! ```ignore
+//! ```no_run
+//! # extern crate glutin;
+//! # fn main() {
 //! let events_loop = glutin::EventsLoop::new();
-//! let window_builder = glutin::WindowBuilder::new()
+//! let window = glutin::WindowBuilder::new()
 //!     .with_title("Hello world!")
 //!     .with_dimensions(1024, 768);
-//! let (window, context) = glutin::ContextBuilder::new()
-//!     .build(window_builder, &events_loop)
-//!     .unwrap();
+//! let context = glutin::ContextBuilder::new();
+//! let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
+//! # }
 //! ```
 //!
 //! For contexts that are *not* associated with any particular window, see the HeadlessContext
@@ -124,31 +126,24 @@ pub trait GlContext {
 
 /// Represents an OpenGL context.
 ///
-/// A `Context` is normally associated with a single window, however `Context`s can be *shared*
+/// A `Context` is normally associated with a single Window, however `Context`s can be *shared*
 /// between multiple windows.
 ///
 /// # Example
 ///
-/// ```ignore
-/// let events_loop = glutin::EventsLoop::new();
-/// let window_builder = glutin::WindowBuilder::new(&events_loop).unwrap();
-/// let context = glutin::ContextBuilder::new(window_builder, &events_loop).unwrap();
-///
-/// unsafe { context.make_current().unwrap() };
-///
-/// loop {
-///     events_loop.poll_events(|event| {
-///         match event {
-///             // process events here
-///             _ => ()
-///         }
-///     });
-///
-///     // draw everything here
-///
-///     context.swap_buffers();
-///     std::thread::sleep(std::time::Duration::from_millis(17));
-/// }
+/// ```no_run
+/// # extern crate glutin;
+/// # use glutin::GlContext;
+/// # fn main() {
+/// # let events_loop = glutin::EventsLoop::new();
+/// # let window = glutin::WindowBuilder::new();
+/// # let context = glutin::ContextBuilder::new();
+/// # let some_gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
+/// let context = glutin::ContextBuilder::new()
+///     .with_vsync(true)
+///     .with_multisampling(8)
+///     .with_shared_lists(some_gl_window.context());
+/// # }
 /// ```
 pub struct Context {
     context: platform::Context,
@@ -163,6 +158,35 @@ pub struct ContextBuilder<'a> {
 }
 
 /// Represents an OpenGL context and a Window with which it is associated.
+///
+/// # Example
+///
+/// ```no_run
+/// # extern crate glutin;
+/// # use glutin::GlContext;
+/// # fn main() {
+/// let mut events_loop = glutin::EventsLoop::new();
+/// let window = glutin::WindowBuilder::new();
+/// let context = glutin::ContextBuilder::new();
+/// let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
+///
+/// unsafe { gl_window.make_current().unwrap() };
+///
+/// loop {
+///     events_loop.poll_events(|event| {
+///         match event {
+///             // process events here
+///             _ => ()
+///         }
+///     });
+///
+///     // draw everything here
+///
+///     gl_window.swap_buffers();
+///     std::thread::sleep(std::time::Duration::from_millis(17));
+/// }
+/// # }
+/// ```
 pub struct GlWindow {
     context: Context,
     window: Window,

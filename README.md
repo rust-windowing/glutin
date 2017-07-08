@@ -40,22 +40,23 @@ extern crate gl;
 extern crate glutin;
 extern crate libc;
 
+use glutin::GlContext;
+
 fn main() {
-    let events_loop = glutin::winit::EventsLoop::new();
-    let window_builder = glutin::winit::WindowBuilder::new()
+    let events_loop = glutin::EventsLoop::new();
+    let window = glutin::WindowBuilder::new()
         .with_title("Hello, world!")
         .with_dimensions(1024, 768);
-    let (_window, context) = glutin::ContextBuilder::new()
-        .with_vsync()
-        .build(window_builder, &events_loop)
-        .unwrap();
+    let context = glutin::ContextBuilder::new()
+        .with_vsync(true);
+    let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
 
     unsafe {
-        context.make_current().unwrap();
+        gl_window.make_current().unwrap();
     }
 
     unsafe {
-        gl::load_with(|symbol| context.get_proc_address(symbol) as *const _);
+        gl::load_with(|symbol| gl_window.get_proc_address(symbol) as *const _);
         gl::ClearColor(0.0, 1.0, 0.0, 1.0);
     }
 
@@ -65,7 +66,7 @@ fn main() {
             match event {
                 glutin::winit::Event::WindowEvent{ event, .. } => match event {
                     glutin::winit::WindowEvent::Closed => running = false,
-                    glutin::winit::WindowEvent::Resized(w, h) => context.resize(w, h),
+                    glutin::winit::WindowEvent::Resized(w, h) => gl_window.resize(w, h),
                 },
                 _ => ()
             }
@@ -75,7 +76,7 @@ fn main() {
             gl::Clear(gl::COLOR_BUFFER_BIT);
         }
 
-        context.swap_buffers().unwrap();
+        gl_window.swap_buffers().unwrap();
     }
 }
 ```
