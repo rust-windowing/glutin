@@ -63,8 +63,9 @@ fn main() {
     while running {
         events_loop.poll_events(|event| {
             match event {
-                glutin::Event::WindowEvent{ event: glutin::WindowEvent::Closed, .. } => {
-                    running = false;
+                glutin::winit::Event::WindowEvent{ event, .. } => match event {
+                    glutin::winit::WindowEvent::Closed => running = false,
+                    glutin::winit::WindowEvent::Resized(w, h) => context.resize(w, h),
                 },
                 _ => ()
             }
