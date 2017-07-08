@@ -1,8 +1,9 @@
 extern crate glutin;
 
-use std::io::{self, Write};
-
 mod support;
+
+use glutin::GlContext;
+use std::io::{self, Write};
 
 fn main() {
     // enumerating monitors
@@ -25,16 +26,15 @@ fn main() {
     };
 
     let mut events_loop = glutin::EventsLoop::new();
-    let window_builder = glutin::WindowBuilder::new()
+    let window = glutin::WindowBuilder::new()
         .with_title("Hello world!")
         .with_fullscreen(monitor);
-    let (_window, context) = glutin::ContextBuilder::new()
-        .build(window_builder, &events_loop)
-        .unwrap();
+    let context = glutin::ContextBuilder::new();
+    let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
 
-    let _ = unsafe { context.make_current() };
+    let _ = unsafe { gl_window.make_current() };
     
-    let gl = support::load(&context);
+    let gl = support::load(&gl_window);
 
     events_loop.run_forever(|event| {
         use glutin::{ControlFlow, Event, WindowEvent, VirtualKeyCode};
@@ -42,7 +42,7 @@ fn main() {
         match event {
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::Closed => return ControlFlow::Break,
-                WindowEvent::Resized(w, h) => context.resize(w, h),
+                WindowEvent::Resized(w, h) => gl_window.resize(w, h),
                 WindowEvent::KeyboardInput { input, .. } => {
                     if let Some(VirtualKeyCode::Escape) = input.virtual_keycode {
                         return ControlFlow::Break;
@@ -54,7 +54,7 @@ fn main() {
         }
 
         gl.draw_frame([0.0, 1.0, 0.0, 1.0]);
-        let _ = context.swap_buffers();
+        let _ = gl_window.swap_buffers();
         ControlFlow::Continue
     });
 }

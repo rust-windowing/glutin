@@ -1,7 +1,7 @@
 use std::ffi::CStr;
 use std::mem;
 use std::ptr;
-use glutin;
+use glutin::{self, GlContext};
 
 mod gl {
     pub use self::Gles2 as Gl;
@@ -12,8 +12,8 @@ pub struct Gl {
     gl: gl::Gl
 }
 
-pub fn load(context: &glutin::Context) -> Gl {
-    let gl = gl::Gl::load_with(|ptr| context.get_proc_address(ptr) as *const _);
+pub fn load(gl_window: &glutin::GlWindow) -> Gl {
+    let gl = gl::Gl::load_with(|ptr| gl_window.get_proc_address(ptr) as *const _);
 
     let version = unsafe {
         let data = CStr::from_ptr(gl.GetString(gl::VERSION) as *const _).to_bytes().to_vec();

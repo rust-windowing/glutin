@@ -1,20 +1,18 @@
 extern crate glutin;
 
-use glutin::MouseCursor;
-
 mod support;
+
+use glutin::{GlContext, MouseCursor};
 
 fn main() {
     let mut events_loop = glutin::EventsLoop::new();
-    let window_builder = glutin::WindowBuilder::new()
-        .with_title("A fantastic window!");
-    let (window, context) = glutin::ContextBuilder::new()
-        .build(window_builder, &events_loop)
-        .unwrap();
+    let window = glutin::WindowBuilder::new().with_title("A fantastic window!");
+    let context = glutin::ContextBuilder::new();
+    let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
 
-    unsafe { context.make_current().unwrap() };
+    unsafe { gl_window.make_current().unwrap() };
 
-    let gl = support::load(&context);
+    let gl = support::load(&gl_window);
     let cursors = [
         MouseCursor::Default, MouseCursor::Crosshair, MouseCursor::Hand, MouseCursor::Arrow,
         MouseCursor::Move, MouseCursor::Text, MouseCursor::Wait, MouseCursor::Help,
@@ -37,7 +35,7 @@ fn main() {
                     input: glutin::KeyboardInput { state: ElementState::Pressed, .. }, ..
                 } => {
                     println!("Setting cursor to \"{:?}\"", cursors[cursor_idx]);
-                    window.set_cursor(cursors[cursor_idx]);
+                    gl_window.set_cursor(cursors[cursor_idx]);
                     if cursor_idx < cursors.len() - 1 {
                         cursor_idx += 1;
                     } else {
@@ -45,13 +43,13 @@ fn main() {
                     }
                 },
                 WindowEvent::Closed => return ControlFlow::Break,
-                WindowEvent::Resized(w, h) => context.resize(w, h),
+                WindowEvent::Resized(w, h) => gl_window.resize(w, h),
                 _ => (),
             }
         }
 
         gl.draw_frame([0.0, 1.0, 0.0, 1.0]);
-        context.swap_buffers().unwrap();
+        gl_window.swap_buffers().unwrap();
         ControlFlow::Continue
     });
 }

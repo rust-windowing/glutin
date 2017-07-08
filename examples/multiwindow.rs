@@ -2,25 +2,20 @@ extern crate glutin;
 
 mod support;
 
+use glutin::GlContext;
+
 fn main() {
     let mut events_loop = glutin::EventsLoop::new();
 
-    struct Window {
-        _window: glutin::Window,
-        context: glutin::Context,
-        gl: support::Gl,
-    }
-
     let mut windows = std::collections::HashMap::new();
     for _ in 0..3 {
-        let (window, context) = glutin::ContextBuilder::new()
-            .build(glutin::WindowBuilder::new(), &events_loop)
-            .unwrap();
-        let _ = unsafe { context.make_current() };
-        let gl = support::load(&context);
-        let window_id = window.id();
-        let window = Window { _window: window, context: context, gl: gl };
-        windows.insert(window_id, window);
+        let window = glutin::WindowBuilder::new();
+        let context = glutin::ContextBuilder::new();
+        let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
+        let _ = unsafe { gl_window.make_current() };
+        let gl = support::load(&gl_window);
+        let window_id = gl_window.id();
+        windows.insert(window_id, (gl_window, gl));
     }
 
     events_loop.run_forever(|event| {
@@ -28,7 +23,7 @@ fn main() {
         match event {
             glutin::Event::WindowEvent { event, window_id } => match event {
                 glutin::WindowEvent::Resized(w, h) => {
-                    windows[&window_id].context.resize(w, h)
+                    windows[&window_id].0.resize(w, h)
                 },
                 glutin::WindowEvent::Closed => {
                     if windows.remove(&window_id).is_some() {
@@ -46,9 +41,9 @@ fn main() {
         for (i, window) in windows.values().enumerate() {
             let mut color = [0.0, 0.0, 0.0, 1.0];
             color[i] = 1.0; // Color each of the three windows a different color.
-            let _ = unsafe { window.context.make_current() };
-            window.gl.draw_frame(color);
-            let _ = window.context.swap_buffers();
+            let _ = unsafe { window.0.make_current() };
+            window.1.draw_frame(color);
+            let _ = window.0.swap_buffers();
         }
 
         glutin::ControlFlow::Continue

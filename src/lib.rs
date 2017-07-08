@@ -162,6 +162,12 @@ pub struct ContextBuilder<'a> {
     pf_reqs: PixelFormatRequirements,
 }
 
+/// Represents an OpenGL context and a Window with which it is associated.
+pub struct GlWindow {
+    context: Context,
+    window: Window,
+}
+
 impl<'a> ContextBuilder<'a> {
     /// Initializes a new `ContextBuilder` with default values.
     pub fn new() -> Self {
@@ -273,30 +279,37 @@ impl<'a> ContextBuilder<'a> {
         self.pf_reqs.srgb = srgb_enabled;
         self
     }
+}
 
-    /// Creates a new OpenGL context.
+impl GlWindow {
+    /// Builds the given window along with the associated GL context, returning the pair as a
+    /// `GlWindow`.
     ///
     /// Error should be very rare and only occur in case of permission denied, incompatible system,
     /// out of memory, etc.
-    pub fn build(self, window_builder: WindowBuilder, events_loop: &EventsLoop)
-        -> Result<(Window, Context), CreationError>
-    {
-        Context::new(window_builder, events_loop, &self.pf_reqs, &self.gl_attr)
-    }
-}
-
-impl Context {
-    // Called by `ContextBuilder::build`.
-    fn new(
+    pub fn new(
         window_builder: WindowBuilder,
+        context_builder: ContextBuilder,
         events_loop: &EventsLoop,
-        pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context>,
-    ) -> Result<(Window, Self), CreationError>
+    ) -> Result<Self, CreationError>
     {
-        let gl_attr = gl_attr.clone().map_sharing(|ctxt| &ctxt.context);
-        platform::Context::new(window_builder, events_loop, pf_reqs, &gl_attr)
-            .map(|(window, context)| (window, Context { context: context }))
+        let ContextBuilder { pf_reqs, gl_attr } = context_builder;
+        let gl_attr = gl_attr.map_sharing(|ctxt| &ctxt.context);
+        platform::Context::new(window_builder, events_loop, &pf_reqs, &gl_attr)
+            .map(|(window, context)| GlWindow {
+                window: window,
+                context: Context { context: context },
+            })
+    }
+
+    /// Borrow the inner `Window`.
+    pub fn window(&self) -> &Window {
+        &self.window
+    }
+
+    /// Borrow the inner GL `Context`.
+    pub fn context(&self) -> &Context {
+        &self.context
     }
 }
 
@@ -327,6 +340,43 @@ impl GlContext for Context {
 
     fn resize(&self, width: u32, height: u32) {
         self.context.resize(width, height);
+    }
+}
+
+impl GlContext for GlWindow {
+    unsafe fn make_current(&self) -> Result<(), ContextError> {
+        self.context.make_current()
+    }
+
+    fn is_current(&self) -> bool {
+        self.context.is_current()
+    }
+
+    fn get_proc_address(&self, addr: &str) -> *const () {
+        self.context.get_proc_address(addr)
+    }
+
+    fn swap_buffers(&self) -> Result<(), ContextError> {
+        self.context.swap_buffers()
+    }
+
+    fn get_api(&self) -> Api {
+        self.context.get_api()
+    }
+
+    fn get_pixel_format(&self) -> PixelFormat {
+        self.context.get_pixel_format()
+    }
+
+    fn resize(&self, width: u32, height: u32) {
+        self.context.resize(width, height);
+    }
+}
+
+impl std::ops::Deref for GlWindow {
+    type Target = Window;
+    fn deref(&self) -> &Self::Target {
+        &self.window
     }
 }
 

@@ -2,17 +2,17 @@ extern crate glutin;
 
 mod support;
 
+use glutin::GlContext;
+
 fn main() {
     let mut events_loop = glutin::EventsLoop::new();
-    let window_builder = glutin::WindowBuilder::new()
-        .with_title("glutin - Cursor grabbing test");
-    let (window, context) = glutin::ContextBuilder::new()
-        .build(window_builder, &events_loop)
-        .unwrap();
+    let window = glutin::WindowBuilder::new().with_title("glutin - Cursor grabbing test");
+    let context = glutin::ContextBuilder::new();
+    let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
 
-    let _ = unsafe { context.make_current() };
+    let _ = unsafe { gl_window.make_current() };
 
-    let gl = support::load(&context);
+    let gl = support::load(&gl_window);
     let mut grabbed = false;
 
     events_loop.run_forever(|event| {
@@ -23,17 +23,17 @@ fn main() {
                 WindowEvent::KeyboardInput { input, .. } if ElementState::Pressed == input.state => {
                     if grabbed {
                         grabbed = false;
-                        window.set_cursor_state(CursorState::Normal)
-                              .ok().expect("could not ungrab mouse cursor");
+                        gl_window.set_cursor_state(CursorState::Normal)
+                                 .ok().expect("could not ungrab mouse cursor");
                     } else {
                         grabbed = true;
-                        window.set_cursor_state(CursorState::Grab)
-                              .ok().expect("could not grab mouse cursor");
+                        gl_window.set_cursor_state(CursorState::Grab)
+                                 .ok().expect("could not grab mouse cursor");
                     }
                 },
 
                 WindowEvent::Closed => return ControlFlow::Break,
-                WindowEvent::Resized(w, h) => context.resize(w, h),
+                WindowEvent::Resized(w, h) => gl_window.resize(w, h),
                 a @ WindowEvent::MouseMoved { .. } => {
                     println!("{:?}", a);
                 },
@@ -43,7 +43,7 @@ fn main() {
         }
 
         gl.draw_frame([0.0, 1.0, 0.0, 1.0]);
-        let _ = context.swap_buffers();
+        let _ = gl_window.swap_buffers();
         ControlFlow::Continue
     });
 }
