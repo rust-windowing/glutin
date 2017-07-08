@@ -7,6 +7,7 @@ mod gl {
     include!(concat!(env!("OUT_DIR"), "/test_gl_bindings.rs"));
 }
 use gl::types::*;
+use glutin::GlContext;
 
 
 #[cfg(target_os = "macos")]
