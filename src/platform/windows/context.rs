@@ -73,6 +73,7 @@ impl Context {
         context_result.map(|context| (window, context))
     }
 
+    #[inline]
     pub fn resize(&self, _width: u32, _height: u32) {
         // Method is for API consistency.
     }
