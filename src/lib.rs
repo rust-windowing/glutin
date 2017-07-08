@@ -1,17 +1,23 @@
-//! The purpose of this library is to provide an OpenGL context on as many
-//!  platforms as possible.
+//! The purpose of this library is to provide an OpenGL context on as many platforms as possible.
 //!
-//! # Building a window
+//! # Building a Context
 //!
-//! There are two ways to create a window:
+//! Individual `Context`s are designed to be associated with and work alongside winit `Window`s.
+//! Due to some operating-system-specific quirks, glutin requires control over the order of
+//! creation of the `Context` and `Window`. Here is an example of building a Context:
 //!
-//!  - Calling `Window::new()`.
-//!  - Calling `let builder = WindowBuilder::new()` then `builder.build()`.
+//! ```ignore
+//! let events_loop = glutin::winit::EventsLoop::new();
+//! let window_builder = glutin::winit::WindowBuilder::new()
+//!     .with_title("Hello world!")
+//!     .with_dimensions(1024, 768);
+//! let (window, context) = glutin::ContextBuilder::new()
+//!     .build(window_builder, &events_loop)
+//!     .unwrap();
+//! ```
 //!
-//! The first way is the simpliest way and will give you default values.
-//!
-//! The second way allows you to customize the way your window and GL context
-//!  will look and behave.
+//! For contexts that are *not* associated with any particular window, see the HeadlessContext
+//! type.
 //!
 //! # Features
 //!
