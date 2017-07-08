@@ -41,21 +41,21 @@ extern crate glutin;
 extern crate libc;
 
 fn main() {
-    let events_loop = glutin::EventsLoop::new();
-    let window = glutin::WindowBuilder::new()
-        .with_title("Hello, world!".to_string())
-        .with_dimensions(1024, 768)
+    let events_loop = glutin::winit::EventsLoop::new();
+    let window_builder = glutin::winit::WindowBuilder::new()
+        .with_title("Hello, world!")
+        .with_dimensions(1024, 768);
+    let (_window, context) = glutin::ContextBuilder::new()
         .with_vsync()
-        .build(&events_loop)
+        .build(window_builder, &events_loop)
         .unwrap();
 
     unsafe {
-        window.make_current()
-    }.unwrap();
+        context.make_current().unwrap();
+    }
 
     unsafe {
-        gl::load_with(|symbol| window.get_proc_address(symbol) as *const _);
-
+        gl::load_with(|symbol| context.get_proc_address(symbol) as *const _);
         gl::ClearColor(0.0, 1.0, 0.0, 1.0);
     }
 
@@ -74,7 +74,7 @@ fn main() {
             gl::Clear(gl::COLOR_BUFFER_BIT);
         }
 
-        window.swap_buffers().unwrap();
+        context.swap_buffers().unwrap();
     }
 }
 ```
