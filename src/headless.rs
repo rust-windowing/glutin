@@ -2,6 +2,7 @@ use Api;
 use ContextError;
 use CreationError;
 use GlAttributes;
+use GlContext;
 use GlProfile;
 use GlRequest;
 use PixelFormat;
@@ -95,17 +96,17 @@ pub struct HeadlessContext {
     context: platform::HeadlessContext,
 }
 
-impl HeadlessContext {
+impl GlContext for HeadlessContext {
     /// Creates a new OpenGL context
     /// Sets the context as the current context.
     #[inline]
-    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
+    unsafe fn make_current(&self) -> Result<(), ContextError> {
         self.context.make_current()
     }
 
     /// Returns true if this context is the current one in this thread.
     #[inline]
-    pub fn is_current(&self) -> bool {
+    fn is_current(&self) -> bool {
         self.context.is_current()
     }
 
@@ -113,7 +114,7 @@ impl HeadlessContext {
     ///
     /// Contrary to `wglGetProcAddress`, all available OpenGL functions return an address.
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const () {
+    fn get_proc_address(&self, addr: &str) -> *const () {
         self.context.get_proc_address(addr)
     }
 
@@ -121,18 +122,24 @@ impl HeadlessContext {
     ///
     /// See `Window::get_api` for more infos.
     #[inline]
-    pub fn get_api(&self) -> Api {
+    fn get_api(&self) -> Api {
         self.context.get_api()
     }
 
     #[inline]
-    pub fn swap_buffers(&self) -> Result<(), ContextError> {
+    fn swap_buffers(&self) -> Result<(), ContextError> {
         self.context.swap_buffers()
     }
 
     #[inline]
-    pub fn get_pixel_format(&self) -> PixelFormat {
+    fn get_pixel_format(&self) -> PixelFormat {
         self.context.get_pixel_format()
+    }
+
+    #[inline]
+    fn resize(&self, _width: u32, _height: u32) {
+        // This method does not mean anything for a HeadlessContext.
+        unimplemented!()
     }
 }
 

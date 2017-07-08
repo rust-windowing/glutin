@@ -85,6 +85,43 @@ mod headless;
 
 pub mod os;
 
+/// A trait for types associated with a GL context.
+pub trait GlContext {
+    /// Sets the context as the current context.
+    unsafe fn make_current(&self) -> Result<(), ContextError>;
+
+    /// Returns true if this context is the current one in this thread.
+    fn is_current(&self) -> bool;
+
+    /// Returns the address of an OpenGL function.
+    fn get_proc_address(&self, addr: &str) -> *const ();
+
+    /// Swaps the buffers in case of double or triple buffering.
+    ///
+    /// You should call this function every time you have finished rendering, or the image may not
+    /// be displayed on the screen.
+    ///
+    /// **Warning**: if you enabled vsync, this function will block until the next time the screen
+    /// is refreshed. However drivers can choose to override your vsync settings, which means that
+    /// you can't know in advance whether `swap_buffers` will block or not.
+    fn swap_buffers(&self) -> Result<(), ContextError>;
+
+    /// Returns the OpenGL API being used.
+    fn get_api(&self) -> Api;
+
+    /// Returns the pixel format of the main framebuffer of the context.
+    fn get_pixel_format(&self) -> PixelFormat;
+
+    /// Resize the GL context.
+    ///
+    /// Some platforms (macos, wayland) require being manually updated when their window or
+    /// surface is resized.
+    ///
+    /// The easiest way of doing this is to call this method for each `Resized` window event that
+    /// is received with the width and height given by the event.
+    fn resize(&self, width: u32, height: u32);
+}
+
 /// Represents an OpenGL context.
 ///
 /// A `Context` is normally associated with a single window, however `Context`s can be *shared*
@@ -126,7 +163,6 @@ pub struct ContextBuilder<'a> {
 }
 
 impl<'a> ContextBuilder<'a> {
-
     /// Initializes a new `ContextBuilder` with default values.
     pub fn new() -> Self {
         ContextBuilder {
@@ -250,7 +286,6 @@ impl<'a> ContextBuilder<'a> {
 }
 
 impl Context {
-
     // Called by `ContextBuilder::build`.
     fn new(
         window_builder: WindowBuilder,
@@ -263,53 +298,35 @@ impl Context {
         platform::Context::new(window_builder, events_loop, pf_reqs, &gl_attr)
             .map(|(window, context)| (window, Context { context: context }))
     }
+}
 
-    /// Resize the GL context.
-    ///
-    /// Some platforms (macos, wayland) require being manually updated when their window or
-    /// surface is resized.
-    ///
-    /// The easiest way of doing this is to call this method for each `Resized` window event that
-    /// is received with the width and height given by the event.
-    pub fn resize(&self, width: u32, height: u32) {
-        self.context.resize(width, height);
-    }
-
-    /// Sets the context as the current context.
-    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
+impl GlContext for Context {
+    unsafe fn make_current(&self) -> Result<(), ContextError> {
         self.context.make_current()
     }
 
-    /// Returns true if this context is the current one in this thread.
-    pub fn is_current(&self) -> bool {
+    fn is_current(&self) -> bool {
         self.context.is_current()
     }
 
-    /// Returns the address of an OpenGL function.
-    pub fn get_proc_address(&self, addr: &str) -> *const () {
+    fn get_proc_address(&self, addr: &str) -> *const () {
         self.context.get_proc_address(addr)
     }
 
-    /// Swaps the buffers in case of double or triple buffering.
-    ///
-    /// You should call this function every time you have finished rendering, or the image may not
-    /// be displayed on the screen.
-    ///
-    /// **Warning**: if you enabled vsync, this function will block until the next time the screen
-    /// is refreshed. However drivers can choose to override your vsync settings, which means that
-    /// you can't know in advance whether `swap_buffers` will block or not.
-    pub fn swap_buffers(&self) -> Result<(), ContextError> {
+    fn swap_buffers(&self) -> Result<(), ContextError> {
         self.context.swap_buffers()
     }
 
-    /// Returns the OpenGL API being used.
-    pub fn get_api(&self) -> Api {
+    fn get_api(&self) -> Api {
         self.context.get_api()
     }
 
-    /// Returns the pixel format of the main framebuffer of the context.
-    pub fn get_pixel_format(&self) -> PixelFormat {
+    fn get_pixel_format(&self) -> PixelFormat {
         self.context.get_pixel_format()
+    }
+
+    fn resize(&self, width: u32, height: u32) {
+        self.context.resize(width, height);
     }
 }
 
