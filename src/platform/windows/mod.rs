@@ -51,8 +51,6 @@ lazy_static! {
     };
 }
 
-// #[derive(Clone, Default)]
-// pub struct PlatformSpecificWindowBuilderAttributes;
 #[derive(Clone, Default)]
 pub struct PlatformSpecificHeadlessBuilderAttributes;
 
