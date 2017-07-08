@@ -3,10 +3,10 @@ extern crate glutin;
 mod support;
 
 fn main() {
-    let mut events_loop = glutin::winit::EventsLoop::new();
+    let mut events_loop = glutin::EventsLoop::new();
 
     struct Window {
-        _window: glutin::winit::Window,
+        _window: glutin::Window,
         context: glutin::Context,
         gl: support::Gl,
     }
@@ -14,7 +14,7 @@ fn main() {
     let mut windows = std::collections::HashMap::new();
     for _ in 0..3 {
         let (window, context) = glutin::ContextBuilder::new()
-            .build(glutin::winit::WindowBuilder::new(), &events_loop)
+            .build(glutin::WindowBuilder::new(), &events_loop)
             .unwrap();
         let _ = unsafe { context.make_current() };
         let gl = support::load(&context);
@@ -26,15 +26,15 @@ fn main() {
     events_loop.run_forever(|event| {
         println!("{:?}", event);
         match event {
-            glutin::winit::Event::WindowEvent { event, window_id } => match event {
-                glutin::winit::WindowEvent::Resized(w, h) => {
+            glutin::Event::WindowEvent { event, window_id } => match event {
+                glutin::WindowEvent::Resized(w, h) => {
                     windows[&window_id].context.resize(w, h)
                 },
-                glutin::winit::WindowEvent::Closed => {
+                glutin::WindowEvent::Closed => {
                     if windows.remove(&window_id).is_some() {
                         println!("Window with ID {:?} has been closed", window_id);
                         if windows.is_empty() {
-                            return glutin::winit::ControlFlow::Break;
+                            return glutin::ControlFlow::Break;
                         }
                     }
                 },
@@ -51,6 +51,6 @@ fn main() {
             let _ = window.context.swap_buffers();
         }
 
-        glutin::winit::ControlFlow::Continue
+        glutin::ControlFlow::Continue
     });
 }

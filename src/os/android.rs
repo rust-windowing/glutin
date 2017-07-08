@@ -1,3 +1,3 @@
-#![cfg(target_os = "windows")]
+#![cfg(any(target_os = "android"))]
 
 pub use winit::os::{WindowBuilderExt, WindowExt};

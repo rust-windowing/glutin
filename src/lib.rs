@@ -2,13 +2,13 @@
 //!
 //! # Building a Context
 //!
-//! Individual `Context`s are designed to be associated with and work alongside winit `Window`s.
+//! Individual `Context`s are designed to be associated with and work alongside `Window`s.
 //! Due to some operating-system-specific quirks, glutin requires control over the order of
 //! creation of the `Context` and `Window`. Here is an example of building a Context:
 //!
 //! ```ignore
-//! let events_loop = glutin::winit::EventsLoop::new();
-//! let window_builder = glutin::winit::WindowBuilder::new()
+//! let events_loop = glutin::EventsLoop::new();
+//! let window_builder = glutin::WindowBuilder::new()
 //!     .with_title("Hello world!")
 //!     .with_dimensions(1024, 768);
 //! let (window, context) = glutin::ContextBuilder::new()
@@ -38,7 +38,7 @@ extern crate shared_library;
 
 extern crate libc;
 
-pub extern crate winit;
+extern crate winit;
 
 #[cfg(target_os = "windows")]
 extern crate winapi;
@@ -69,6 +69,13 @@ extern crate x11_dl;
 extern crate wayland_client;
 
 pub use headless::{HeadlessRendererBuilder, HeadlessContext};
+pub use winit::{AvailableMonitorsIter, AxisId, ButtonId, ControlFlow,
+                CreationError as WindowCreationError, CursorState, DeviceEvent, DeviceId,
+                ElementState, Event, EventsLoop, EventsLoopClosed, EventsLoopProxy,
+                get_available_monitors, get_primary_monitor, KeyboardInput, ModifiersState,
+                MonitorId, MouseButton, MouseCursor, MouseScrollDelta, NativeMonitorId, ScanCode,
+                Touch, TouchPhase, VirtualKeyCode, Window, WindowAttributes, WindowBuilder,
+                WindowEvent, WindowId};
 
 use std::io;
 
@@ -86,9 +93,9 @@ pub mod os;
 /// # Example
 ///
 /// ```ignore
-/// let events_loop = glutin::winit::EventsLoop::new();
-/// let window = glutin::winit::WindowBuilder::new(&events_loop).unwrap();
-/// let context = glutin::ContextBuilder::new(&window).unwrap();
+/// let events_loop = glutin::EventsLoop::new();
+/// let window_builder = glutin::WindowBuilder::new(&events_loop).unwrap();
+/// let context = glutin::ContextBuilder::new(window_builder, &events_loop).unwrap();
 ///
 /// unsafe { context.make_current().unwrap() };
 ///
@@ -235,8 +242,8 @@ impl<'a> ContextBuilder<'a> {
     ///
     /// Error should be very rare and only occur in case of permission denied, incompatible system,
     /// out of memory, etc.
-    pub fn build(self, window_builder: winit::WindowBuilder, events_loop: &winit::EventsLoop)
-        -> Result<(winit::Window, Context), CreationError>
+    pub fn build(self, window_builder: WindowBuilder, events_loop: &EventsLoop)
+        -> Result<(Window, Context), CreationError>
     {
         Context::new(window_builder, events_loop, &self.pf_reqs, &self.gl_attr)
     }
@@ -246,11 +253,11 @@ impl Context {
 
     // Called by `ContextBuilder::build`.
     fn new(
-        window_builder: winit::WindowBuilder,
-        events_loop: &winit::EventsLoop,
+        window_builder: WindowBuilder,
+        events_loop: &EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-    ) -> Result<(winit::Window, Self), CreationError>
+    ) -> Result<(Window, Self), CreationError>
     {
         let gl_attr = gl_attr.clone().map_sharing(|ctxt| &ctxt.context);
         platform::Context::new(window_builder, events_loop, pf_reqs, &gl_attr)
@@ -262,8 +269,8 @@ impl Context {
     /// Some platforms (macos, wayland) require being manually updated when their window or
     /// surface is resized.
     ///
-    /// When using glutin with winit, the easiest way of doing this is to call this method for each
-    /// `Resized` window event that is received with the width and height given by the event.
+    /// The easiest way of doing this is to call this method for each `Resized` window event that
+    /// is received with the width and height given by the event.
     pub fn resize(&self, width: u32, height: u32) {
         self.context.resize(width, height);
     }
@@ -317,7 +324,7 @@ pub enum CreationError {
     OpenGlVersionNotSupported,
     NoAvailablePixelFormat,
     PlatformSpecific(String),
-    Window(winit::CreationError),
+    Window(WindowCreationError),
 }
 
 impl CreationError {
@@ -362,8 +369,8 @@ impl std::error::Error for CreationError {
     }
 }
 
-impl From<winit::CreationError> for CreationError {
-    fn from(err: winit::CreationError) -> Self {
+impl From<WindowCreationError> for CreationError {
+    fn from(err: WindowCreationError) -> Self {
         CreationError::Window(err)
     }
 }
