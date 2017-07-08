@@ -43,7 +43,8 @@ impl Context {
         let gl_attr = gl_attr.clone().map_sharing(|ctxt| {
             match *ctxt {
                 Context::Wgl(ref c) => c.get_hglrc(),
-                Context::Egl(_) => unimplemented!(),        // FIXME:
+                // FIXME
+                Context::Egl(_) => unimplemented!(),
             }
         });
         let context_result = unsafe {
