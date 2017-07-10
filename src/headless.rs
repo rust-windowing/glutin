@@ -2,9 +2,9 @@ use Api;
 use ContextError;
 use CreationError;
 use GlAttributes;
+use GlContext;
 use GlProfile;
 use GlRequest;
-use GlContext;
 use PixelFormat;
 use PixelFormatRequirements;
 use Robustness;
@@ -96,17 +96,17 @@ pub struct HeadlessContext {
     context: platform::HeadlessContext,
 }
 
-impl HeadlessContext {
+impl GlContext for HeadlessContext {
     /// Creates a new OpenGL context
     /// Sets the context as the current context.
     #[inline]
-    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
+    unsafe fn make_current(&self) -> Result<(), ContextError> {
         self.context.make_current()
     }
 
     /// Returns true if this context is the current one in this thread.
     #[inline]
-    pub fn is_current(&self) -> bool {
+    fn is_current(&self) -> bool {
         self.context.is_current()
     }
 
@@ -114,7 +114,7 @@ impl HeadlessContext {
     ///
     /// Contrary to `wglGetProcAddress`, all available OpenGL functions return an address.
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const () {
+    fn get_proc_address(&self, addr: &str) -> *const () {
         self.context.get_proc_address(addr)
     }
 
@@ -122,29 +122,8 @@ impl HeadlessContext {
     ///
     /// See `Window::get_api` for more infos.
     #[inline]
-    pub fn get_api(&self) -> Api {
+    fn get_api(&self) -> Api {
         self.context.get_api()
-    }
-
-    #[inline]
-    pub fn set_window_resize_callback(&mut self, _: Option<fn(u32, u32)>) {
-    }
-}
-
-impl GlContext for HeadlessContext {
-    #[inline]
-    unsafe fn make_current(&self) -> Result<(), ContextError> {
-        self.context.make_current()
-    }
-
-    #[inline]
-    fn is_current(&self) -> bool {
-        self.context.is_current()
-    }
-
-    #[inline]
-    fn get_proc_address(&self, addr: &str) -> *const () {
-        self.context.get_proc_address(addr)
     }
 
     #[inline]
@@ -153,13 +132,14 @@ impl GlContext for HeadlessContext {
     }
 
     #[inline]
-    fn get_api(&self) -> Api {
-        self.context.get_api()
+    fn get_pixel_format(&self) -> PixelFormat {
+        self.context.get_pixel_format()
     }
 
     #[inline]
-    fn get_pixel_format(&self) -> PixelFormat {
-        self.context.get_pixel_format()
+    fn resize(&self, _width: u32, _height: u32) {
+        // This method does not mean anything for a HeadlessContext.
+        unimplemented!()
     }
 }
 

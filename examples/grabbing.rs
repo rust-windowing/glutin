@@ -2,45 +2,48 @@ extern crate glutin;
 
 mod support;
 
+use glutin::GlContext;
+
 fn main() {
-    let events_loop = glutin::EventsLoop::new();
-    let window = glutin::WindowBuilder::new()
-        .with_title("glutin - Cursor grabbing test")
-        .build(&events_loop)
-        .unwrap();
+    let mut events_loop = glutin::EventsLoop::new();
+    let window = glutin::WindowBuilder::new().with_title("glutin - Cursor grabbing test");
+    let context = glutin::ContextBuilder::new();
+    let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
 
-    let _ = unsafe { window.make_current() };
+    let _ = unsafe { gl_window.make_current() };
 
-    let context = support::load(&window);
+    let gl = support::load(&gl_window);
     let mut grabbed = false;
 
     events_loop.run_forever(|event| {
+        use glutin::{CursorState, ControlFlow, Event, WindowEvent, ElementState};
         match event {
-            glutin::Event::WindowEvent { event, .. } => match event {
+            Event::WindowEvent { event, .. } => match event {
 
-                glutin::WindowEvent::KeyboardInput(glutin::ElementState::Pressed, _, _, _) => {
+                WindowEvent::KeyboardInput { input, .. } if ElementState::Pressed == input.state => {
                     if grabbed {
                         grabbed = false;
-                        window.set_cursor_state(glutin::CursorState::Normal)
-                              .ok().expect("could not ungrab mouse cursor");
+                        gl_window.set_cursor_state(CursorState::Normal)
+                                 .ok().expect("could not ungrab mouse cursor");
                     } else {
                         grabbed = true;
-                        window.set_cursor_state(glutin::CursorState::Grab)
-                              .ok().expect("could not grab mouse cursor");
+                        gl_window.set_cursor_state(CursorState::Grab)
+                                 .ok().expect("could not grab mouse cursor");
                     }
                 },
 
-                glutin::WindowEvent::Closed => events_loop.interrupt(),
-
-                a @ glutin::WindowEvent::MouseMoved(_, _) => {
+                WindowEvent::Closed => return ControlFlow::Break,
+                WindowEvent::Resized(w, h) => gl_window.resize(w, h),
+                a @ WindowEvent::MouseMoved { .. } => {
                     println!("{:?}", a);
                 },
-
                 _ => (),
             },
+            _ => (),
         }
 
-        context.draw_frame((0.0, 1.0, 0.0, 1.0));
-        let _ = window.swap_buffers();
+        gl.draw_frame([0.0, 1.0, 0.0, 1.0]);
+        let _ = gl_window.swap_buffers();
+        ControlFlow::Continue
     });
 }

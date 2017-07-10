@@ -1,17 +1,25 @@
-//! The purpose of this library is to provide an OpenGL context on as many
-//!  platforms as possible.
+//! The purpose of this library is to provide an OpenGL context on as many platforms as possible.
 //!
-//! # Building a window
+//! # Building a GlWindow
 //!
-//! There are two ways to create a window:
+//! A `GlWindow` is composed of a `Window` and an OpenGL `Context`. Due to some
+//! operating-system-specific quirks, glutin requires control over the order of creation of the
+//! `Context` and `Window`. Here is an example of building a GlWindow:
 //!
-//!  - Calling `Window::new()`.
-//!  - Calling `let builder = WindowBuilder::new()` then `builder.build()`.
+//! ```no_run
+//! # extern crate glutin;
+//! # fn main() {
+//! let events_loop = glutin::EventsLoop::new();
+//! let window = glutin::WindowBuilder::new()
+//!     .with_title("Hello world!")
+//!     .with_dimensions(1024, 768);
+//! let context = glutin::ContextBuilder::new();
+//! let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
+//! # }
+//! ```
 //!
-//! The first way is the simpliest way and will give you default values.
-//!
-//! The second way allows you to customize the way your window and GL context
-//!  will look and behave.
+//! For contexts that are *not* associated with any particular window, see the HeadlessContext
+//! type.
 //!
 //! # Features
 //!
@@ -23,6 +31,7 @@
 //!
 //! By default only `window` is enabled.
 
+#[cfg(target_os = "windows")]
 #[macro_use]
 extern crate lazy_static;
 
@@ -56,105 +65,29 @@ extern crate cocoa;
 extern crate core_foundation;
 #[cfg(target_os = "macos")]
 extern crate core_graphics;
-#[cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "openbsd"))]
+#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "dragonfly", target_os = "openbsd"))]
 extern crate x11_dl;
 #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "dragonfly", target_os = "openbsd"))]
-#[macro_use(wayland_env)]
 extern crate wayland_client;
 
-pub use events::*;
 pub use headless::{HeadlessRendererBuilder, HeadlessContext};
-pub use window::{AvailableMonitorsIter, MonitorId, WindowId, get_available_monitors, get_primary_monitor};
-pub use winit::NativeMonitorId;
+pub use winit::{AvailableMonitorsIter, AxisId, ButtonId, ControlFlow,
+                CreationError as WindowCreationError, CursorState, DeviceEvent, DeviceId,
+                ElementState, Event, EventsLoop, EventsLoopClosed, EventsLoopProxy,
+                get_available_monitors, get_primary_monitor, KeyboardInput, ModifiersState,
+                MonitorId, MouseButton, MouseCursor, MouseScrollDelta, NativeMonitorId, ScanCode,
+                Touch, TouchPhase, VirtualKeyCode, Window, WindowAttributes, WindowBuilder,
+                WindowEvent, WindowId};
 
 use std::io;
 
 mod api;
 mod platform;
-mod events;
 mod headless;
-mod window;
 
 pub mod os;
 
-/// Represents an OpenGL context and the Window or environment around it.
-///
-/// # Example
-///
-/// ```ignore
-/// let window = Window::new(&events_loop).unwrap();
-///
-/// unsafe { window.make_current() };
-///
-/// loop {
-///     events_loop.poll_events(|event| {
-///         match(event) {
-///             // process events here
-///             _ => ()
-///         }
-///     });
-///
-///     // draw everything here
-///
-///     window.swap_buffers();
-///     std::thread::sleep(std::time::Duration::from_millis(17));
-/// }
-/// ```
-pub struct Window {
-    window: platform::Window,
-}
-
-/// Object that allows you to build windows.
-#[derive(Clone)]
-pub struct WindowBuilder<'a> {
-    winit_builder: winit::WindowBuilder,
-
-    /// The attributes to use to create the context.
-    pub opengl: GlAttributes<&'a platform::Window>,
-
-    // Should be made public once it's stabilized.
-    pf_reqs: PixelFormatRequirements,
-}
-
-/// Provides a way to retreive events from the windows that are registered to it.
-// TODO: document usage in multiple threads
-pub struct EventsLoop {
-    events_loop: platform::EventsLoop,
-}
-
-impl EventsLoop {
-    /// Builds a new events loop.
-    pub fn new() -> EventsLoop {
-        EventsLoop {
-            events_loop: platform::EventsLoop::new(),
-        }
-    }
-
-    /// Fetches all the events that are pending, calls the callback function for each of them,
-    /// and returns.
-    #[inline]
-    pub fn poll_events<F>(&self, callback: F)
-        where F: FnMut(Event)
-    {
-        self.events_loop.poll_events(callback)
-    }
-
-    /// Runs forever until `interrupt()` is called. Whenever an event happens, calls the callback.
-    #[inline]
-    pub fn run_forever<F>(&self, callback: F)
-        where F: FnMut(Event)
-    {
-        self.events_loop.run_forever(callback)
-    }
-
-    /// If we called `run_forever()`, stops the process of waiting for events.
-    #[inline]
-    pub fn interrupt(&self) {
-        self.events_loop.interrupt()
-    }
-}
-
-/// Trait that describes objects that have access to an OpenGL context.
+/// A trait for types associated with a GL context.
 pub trait GlContext {
     /// Sets the context as the current context.
     unsafe fn make_current(&self) -> Result<(), ContextError>;
@@ -167,8 +100,8 @@ pub trait GlContext {
 
     /// Swaps the buffers in case of double or triple buffering.
     ///
-    /// You should call this function every time you have finished rendering, or the image
-    /// may not be displayed on the screen.
+    /// You should call this function every time you have finished rendering, or the image may not
+    /// be displayed on the screen.
     ///
     /// **Warning**: if you enabled vsync, this function will block until the next time the screen
     /// is refreshed. However drivers can choose to override your vsync settings, which means that
@@ -180,6 +113,295 @@ pub trait GlContext {
 
     /// Returns the pixel format of the main framebuffer of the context.
     fn get_pixel_format(&self) -> PixelFormat;
+
+    /// Resize the GL context.
+    ///
+    /// Some platforms (macos, wayland) require being manually updated when their window or
+    /// surface is resized.
+    ///
+    /// The easiest way of doing this is to call this method for each `Resized` window event that
+    /// is received with the width and height given by the event.
+    fn resize(&self, width: u32, height: u32);
+}
+
+/// Represents an OpenGL context.
+///
+/// A `Context` is normally associated with a single Window, however `Context`s can be *shared*
+/// between multiple windows.
+///
+/// # Example
+///
+/// ```no_run
+/// # extern crate glutin;
+/// # use glutin::GlContext;
+/// # fn main() {
+/// # let events_loop = glutin::EventsLoop::new();
+/// # let window = glutin::WindowBuilder::new();
+/// # let context = glutin::ContextBuilder::new();
+/// # let some_gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
+/// let context = glutin::ContextBuilder::new()
+///     .with_vsync(true)
+///     .with_multisampling(8)
+///     .with_shared_lists(some_gl_window.context());
+/// # }
+/// ```
+pub struct Context {
+    context: platform::Context,
+}
+
+/// Object that allows you to build `Context`s.
+pub struct ContextBuilder<'a> {
+    /// The attributes to use to create the context.
+    pub gl_attr: GlAttributes<&'a Context>,
+    // Should be made public once it's stabilized.
+    pf_reqs: PixelFormatRequirements,
+}
+
+/// Represents an OpenGL context and a Window with which it is associated.
+///
+/// # Example
+///
+/// ```no_run
+/// # extern crate glutin;
+/// # use glutin::GlContext;
+/// # fn main() {
+/// let mut events_loop = glutin::EventsLoop::new();
+/// let window = glutin::WindowBuilder::new();
+/// let context = glutin::ContextBuilder::new();
+/// let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
+///
+/// unsafe { gl_window.make_current().unwrap() };
+///
+/// loop {
+///     events_loop.poll_events(|event| {
+///         match event {
+///             // process events here
+///             _ => ()
+///         }
+///     });
+///
+///     // draw everything here
+///
+///     gl_window.swap_buffers();
+///     std::thread::sleep(std::time::Duration::from_millis(17));
+/// }
+/// # }
+/// ```
+pub struct GlWindow {
+    context: Context,
+    window: Window,
+}
+
+impl<'a> ContextBuilder<'a> {
+    /// Initializes a new `ContextBuilder` with default values.
+    pub fn new() -> Self {
+        ContextBuilder {
+            pf_reqs: std::default::Default::default(),
+            gl_attr: std::default::Default::default(),
+        }
+    }
+
+    /// Sets how the backend should choose the OpenGL API and version.
+    #[inline]
+    pub fn with_gl(mut self, request: GlRequest) -> Self {
+        self.gl_attr.version = request;
+        self
+    }
+
+    /// Sets the desired OpenGL context profile.
+    #[inline]
+    pub fn with_gl_profile(mut self, profile: GlProfile) -> Self {
+        self.gl_attr.profile = Some(profile);
+        self
+    }
+
+    /// Sets the *debug* flag for the OpenGL context.
+    ///
+    /// The default value for this flag is `cfg!(debug_assertions)`, which means that it's enabled
+    /// when you run `cargo build` and disabled when you run `cargo build --release`.
+    #[inline]
+    pub fn with_gl_debug_flag(mut self, flag: bool) -> Self {
+        self.gl_attr.debug = flag;
+        self
+    }
+
+    /// Sets the robustness of the OpenGL context. See the docs of `Robustness`.
+    #[inline]
+    pub fn with_gl_robustness(mut self, robustness: Robustness) -> Self {
+        self.gl_attr.robustness = robustness;
+        self
+    }
+
+    /// Requests that the window has vsync enabled.
+    ///
+    /// By default, vsync is not enabled.
+    #[inline]
+    pub fn with_vsync(mut self, vsync: bool) -> Self {
+        self.gl_attr.vsync = vsync;
+        self
+    }
+
+    /// Share the display lists with the given `Context`.
+    #[inline]
+    pub fn with_shared_lists(mut self, other: &'a Context) -> Self {
+        self.gl_attr.sharing = Some(other);
+        self
+    }
+
+    /// Sets the multisampling level to request. A value of `0` indicates that multisampling must
+    /// not be enabled.
+    ///
+    /// # Panic
+    ///
+    /// Will panic if `samples` is not a power of two.
+    #[inline]
+    pub fn with_multisampling(mut self, samples: u16) -> Self {
+        self.pf_reqs.multisampling = match samples {
+            0 => None,
+            _ => {
+                assert!(samples.is_power_of_two());
+                Some(samples)
+            }
+        };
+        self
+    }
+
+    /// Sets the number of bits in the depth buffer.
+    #[inline]
+    pub fn with_depth_buffer(mut self, bits: u8) -> Self {
+        self.pf_reqs.depth_bits = Some(bits);
+        self
+    }
+
+    /// Sets the number of bits in the stencil buffer.
+    #[inline]
+    pub fn with_stencil_buffer(mut self, bits: u8) -> Self {
+        self.pf_reqs.stencil_bits = Some(bits);
+        self
+    }
+
+    /// Sets the number of bits in the color buffer.
+    #[inline]
+    pub fn with_pixel_format(mut self, color_bits: u8, alpha_bits: u8) -> Self {
+        self.pf_reqs.color_bits = Some(color_bits);
+        self.pf_reqs.alpha_bits = Some(alpha_bits);
+        self
+    }
+
+    /// Request the backend to be stereoscopic.
+    #[inline]
+    pub fn with_stereoscopy(mut self) -> Self {
+        self.pf_reqs.stereoscopy = true;
+        self
+    }
+
+    /// Sets whether sRGB should be enabled on the window.
+    ///
+    /// The default value is `false`.
+    #[inline]
+    pub fn with_srgb(mut self, srgb_enabled: bool) -> Self {
+        self.pf_reqs.srgb = srgb_enabled;
+        self
+    }
+}
+
+impl GlWindow {
+    /// Builds the given window along with the associated GL context, returning the pair as a
+    /// `GlWindow`.
+    ///
+    /// Error should be very rare and only occur in case of permission denied, incompatible system,
+    /// out of memory, etc.
+    pub fn new(
+        window_builder: WindowBuilder,
+        context_builder: ContextBuilder,
+        events_loop: &EventsLoop,
+    ) -> Result<Self, CreationError>
+    {
+        let ContextBuilder { pf_reqs, gl_attr } = context_builder;
+        let gl_attr = gl_attr.map_sharing(|ctxt| &ctxt.context);
+        platform::Context::new(window_builder, events_loop, &pf_reqs, &gl_attr)
+            .map(|(window, context)| GlWindow {
+                window: window,
+                context: Context { context: context },
+            })
+    }
+
+    /// Borrow the inner `Window`.
+    pub fn window(&self) -> &Window {
+        &self.window
+    }
+
+    /// Borrow the inner GL `Context`.
+    pub fn context(&self) -> &Context {
+        &self.context
+    }
+}
+
+impl GlContext for Context {
+    unsafe fn make_current(&self) -> Result<(), ContextError> {
+        self.context.make_current()
+    }
+
+    fn is_current(&self) -> bool {
+        self.context.is_current()
+    }
+
+    fn get_proc_address(&self, addr: &str) -> *const () {
+        self.context.get_proc_address(addr)
+    }
+
+    fn swap_buffers(&self) -> Result<(), ContextError> {
+        self.context.swap_buffers()
+    }
+
+    fn get_api(&self) -> Api {
+        self.context.get_api()
+    }
+
+    fn get_pixel_format(&self) -> PixelFormat {
+        self.context.get_pixel_format()
+    }
+
+    fn resize(&self, width: u32, height: u32) {
+        self.context.resize(width, height);
+    }
+}
+
+impl GlContext for GlWindow {
+    unsafe fn make_current(&self) -> Result<(), ContextError> {
+        self.context.make_current()
+    }
+
+    fn is_current(&self) -> bool {
+        self.context.is_current()
+    }
+
+    fn get_proc_address(&self, addr: &str) -> *const () {
+        self.context.get_proc_address(addr)
+    }
+
+    fn swap_buffers(&self) -> Result<(), ContextError> {
+        self.context.swap_buffers()
+    }
+
+    fn get_api(&self) -> Api {
+        self.context.get_api()
+    }
+
+    fn get_pixel_format(&self) -> PixelFormat {
+        self.context.get_pixel_format()
+    }
+
+    fn resize(&self, width: u32, height: u32) {
+        self.context.resize(width, height);
+    }
+}
+
+impl std::ops::Deref for GlWindow {
+    type Target = Window;
+    fn deref(&self) -> &Self::Target {
+        &self.window
+    }
 }
 
 /// Error that can happen while creating a window or a headless renderer.
@@ -192,6 +414,8 @@ pub enum CreationError {
     RobustnessNotSupported,
     OpenGlVersionNotSupported,
     NoAvailablePixelFormat,
+    PlatformSpecific(String),
+    Window(WindowCreationError),
 }
 
 impl CreationError {
@@ -206,6 +430,8 @@ impl CreationError {
                                                          supported.",
             CreationError::NoAvailablePixelFormat => "Couldn't find any pixel format that matches \
                                                       the criterias.",
+            CreationError::PlatformSpecific(ref text) => &text,
+            CreationError::Window(ref err) => std::error::Error::description(err),
         }
     }
 }
@@ -228,8 +454,15 @@ impl std::error::Error for CreationError {
     fn cause(&self) -> Option<&std::error::Error> {
         match *self {
             CreationError::NoBackendAvailable(ref err) => Some(&**err),
+            CreationError::Window(ref err) => Some(err),
             _ => None
         }
+    }
+}
+
+impl From<WindowCreationError> for CreationError {
+    fn from(err: WindowCreationError) -> Self {
+        CreationError::Window(err)
     }
 }
 
@@ -366,10 +599,6 @@ pub enum ReleaseBehavior {
     Flush,
 }
 
-pub use winit::MouseCursor;
-
-pub use winit::CursorState;
-
 /// Describes a possible format. Unused.
 #[allow(missing_docs)]
 #[derive(Debug, Clone)]
@@ -453,8 +682,6 @@ impl Default for PixelFormatRequirements {
         }
     }
 }
-
-pub use winit::WindowAttributes; // TODO
 
 /// Attributes to use when creating an OpenGL context.
 #[derive(Clone)]

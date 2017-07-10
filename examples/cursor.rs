@@ -1,19 +1,18 @@
 extern crate glutin;
 
-use glutin::MouseCursor;
-
 mod support;
 
+use glutin::{GlContext, MouseCursor};
+
 fn main() {
-    let events_loop = glutin::EventsLoop::new();
-    let window = glutin::WindowBuilder::new()
-        .with_title("A fantastic window!")
-        .build(&events_loop)
-        .unwrap();
+    let mut events_loop = glutin::EventsLoop::new();
+    let window = glutin::WindowBuilder::new().with_title("A fantastic window!");
+    let context = glutin::ContextBuilder::new();
+    let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
 
-    unsafe { window.make_current().unwrap() };
+    unsafe { gl_window.make_current().unwrap() };
 
-    let context = support::load(&window);
+    let gl = support::load(&gl_window);
     let cursors = [
         MouseCursor::Default, MouseCursor::Crosshair, MouseCursor::Hand, MouseCursor::Arrow,
         MouseCursor::Move, MouseCursor::Text, MouseCursor::Wait, MouseCursor::Help,
@@ -29,23 +28,28 @@ fn main() {
     let mut cursor_idx = 0;
 
     events_loop.run_forever(|event| {
-        match event {
-            glutin::Event::WindowEvent { event, .. } => match event {
-                glutin::WindowEvent::KeyboardInput(glutin::ElementState::Pressed, _, _, _) => {
+        use glutin::{ControlFlow, Event, WindowEvent, ElementState};
+        if let Event::WindowEvent { event, .. } = event {
+            match event {
+                WindowEvent::KeyboardInput {
+                    input: glutin::KeyboardInput { state: ElementState::Pressed, .. }, ..
+                } => {
                     println!("Setting cursor to \"{:?}\"", cursors[cursor_idx]);
-                    window.set_cursor(cursors[cursor_idx]);
+                    gl_window.set_cursor(cursors[cursor_idx]);
                     if cursor_idx < cursors.len() - 1 {
                         cursor_idx += 1;
                     } else {
                         cursor_idx = 0;
                     }
                 },
-                glutin::WindowEvent::Closed => events_loop.interrupt(),
+                WindowEvent::Closed => return ControlFlow::Break,
+                WindowEvent::Resized(w, h) => gl_window.resize(w, h),
                 _ => (),
-            },
+            }
         }
 
-        context.draw_frame((0.0, 1.0, 0.0, 1.0));
-        window.swap_buffers().unwrap();
+        gl.draw_frame([0.0, 1.0, 0.0, 1.0]);
+        gl_window.swap_buffers().unwrap();
+        ControlFlow::Continue
     });
 }

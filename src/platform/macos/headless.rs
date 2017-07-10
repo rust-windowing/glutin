@@ -2,7 +2,6 @@ use ContextError;
 use CreationError;
 use CreationError::OsError;
 use GlAttributes;
-use GlContext;
 use PixelFormatRequirements;
 
 use core_foundation::base::TCFType;
@@ -47,21 +46,19 @@ impl HeadlessContext {
 
         Ok(headless)
     }
-}
 
-impl GlContext for HeadlessContext {
-    unsafe fn make_current(&self) -> Result<(), ContextError> {
+    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
         self.context.makeCurrentContext();
         Ok(())
     }
 
     #[inline]
-    fn is_current(&self) -> bool {
+    pub fn is_current(&self) -> bool {
         unimplemented!()
     }
 
     #[inline]
-    fn get_proc_address(&self, _addr: &str) -> *const () {
+    pub fn get_proc_address(&self, _addr: &str) -> *const () {
         let symbol_name: CFString = _addr.parse().unwrap();
         let framework_name: CFString = "com.apple.opengl".parse().unwrap();
         let framework = unsafe {
@@ -74,18 +71,18 @@ impl GlContext for HeadlessContext {
     }
 
     #[inline]
-    fn swap_buffers(&self) -> Result<(), ContextError> {
+    pub fn swap_buffers(&self) -> Result<(), ContextError> {
         unsafe { self.context.flushBuffer(); }
         Ok(())
     }
 
     #[inline]
-    fn get_api(&self) -> ::Api {
+    pub fn get_api(&self) -> ::Api {
         ::Api::OpenGl
     }
 
     #[inline]
-    fn get_pixel_format(&self) -> PixelFormat {
+    pub fn get_pixel_format(&self) -> PixelFormat {
         unimplemented!();
     }
 }

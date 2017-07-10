@@ -3,7 +3,6 @@
 use ContextError;
 use CreationError;
 use GlAttributes;
-use GlContext;
 use GlRequest;
 use GlProfile;
 use PixelFormat;
@@ -151,11 +150,9 @@ impl Context {
     pub fn get_hglrc(&self) -> winapi::HGLRC {
         self.context.0
     }
-}
 
-impl GlContext for Context {
     #[inline]
-    unsafe fn make_current(&self) -> Result<(), ContextError> {
+    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
         if gl::wgl::MakeCurrent(self.hdc as *const _, self.context.0 as *const _) != 0 {
             Ok(())
         } else {
@@ -164,11 +161,11 @@ impl GlContext for Context {
     }
 
     #[inline]
-    fn is_current(&self) -> bool {
+    pub fn is_current(&self) -> bool {
         unsafe { gl::wgl::GetCurrentContext() == self.context.0 as *const c_void }
     }
 
-    fn get_proc_address(&self, addr: &str) -> *const () {
+    pub fn get_proc_address(&self, addr: &str) -> *const () {
         let addr = CString::new(addr.as_bytes()).unwrap();
         let addr = addr.as_ptr();
 
@@ -180,7 +177,7 @@ impl GlContext for Context {
     }
 
     #[inline]
-    fn swap_buffers(&self) -> Result<(), ContextError> {
+    pub fn swap_buffers(&self) -> Result<(), ContextError> {
         // TODO: decide how to handle the error
         /*if unsafe { gdi32::SwapBuffers(self.hdc) } != 0 {
             Ok(())
@@ -192,13 +189,13 @@ impl GlContext for Context {
     }
 
     #[inline]
-    fn get_api(&self) -> Api {
+    pub fn get_api(&self) -> Api {
         // FIXME: can be opengl es
         Api::OpenGl
     }
 
     #[inline]
-    fn get_pixel_format(&self) -> PixelFormat {
+    pub fn get_pixel_format(&self) -> PixelFormat {
         self.pixel_format.clone()
     }
 }
@@ -220,7 +217,7 @@ unsafe fn create_context(extra: Option<(&gl::wgl_extra::Wgl, &PixelFormatRequire
 {
     let share;
 
-    if let Some((extra_functions, pf_reqs, opengl, extensions)) = extra {
+    if let Some((extra_functions, _pf_reqs, opengl, extensions)) = extra {
         share = opengl.sharing.unwrap_or(ptr::null_mut());
 
         if extensions.split(' ').find(|&i| i == "WGL_ARB_create_context").is_some() {
