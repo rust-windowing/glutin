@@ -606,7 +606,7 @@ unsafe fn choose_arb_pixel_format(extra: &gl::wgl_extra::Wgl, extensions: &str,
     let pf_desc = PixelFormat {
         hardware_accelerated: get_info(gl::wgl_extra::ACCELERATION_ARB) !=
                                                                 gl::wgl_extra::NO_ACCELERATION_ARB,
-        color_bits: get_info(gl::wgl_extra::RED_BITS_ARB) as u8 + 
+        color_bits: get_info(gl::wgl_extra::RED_BITS_ARB) as u8 +
                     get_info(gl::wgl_extra::GREEN_BITS_ARB) as u8 +
                     get_info(gl::wgl_extra::BLUE_BITS_ARB) as u8,
         alpha_bits: get_info(gl::wgl_extra::ALPHA_BITS_ARB) as u8,
@@ -694,6 +694,30 @@ unsafe fn load_extra_functions(window: winapi::HWND) -> Result<gl::wgl_extra::Wg
         let mut class_name = [0u16; 128];
         if user32::GetClassNameW(window, class_name.as_mut_ptr(), 128) == 0 {
             return Err(CreationError::OsError(format!("GetClassNameW function failed: {}",
+                                              format!("{}", io::Error::last_os_error()))));
+        }
+
+        // access to class information of the real window
+        let instance = kernel32::GetModuleHandleW(ptr::null());
+        let mut class: winapi::WNDCLASSEXW = mem::zeroed();
+
+        if user32::GetClassInfoExW(instance, class_name.as_ptr(), &mut class) == 0 {
+            return Err(CreationError::OsError(format!("GetClassInfoExW function failed: {}",
+                                              format!("{}", io::Error::last_os_error()))));
+        }
+
+        // register a new class for the dummy window,
+        // similar to the class of the real window but with a different callback
+        let class_name = OsStr::new("WglDummy Class").encode_wide().chain(Some(0).into_iter())
+                                                   .collect::<Vec<_>>();
+
+        class.cbSize = mem::size_of::<winapi::WNDCLASSEXW>() as winapi::UINT;
+        class.lpszClassName = class_name.as_ptr();
+        class.lpfnWndProc = Some(user32::DefWindowProcW);
+
+        // this shouldn't fail if the registration of the real window class worked
+        if user32::RegisterClassExW(&class) == 0 {
+            return Err(CreationError::OsError(format!("RegisterClassExW function failed: {}",
                                               format!("{}", io::Error::last_os_error()))));
         }
 
