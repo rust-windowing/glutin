@@ -715,11 +715,10 @@ unsafe fn load_extra_functions(window: winapi::HWND) -> Result<gl::wgl_extra::Wg
         class.lpszClassName = class_name.as_ptr();
         class.lpfnWndProc = Some(user32::DefWindowProcW);
 
-        // this shouldn't fail if the registration of the real window class worked
-        if user32::RegisterClassExW(&class) == 0 {
-            return Err(CreationError::OsError(format!("RegisterClassExW function failed: {}",
-                                              format!("{}", io::Error::last_os_error()))));
-        }
+        // this shouldn't fail if the registration of the real window class worked.
+        // multiple registrations of the window class trigger an error which we want
+        // to ignore silently (e.g for multi-window setups)
+        user32::RegisterClassExW(&class);
 
         // this dummy window should match the real one enough to get the same OpenGL driver
         let title = OsStr::new("dummy window").encode_wide().chain(Some(0).into_iter())
