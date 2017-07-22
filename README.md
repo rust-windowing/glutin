@@ -43,7 +43,7 @@ extern crate libc;
 use glutin::GlContext;
 
 fn main() {
-    let events_loop = glutin::EventsLoop::new();
+    let mut events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new()
         .with_title("Hello, world!")
         .with_dimensions(1024, 768);
@@ -64,9 +64,10 @@ fn main() {
     while running {
         events_loop.poll_events(|event| {
             match event {
-                glutin::winit::Event::WindowEvent{ event, .. } => match event {
-                    glutin::winit::WindowEvent::Closed => running = false,
-                    glutin::winit::WindowEvent::Resized(w, h) => gl_window.resize(w, h),
+                glutin::Event::WindowEvent{ event, .. } => match event {
+                    glutin::WindowEvent::Closed => running = false,
+                    glutin::WindowEvent::Resized(w, h) => gl_window.resize(w, h),
+                    _ => ()
                 },
                 _ => ()
             }
