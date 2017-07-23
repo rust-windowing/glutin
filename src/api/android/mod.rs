@@ -54,6 +54,10 @@ impl Context {
     }
 
     #[inline]
+    pub fn resize(&self, _: u32, _: u32) {
+    }
+
+    #[inline]
     pub fn is_current(&self) -> bool {
         self.egl_context.is_current()
     }
