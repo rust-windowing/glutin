@@ -138,13 +138,17 @@ impl Context {
     #[inline]
     pub fn is_current(&self) -> bool {
         unsafe {
+            let pool = NSAutoreleasePool::new(nil);
             let current = NSOpenGLContext::currentContext(nil);
+            let mut res = false;
             if current != nil {
                 let is_equal: BOOL = msg_send![current, isEqual:*self.gl];
-                is_equal != NO
+                res = is_equal != NO
             } else {
-                false
+                res = false
             }
+            let _: () = msg_send![pool, release];
+            res
         }
     }
 
