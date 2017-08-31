@@ -77,7 +77,7 @@ pub use winit::{AvailableMonitorsIter, AxisId, ButtonId, ControlFlow,
                 get_available_monitors, get_primary_monitor, KeyboardInput, ModifiersState,
                 MonitorId, MouseButton, MouseCursor, MouseScrollDelta, ScanCode,
                 Touch, TouchPhase, VirtualKeyCode, Window, WindowAttributes, WindowBuilder,
-                WindowEvent, WindowId, FullScreenState};
+                WindowEvent, WindowId, FullScreen};
 
 use std::io;
 
