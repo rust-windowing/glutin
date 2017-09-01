@@ -37,6 +37,10 @@ pub struct Context {
     pixel_format: PixelFormat,
 }
 
+/// according to https://developer.apple.com/library/content/documentation/GraphicsImaging/Conceptual/OpenGL-MacProgGuide/opengl_threading/opengl_threading.html
+/// it is safe to use an `NSOpenGLContext` from multiple threads provided only one thread does so at a time.
+unsafe impl Send for Context {}
+
 impl Context {
 
     pub fn new(

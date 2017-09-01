@@ -335,6 +335,10 @@ impl GlWindow {
     pub fn context(&self) -> &Context {
         &self.context
     }
+
+    pub fn split(self) -> (Window, Context) {
+        (self.window, self.context)
+    }
 }
 
 impl GlContext for Context {
