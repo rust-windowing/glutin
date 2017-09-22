@@ -24,7 +24,7 @@ use std::ops::Deref;
 
 use winit;
 use winit::os::macos::WindowExt;
-pub use winit::{MonitorId, NativeMonitorId, get_available_monitors, get_primary_monitor};
+pub use winit::{MonitorId};
 pub use self::headless::HeadlessContext;
 pub use self::headless::PlatformSpecificHeadlessBuilderAttributes;
 
