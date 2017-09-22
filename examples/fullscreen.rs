@@ -6,9 +6,11 @@ use glutin::GlContext;
 use std::io::{self, Write};
 
 fn main() {
+    let mut events_loop = glutin::EventsLoop::new();
+
     // enumerating monitors
     let monitor = {
-        for (num, monitor) in glutin::get_available_monitors().enumerate() {
+        for (num, monitor) in events_loop.get_available_monitors().enumerate() {
             println!("Monitor #{}: {:?}", num, monitor.get_name());
         }
 
@@ -18,17 +20,16 @@ fn main() {
         let mut num = String::new();
         io::stdin().read_line(&mut num).unwrap();
         let num = num.trim().parse().ok().expect("Please enter a number");
-        let monitor = glutin::get_available_monitors().nth(num).expect("Please enter a valid ID");
+        let monitor = events_loop.get_available_monitors().nth(num).expect("Please enter a valid ID");
 
         println!("Using {:?}", monitor.get_name());
 
         monitor
     };
 
-    let mut events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new()
         .with_title("Hello world!")
-        .with_fullscreen(monitor);
+        .with_fullscreen(Some(monitor));
     let context = glutin::ContextBuilder::new();
     let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
 
