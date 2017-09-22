@@ -125,13 +125,7 @@ impl Context {
         };
 
         // Get the screen_id for the window being built.
-        let screen_id = match window_builder.window.monitor {
-            Some(ref m) => match m.get_native_identifier() {
-                winit::NativeMonitorId::Numeric(monitor) => monitor as i32,
-                _ => panic!("Non-`Numeric` X11 `NativeMonitorId` (X11 expects `Numeric`)"),
-            },
-            _ => unsafe { (display.xlib.XDefaultScreen)(display.display) },
-        };
+        let screen_id = unsafe { (display.xlib.XDefaultScreen)(display.display) };
 
         // start the context building process
         enum Prototype<'a> {
