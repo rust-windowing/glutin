@@ -5,6 +5,7 @@ use {Api, ContextError, CreationError, GlAttributes, PixelFormat, PixelFormatReq
 use api::osmesa::OsMesaContext;
 use wayland_client;
 use winit;
+use winit::os::unix::EventsLoopExt;
 
 mod wayland;
 mod x11;
@@ -25,7 +26,7 @@ impl Context {
     {
         // winit allows use of XWayland, in which case will use an X11 backend
         // even if a wayland connection is available
-        let use_wayland = winit::os::unix::get_x11_xconnection().is_none() &&
+        let use_wayland = events_loop.is_wayland() &&
              wayland_client::default_connect().is_ok();
 
         if use_wayland {

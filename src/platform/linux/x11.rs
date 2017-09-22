@@ -4,7 +4,7 @@ use std::{mem, ptr, fmt, error};
 use std::sync::Arc;
 
 use winit;
-use winit::os::unix::{WindowExt, WindowBuilderExt, get_x11_xconnection};
+use winit::os::unix::{EventsLoopExt, WindowExt, WindowBuilderExt};
 
 use {Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat, PixelFormatRequirements};
 
@@ -119,7 +119,7 @@ impl Context {
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<(winit::Window, Self), CreationError>
     {
-        let display = match get_x11_xconnection() {
+        let display = match events_loop.get_xlib_xconnection() {
             Some(display) => display,
             None => return Err(CreationError::NoBackendAvailable(Box::new(NoX11Connection))),
         };
