@@ -74,7 +74,7 @@ pub use headless::{HeadlessRendererBuilder, HeadlessContext};
 pub use winit::{AvailableMonitorsIter, AxisId, ButtonId, ControlFlow,
                 CreationError as WindowCreationError, CursorState, DeviceEvent, DeviceId,
                 ElementState, Event, EventsLoop, EventsLoopClosed, EventsLoopProxy,
-                get_available_monitors, get_primary_monitor, KeyboardInput, ModifiersState,
+                KeyboardInput, ModifiersState,
                 MonitorId, MouseButton, MouseCursor, MouseScrollDelta, ScanCode,
                 Touch, TouchPhase, VirtualKeyCode, Window, WindowAttributes, WindowBuilder,
                 WindowEvent, WindowId};

@@ -5,6 +5,7 @@ use {Api, ContextError, CreationError, GlAttributes, PixelFormat, PixelFormatReq
 use api::osmesa::OsMesaContext;
 use wayland_client;
 use winit;
+use winit::os::unix::EventsLoopExt;
 
 mod wayland;
 mod x11;
@@ -23,12 +24,7 @@ impl Context {
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<(winit::Window, Self), CreationError>
     {
-        // winit allows use of XWayland, in which case will use an X11 backend
-        // even if a wayland connection is available
-        let use_wayland = winit::os::unix::get_x11_xconnection().is_none() &&
-             wayland_client::default_connect().is_ok();
-
-        if use_wayland {
+        if events_loop.is_wayland() {
             if let Some(&Context::X(_)) = gl_attr.sharing {
                 let msg = "Cannot share a wayland context with an X11 context";
                 return Err(CreationError::PlatformSpecific(msg.into()));
