@@ -1,64 +1,194 @@
 #![cfg(target_os = "emscripten")]
 
-use Api;
-use ContextError;
-use CreationError;
-use GlAttributes;
-use GlContext;
-use PixelFormat;
-use PixelFormatRequirements;
+use {Api, ContextError, CreationError, GlAttributes, PixelFormat, PixelFormatRequirements};
+use winit;
+use std::ffi::CString;
 
-pub use api::emscripten::{Window, WindowProxy, MonitorId, get_available_monitors};
-pub use api::emscripten::{get_primary_monitor, WaitEventsIterator, PollEventsIterator};
+mod ffi;
 
-pub struct HeadlessContext(Window);
+pub struct Context {
+    context: ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE,
+}
+
+impl Context {
+    #[inline]
+    pub fn new(
+        window_builder: winit::WindowBuilder,
+        events_loop: &winit::EventsLoop,
+        pf_reqs: &PixelFormatRequirements,
+        gl_attr: &GlAttributes<&Context>,
+    ) -> Result<(winit::Window, Self), CreationError>
+    {
+        let window = window_builder.build(events_loop)?;
+
+        // getting the default values of attributes
+        let mut attributes = unsafe {
+            use std::mem;
+            let mut attributes: ffi::EmscriptenWebGLContextAttributes = mem::uninitialized();
+            ffi::emscripten_webgl_init_context_attributes(&mut attributes);
+            attributes
+        };
+
+        // setting the attributes
+        // FIXME: 
+        /*match builder.opengl.version {
+            Some((major, minor)) => {
+                attributes.majorVersion = major as libc::c_int;
+                attributes.minorVersion = minor as libc::c_int;
+            },
+            None => ()
+        };*/
+
+        // creating the context
+        let context = unsafe {
+            use std::{mem, ptr};
+            // TODO: correct first parameter based on the window
+            let context = ffi::emscripten_webgl_create_context(ptr::null(), &attributes);
+            if context <= 0 {
+                return Err(CreationError::OsError(format!("Error while calling emscripten_webgl_create_context: {}",
+                    error_to_str(mem::transmute(context)))));
+            }
+            context
+        };
+
+        // TODO: emscripten_set_webglcontextrestored_callback
+
+        let ctxt = Context {
+            context: context
+        };
+
+        Ok((window, ctxt))
+    }
+
+    #[inline]
+    pub fn resize(&self, width: u32, height: u32) {
+        // TODO: ?
+    }
+
+    #[inline]
+    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
+        // TOOD: check if == EMSCRIPTEN_RESULT
+        ffi::emscripten_webgl_make_context_current(self.context);
+        Ok(())
+    }
+
+    #[inline]
+    pub fn is_current(&self) -> bool {
+        true        // FIXME: 
+    }
+
+    #[inline]
+    pub fn get_proc_address(&self, addr: &str) -> *const () {
+        let addr = CString::new(addr).unwrap();
+
+        unsafe {
+            // FIXME: if `as_ptr()` is used, then wrong data is passed to emscripten
+            ffi::emscripten_GetProcAddress(addr.into_raw() as *const _) as *const _
+        }
+    }
+
+    #[inline]
+    pub fn swap_buffers(&self) -> Result<(), ContextError> {
+        Ok(())
+    }
+
+    #[inline]
+    pub fn get_api(&self) -> Api {
+        Api::WebGl
+    }
+
+    #[inline]
+    pub fn get_pixel_format(&self) -> PixelFormat {
+        // FIXME: this is a dummy pixel format
+        PixelFormat {
+            hardware_accelerated: true,
+            color_bits: 24,
+            alpha_bits: 8,
+            depth_bits: 24,
+            stencil_bits: 8,
+            stereoscopy: false,
+            double_buffer: true,
+            multisampling: None,
+            srgb: true,
+        }
+    }
+}
+
+impl Drop for Context {
+    fn drop(&mut self) {
+        unsafe {
+            ffi::emscripten_webgl_destroy_context(self.context);
+        }
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct PlatformSpecificHeadlessBuilderAttributes;
+
+pub struct HeadlessContext {
+    context: ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE,
+}
 
 impl HeadlessContext {
-    /// See the docs in the crate root file.
-    #[inline]
-    pub fn new(_: (u32, u32), _: &PixelFormatRequirements, _: &GlAttributes<&HeadlessContext>, _: &PlatformSpecificHeadlessBuilderAttributes)
+    pub fn new(dimensions: (u32, u32), pf_reqs: &PixelFormatRequirements,
+               opengl: &GlAttributes<&HeadlessContext>,
+               _: &PlatformSpecificHeadlessBuilderAttributes)
                -> Result<HeadlessContext, CreationError>
     {
         unimplemented!()
     }
+
+    #[inline]
+    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
+        // TOOD: check if == EMSCRIPTEN_RESULT
+        ffi::emscripten_webgl_make_context_current(self.context);
+        Ok(())
+    }
+
+    #[inline]
+    pub fn is_current(&self) -> bool {
+        true        // FIXME: 
+    }
+
+    #[inline]
+    pub fn get_proc_address(&self, addr: &str) -> *const () {
+        let addr = CString::new(addr).unwrap();
+
+        unsafe {
+            // FIXME: if `as_ptr()` is used, then wrong data is passed to emscripten
+            ffi::emscripten_GetProcAddress(addr.into_raw() as *const _) as *const _
+        }
+    }
+
+    #[inline]
+    pub fn swap_buffers(&self) -> Result<(), ContextError> {
+        Ok(())
+    }
+
+    #[inline]
+    pub fn get_api(&self) -> Api {
+        Api::WebGl
+    }
+
+    #[inline]
+    pub fn get_pixel_format(&self) -> PixelFormat {
+        unimplemented!()
+    }
 }
 
-impl GlContext for HeadlessContext {
-    #[inline]
-    unsafe fn make_current(&self) -> Result<(), ContextError> {
-        self.0.make_current()
-    }
+fn error_to_str(code: ffi::EMSCRIPTEN_RESULT) -> &'static str {
+    match code {
+        ffi::EMSCRIPTEN_RESULT_SUCCESS | ffi::EMSCRIPTEN_RESULT_DEFERRED
+            => "Internal error in the library (success detected as failure)",
 
-    #[inline]
-    fn is_current(&self) -> bool {
-        self.0.is_current()
-    }
+        ffi::EMSCRIPTEN_RESULT_NOT_SUPPORTED => "Not supported",
+        ffi::EMSCRIPTEN_RESULT_FAILED_NOT_DEFERRED => "Failed not deferred",
+        ffi::EMSCRIPTEN_RESULT_INVALID_TARGET => "Invalid target",
+        ffi::EMSCRIPTEN_RESULT_UNKNOWN_TARGET => "Unknown target",
+        ffi::EMSCRIPTEN_RESULT_INVALID_PARAM => "Invalid parameter",
+        ffi::EMSCRIPTEN_RESULT_FAILED => "Failed",
+        ffi::EMSCRIPTEN_RESULT_NO_DATA => "No data",
 
-    #[inline]
-    fn get_proc_address(&self, addr: &str) -> *const () {
-        self.0.get_proc_address(addr)
-    }
-
-    #[inline]
-    fn swap_buffers(&self) -> Result<(), ContextError> {
-        self.0.swap_buffers()
-    }
-
-    #[inline]
-    fn get_api(&self) -> Api {
-        self.0.get_api()
-    }
-
-    #[inline]
-    fn get_pixel_format(&self) -> PixelFormat {
-        self.0.get_pixel_format()
+        _ => "Undocumented error"
     }
 }
-
-unsafe impl Send for HeadlessContext {}
-unsafe impl Sync for HeadlessContext {}
-
-#[derive(Clone, Default)]
-pub struct PlatformSpecificWindowBuilderAttributes;
-#[derive(Clone, Default)]
-pub struct PlatformSpecificHeadlessBuilderAttributes;
