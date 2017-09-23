@@ -49,7 +49,7 @@ jobs:
   
 workflows:
   version: 2
-  build-test-and-deploy:
+  test-all:
     jobs:
       - android-test
       - asmjs-test
