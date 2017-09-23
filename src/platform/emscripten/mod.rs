@@ -74,7 +74,9 @@ impl Context {
 
     #[inline]
     pub fn is_current(&self) -> bool {
-        true        // FIXME: 
+        unsafe {
+            ffi::emscripten_webgl_get_current_context() == self.context
+        }
     }
 
     #[inline]
@@ -147,7 +149,9 @@ impl HeadlessContext {
 
     #[inline]
     pub fn is_current(&self) -> bool {
-        true        // FIXME: 
+        unsafe {
+            ffi::emscripten_webgl_get_current_context() == self.context
+        }
     }
 
     #[inline]
