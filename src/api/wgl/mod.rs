@@ -16,8 +16,7 @@ use self::make_current_guard::CurrentContextGuard;
 use std::ffi::{CStr, CString, OsStr};
 use std::os::raw::{c_void, c_int};
 use std::os::windows::ffi::OsStrExt;
-use std::{mem, ptr};
-use std::io;
+use std::{io, mem, ptr};
 
 use winapi;
 use kernel32;
@@ -197,6 +196,11 @@ impl Context {
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         self.pixel_format.clone()
+    }
+
+    #[inline]
+    pub unsafe fn as_mut_ptr(&self) -> winapi::HDC {
+        self.hdc
     }
 }
 

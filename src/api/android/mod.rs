@@ -16,15 +16,13 @@ use PixelFormatRequirements;
 
 use api::egl;
 use api::egl::Context as EglContext;
+use os::GlContextExt;
 
 mod ffi;
 
 pub struct Context {
     egl_context: EglContext,
 }
-
-#[derive(Clone, Default)]
-pub struct PlatformSpecificHeadlessBuilderAttributes;
 
 impl Context {
     pub fn new(
@@ -83,6 +81,18 @@ impl Context {
     }
 }
 
+impl GlContextExt for Context {
+    type Handle = egl::ffi::egl::types::EGLContext;
+
+    #[inline]
+    unsafe fn as_mut_ptr(&self) -> Self::Handle {
+        self.egl_context.as_mut_ptr()
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct PlatformSpecificHeadlessBuilderAttributes;
+
 pub struct HeadlessContext(EglContext);
 
 unsafe impl Send for HeadlessContext {}
@@ -134,5 +144,14 @@ impl HeadlessContext {
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         self.0.get_pixel_format()
+    }
+}
+
+impl GlContextExt for HeadlessContext {
+    type Handle = egl::ffi::egl::types::EGLContext;
+
+    #[inline]
+    unsafe fn as_mut_ptr(&self) -> Self::Handle {
+        self.0.as_mut_ptr()
     }
 }

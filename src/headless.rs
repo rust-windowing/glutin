@@ -9,6 +9,7 @@ use PixelFormat;
 use PixelFormatRequirements;
 use Robustness;
 
+use os::GlContextExt;
 use platform;
 
 /// Object that allows you to build headless contexts.
@@ -143,3 +144,11 @@ impl GlContext for HeadlessContext {
     }
 }
 
+impl GlContextExt for HeadlessContext {
+    type Handle = <platform::HeadlessContext as GlContextExt>::Handle;
+
+    #[inline]
+    unsafe fn as_mut_ptr(&self) -> Self::Handle {
+        self.context.as_mut_ptr()
+    }
+}

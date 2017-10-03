@@ -143,6 +143,11 @@ impl Context {
     pub fn get_pixel_format(&self) -> PixelFormat {
         self.pixel_format.clone()
     }
+
+    #[inline]
+    pub unsafe fn as_mut_ptr(&self) -> ffi::GLXContext {
+        self.context
+    }
 }
 
 unsafe impl Send for Context {}

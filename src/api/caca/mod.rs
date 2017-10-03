@@ -111,7 +111,6 @@ impl Context {
     pub fn get_pixel_format(&self) -> PixelFormat {
         self.opengl.get_pixel_format()
     }
-
 }
 
 impl Drop for Context {

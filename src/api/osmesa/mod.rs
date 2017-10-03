@@ -18,6 +18,10 @@ use PixelFormatRequirements;
 use Robustness;
 use libc;
 
+pub mod ffi {
+    pub use super::osmesa_sys::OSMesaContext;
+}
+
 pub struct OsMesaContext {
     context: osmesa_sys::OSMesaContext,
     buffer: Vec<u32>,
@@ -185,6 +189,11 @@ impl OsMesaContext {
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         unimplemented!();
+    }
+
+    #[inline]
+    pub unsafe fn as_mut_ptr(&self) -> osmesa_sys::OSMesaContext {
+        self.context
     }
 }
 

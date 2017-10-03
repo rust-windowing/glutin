@@ -18,6 +18,7 @@ use api::wgl::Context as WglContext;
 use api::egl::Context as EglContext;
 use api::egl::ffi::egl::Egl;
 use api::egl;
+use os::windows::Context as OsContext;
 
 unsafe impl Send for Context {}
 unsafe impl Sync for Context {}
@@ -27,9 +28,7 @@ pub enum Context {
     Wgl(WglContext),
 }
 
-
 impl Context {
-
     /// See the docs in the crate root file.
     pub fn new(
         window_builder: winit::WindowBuilder,
@@ -124,6 +123,14 @@ impl Context {
         match *self {
             Context::Wgl(ref c) => c.get_pixel_format(),
             Context::Egl(ref c) => c.get_pixel_format(),
+        }
+    }
+
+    #[inline]
+    pub unsafe fn as_mut_ptr(&self) -> OsContext {
+        match *self {
+            Context::Wgl(ref c) => OsContext::Wgl(c.as_mut_ptr()),
+            Context::Egl(ref c) => OsContext::Egl(c.as_mut_ptr()),
         }
     }
 }

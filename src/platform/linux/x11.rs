@@ -15,6 +15,7 @@ use api::{dlopen, egl};
 use api::egl::Context as EglContext;
 use api::glx::ffi::glx::Glx;
 use api::egl::ffi::egl::Egl;
+use os::unix::Context as OsContext;
 
 #[derive(Debug)]
 struct NoX11Connection;
@@ -293,6 +294,15 @@ impl Context {
         match self.context {
             GlContext::Glx(ref ctxt) => ctxt.get_pixel_format(),
             GlContext::Egl(ref ctxt) => ctxt.get_pixel_format(),
+            GlContext::None => panic!()
+        }
+    }
+
+    #[inline]
+    pub unsafe fn as_mut_ptr(&self) -> OsContext {
+        match self.context {
+            GlContext::Glx(ref ctxt) => OsContext::Glx(ctxt.as_mut_ptr()),
+            GlContext::Egl(ref ctxt) => OsContext::Egl(ctxt.as_mut_ptr()),
             GlContext::None => panic!()
         }
     }

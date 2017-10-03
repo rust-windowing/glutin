@@ -2,8 +2,9 @@
 
 use {Api, ContextError, CreationError, GlAttributes, PixelFormat, PixelFormatRequirements};
 
-use api::osmesa::OsMesaContext;
-use wayland_client;
+use api::osmesa::{self, OsMesaContext};
+use os::GlContextExt;
+use os::unix::Context as OsContext;
 use winit;
 use winit::os::unix::EventsLoopExt;
 
@@ -35,8 +36,7 @@ impl Context {
             });
             wayland::Context::new(window_builder, events_loop, pf_reqs, &gl_attr)
                 .map(|(window, context)| (window, Context::Wayland(context)))
-        }
-        else {
+        } else {
             if let Some(&Context::Wayland(_)) = gl_attr.sharing {
                 let msg = "Cannot share a X11 context with an wayland context";
                 return Err(CreationError::PlatformSpecific(msg.into()));
@@ -106,6 +106,18 @@ impl Context {
     }
 }
 
+impl GlContextExt for Context {
+    type Handle = OsContext;
+
+    #[inline]
+    unsafe fn as_mut_ptr(&self) -> Self::Handle {
+        match *self {
+            Context::X(ref ctxt) => ctxt.as_mut_ptr(),
+            Context::Wayland(ref ctxt) => OsContext::Egl(ctxt.as_mut_ptr())
+        }
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct PlatformSpecificHeadlessBuilderAttributes;
 
@@ -156,5 +168,13 @@ impl HeadlessContext {
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         self.0.get_pixel_format()
+    }
+}
+
+impl GlContextExt for HeadlessContext {
+    type Handle = osmesa::ffi::OSMesaContext;
+
+    unsafe fn as_mut_ptr(&self) -> Self::Handle {
+        self.0.as_mut_ptr()
     }
 }

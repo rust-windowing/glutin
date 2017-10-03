@@ -343,12 +343,10 @@ impl Window {
     }
 
     #[inline]
-    pub fn set_window_resize_callback(&mut self, _: Option<fn(u32, u32)>) {
-    }
+    pub fn set_window_resize_callback(&mut self, _: Option<fn(u32, u32)>) {}
 
     #[inline]
-    pub fn set_cursor(&self, _: MouseCursor) {
-    }
+    pub fn set_cursor(&self, _: MouseCursor) {}
 
     #[inline]
     pub fn set_cursor_state(&self, _: CursorState) -> Result<(), String> {
@@ -369,7 +367,6 @@ impl Window {
     pub fn create_window_proxy(&self) -> WindowProxy {
         WindowProxy
     }
-
 }
 
 impl GlContext for Window {
@@ -426,7 +423,6 @@ impl WindowProxy {
         unimplemented!()
     }
 }
-
 
 impl<'a> Iterator for WaitEventsIterator<'a> {
     type Item = Event;

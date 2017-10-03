@@ -1,7 +1,10 @@
 #![cfg(target_os = "emscripten")]
 
 use {Api, ContextError, CreationError, GlAttributes, PixelFormat, PixelFormatRequirements};
+use os::GlContextExt;
+
 use winit;
+
 use std::ffi::CString;
 
 mod ffi;
@@ -116,6 +119,15 @@ impl Context {
     }
 }
 
+impl GlContextExt for Context {
+    type Handle = ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE;
+
+    #[inline]
+    unsafe fn as_mut_ptr(&self) -> Self::Handle {
+        self.context
+    }
+}
+
 impl Drop for Context {
     fn drop(&mut self) {
         unsafe {
@@ -177,6 +189,15 @@ impl HeadlessContext {
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         unimplemented!()
+    }
+}
+
+impl GlContextExt for HeadlessContext {
+    type Handle = ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE;
+
+    #[inline]
+    unsafe fn as_mut_ptr(&self) -> Self::Handle {
+        self.context
     }
 }
 

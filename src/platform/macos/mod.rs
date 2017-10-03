@@ -1,11 +1,16 @@
 #![cfg(target_os = "macos")]
 
+pub use self::headless::HeadlessContext;
+pub use self::headless::PlatformSpecificHeadlessBuilderAttributes;
+pub use winit::{MonitorId};
+
 use CreationError;
 use ContextError;
 use GlAttributes;
 use PixelFormat;
 use PixelFormatRequirements;
 use Robustness;
+use os::GlContextExt;
 
 use objc::runtime::{BOOL, NO};
 
@@ -24,9 +29,6 @@ use std::ops::Deref;
 
 use winit;
 use winit::os::macos::WindowExt;
-pub use winit::{MonitorId};
-pub use self::headless::HeadlessContext;
-pub use self::headless::PlatformSpecificHeadlessBuilderAttributes;
 
 mod headless;
 mod helpers;
@@ -181,6 +183,15 @@ impl Context {
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         self.pixel_format.clone()
+    }
+}
+
+impl GlContextExt for Context {
+    type Handle = id;
+
+    #[inline]
+    unsafe fn as_mut_ptr(&self) -> Self::Handle {
+        *self.gl.deref()
     }
 }
 

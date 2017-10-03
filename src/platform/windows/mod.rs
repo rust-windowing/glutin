@@ -12,6 +12,8 @@ use winit;
 use api::egl::ffi::egl::Egl;
 use api::egl;
 use api::egl::Context as EglContext;
+use os::GlContextExt;
+use os::windows::Context as OsContext;
 
 use std::ffi::CString;
 use std::ops::{Deref, DerefMut};
@@ -89,6 +91,14 @@ impl DerefMut for Context {
     #[inline]
     fn deref_mut(&mut self) -> &mut context::Context {
         &mut self.0
+    }
+}
+
+impl GlContextExt for Context {
+    type Handle = OsContext;
+
+    unsafe fn as_mut_ptr(&self) -> Self::Handle {
+        self.0.as_mut_ptr()
     }
 }
 
@@ -173,6 +183,17 @@ impl HeadlessContext {
         match self {
             &HeadlessContext::HiddenWindow(_, _, ref ctxt) => ctxt.get_pixel_format(),
             &HeadlessContext::EglPbuffer(ref ctxt) => ctxt.get_pixel_format(),
+        }
+    }
+}
+
+impl GlContextExt for HeadlessContext {
+    type Handle = OsContext;
+
+    unsafe fn as_mut_ptr(&self) -> Self::Handle {
+        match *self {
+            HeadlessContext::HiddenWindow(_, _, ref ctxt) => ctxt.as_mut_ptr(),
+            HeadlessContext::EglPbuffer(ref ctxt) => OsContext::Egl(ctxt.as_mut_ptr()),
         }
     }
 }

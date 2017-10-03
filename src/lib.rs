@@ -367,6 +367,14 @@ impl GlContext for Context {
     }
 }
 
+impl os::GlContextExt for Context {
+    type Handle = <platform::Context as os::GlContextExt>::Handle;
+
+    unsafe fn as_mut_ptr(&self) -> Self::Handle {
+        self.context.as_mut_ptr()
+    }
+}
+
 impl GlContext for GlWindow {
     unsafe fn make_current(&self) -> Result<(), ContextError> {
         self.context.make_current()
