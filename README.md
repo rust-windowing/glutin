@@ -90,6 +90,27 @@ Note that glutin aims at being a low-level brick in your rendering infrastructur
 
  - To compile the examples for android, initialize the submodules, go to `deps/apk-builder/apk-builder` and run `cargo build`, then go back to `glutin` and call `ANDROID_HOME=/path/to/sdk NDK_HOME=/path/to/ndk NDK_STANDALONE=/path/to/standalone cargo test --no-run --target=arm-linux-androideabi`
 
+### Emscripten with asmjs
+
+In order to use glutin with emscripten, start by compiling your code with `--target=asmjs-unknown-emscripten`.
+
+Then create an HTML document that contains this:
+
+```html
+<canvas id="canvas"></canvas>
+<script type="text/javascript">
+var Module = {
+    canvas: document.getElementById('canvas')
+};
+</script>
+<script type="text/javascript" src="target/asmjs-unknown-emscripten/debug/..." async></script>
+```
+
+*Note: adjust the `src` element of the script to point to the .js file that was produced by the compilation.*
+
+The `Module` object is the link between emscripten and the HTML page.
+See also [this documentation](https://kripken.github.io/emscripten-site/docs/api_reference/module.html).
+
 ### X11
 
  - The plan is that glutin tries to dynamically link-to and use wayland if possible. If it doesn't work, it will try xlib instead. If it doesn't work, it will try libcaca. This is work-in-progress.
