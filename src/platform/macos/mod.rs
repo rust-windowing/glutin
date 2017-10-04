@@ -2,7 +2,8 @@
 
 pub use self::headless::HeadlessContext;
 pub use self::headless::PlatformSpecificHeadlessBuilderAttributes;
-pub use winit::{MonitorId};
+
+pub use winit::MonitorId;
 
 use CreationError;
 use ContextError;
@@ -11,23 +12,20 @@ use PixelFormat;
 use PixelFormatRequirements;
 use Robustness;
 
-use objc::runtime::{BOOL, NO};
-
 use cgl::{CGLEnable, kCGLCECrashOnRemovedFunctions, CGLSetParameter, kCGLCPSurfaceOpacity};
-
 use cocoa::base::{id, nil};
 use cocoa::foundation::NSAutoreleasePool;
 use cocoa::appkit::{self, NSOpenGLContext, NSOpenGLPixelFormat};
-
 use core_foundation::base::TCFType;
 use core_foundation::string::CFString;
 use core_foundation::bundle::{CFBundleGetBundleWithIdentifier, CFBundleGetFunctionPointerForName};
+use objc::runtime::{BOOL, NO};
+use winit;
+use winit::os::macos::WindowExt;
 
 use std::str::FromStr;
 use std::ops::Deref;
-
-use winit;
-use winit::os::macos::WindowExt;
+use std::os::raw::c_void;
 
 mod headless;
 mod helpers;
@@ -39,7 +37,6 @@ pub struct Context {
 }
 
 impl Context {
-
     pub fn new(
         window_builder: winit::WindowBuilder,
         events_loop: &winit::EventsLoop,
@@ -185,8 +182,8 @@ impl Context {
     }
 
     #[inline]
-    pub unsafe fn raw_handle(&self) -> id {
-        *self.gl.deref()
+    pub unsafe fn raw_handle(&self) -> *mut c_void {
+        *self.gl.deref() as *mut _
     }
 }
 

@@ -1,6 +1,5 @@
 #![cfg(target_os = "macos")]
 
-pub use cocoa::base::id;
 pub use winit::os::macos::ActivationPolicy;
 pub use winit::os::macos::MonitorIdExt;
 pub use winit::os::macos::WindowBuilderExt;
@@ -9,8 +8,10 @@ pub use winit::os::macos::WindowExt;
 use {Context, HeadlessContext};
 use os::GlContextExt;
 
+use std::os::raw::c_void;
+
 impl GlContextExt for Context {
-    type Handle = id;
+    type Handle = *mut c_void;
 
     #[inline]
     unsafe fn raw_handle(&self) -> Self::Handle {
@@ -19,7 +20,7 @@ impl GlContextExt for Context {
 }
 
 impl GlContextExt for HeadlessContext {
-    type Handle = id;
+    type Handle = *mut c_void;
 
     #[inline]
     unsafe fn raw_handle(&self) -> Self::Handle {

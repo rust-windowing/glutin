@@ -1,13 +1,15 @@
 #![cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "openbsd"))]
 
-use winit;
-use winit::os::unix::EventsLoopExt;
-
 use {Api, ContextError, CreationError, GlAttributes, PixelFormat, PixelFormatRequirements};
 use api::egl;
 use api::glx;
-use api::osmesa::{self, OsMesaContext};
+use api::osmesa::OsMesaContext;
 use self::x11::GlContext;
+
+use winit;
+use winit::os::unix::EventsLoopExt;
+
+use std::os::raw::c_void;
 
 mod wayland;
 mod x11;
@@ -179,7 +181,7 @@ impl HeadlessContext {
     }
 
     #[inline]
-    pub unsafe fn raw_handle(&self) -> osmesa::ffi::OSMesaContext {
+    pub unsafe fn raw_handle(&self) -> *mut c_void {
         self.0.raw_handle()
     }
 }
