@@ -24,7 +24,7 @@ mod context;
 #[derive(Clone, Debug)]
 pub enum RawHandle {
     Egl(egl::ffi::EGLContext),
-    Wgl(winapi::HDC),
+    Wgl(winapi::HGLRC),
 }
 
 /// Stupid wrapper because `*const libc::c_void` doesn't implement `Sync`.

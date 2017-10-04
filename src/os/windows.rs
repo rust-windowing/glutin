@@ -1,6 +1,6 @@
 #![cfg(target_os = "windows")]
 
-pub use winapi::HDC;
+pub use winapi::HGLRC;
 pub use winit::os::windows::{WindowBuilderExt, WindowExt, MonitorIdExt};
 
 pub use api::egl::ffi::EGLContext;

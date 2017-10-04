@@ -197,11 +197,6 @@ impl Context {
     pub fn get_pixel_format(&self) -> PixelFormat {
         self.pixel_format.clone()
     }
-
-    #[inline]
-    pub unsafe fn raw_handle(&self) -> winapi::HDC {
-        self.hdc
-    }
 }
 
 unsafe impl Send for Context {}

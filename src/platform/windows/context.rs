@@ -128,7 +128,7 @@ impl Context {
     #[inline]
     pub unsafe fn raw_handle(&self) -> RawHandle {
         match *self {
-            Context::Wgl(ref c) => RawHandle::Wgl(c.raw_handle()),
+            Context::Wgl(ref c) => RawHandle::Wgl(c.get_hglrc()),
             Context::Egl(ref c) => RawHandle::Egl(c.raw_handle()),
         }
     }
