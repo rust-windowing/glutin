@@ -12,8 +12,6 @@ use cocoa::appkit::*;
 use PixelFormat;
 use super::helpers;
 
-use os::GlContextExt;
-
 #[derive(Clone, Default)]
 pub struct PlatformSpecificHeadlessBuilderAttributes;
 
@@ -87,15 +85,12 @@ impl HeadlessContext {
     pub fn get_pixel_format(&self) -> PixelFormat {
         unimplemented!();
     }
+
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> id {
+        self.context
+    }
 }
 
 unsafe impl Send for HeadlessContext {}
 unsafe impl Sync for HeadlessContext {}
-
-impl GlContextExt for HeadlessContext {
-    type Handle = id;
-
-    unsafe fn as_mut_ptr(&self) -> Self::Handle {
-        self.context
-    }
-}

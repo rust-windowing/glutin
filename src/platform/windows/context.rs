@@ -2,6 +2,7 @@
 
 use std::ptr;
 
+use winapi;
 use winit;
 
 use ContextError;
@@ -12,13 +13,11 @@ use Api;
 use PixelFormat;
 use PixelFormatRequirements;
 
-use winapi;
-
 use api::wgl::Context as WglContext;
 use api::egl::Context as EglContext;
 use api::egl::ffi::egl::Egl;
 use api::egl;
-use os::windows::Context as OsContext;
+use platform::RawHandle;
 
 unsafe impl Send for Context {}
 unsafe impl Sync for Context {}
@@ -127,10 +126,10 @@ impl Context {
     }
 
     #[inline]
-    pub unsafe fn as_mut_ptr(&self) -> OsContext {
+    pub unsafe fn raw_handle(&self) -> RawHandle {
         match *self {
-            Context::Wgl(ref c) => OsContext::Wgl(c.as_mut_ptr()),
-            Context::Egl(ref c) => OsContext::Egl(c.as_mut_ptr()),
+            Context::Wgl(ref c) => RawHandle::Wgl(c.raw_handle()),
+            Context::Egl(ref c) => RawHandle::Egl(c.raw_handle()),
         }
     }
 }

@@ -1,5 +1,12 @@
 #![cfg(target_os = "windows")]
 
+use std::ffi::CString;
+use std::ops::{Deref, DerefMut};
+
+use kernel32;
+use winapi;
+use winit;
+
 use Api;
 use ContextError;
 use CreationError;
@@ -7,19 +14,18 @@ use PixelFormat;
 use PixelFormatRequirements;
 use GlAttributes;
 
-use winit;
-
 use api::egl::ffi::egl::Egl;
 use api::egl;
 use api::egl::Context as EglContext;
-use os::GlContextExt;
-use os::windows::Context as OsContext;
-
-use std::ffi::CString;
-use std::ops::{Deref, DerefMut};
-use kernel32;
 
 mod context;
+
+/// Context handles available on Windows.
+#[derive(Clone, Debug)]
+pub enum RawHandle {
+    Egl(egl::ffi::EGLContext),
+    Wgl(winapi::HDC),
+}
 
 /// Stupid wrapper because `*const libc::c_void` doesn't implement `Sync`.
 struct EglWrapper(Egl);
@@ -52,9 +58,6 @@ lazy_static! {
         None
     };
 }
-
-#[derive(Clone, Default)]
-pub struct PlatformSpecificHeadlessBuilderAttributes;
 
 /// The Win32 implementation of the main `Context` object.
 pub struct Context(context::Context);
@@ -94,15 +97,9 @@ impl DerefMut for Context {
     }
 }
 
-impl GlContextExt for Context {
-    type Handle = OsContext;
+#[derive(Clone, Default)]
+pub struct PlatformSpecificHeadlessBuilderAttributes;
 
-    unsafe fn as_mut_ptr(&self) -> Self::Handle {
-        self.0.as_mut_ptr()
-    }
-}
-
-///
 pub enum HeadlessContext {
     /// A regular window, but invisible.
     HiddenWindow(winit::EventsLoop, winit::Window, context::Context),
@@ -185,15 +182,12 @@ impl HeadlessContext {
             &HeadlessContext::EglPbuffer(ref ctxt) => ctxt.get_pixel_format(),
         }
     }
-}
 
-impl GlContextExt for HeadlessContext {
-    type Handle = OsContext;
-
-    unsafe fn as_mut_ptr(&self) -> Self::Handle {
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> RawHandle {
         match *self {
-            HeadlessContext::HiddenWindow(_, _, ref ctxt) => ctxt.as_mut_ptr(),
-            HeadlessContext::EglPbuffer(ref ctxt) => OsContext::Egl(ctxt.as_mut_ptr()),
+            HeadlessContext::HiddenWindow(_, _, ref ctxt) => ctxt.raw_handle(),
+            HeadlessContext::EglPbuffer(ref ctxt) => RawHandle::Egl(ctxt.raw_handle()),
         }
     }
 }

@@ -9,7 +9,6 @@ use PixelFormat;
 use PixelFormatRequirements;
 use Robustness;
 
-use os::GlContextExt;
 use platform;
 
 /// Object that allows you to build headless contexts.
@@ -94,7 +93,7 @@ impl<'a> HeadlessRendererBuilder<'a> {
 
 /// Represents a headless OpenGL context.
 pub struct HeadlessContext {
-    context: platform::HeadlessContext,
+    pub(crate) context: platform::HeadlessContext,
 }
 
 impl GlContext for HeadlessContext {
@@ -141,14 +140,5 @@ impl GlContext for HeadlessContext {
     fn resize(&self, _width: u32, _height: u32) {
         // This method does not mean anything for a HeadlessContext.
         unimplemented!()
-    }
-}
-
-impl GlContextExt for HeadlessContext {
-    type Handle = <platform::HeadlessContext as GlContextExt>::Handle;
-
-    #[inline]
-    unsafe fn as_mut_ptr(&self) -> Self::Handle {
-        self.context.as_mut_ptr()
     }
 }

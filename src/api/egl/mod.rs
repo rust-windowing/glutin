@@ -322,7 +322,7 @@ impl Context {
     }
 
     #[inline]
-    pub unsafe fn as_mut_ptr(&self) -> ffi::egl::types::EGLContext {
+    pub unsafe fn raw_handle(&self) -> ffi::egl::types::EGLContext {
         self.context
     }
 }

@@ -199,7 +199,7 @@ impl Context {
     }
 
     #[inline]
-    pub unsafe fn as_mut_ptr(&self) -> winapi::HDC {
+    pub unsafe fn raw_handle(&self) -> winapi::HDC {
         self.hdc
     }
 }

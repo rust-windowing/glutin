@@ -10,7 +10,6 @@ use GlAttributes;
 use PixelFormat;
 use PixelFormatRequirements;
 use Robustness;
-use os::GlContextExt;
 
 use objc::runtime::{BOOL, NO};
 
@@ -184,13 +183,9 @@ impl Context {
     pub fn get_pixel_format(&self) -> PixelFormat {
         self.pixel_format.clone()
     }
-}
-
-impl GlContextExt for Context {
-    type Handle = id;
 
     #[inline]
-    unsafe fn as_mut_ptr(&self) -> Self::Handle {
+    pub unsafe fn raw_handle(&self) -> id {
         *self.gl.deref()
     }
 }

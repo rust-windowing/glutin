@@ -192,7 +192,7 @@ impl OsMesaContext {
     }
 
     #[inline]
-    pub unsafe fn as_mut_ptr(&self) -> osmesa_sys::OSMesaContext {
+    pub unsafe fn raw_handle(&self) -> osmesa_sys::OSMesaContext {
         self.context
     }
 }

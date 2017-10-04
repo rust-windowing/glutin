@@ -19,5 +19,5 @@ pub trait GlContextExt {
     type Handle;
 
     /// Returns the raw context handle.
-    unsafe fn as_mut_ptr(&self) -> Self::Handle;
+    unsafe fn raw_handle(&self) -> Self::Handle;
 }

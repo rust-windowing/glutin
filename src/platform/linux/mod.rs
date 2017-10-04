@@ -1,15 +1,23 @@
 #![cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "openbsd"))]
 
-use {Api, ContextError, CreationError, GlAttributes, PixelFormat, PixelFormatRequirements};
-
-use api::osmesa::{self, OsMesaContext};
-use os::GlContextExt;
-use os::unix::Context as OsContext;
 use winit;
 use winit::os::unix::EventsLoopExt;
 
+use {Api, ContextError, CreationError, GlAttributes, PixelFormat, PixelFormatRequirements};
+use api::egl;
+use api::glx;
+use api::osmesa::{self, OsMesaContext};
+use self::x11::GlContext;
+
 mod wayland;
 mod x11;
+
+/// Context handles available on Unix-like platforms.
+#[derive(Clone, Debug)]
+pub enum RawHandle {
+    Glx(glx::ffi::GLXContext),
+    Egl(egl::ffi::EGLContext),
+}
 
 pub enum Context {
     X(x11::Context),
@@ -104,16 +112,16 @@ impl Context {
             Context::Wayland(ref ctxt) => ctxt.get_pixel_format()
         }
     }
-}
-
-impl GlContextExt for Context {
-    type Handle = OsContext;
 
     #[inline]
-    unsafe fn as_mut_ptr(&self) -> Self::Handle {
+    pub unsafe fn raw_handle(&self) -> RawHandle {
         match *self {
-            Context::X(ref ctxt) => ctxt.as_mut_ptr(),
-            Context::Wayland(ref ctxt) => OsContext::Egl(ctxt.as_mut_ptr())
+            Context::X(ref ctxt) => match *ctxt.raw_handle() {
+                GlContext::Glx(ref ctxt) => RawHandle::Glx(ctxt.raw_handle()),
+                GlContext::Egl(ref ctxt) => RawHandle::Egl(ctxt.raw_handle()),
+                GlContext::None => panic!()
+            }
+            Context::Wayland(ref ctxt) => RawHandle::Egl(ctxt.raw_handle())
         }
     }
 }
@@ -169,12 +177,9 @@ impl HeadlessContext {
     pub fn get_pixel_format(&self) -> PixelFormat {
         self.0.get_pixel_format()
     }
-}
 
-impl GlContextExt for HeadlessContext {
-    type Handle = osmesa::ffi::OSMesaContext;
-
-    unsafe fn as_mut_ptr(&self) -> Self::Handle {
-        self.0.as_mut_ptr()
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> osmesa::ffi::OSMesaContext {
+        self.0.raw_handle()
     }
 }

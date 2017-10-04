@@ -16,7 +16,6 @@ use PixelFormatRequirements;
 
 use api::egl;
 use api::egl::Context as EglContext;
-use os::GlContextExt;
 
 mod ffi;
 
@@ -79,14 +78,10 @@ impl Context {
     pub fn get_pixel_format(&self) -> PixelFormat {
         self.egl_context.get_pixel_format()
     }
-}
-
-impl GlContextExt for Context {
-    type Handle = egl::ffi::egl::types::EGLContext;
 
     #[inline]
-    unsafe fn as_mut_ptr(&self) -> Self::Handle {
-        self.egl_context.as_mut_ptr()
+    pub unsafe fn raw_handle(&self) -> egl::ffi::EGLContext {
+        self.egl_context.raw_handle()
     }
 }
 
@@ -145,13 +140,9 @@ impl HeadlessContext {
     pub fn get_pixel_format(&self) -> PixelFormat {
         self.0.get_pixel_format()
     }
-}
-
-impl GlContextExt for HeadlessContext {
-    type Handle = egl::ffi::egl::types::EGLContext;
 
     #[inline]
-    unsafe fn as_mut_ptr(&self) -> Self::Handle {
-        self.0.as_mut_ptr()
+    pub unsafe fn raw_handle(&self) -> egl::ffi::EGLContext {
+        self.0.raw_handle()
     }
 }

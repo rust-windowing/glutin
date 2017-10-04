@@ -145,7 +145,7 @@ impl Context {
     }
 
     #[inline]
-    pub unsafe fn as_mut_ptr(&self) -> ffi::GLXContext {
+    pub unsafe fn raw_handle(&self) -> ffi::GLXContext {
         self.context
     }
 }
