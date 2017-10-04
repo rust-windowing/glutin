@@ -88,7 +88,9 @@ Note that glutin aims at being a low-level brick in your rendering infrastructur
 
 ### Android
 
- - To compile the examples for android, initialize the submodules, go to `deps/apk-builder/apk-builder` and run `cargo build`, then go back to `glutin` and call `ANDROID_HOME=/path/to/sdk NDK_HOME=/path/to/ndk NDK_STANDALONE=/path/to/standalone cargo test --no-run --target=arm-linux-androideabi`
+To compile the examples for android, you have to use the `cargo apk` utility.
+
+See [the `android-rs-glue` repository](https://github.com/tomaka/android-rs-glue) for instructions.
 
 ### X11
 
