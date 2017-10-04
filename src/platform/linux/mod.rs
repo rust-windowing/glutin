@@ -120,7 +120,7 @@ impl Context {
                 GlContext::Glx(ref ctxt) => RawHandle::Glx(ctxt.raw_handle()),
                 GlContext::Egl(ref ctxt) => RawHandle::Egl(ctxt.raw_handle()),
                 GlContext::None => panic!()
-            }
+            },
             Context::Wayland(ref ctxt) => RawHandle::Egl(ctxt.raw_handle())
         }
     }
