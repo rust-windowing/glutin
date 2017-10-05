@@ -63,10 +63,8 @@
 #![deny(warnings)]
 
 use std::collections::VecDeque;
-use std::ptr;
-use std::io;
-use std::mem;
 use std::ffi::CString;
+use std::{mem, io, os, ptr};
 
 use libc;
 use objc::runtime::{Class, BOOL, YES, NO };
@@ -366,6 +364,11 @@ impl Window {
     #[inline]
     pub fn create_window_proxy(&self) -> WindowProxy {
         WindowProxy
+    }
+
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> *mut os::raw::c_void {
+        self.eagl_context as *mut _
     }
 }
 

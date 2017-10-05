@@ -9,16 +9,8 @@ use CreationError;
 use PixelFormat;
 use PixelFormatRequirements;
 use ContextError;
-use os::GlContextExt;
 
-impl GlContextExt for Context {
-    type Handle = id;
-
-    #[inline]
-    unsafe fn as_mut_ptr(&self) -> Self::Handle {
-        *self.eagl_context.deref()
-    }
-}
+use std::os::raw::c_void;
 
 #[derive(Clone, Default)]
 pub struct PlatformSpecificHeadlessBuilderAttributes;
@@ -60,15 +52,11 @@ impl HeadlessContext {
     pub fn get_pixel_format(&self) -> PixelFormat {
         unimplemented!()
     }
+
+    pub unsafe fn raw_handle(&self) -> *mut c_void {
+        unimplemented!()
+    }
 }
 
 unsafe impl Send for HeadlessContext {}
 unsafe impl Sync for HeadlessContext {}
-
-impl GlContextExt for HeadlessContext {
-    type Handle = i32;
-
-    unsafe fn as_mut_ptr(&self) -> Self::Handle {
-        unimplemented!()
-    }
-}
