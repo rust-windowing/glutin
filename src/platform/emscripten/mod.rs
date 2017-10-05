@@ -1,8 +1,10 @@
 #![cfg(target_os = "emscripten")]
 
-use {Api, ContextError, CreationError, GlAttributes, PixelFormat, PixelFormatRequirements};
-use winit;
 use std::ffi::CString;
+
+use {Api, ContextError, CreationError, GlAttributes, PixelFormat, PixelFormatRequirements};
+
+use winit;
 
 mod ffi;
 
@@ -114,6 +116,11 @@ impl Context {
             srgb: true,
         }
     }
+
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE {
+        self.context
+    }
 }
 
 impl Drop for Context {
@@ -177,6 +184,11 @@ impl HeadlessContext {
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         unimplemented!()
+    }
+
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE {
+        self.context
     }
 }
 

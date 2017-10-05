@@ -1,12 +1,24 @@
 #![cfg(target_os = "ios")]
 
+pub use api::ios::*;
+
+pub use cocoa::base::id;
+
 use GlAttributes;
 use CreationError;
 use PixelFormat;
 use PixelFormatRequirements;
 use ContextError;
+use os::GlContextExt;
 
-pub use api::ios::*;
+impl GlContextExt for Context {
+    type Handle = id;
+
+    #[inline]
+    unsafe fn as_mut_ptr(&self) -> Self::Handle {
+        *self.eagl_context.deref()
+    }
+}
 
 #[derive(Clone, Default)]
 pub struct PlatformSpecificHeadlessBuilderAttributes;
@@ -46,9 +58,17 @@ impl HeadlessContext {
     }
 
     pub fn get_pixel_format(&self) -> PixelFormat {
-        unimplemented!();
+        unimplemented!()
     }
 }
 
 unsafe impl Send for HeadlessContext {}
 unsafe impl Sync for HeadlessContext {}
+
+impl GlContextExt for HeadlessContext {
+    type Handle = i32;
+
+    unsafe fn as_mut_ptr(&self) -> Self::Handle {
+        unimplemented!()
+    }
+}

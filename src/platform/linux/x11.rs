@@ -83,7 +83,7 @@ impl GlxOrEgl {
     }
 }
 
-enum GlContext {
+pub enum GlContext {
     Glx(GlxContext),
     Egl(EglContext),
     None,
@@ -295,5 +295,10 @@ impl Context {
             GlContext::Egl(ref ctxt) => ctxt.get_pixel_format(),
             GlContext::None => panic!()
         }
+    }
+
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> &GlContext {
+        &self.context
     }
 }

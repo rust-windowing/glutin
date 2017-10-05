@@ -2,6 +2,7 @@
 
 use std::ptr;
 
+use winapi;
 use winit;
 
 use ContextError;
@@ -12,12 +13,11 @@ use Api;
 use PixelFormat;
 use PixelFormatRequirements;
 
-use winapi;
-
 use api::wgl::Context as WglContext;
 use api::egl::Context as EglContext;
 use api::egl::ffi::egl::Egl;
 use api::egl;
+use platform::RawHandle;
 
 unsafe impl Send for Context {}
 unsafe impl Sync for Context {}
@@ -27,9 +27,7 @@ pub enum Context {
     Wgl(WglContext),
 }
 
-
 impl Context {
-
     /// See the docs in the crate root file.
     pub fn new(
         window_builder: winit::WindowBuilder,
@@ -124,6 +122,14 @@ impl Context {
         match *self {
             Context::Wgl(ref c) => c.get_pixel_format(),
             Context::Egl(ref c) => c.get_pixel_format(),
+        }
+    }
+
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> RawHandle {
+        match *self {
+            Context::Wgl(ref c) => RawHandle::Wgl(c.get_hglrc()),
+            Context::Egl(ref c) => RawHandle::Egl(c.raw_handle()),
         }
     }
 }

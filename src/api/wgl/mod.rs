@@ -16,8 +16,7 @@ use self::make_current_guard::CurrentContextGuard;
 use std::ffi::{CStr, CString, OsStr};
 use std::os::raw::{c_void, c_int};
 use std::os::windows::ffi::OsStrExt;
-use std::{mem, ptr};
-use std::io;
+use std::{io, mem, ptr};
 
 use winapi;
 use kernel32;

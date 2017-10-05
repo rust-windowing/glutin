@@ -1,9 +1,11 @@
 #![allow(non_camel_case_types)]
 
-use libc;
-
 #[cfg(target_os = "windows")]
 extern crate winapi;
+
+pub use self::egl::types::EGLContext;
+
+use libc;
 
 pub mod egl {
     pub type khronos_utime_nanoseconds_t = super::khronos_utime_nanoseconds_t;

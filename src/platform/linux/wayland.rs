@@ -4,8 +4,7 @@ use winit;
 use winit::os::unix::WindowExt;
 use {ContextError, CreationError, GlAttributes, PixelFormat, PixelFormatRequirements};
 use api::dlopen;
-use api::egl;
-use api::egl::Context as EglContext;
+use api::egl::{self, ffi, Context as EglContext};
 use wayland_client::egl as wegl;
 
 pub struct Context {
@@ -78,5 +77,10 @@ impl Context {
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         self.context.get_pixel_format().clone()
+    }
+
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> ffi::EGLContext {
+        self.context.raw_handle()
     }
 }

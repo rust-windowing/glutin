@@ -23,9 +23,6 @@ pub struct Context {
     egl_context: EglContext,
 }
 
-#[derive(Clone, Default)]
-pub struct PlatformSpecificHeadlessBuilderAttributes;
-
 impl Context {
     pub fn new(
         window_builder: winit::WindowBuilder,
@@ -81,7 +78,15 @@ impl Context {
     pub fn get_pixel_format(&self) -> PixelFormat {
         self.egl_context.get_pixel_format()
     }
+
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> egl::ffi::EGLContext {
+        self.egl_context.raw_handle()
+    }
 }
+
+#[derive(Clone, Default)]
+pub struct PlatformSpecificHeadlessBuilderAttributes;
 
 pub struct HeadlessContext(EglContext);
 
@@ -134,5 +139,10 @@ impl HeadlessContext {
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         self.0.get_pixel_format()
+    }
+
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> egl::ffi::EGLContext {
+        self.0.raw_handle()
     }
 }

@@ -1,5 +1,12 @@
 #![cfg(target_os = "windows")]
 
+use std::ffi::CString;
+use std::ops::{Deref, DerefMut};
+
+use kernel32;
+use winapi;
+use winit;
+
 use Api;
 use ContextError;
 use CreationError;
@@ -7,17 +14,18 @@ use PixelFormat;
 use PixelFormatRequirements;
 use GlAttributes;
 
-use winit;
-
 use api::egl::ffi::egl::Egl;
 use api::egl;
 use api::egl::Context as EglContext;
 
-use std::ffi::CString;
-use std::ops::{Deref, DerefMut};
-use kernel32;
-
 mod context;
+
+/// Context handles available on Windows.
+#[derive(Clone, Debug)]
+pub enum RawHandle {
+    Egl(egl::ffi::EGLContext),
+    Wgl(winapi::HGLRC),
+}
 
 /// Stupid wrapper because `*const libc::c_void` doesn't implement `Sync`.
 struct EglWrapper(Egl);
@@ -50,9 +58,6 @@ lazy_static! {
         None
     };
 }
-
-#[derive(Clone, Default)]
-pub struct PlatformSpecificHeadlessBuilderAttributes;
 
 /// The Win32 implementation of the main `Context` object.
 pub struct Context(context::Context);
@@ -92,7 +97,9 @@ impl DerefMut for Context {
     }
 }
 
-///
+#[derive(Clone, Default)]
+pub struct PlatformSpecificHeadlessBuilderAttributes;
+
 pub enum HeadlessContext {
     /// A regular window, but invisible.
     HiddenWindow(winit::EventsLoop, winit::Window, context::Context),
@@ -173,6 +180,14 @@ impl HeadlessContext {
         match self {
             &HeadlessContext::HiddenWindow(_, _, ref ctxt) => ctxt.get_pixel_format(),
             &HeadlessContext::EglPbuffer(ref ctxt) => ctxt.get_pixel_format(),
+        }
+    }
+
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> RawHandle {
+        match *self {
+            HeadlessContext::HiddenWindow(_, _, ref ctxt) => ctxt.raw_handle(),
+            HeadlessContext::EglPbuffer(ref ctxt) => RawHandle::Egl(ctxt.raw_handle()),
         }
     }
 }

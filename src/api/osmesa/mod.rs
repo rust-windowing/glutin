@@ -2,11 +2,6 @@
 
 extern crate osmesa_sys;
 
-use std::error::Error;
-use std::ffi::CString;
-use std::fmt::{Debug, Display, Error as FormatError, Formatter};
-use std::{mem, ptr};
-
 use Api;
 use ContextError;
 use CreationError;
@@ -17,6 +12,16 @@ use PixelFormat;
 use PixelFormatRequirements;
 use Robustness;
 use libc;
+
+use std::error::Error;
+use std::ffi::CString;
+use std::fmt::{Debug, Display, Error as FormatError, Formatter};
+use std::{mem, ptr};
+use std::os::raw::c_void;
+
+pub mod ffi {
+    pub use super::osmesa_sys::OSMesaContext;
+}
 
 pub struct OsMesaContext {
     context: osmesa_sys::OSMesaContext,
@@ -185,6 +190,11 @@ impl OsMesaContext {
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         unimplemented!();
+    }
+
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> *mut c_void {
+        self.context as *mut _
     }
 }
 

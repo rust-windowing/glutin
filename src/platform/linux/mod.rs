@@ -1,14 +1,25 @@
 #![cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "openbsd"))]
 
 use {Api, ContextError, CreationError, GlAttributes, PixelFormat, PixelFormatRequirements};
-
+use api::egl;
+use api::glx;
 use api::osmesa::OsMesaContext;
-use wayland_client;
+use self::x11::GlContext;
+
 use winit;
 use winit::os::unix::EventsLoopExt;
 
+use std::os::raw::c_void;
+
 mod wayland;
 mod x11;
+
+/// Context handles available on Unix-like platforms.
+#[derive(Clone, Debug)]
+pub enum RawHandle {
+    Glx(glx::ffi::GLXContext),
+    Egl(egl::ffi::EGLContext),
+}
 
 pub enum Context {
     X(x11::Context),
@@ -35,8 +46,7 @@ impl Context {
             });
             wayland::Context::new(window_builder, events_loop, pf_reqs, &gl_attr)
                 .map(|(window, context)| (window, Context::Wayland(context)))
-        }
-        else {
+        } else {
             if let Some(&Context::Wayland(_)) = gl_attr.sharing {
                 let msg = "Cannot share a X11 context with an wayland context";
                 return Err(CreationError::PlatformSpecific(msg.into()));
@@ -104,6 +114,18 @@ impl Context {
             Context::Wayland(ref ctxt) => ctxt.get_pixel_format()
         }
     }
+
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> RawHandle {
+        match *self {
+            Context::X(ref ctxt) => match *ctxt.raw_handle() {
+                GlContext::Glx(ref ctxt) => RawHandle::Glx(ctxt.raw_handle()),
+                GlContext::Egl(ref ctxt) => RawHandle::Egl(ctxt.raw_handle()),
+                GlContext::None => panic!()
+            },
+            Context::Wayland(ref ctxt) => RawHandle::Egl(ctxt.raw_handle())
+        }
+    }
 }
 
 #[derive(Clone, Default)]
@@ -156,5 +178,10 @@ impl HeadlessContext {
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         self.0.get_pixel_format()
+    }
+
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> *mut c_void {
+        self.0.raw_handle()
     }
 }

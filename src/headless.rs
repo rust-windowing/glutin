@@ -93,7 +93,7 @@ impl<'a> HeadlessRendererBuilder<'a> {
 
 /// Represents a headless OpenGL context.
 pub struct HeadlessContext {
-    context: platform::HeadlessContext,
+    pub(crate) context: platform::HeadlessContext,
 }
 
 impl GlContext for HeadlessContext {
@@ -142,4 +142,3 @@ impl GlContext for HeadlessContext {
         unimplemented!()
     }
 }
-

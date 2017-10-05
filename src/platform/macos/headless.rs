@@ -2,15 +2,16 @@ use ContextError;
 use CreationError;
 use CreationError::OsError;
 use GlAttributes;
+use PixelFormat;
 use PixelFormatRequirements;
+use super::helpers;
 
 use core_foundation::base::TCFType;
 use core_foundation::string::CFString;
 use core_foundation::bundle::{CFBundleGetBundleWithIdentifier, CFBundleGetFunctionPointerForName};
 use cocoa::base::{id, nil};
 use cocoa::appkit::*;
-use PixelFormat;
-use super::helpers;
+use std::os::raw::c_void;
 
 #[derive(Clone, Default)]
 pub struct PlatformSpecificHeadlessBuilderAttributes;
@@ -84,6 +85,11 @@ impl HeadlessContext {
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         unimplemented!();
+    }
+
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> *mut c_void {
+        self.context as *mut _
     }
 }
 

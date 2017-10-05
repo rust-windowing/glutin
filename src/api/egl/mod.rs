@@ -320,6 +320,11 @@ impl Context {
     pub fn get_pixel_format(&self) -> PixelFormat {
         self.pixel_format.clone()
     }
+
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> ffi::egl::types::EGLContext {
+        self.context
+    }
 }
 
 unsafe impl Send for Context {}
