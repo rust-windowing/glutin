@@ -1,40 +1,30 @@
 use Api;
 use ContextError;
 use CreationError;
+use EventsLoop;
 use GlAttributes;
 use GlContext;
-use GlWindowContext;
 use GlProfile;
 use GlRequest;
-use PixelFormat;
-use PixelFormatRequirements;
 use Robustness;
 
 use platform;
 
-/// Object that allows you to build headless contexts.
+/// Object that allows you to build pure contexts.
 #[derive(Clone)]
-pub struct HeadlessRendererBuilder<'a> {
-    /// The dimensions to use.
-    pub dimensions: (u32, u32),
-
+pub struct PureRendererBuilder<'a> {
     /// The OpenGL attributes to build the context with.
-    pub opengl: GlAttributes<&'a platform::HeadlessContext>,
-
-    // Should be made public once it's stabilized.
-    pf_reqs: PixelFormatRequirements,
+    pub opengl: GlAttributes<&'a platform::PureContext>,
 
     /// Platform-specific configuration.
-    platform_specific: platform::PlatformSpecificHeadlessBuilderAttributes,
+    platform_specific: platform::PlatformSpecificPureBuilderAttributes,
 }
 
-impl<'a> HeadlessRendererBuilder<'a> {
-    /// Initializes a new `HeadlessRendererBuilder` with default values.
+impl<'a> PureRendererBuilder<'a> {
+    /// Initializes a new `PureRendererBuilder` with default values.
     #[inline]
-    pub fn new(width: u32, height: u32) -> Self {
-        HeadlessRendererBuilder {
-            dimensions: (width, height),
-            pf_reqs: Default::default(),
+    pub fn new() -> Self {
+        PureRendererBuilder {
             opengl: Default::default(),
             platform_specific: Default::default(),
         }
@@ -76,10 +66,9 @@ impl<'a> HeadlessRendererBuilder<'a> {
     /// Error should be very rare and only occur in case of permission denied, incompatible system,
     ///  out of memory, etc.
     #[inline]
-    pub fn build(self) -> Result<HeadlessContext, CreationError> {
-        platform::HeadlessContext::new(self.dimensions, &self.pf_reqs, &self.opengl,
-                                       &self.platform_specific)
-                .map(|w| HeadlessContext { context: w })
+    pub fn build(self, events_loop: &EventsLoop) -> Result<PureContext, CreationError> {
+        platform::PureContext::new(events_loop, &self.opengl, &self.platform_specific)
+            .map(|w| PureContext { context: w })
     }
 
     /// Builds the headless context.
@@ -87,19 +76,19 @@ impl<'a> HeadlessRendererBuilder<'a> {
     /// The context is build in a *strict* way. That means that if the backend couldn't give
     /// you what you requested, an `Err` will be returned.
     #[inline]
-    pub fn build_strict(self) -> Result<HeadlessContext, CreationError> {
-        self.build()
+    pub fn build_strict(self, events_loop: &EventsLoop) -> Result<PureContext, CreationError> {
+        self.build(events_loop)
     }
 }
 
-/// Represents a headless OpenGL context.
-/// Headless contexts don't have an associated window,
-/// but still have an off-screen target assigned to them.
-pub struct HeadlessContext {
-    pub(crate) context: platform::HeadlessContext,
+/// Represents a pure OpenGL context.
+/// Pure contexts don't have main framebuffers. Users can only
+/// render to their own surfaces/texture in custom framebuffers.
+pub struct PureContext {
+    pub(crate) context: platform::PureContext,
 }
 
-impl GlContext for HeadlessContext {
+impl GlContext for PureContext {
     /// Creates a new OpenGL context
     /// Sets the context as the current context.
     #[inline]
@@ -127,23 +116,5 @@ impl GlContext for HeadlessContext {
     #[inline]
     fn get_api(&self) -> Api {
         self.context.get_api()
-    }
-}
-
-impl GlWindowContext for HeadlessContext {
-    #[inline]
-    fn swap_buffers(&self) -> Result<(), ContextError> {
-        self.context.swap_buffers()
-    }
-
-    #[inline]
-    fn get_pixel_format(&self) -> PixelFormat {
-        self.context.get_pixel_format()
-    }
-
-    #[inline]
-    fn resize(&self, _width: u32, _height: u32) {
-        // This method does not mean anything for a HeadlessContext.
-        unimplemented!()
     }
 }

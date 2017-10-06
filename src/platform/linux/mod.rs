@@ -4,7 +4,7 @@ use {Api, ContextError, CreationError, GlAttributes, PixelFormat, PixelFormatReq
 use api::egl;
 use api::glx;
 use api::osmesa::OsMesaContext;
-use self::x11::GlContext;
+use self::x11::{GlContext, GlPureContext};
 
 use winit;
 use winit::os::unix::EventsLoopExt;
@@ -128,6 +128,7 @@ impl Context {
     }
 }
 
+
 #[derive(Clone, Default)]
 pub struct PlatformSpecificHeadlessBuilderAttributes;
 
@@ -183,5 +184,56 @@ impl HeadlessContext {
     #[inline]
     pub unsafe fn raw_handle(&self) -> *mut c_void {
         self.0.raw_handle()
+    }
+}
+
+
+#[derive(Clone, Default)]
+pub struct PlatformSpecificPureBuilderAttributes;
+
+pub struct PureContext(x11::PureContext);
+
+impl PureContext {
+    #[inline]
+    pub fn new(
+        events_loop: &winit::EventsLoop,
+        gl_attr: &GlAttributes<&PureContext>,
+        _: &PlatformSpecificPureBuilderAttributes,
+    ) -> Result<Self, CreationError>
+    {
+        assert!(!events_loop.is_wayland()); //TODO
+
+        let gl_attr = gl_attr.clone().map_sharing(|ctxt| &ctxt.0);
+
+        x11::PureContext::new(events_loop, &gl_attr)
+            .map(PureContext)
+    }
+
+    #[inline]
+    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
+        self.0.make_current()
+    }
+
+    #[inline]
+    pub fn is_current(&self) -> bool {
+        self.0.is_current()
+    }
+
+    #[inline]
+    pub fn get_proc_address(&self, addr: &str) -> *const () {
+        self.0.get_proc_address(addr)
+    }
+
+    #[inline]
+    pub fn get_api(&self) -> Api {
+        self.0.get_api()
+    }
+
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> glx::ffi::GLXContext {
+        match *self.0.raw_handle() {
+            GlPureContext::Glx(ref ctxt) => ctxt.raw_handle(),
+            GlPureContext::None => panic!(),
+        }
     }
 }

@@ -71,6 +71,7 @@ extern crate x11_dl;
 extern crate wayland_client;
 
 pub use headless::{HeadlessRendererBuilder, HeadlessContext};
+pub use puree::{PureRendererBuilder, PureContext};
 pub use winit::{AvailableMonitorsIter, AxisId, ButtonId, ControlFlow,
                 CreationError as WindowCreationError, CursorState, DeviceEvent, DeviceId,
                 ElementState, Event, EventsLoop, EventsLoopClosed, EventsLoopProxy,
@@ -84,10 +85,10 @@ use std::io;
 mod api;
 mod platform;
 mod headless;
+mod puree; // Note: `pure` is a reserved keyword
 
 pub mod os;
 
-/// A trait for types associated with a GL context.
 pub trait GlContext {
     /// Sets the context as the current context.
     unsafe fn make_current(&self) -> Result<(), ContextError>;
@@ -98,6 +99,12 @@ pub trait GlContext {
     /// Returns the address of an OpenGL function.
     fn get_proc_address(&self, addr: &str) -> *const ();
 
+    /// Returns the OpenGL API being used.
+    fn get_api(&self) -> Api;
+}
+
+/// A trait for types associated with a GL context.
+pub trait GlWindowContext: GlContext {
     /// Swaps the buffers in case of double or triple buffering.
     ///
     /// You should call this function every time you have finished rendering, or the image may not
@@ -107,9 +114,6 @@ pub trait GlContext {
     /// is refreshed. However drivers can choose to override your vsync settings, which means that
     /// you can't know in advance whether `swap_buffers` will block or not.
     fn swap_buffers(&self) -> Result<(), ContextError>;
-
-    /// Returns the OpenGL API being used.
-    fn get_api(&self) -> Api;
 
     /// Returns the pixel format of the main framebuffer of the context.
     fn get_pixel_format(&self) -> PixelFormat;
@@ -350,12 +354,14 @@ impl GlContext for Context {
         self.context.get_proc_address(addr)
     }
 
-    fn swap_buffers(&self) -> Result<(), ContextError> {
-        self.context.swap_buffers()
-    }
-
     fn get_api(&self) -> Api {
         self.context.get_api()
+    }
+}
+
+impl GlWindowContext for Context {
+    fn swap_buffers(&self) -> Result<(), ContextError> {
+        self.context.swap_buffers()
     }
 
     fn get_pixel_format(&self) -> PixelFormat {
@@ -380,12 +386,14 @@ impl GlContext for GlWindow {
         self.context.get_proc_address(addr)
     }
 
-    fn swap_buffers(&self) -> Result<(), ContextError> {
-        self.context.swap_buffers()
-    }
-
     fn get_api(&self) -> Api {
         self.context.get_api()
+    }
+}
+
+impl GlWindowContext for GlWindow {
+    fn swap_buffers(&self) -> Result<(), ContextError> {
+        self.context.swap_buffers()
     }
 
     fn get_pixel_format(&self) -> PixelFormat {

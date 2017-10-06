@@ -10,7 +10,7 @@ use {Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat, Pix
 
 use std::ffi::CString;
 
-use api::glx::{ffi, Context as GlxContext};
+use api::glx::{ffi, Context as GlxContext, PureContext as GlxPureContext};
 use api::{dlopen, egl};
 use api::egl::Context as EglContext;
 use api::glx::ffi::glx::Glx;
@@ -83,6 +83,7 @@ impl GlxOrEgl {
     }
 }
 
+
 pub enum GlContext {
     Glx(GlxContext),
     Egl(EglContext),
@@ -100,18 +101,16 @@ unsafe impl Sync for Context {}
 
 impl Drop for Context {
     fn drop(&mut self) {
+        // we don't call MakeCurrent(0, 0) because we are not sure that the context
+        // is still the current one
+        self.context = GlContext::None;
         unsafe {
-            // we don't call MakeCurrent(0, 0) because we are not sure that the context
-            // is still the current one
-            self.context = GlContext::None;
-
             (self.display.xlib.XFreeColormap)(self.display.display, self.colormap);
         }
     }
 }
 
 impl Context {
-
     pub fn new(
         window_builder: winit::WindowBuilder,
         events_loop: &winit::EventsLoop,
@@ -299,6 +298,138 @@ impl Context {
 
     #[inline]
     pub unsafe fn raw_handle(&self) -> &GlContext {
+        &self.context
+    }
+}
+
+
+pub enum GlPureContext {
+    Glx(GlxPureContext),
+    None,
+}
+
+pub struct PureContext {
+    _display: Arc<XConnection>,
+    context: GlPureContext,
+}
+
+unsafe impl Send for PureContext {}
+unsafe impl Sync for PureContext {}
+
+impl Drop for PureContext {
+    fn drop(&mut self) {
+        // we don't call MakeCurrent(0, 0) because we are not sure that the context
+        // is still the current one
+        self.context = GlPureContext::None;
+    }
+}
+
+impl PureContext {
+    pub fn new(
+        events_loop: &winit::EventsLoop,
+        gl_attr: &GlAttributes<&PureContext>,
+    ) -> Result<Self, CreationError>
+    {
+        let display = match events_loop.get_xlib_xconnection() {
+            Some(display) => display,
+            None => return Err(CreationError::NoBackendAvailable(Box::new(NoX11Connection))),
+        };
+
+        // Get the screen_id for the window being built.
+        let screen_id = unsafe { (display.xlib.XDefaultScreen)(display.display) };
+
+        // start the context building process
+        enum Prototype<'a> {
+            Glx(::api::glx::PureContextPrototype<'a>),
+        }
+
+        let builder_clone_opengl_glx = gl_attr.clone().map_sharing(|_| unimplemented!());      // FIXME:
+        let backend = GlxOrEgl::new();
+        let context = match gl_attr.version {
+            GlRequest::Latest |
+            GlRequest::Specific(Api::OpenGl, _) |
+            GlRequest::GlThenGles { .. } => {
+                // GLX should be preferred over EGL, otherwise crashes may occur
+                // on X11 – issue #314
+                if let Some(ref glx) = backend.glx {
+                    Prototype::Glx(try!(GlxPureContext::new(
+                        glx.clone(),
+                        &display.xlib,
+                        &builder_clone_opengl_glx,
+                        display.display,
+                        screen_id,
+                    )))
+                } else if let Some(_) = backend.egl {
+                    unimplemented!()
+                } else {
+                    return Err(CreationError::NotSupported);
+                }
+            },
+            GlRequest::Specific(Api::OpenGlEs, _) => {
+                if let Some(_) = backend.egl {
+                    unimplemented!()
+                } else {
+                    return Err(CreationError::NotSupported);
+                }
+            },
+            GlRequest::Specific(_, _) => {
+                return Err(CreationError::NotSupported);
+            },
+        };
+
+        // finish creating the OpenGL context
+        let context = match context {
+            Prototype::Glx(ctxt) => {
+                GlPureContext::Glx(try!(ctxt.finish()))
+            },
+        };
+
+        // getting the root window
+        let _root = unsafe { (display.xlib.XDefaultRootWindow)(display.display) };
+        display.check_errors().expect("Failed to get root window");
+
+        let context = PureContext {
+            _display: display.clone(),
+            context,
+        };
+
+        Ok(context)
+    }
+
+    #[inline]
+    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
+        match self.context {
+            GlPureContext::Glx(ref ctxt) => ctxt.make_current(),
+            GlPureContext::None => Ok(())
+        }
+    }
+
+    #[inline]
+    pub fn is_current(&self) -> bool {
+        match self.context {
+            GlPureContext::Glx(ref ctxt) => ctxt.is_current(),
+            GlPureContext::None => panic!()
+        }
+    }
+
+    #[inline]
+    pub fn get_proc_address(&self, addr: &str) -> *const () {
+        match self.context {
+            GlPureContext::Glx(ref ctxt) => ctxt.get_proc_address(addr),
+            GlPureContext::None => ptr::null()
+        }
+    }
+
+    #[inline]
+    pub fn get_api(&self) -> Api {
+        match self.context {
+            GlPureContext::Glx(ref ctxt) => ctxt.get_api(),
+            GlPureContext::None => panic!()
+        }
+    }
+
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> &GlPureContext {
         &self.context
     }
 }
