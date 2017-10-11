@@ -198,7 +198,7 @@ impl<'a> ContextPrototype<'a> {
         // creating GL context
         let context = match self.opengl.version {
             GlRequest::Latest => {
-                let opengl_versions = [(4, 5), (4, 4), (4, 3), (4, 2), (4, 1), (4, 0),
+                let opengl_versions = [(4, 6), (4, 5), (4, 4), (4, 3), (4, 2), (4, 1), (4, 0),
                                        (3, 3), (3, 2), (3, 1)];
                 let ctxt;
                 'outer: loop
