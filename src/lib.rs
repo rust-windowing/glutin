@@ -618,7 +618,7 @@ pub struct PixelFormat {
 // TODO: swap method? (swap, copy)
 #[derive(Clone, Debug)]
 pub struct PixelFormatRequirements {
-    /// If true, only hardware-accelerated formats will be conisdered. If false, only software
+    /// If true, only hardware-accelerated formats will be considered. If false, only software
     /// renderers. `None` means "don't care". Default is `Some(true)`.
     pub hardware_accelerated: Option<bool>,
 

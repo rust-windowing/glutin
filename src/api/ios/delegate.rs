@@ -100,8 +100,8 @@ pub fn create_delegate_class() {
         unsafe {
             let state: *mut libc::c_void = *this.get_ivar("glutinState");
             let state = &mut *(state as *mut DelegateState);
-            // push event to the front to garantee that we'll process it
-            // immidiatly after jump
+            // push event to the front to guarantee that we'll process it
+            // immediately after jump
             state.events_queue.push_front(Event::Closed);
             longjmp(mem::transmute(&mut jmpbuf),1);
         }
