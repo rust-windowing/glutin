@@ -25,7 +25,7 @@ pub mod ffi {
         include!(concat!(env!("OUT_DIR"), "/glx_bindings.rs"));
     }
 
-    /// Functions that are not necessarly always available
+    /// Functions that are not necessarily always available
     pub mod glx_extra {
         include!(concat!(env!("OUT_DIR"), "/glx_extra_bindings.rs"));
     }

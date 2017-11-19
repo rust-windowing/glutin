@@ -34,7 +34,7 @@ pub struct Context {
 
     hdc: winapi::HDC,
 
-    /// Binded to `opengl32.dll`.
+    /// Bound to `opengl32.dll`.
     ///
     /// `wglGetProcAddress` returns null for GL 1.1 functions because they are
     ///  already defined by the system. This module contains them.
