@@ -35,6 +35,8 @@
 #[macro_use]
 extern crate lazy_static;
 
+// Caca requires shared_library macro_use on Linux
+#[cfg(target_os = "linux")]
 #[macro_use]
 extern crate shared_library;
 
