@@ -32,13 +32,11 @@ Glutin is an OpenGL context creation library and doesn't directly provide OpenGL
 ```toml
 [dependencies]
 gl = "*"
-libc = "*"
 ```
 
 ```rust
 extern crate gl;
 extern crate glutin;
-extern crate libc;
 
 use glutin::GlContext;
 
