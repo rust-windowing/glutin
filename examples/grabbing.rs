@@ -18,27 +18,33 @@ fn main() {
     events_loop.run_forever(|event| {
         use glutin::{CursorState, ControlFlow, Event, WindowEvent, ElementState};
         match event {
-            Event::WindowEvent { event, .. } => match event {
+            Event::WindowEvent { event, .. } => {
+                match event {
 
-                WindowEvent::KeyboardInput { input, .. } if ElementState::Pressed == input.state => {
-                    if grabbed {
-                        grabbed = false;
-                        gl_window.set_cursor_state(CursorState::Normal)
-                                 .ok().expect("could not ungrab mouse cursor");
-                    } else {
-                        grabbed = true;
-                        gl_window.set_cursor_state(CursorState::Grab)
-                                 .ok().expect("could not grab mouse cursor");
+                    WindowEvent::KeyboardInput { input, .. }
+                        if ElementState::Pressed == input.state => {
+                        if grabbed {
+                            grabbed = false;
+                            gl_window
+                                .set_cursor_state(CursorState::Normal)
+                                .ok()
+                                .expect("could not ungrab mouse cursor");
+                        } else {
+                            grabbed = true;
+                            gl_window.set_cursor_state(CursorState::Grab).ok().expect(
+                                "could not grab mouse cursor",
+                            );
+                        }
                     }
-                },
 
-                WindowEvent::Closed => return ControlFlow::Break,
-                WindowEvent::Resized(w, h) => gl_window.resize(w, h),
-                a @ WindowEvent::MouseMoved { .. } => {
-                    println!("{:?}", a);
-                },
-                _ => (),
-            },
+                    WindowEvent::Closed => return ControlFlow::Break,
+                    WindowEvent::Resized(w, h) => gl_window.resize(w, h),
+                    a @ WindowEvent::CursorMoved { .. } => {
+                        println!("{:?}", a);
+                    }
+                    _ => (),
+                }
+            }
             _ => (),
         }
 
