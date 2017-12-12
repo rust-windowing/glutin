@@ -11,7 +11,7 @@ documentation = "https://docs.rs/glutin"
 build = "build.rs"
 
 [dependencies]
-lazy_static = "0.2.0"
+lazy_static = "1"
 libc = "0.2"
 shared_library = "0.1.0"
 winit = "0.9.0"
