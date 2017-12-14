@@ -32,14 +32,10 @@ impl Context {
         };
 
         // setting the attributes
-        // FIXME: 
-        /*match builder.opengl.version {
-            Some((major, minor)) => {
-                attributes.majorVersion = major as libc::c_int;
-                attributes.minorVersion = minor as libc::c_int;
-            },
-            None => ()
-        };*/
+        if let Some((major, minor)) = builder.opengl.version {
+            attributes.majorVersion = major as _;
+            attributes.minorVersion = minor as _;
+        }
 
         // creating the context
         let context = unsafe {
