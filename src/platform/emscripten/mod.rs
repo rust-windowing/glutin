@@ -2,7 +2,8 @@
 
 use std::ffi::CString;
 
-use {Api, ContextError, CreationError, GlAttributes, PixelFormat, PixelFormatRequirements};
+use {Api, ContextError, CreationError, GlAttributes, GlRequest};
+use {PixelFormat, PixelFormatRequirements};
 
 use winit;
 
@@ -32,7 +33,7 @@ impl Context {
         };
 
         // setting the attributes
-        if let Some((major, minor)) = gl_attr.version.to_gl_version() {
+        if let GlRequest::Specific(Api::WebGl, (major, minor)) = gl_attr.version {
             attributes.majorVersion = major as _;
             attributes.minorVersion = minor as _;
         }
