@@ -2,7 +2,8 @@
 
 use std::ffi::CString;
 
-use {Api, ContextError, CreationError, GlAttributes, PixelFormat, PixelFormatRequirements};
+use {Api, ContextError, CreationError, GlAttributes, GlRequest};
+use {PixelFormat, PixelFormatRequirements};
 
 use winit;
 
@@ -32,14 +33,10 @@ impl Context {
         };
 
         // setting the attributes
-        // FIXME: 
-        /*match builder.opengl.version {
-            Some((major, minor)) => {
-                attributes.majorVersion = major as libc::c_int;
-                attributes.minorVersion = minor as libc::c_int;
-            },
-            None => ()
-        };*/
+        if let GlRequest::Specific(Api::WebGl, (major, minor)) = gl_attr.version {
+            attributes.majorVersion = major as _;
+            attributes.minorVersion = minor as _;
+        }
 
         // creating the context
         let context = unsafe {
