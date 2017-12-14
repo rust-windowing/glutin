@@ -32,7 +32,7 @@ impl Context {
         };
 
         // setting the attributes
-        if let Some((major, minor)) = builder.opengl.version {
+        if let Some((major, minor)) = gl_attr.version.to_gl_version() {
             attributes.majorVersion = major as _;
             attributes.minorVersion = minor as _;
         }
