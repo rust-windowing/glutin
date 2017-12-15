@@ -33,7 +33,10 @@ impl<'a> HeadlessRendererBuilder<'a> {
     pub fn new(width: u32, height: u32) -> HeadlessRendererBuilder<'a> {
         HeadlessRendererBuilder {
             dimensions: (width, height),
-            pf_reqs: Default::default(),
+            pf_reqs: PixelFormatRequirements {
+                hardware_accelerated: None,
+                .. Default::default()
+            },
             opengl: Default::default(),
             platform_specific: Default::default(),
         }
