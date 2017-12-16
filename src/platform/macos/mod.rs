@@ -135,10 +135,12 @@ impl Context {
 
     #[inline]
     pub fn is_current(&self) -> bool {
+        let res;
+
         unsafe {
             let pool = NSAutoreleasePool::new(nil);
             let current = NSOpenGLContext::currentContext(nil);
-            let mut res = false;
+            
             if current != nil {
                 let is_equal: BOOL = msg_send![current, isEqual:*self.gl];
                 res = is_equal != NO
@@ -146,8 +148,9 @@ impl Context {
                 res = false
             }
             let _: () = msg_send![pool, release];
-            res
         }
+
+        res
     }
 
     pub fn get_proc_address(&self, addr: &str) -> *const () {
