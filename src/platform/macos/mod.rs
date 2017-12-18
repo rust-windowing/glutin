@@ -61,7 +61,8 @@ impl Context {
 
         let view = window.get_nsview() as id;
 
-        let attributes = try!(helpers::build_nsattributes(pf_reqs, gl_attr));
+        let gl_profile = helpers::get_gl_profile(gl_attr)?;
+        let attributes = helpers::build_nsattributes(pf_reqs, gl_profile)?;
         unsafe {
             let pixel_format = IdRef::new(NSOpenGLPixelFormat::alloc(nil)
                 .initWithAttributes_(&attributes));
@@ -138,13 +139,12 @@ impl Context {
         unsafe {
             let pool = NSAutoreleasePool::new(nil);
             let current = NSOpenGLContext::currentContext(nil);
-            let mut res = false;
-            if current != nil {
+            let res = if current != nil {
                 let is_equal: BOOL = msg_send![current, isEqual:*self.gl];
-                res = is_equal != NO
+                is_equal != NO
             } else {
-                res = false
-            }
+                false
+            };
             let _: () = msg_send![pool, release];
             res
         }

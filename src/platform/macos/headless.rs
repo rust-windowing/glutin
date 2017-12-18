@@ -26,10 +26,9 @@ impl HeadlessContext {
                _: &PlatformSpecificHeadlessBuilderAttributes)
                -> Result<HeadlessContext, CreationError>
     {
+        let gl_profile = helpers::get_gl_profile(opengl)?;
+        let attributes = helpers::build_nsattributes(pf_reqs, gl_profile)?;
         let context = unsafe {
-
-            let attributes = try!(helpers::build_nsattributes(pf_reqs, opengl));
-
             let pixelformat = NSOpenGLPixelFormat::alloc(nil).initWithAttributes_(&attributes);
             if pixelformat == nil {
                 return Err(OsError(format!("Could not create the pixel format")));
@@ -42,7 +41,7 @@ impl HeadlessContext {
         };
 
         let headless = HeadlessContext {
-            context: context,
+            context,
         };
 
         Ok(headless)

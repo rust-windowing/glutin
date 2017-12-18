@@ -35,6 +35,7 @@
 #[macro_use]
 extern crate lazy_static;
 
+#[cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "openbsd"))]
 #[macro_use]
 extern crate shared_library;
 
