@@ -11,7 +11,7 @@ documentation = "https://docs.rs/glutin"
 build = "build.rs"
 
 [dependencies]
-lazy_static = "0.2.0"
+lazy_static = "1"
 libc = "0.2"
 shared_library = "0.1.0"
 winit = "0.9.0"
@@ -28,9 +28,9 @@ objc = "0.2"
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2"
 cgl = "0.2"
-cocoa = "0.9"
+cocoa = "0.13"
 core-foundation = "0.4"
-core-graphics = "0.8"
+core-graphics = "0.12"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winapi = "0.2"
@@ -42,5 +42,5 @@ dwmapi-sys = "0.1"
 
 [target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os="dragonfly", target_os="openbsd"))'.dependencies]
 osmesa-sys = "0.1.0"
-wayland-client = { version = "0.9.5", features = ["egl", "dlopen"] }
+wayland-client = { version = "0.12", features = ["egl", "dlopen"] }
 x11-dl = "2.4"
