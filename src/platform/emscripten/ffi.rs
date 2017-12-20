@@ -15,6 +15,7 @@ pub type em_webgl_context_callback = extern fn(libc::c_int, *const libc::c_void,
 pub type em_callback_func = unsafe extern fn();
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct EmscriptenWebGLContextAttributes {
     pub alpha: EM_BOOL,
     pub depth: EM_BOOL,
@@ -27,6 +28,7 @@ pub struct EmscriptenWebGLContextAttributes {
     pub majorVersion: libc::c_int,
     pub minorVersion: libc::c_int,
     pub enableExtensionsByDefault: EM_BOOL,
+    pub explicitSwapControl: EM_BOOL,
 }
 
 // values for EMSCRIPTEN_RESULT
