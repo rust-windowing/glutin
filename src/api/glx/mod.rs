@@ -246,7 +246,7 @@ impl<'a> ContextPrototype<'a> {
         if self.opengl.vsync {
             unsafe { self.glx.MakeCurrent(self.display as *mut _, window, context) };
 
-            if extra_functions.SwapIntervalEXT.is_loaded() {
+            if check_ext(&self.extensions, "GLX_EXT_swap_control") && extra_functions.SwapIntervalEXT.is_loaded() {
                 // this should be the most common extension
                 unsafe {
                     extra_functions.SwapIntervalEXT(self.display as *mut _, window, 1);
@@ -274,7 +274,7 @@ impl<'a> ContextPrototype<'a> {
                     extra_functions.SwapIntervalMESA(1);
                 }*/
 
-            } else if extra_functions.SwapIntervalSGI.is_loaded() {
+            } else if check_ext(&self.extensions, "GLX_SGI_swap_control") && extra_functions.SwapIntervalSGI.is_loaded() {
                 unsafe {
                     extra_functions.SwapIntervalSGI(1);
                 }
@@ -312,7 +312,7 @@ fn create_context(glx: &ffi::glx::Glx, extra_functions: &ffi::glx_extra::Glx, ex
 {
     unsafe {
         let old_callback = (xlib.XSetErrorHandler)(Some(x_error_callback));
-        let context = if extensions.split(' ').find(|&i| i == "GLX_ARB_create_context").is_some() {
+        let context = if check_ext(extensions, "GLX_ARB_create_context") {
             let mut attributes = Vec::with_capacity(9);
 
             attributes.push(ffi::glx_extra::CONTEXT_MAJOR_VERSION_ARB as c_int);
@@ -336,7 +336,7 @@ fn create_context(glx: &ffi::glx::Glx, extra_functions: &ffi::glx_extra::Glx, ex
                 let mut flags = 0;
 
                 // robustness
-                if extensions.split(' ').find(|&i| i == "GLX_ARB_create_context_robustness").is_some() {
+                if check_ext(extensions, "GLX_ARB_create_context_robustness") {
                     match robustness {
                         Robustness::RobustNoResetNotification | Robustness::TryRobustNoResetNotification => {
                             attributes.push(ffi::glx_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB as c_int);
@@ -411,7 +411,7 @@ unsafe fn choose_fbconfig(glx: &ffi::glx::Glx, extensions: &str, xlib: &ffi::Xli
 
         out.push(ffi::glx::RENDER_TYPE as c_int);
         if reqs.float_color_buffer {
-            if extensions.split(' ').find(|&i| i == "GLX_ARB_fbconfig_float").is_some() {
+            if check_ext(extensions, "GLX_ARB_fbconfig_float") {
                 out.push(ffi::glx_extra::RGBA_FLOAT_BIT_ARB as c_int);
             } else {
                 return Err(());
@@ -449,7 +449,7 @@ unsafe fn choose_fbconfig(glx: &ffi::glx::Glx, extensions: &str, xlib: &ffi::Xli
         out.push(if double_buffer { 1 } else { 0 });
 
         if let Some(multisampling) = reqs.multisampling {
-            if extensions.split(' ').find(|&i| i == "GLX_ARB_multisample").is_some() {
+            if check_ext(extensions, "GLX_ARB_multisample") {
                 out.push(ffi::glx_extra::SAMPLE_BUFFERS_ARB as c_int);
                 out.push(if multisampling == 0 { 0 } else { 1 });
                 out.push(ffi::glx_extra::SAMPLES_ARB as c_int);
@@ -463,10 +463,10 @@ unsafe fn choose_fbconfig(glx: &ffi::glx::Glx, extensions: &str, xlib: &ffi::Xli
         out.push(if reqs.stereoscopy { 1 } else { 0 });
 
         if reqs.srgb {
-            if extensions.split(' ').find(|&i| i == "GLX_ARB_framebuffer_sRGB").is_some() {
+            if check_ext(extensions, "GLX_ARB_framebuffer_sRGB") {
                 out.push(ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as c_int);
                 out.push(1);
-            } else if extensions.split(' ').find(|&i| i == "GLX_EXT_framebuffer_sRGB").is_some() {
+            } else if check_ext(extensions, "GLX_EXT_framebuffer_sRGB") {
                 out.push(ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as c_int);
                 out.push(1);
             } else {
@@ -477,7 +477,7 @@ unsafe fn choose_fbconfig(glx: &ffi::glx::Glx, extensions: &str, xlib: &ffi::Xli
         match reqs.release_behavior {
             ReleaseBehavior::Flush => (),
             ReleaseBehavior::None => {
-                if extensions.split(' ').find(|&i| i == "GLX_ARB_context_flush_control").is_some() {
+                if check_ext(extensions, "GLX_ARB_context_flush_control") {
                     out.push(ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_ARB as c_int);
                     out.push(ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_NONE_ARB as c_int);
                 }
@@ -551,4 +551,9 @@ unsafe fn choose_fbconfig(glx: &ffi::glx::Glx, extensions: &str, xlib: &ffi::Xli
     };
 
     Ok((fb_config, pf_desc))
+}
+
+/// Checks if `ext` is available.
+fn check_ext(extensions: &str, ext: &str) -> bool {
+    extensions.split(' ').find(|&s| s == ext).is_some()
 }
