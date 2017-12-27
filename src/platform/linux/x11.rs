@@ -214,10 +214,10 @@ impl Context {
         // finish creating the OpenGL context
         let context = match context {
             Prototype::Glx(ctxt) => {
-                GlContext::Glx(try!(ctxt.finish(xlib_window as _)))
+                GlContext::Glx(try!(ctxt.finish(xlib_window)))
             },
             Prototype::Egl(ctxt) => {
-                GlContext::Egl(try!(ctxt.finish(xlib_window)))
+                GlContext::Egl(try!(ctxt.finish(xlib_window as _)))
             },
         };
 
