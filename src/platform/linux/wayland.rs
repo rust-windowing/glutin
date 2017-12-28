@@ -34,7 +34,9 @@ impl Context {
                 unsafe { dlopen::dlsym(libegl, sym.as_ptr()) }
             });
             let gl_attr = gl_attr.clone().map_sharing(|_| unimplemented!()); // TODO
-            let native_display = egl::NativeDisplay::Wayland(Some(window.get_wayland_display().unwrap()));
+            let native_display = egl::NativeDisplay::Wayland(Some(
+                window.get_wayland_display().unwrap() as *const _
+            ));
             EglContext::new(egl, pf_reqs, &gl_attr, native_display)
                 .and_then(|p| p.finish(egl_surface.ptr() as *const _))?
         };
