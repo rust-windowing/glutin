@@ -81,7 +81,10 @@ pub fn build_nsattributes(
         attributes.push(NSOpenGLPFAAccelerated as u32);
     }
 
-    if let Some(true) = pf_reqs.double_buffer {
+    // Note: according to Apple docs, not specifying `NSOpenGLPFADoubleBuffer`
+    // equals to requesting a single front buffer, in which case most of the GL
+    // renderers will show nothing, since they draw to GL_BACK. 
+    if pf_reqs.double_buffer != Some(false) {
         attributes.push(NSOpenGLPFADoubleBuffer as u32);
     }
 
