@@ -32,13 +32,14 @@ cocoa = "0.13"
 core-foundation = "0.4"
 core-graphics = "0.12"
 
-[target.'cfg(target_os = "windows")'.dependencies]
-winapi = "0.2"
-shell32-sys = "0.1"
-gdi32-sys = "0.1"
-user32-sys = "~0.1.2"
-kernel32-sys = "0.2"
-dwmapi-sys = "0.1"
+[target.'cfg(target_os = "windows")'.dependencies.winapi]
+version = "0.3.2"
+features = [
+    "winnt",
+    "winuser",
+    "wingdi",
+    "libloaderapi",
+]
 
 [target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os="dragonfly", target_os="openbsd"))'.dependencies]
 osmesa-sys = "0.1.0"

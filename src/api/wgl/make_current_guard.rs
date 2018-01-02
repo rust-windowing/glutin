@@ -2,25 +2,25 @@ use std::marker::PhantomData;
 use std::os::raw::c_void;
 use std::io;
 
-use winapi;
+use winapi::shared::windef::{HDC, HGLRC};
 use CreationError;
 
 use super::gl;
 /// A guard for when you want to make the context current. Destroying the guard restores the
 /// previously-current context.
 pub struct CurrentContextGuard<'a, 'b> {
-    previous_hdc: winapi::HDC,
-    previous_hglrc: winapi::HGLRC,
+    previous_hdc: HDC,
+    previous_hglrc: HGLRC,
     marker1: PhantomData<&'a ()>,
     marker2: PhantomData<&'b ()>,
 }
 
 impl<'a, 'b> CurrentContextGuard<'a, 'b> {
-    pub unsafe fn make_current(hdc: winapi::HDC, context: winapi::HGLRC)
+    pub unsafe fn make_current(hdc: HDC, context: HGLRC)
                                -> Result<CurrentContextGuard<'a, 'b>, CreationError>
     {
-        let previous_hdc = gl::wgl::GetCurrentDC() as winapi::HDC;
-        let previous_hglrc = gl::wgl::GetCurrentContext() as winapi::HGLRC;
+        let previous_hdc = gl::wgl::GetCurrentDC() as HDC;
+        let previous_hglrc = gl::wgl::GetCurrentContext() as HGLRC;
 
         let result = gl::wgl::MakeCurrent(hdc as *const _, context as *const _);
         if result == 0 {

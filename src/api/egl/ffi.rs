@@ -30,7 +30,7 @@ pub type EGLNativeDisplayType = *const libc::c_void;
 pub type EGLNativePixmapType = *const libc::c_void;     // FIXME: egl_native_pixmap_t instead
 
 #[cfg(target_os = "windows")]
-pub type EGLNativeWindowType = winapi::HWND;
+pub type EGLNativeWindowType = winapi::shared::windef::HWND;
 #[cfg(target_os = "linux")]
 pub type EGLNativeWindowType = *const libc::c_void;
 #[cfg(target_os = "android")]

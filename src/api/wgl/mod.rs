@@ -18,10 +18,13 @@ use std::os::raw::{c_void, c_int};
 use std::os::windows::ffi::OsStrExt;
 use std::{io, mem, ptr};
 
-use winapi;
-use kernel32;
-use user32;
-use gdi32;
+use winapi::shared::windef::{HDC, HGLRC, HWND};
+use winapi::shared::minwindef::HMODULE;
+use winapi::um::wingdi::*;
+use winapi::shared::minwindef::*;
+use winapi::um::winuser::*;
+use winapi::um::libloaderapi::*;
+use winapi::shared::ntdef::LPCWSTR;
 
 mod make_current_guard;
 mod gl;
@@ -32,32 +35,32 @@ mod gl;
 pub struct Context {
     context: ContextWrapper,
 
-    hdc: winapi::HDC,
+    hdc: HDC,
 
     /// Bound to `opengl32.dll`.
     ///
     /// `wglGetProcAddress` returns null for GL 1.1 functions because they are
     ///  already defined by the system. This module contains them.
-    gl_library: winapi::HMODULE,
+    gl_library: HMODULE,
 
     /// The pixel format that has been used to create this context.
     pixel_format: PixelFormat,
 }
 
 /// A simple wrapper that destroys the window when it is destroyed.
-struct WindowWrapper(winapi::HWND, winapi::HDC);
+struct WindowWrapper(HWND, HDC);
 
 impl Drop for WindowWrapper {
     #[inline]
     fn drop(&mut self) {
         unsafe {
-            user32::DestroyWindow(self.0);
+            DestroyWindow(self.0);
         }
     }
 }
 
 /// Wraps around a context so that it is destroyed when necessary.
-struct ContextWrapper(winapi::HGLRC);
+struct ContextWrapper(HGLRC);
 
 impl Drop for ContextWrapper {
     #[inline]
@@ -76,10 +79,10 @@ impl Context {
     /// # Unsafety
     ///
     /// The `window` must continue to exist as long as the resulting `Context` exists.
-    pub unsafe fn new(pf_reqs: &PixelFormatRequirements, opengl: &GlAttributes<winapi::HGLRC>,
-                      window: winapi::HWND) -> Result<Context, CreationError>
+    pub unsafe fn new(pf_reqs: &PixelFormatRequirements, opengl: &GlAttributes<HGLRC>,
+                      window: HWND) -> Result<Context, CreationError>
     {
-        let hdc = user32::GetDC(window);
+        let hdc = GetDC(window);
         if hdc.is_null() {
             let err = Err(CreationError::OsError(format!("GetDC function failed: {}",
                                                 format!("{}", io::Error::last_os_error()))));
@@ -146,7 +149,7 @@ impl Context {
 
     /// Returns the raw HGLRC.
     #[inline]
-    pub fn get_hglrc(&self) -> winapi::HGLRC {
+    pub fn get_hglrc(&self) -> HGLRC {
         self.context.0
     }
 
@@ -171,19 +174,19 @@ impl Context {
         unsafe {
             let p = gl::wgl::GetProcAddress(addr) as *const _;
             if !p.is_null() { return p; }
-            kernel32::GetProcAddress(self.gl_library, addr) as *const _
+            GetProcAddress(self.gl_library, addr) as *const _
         }
     }
 
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
         // TODO: decide how to handle the error
-        /*if unsafe { gdi32::SwapBuffers(self.hdc) } != 0 {
+        /*if unsafe { SwapBuffers(self.hdc) } != 0 {
             Ok(())
         } else {
             Err(ContextError::IoError(io::Error::last_os_error()))
         }*/
-        unsafe { gdi32::SwapBuffers(self.hdc) };
+        unsafe { SwapBuffers(self.hdc) };
         Ok(())
     }
 
@@ -210,8 +213,8 @@ unsafe impl Sync for Context {}
 /// Otherwise, only the basic API will be used and the chances of `CreationError::NotSupported`
 /// being returned increase.
 unsafe fn create_context(extra: Option<(&gl::wgl_extra::Wgl, &PixelFormatRequirements,
-                                        &GlAttributes<winapi::HGLRC>, &str)>,
-                         _: winapi::HWND, hdc: winapi::HDC)
+                                        &GlAttributes<HGLRC>, &str)>,
+                         _: HWND, hdc: HDC)
                          -> Result<ContextWrapper, CreationError>
 {
     let share;
@@ -318,7 +321,7 @@ unsafe fn create_context(extra: Option<(&gl::wgl_extra::Wgl, &PixelFormatRequire
                 return Err(CreationError::OsError(format!("wglCreateContextAttribsARB failed: {}",
                                                       format!("{}", io::Error::last_os_error()))));
             } else {
-                return Ok(ContextWrapper(ctxt as winapi::HGLRC));
+                return Ok(ContextWrapper(ctxt as HGLRC));
             }
         }
 
@@ -339,13 +342,13 @@ unsafe fn create_context(extra: Option<(&gl::wgl_extra::Wgl, &PixelFormatRequire
         }
     };
 
-    Ok(ContextWrapper(ctxt as winapi::HGLRC))
+    Ok(ContextWrapper(ctxt as HGLRC))
 }
 
 /// Chooses a pixel formats without using WGL.
 ///
 /// Gives less precise results than `enumerate_arb_pixel_formats`.
-unsafe fn choose_native_pixel_format(hdc: winapi::HDC, reqs: &PixelFormatRequirements)
+unsafe fn choose_native_pixel_format(hdc: HDC, reqs: &PixelFormatRequirements)
                                      -> Result<(c_int, PixelFormat), ()>
 {
     // TODO: hardware acceleration is not handled
@@ -374,25 +377,25 @@ unsafe fn choose_native_pixel_format(hdc: winapi::HDC, reqs: &PixelFormatRequire
     }
 
     // building the descriptor to pass to ChoosePixelFormat
-    let descriptor = winapi::PIXELFORMATDESCRIPTOR {
-        nSize: mem::size_of::<winapi::PIXELFORMATDESCRIPTOR>() as u16,
+    let descriptor = PIXELFORMATDESCRIPTOR {
+        nSize: mem::size_of::<PIXELFORMATDESCRIPTOR>() as u16,
         nVersion: 1,
         dwFlags: {
             let f1 = match reqs.double_buffer {
-                None => winapi::PFD_DOUBLEBUFFER, // Should be PFD_DOUBLEBUFFER_DONTCARE after you can choose
-                Some(true) => winapi::PFD_DOUBLEBUFFER,
+                None => PFD_DOUBLEBUFFER, // Should be PFD_DOUBLEBUFFER_DONTCARE after you can choose
+                Some(true) => PFD_DOUBLEBUFFER,
                 Some(false) => 0,
             };
 
             let f2 = if reqs.stereoscopy {
-                winapi::PFD_STEREO
+                PFD_STEREO
             } else {
                 0
             };
 
-            winapi::PFD_DRAW_TO_WINDOW | winapi::PFD_SUPPORT_OPENGL | f1 | f2
+            PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | f1 | f2
         },
-        iPixelType: winapi::PFD_TYPE_RGBA,
+        iPixelType: PFD_TYPE_RGBA,
         cColorBits: reqs.color_bits.unwrap_or(0),
         cRedBits: 0,
         cRedShift: 0,
@@ -410,7 +413,7 @@ unsafe fn choose_native_pixel_format(hdc: winapi::HDC, reqs: &PixelFormatRequire
         cDepthBits: reqs.depth_bits.unwrap_or(0),
         cStencilBits: reqs.stencil_bits.unwrap_or(0),
         cAuxBuffers: 0,
-        iLayerType: winapi::PFD_MAIN_PLANE,
+        iLayerType: PFD_MAIN_PLANE,
         bReserved: 0,
         dwLayerMask: 0,
         dwVisibleMask: 0,
@@ -418,14 +421,14 @@ unsafe fn choose_native_pixel_format(hdc: winapi::HDC, reqs: &PixelFormatRequire
     };
 
     // now querying
-    let pf_id = gdi32::ChoosePixelFormat(hdc, &descriptor);
+    let pf_id = ChoosePixelFormat(hdc, &descriptor);
     if pf_id == 0 {
         return Err(());
     }
 
     // querying back the capabilities of what windows told us
-    let mut output: winapi::PIXELFORMATDESCRIPTOR = mem::zeroed();
-    if gdi32::DescribePixelFormat(hdc, pf_id, mem::size_of::<winapi::PIXELFORMATDESCRIPTOR>() as u32,
+    let mut output: PIXELFORMATDESCRIPTOR = mem::zeroed();
+    if DescribePixelFormat(hdc, pf_id, mem::size_of::<PIXELFORMATDESCRIPTOR>() as u32,
                                   &mut output) == 0
     {
         return Err(());
@@ -433,24 +436,24 @@ unsafe fn choose_native_pixel_format(hdc: winapi::HDC, reqs: &PixelFormatRequire
 
     // windows may return us a non-conforming pixel format if none are supported, so we have to
     // check this
-    if (output.dwFlags & winapi::PFD_DRAW_TO_WINDOW) == 0 {
+    if (output.dwFlags & PFD_DRAW_TO_WINDOW) == 0 {
         return Err(());
     }
-    if (output.dwFlags & winapi::PFD_SUPPORT_OPENGL) == 0 {
+    if (output.dwFlags & PFD_SUPPORT_OPENGL) == 0 {
         return Err(());
     }
-    if output.iPixelType != winapi::PFD_TYPE_RGBA {
+    if output.iPixelType != PFD_TYPE_RGBA {
         return Err(());
     }
 
     let pf_desc = PixelFormat {
-        hardware_accelerated: (output.dwFlags & winapi::PFD_GENERIC_FORMAT) == 0,
+        hardware_accelerated: (output.dwFlags & PFD_GENERIC_FORMAT) == 0,
         color_bits: output.cRedBits + output.cGreenBits + output.cBlueBits,
         alpha_bits: output.cAlphaBits,
         depth_bits: output.cDepthBits,
         stencil_bits: output.cStencilBits,
-        stereoscopy: (output.dwFlags & winapi::PFD_STEREO) != 0,
-        double_buffer: (output.dwFlags & winapi::PFD_DOUBLEBUFFER) != 0,
+        stereoscopy: (output.dwFlags & PFD_STEREO) != 0,
+        double_buffer: (output.dwFlags & PFD_DOUBLEBUFFER) != 0,
         multisampling: None,
         srgb: false,
     };
@@ -485,7 +488,7 @@ unsafe fn choose_native_pixel_format(hdc: winapi::HDC, reqs: &PixelFormatRequire
 ///
 /// Gives more precise results than `enumerate_native_pixel_formats`.
 unsafe fn choose_arb_pixel_format(extra: &gl::wgl_extra::Wgl, extensions: &str,
-                                  hdc: winapi::HDC, reqs: &PixelFormatRequirements)
+                                  hdc: HDC, reqs: &PixelFormatRequirements)
                                   -> Result<(c_int, PixelFormat), ()>
 {
     let descriptor = {
@@ -636,17 +639,17 @@ unsafe fn choose_arb_pixel_format(extra: &gl::wgl_extra::Wgl, extensions: &str,
 }
 
 /// Calls `SetPixelFormat` on a window.
-unsafe fn set_pixel_format(hdc: winapi::HDC, id: c_int) -> Result<(), CreationError> {
-    let mut output: winapi::PIXELFORMATDESCRIPTOR = mem::zeroed();
+unsafe fn set_pixel_format(hdc: HDC, id: c_int) -> Result<(), CreationError> {
+    let mut output: PIXELFORMATDESCRIPTOR = mem::zeroed();
 
-    if gdi32::DescribePixelFormat(hdc, id, mem::size_of::<winapi::PIXELFORMATDESCRIPTOR>()
-                                  as winapi::UINT, &mut output) == 0
+    if DescribePixelFormat(hdc, id, mem::size_of::<PIXELFORMATDESCRIPTOR>()
+                                  as UINT, &mut output) == 0
     {
         return Err(CreationError::OsError(format!("DescribePixelFormat function failed: {}",
                                                   format!("{}", io::Error::last_os_error()))));
     }
 
-    if gdi32::SetPixelFormat(hdc, id, &output) == 0 {
+    if SetPixelFormat(hdc, id, &output) == 0 {
         return Err(CreationError::OsError(format!("SetPixelFormat function failed: {}",
                                                   format!("{}", io::Error::last_os_error()))));
     }
@@ -655,11 +658,11 @@ unsafe fn set_pixel_format(hdc: winapi::HDC, id: c_int) -> Result<(), CreationEr
 }
 
 /// Loads the `opengl32.dll` library.
-unsafe fn load_opengl32_dll() -> Result<winapi::HMODULE, CreationError> {
+unsafe fn load_opengl32_dll() -> Result<HMODULE, CreationError> {
     let name = OsStr::new("opengl32.dll").encode_wide().chain(Some(0).into_iter())
                                          .collect::<Vec<_>>();
 
-    let lib = kernel32::LoadLibraryW(name.as_ptr());
+    let lib = LoadLibraryW(name.as_ptr());
 
     if lib.is_null() {
         return Err(CreationError::OsError(format!("LoadLibrary function failed: {}",
@@ -673,17 +676,17 @@ unsafe fn load_opengl32_dll() -> Result<winapi::HMODULE, CreationError> {
 ///
 /// The `window` must be passed because the driver can vary depending on the window's
 /// characteristics.
-unsafe fn load_extra_functions(window: winapi::HWND) -> Result<gl::wgl_extra::Wgl, CreationError> {
-    let (ex_style, style) = (winapi::WS_EX_APPWINDOW, winapi::WS_POPUP |
-                             winapi::WS_CLIPSIBLINGS | winapi::WS_CLIPCHILDREN);
+unsafe fn load_extra_functions(window: HWND) -> Result<gl::wgl_extra::Wgl, CreationError> {
+    let (ex_style, style) = (WS_EX_APPWINDOW, WS_POPUP |
+                             WS_CLIPSIBLINGS | WS_CLIPCHILDREN);
 
     // creating a dummy invisible window
     let dummy_window = {
         // getting the rect of the real window
         let rect = {
-            let mut placement: winapi::WINDOWPLACEMENT = mem::zeroed();
-            placement.length = mem::size_of::<winapi::WINDOWPLACEMENT>() as winapi::UINT;
-            if user32::GetWindowPlacement(window, &mut placement) == 0 {
+            let mut placement: WINDOWPLACEMENT = mem::zeroed();
+            placement.length = mem::size_of::<WINDOWPLACEMENT>() as UINT;
+            if GetWindowPlacement(window, &mut placement) == 0 {
                 panic!();
             }
             placement.rcNormalPosition
@@ -691,16 +694,16 @@ unsafe fn load_extra_functions(window: winapi::HWND) -> Result<gl::wgl_extra::Wg
 
         // getting the class name of the real window
         let mut class_name = [0u16; 128];
-        if user32::GetClassNameW(window, class_name.as_mut_ptr(), 128) == 0 {
+        if GetClassNameW(window, class_name.as_mut_ptr(), 128) == 0 {
             return Err(CreationError::OsError(format!("GetClassNameW function failed: {}",
                                               format!("{}", io::Error::last_os_error()))));
         }
 
         // access to class information of the real window
-        let instance = kernel32::GetModuleHandleW(ptr::null());
-        let mut class: winapi::WNDCLASSEXW = mem::zeroed();
+        let instance = GetModuleHandleW(ptr::null());
+        let mut class: WNDCLASSEXW = mem::zeroed();
 
-        if user32::GetClassInfoExW(instance, class_name.as_ptr(), &mut class) == 0 {
+        if GetClassInfoExW(instance, class_name.as_ptr(), &mut class) == 0 {
             return Err(CreationError::OsError(format!("GetClassInfoExW function failed: {}",
                                               format!("{}", io::Error::last_os_error()))));
         }
@@ -710,25 +713,25 @@ unsafe fn load_extra_functions(window: winapi::HWND) -> Result<gl::wgl_extra::Wg
         let class_name = OsStr::new("WglDummy Class").encode_wide().chain(Some(0).into_iter())
                                                    .collect::<Vec<_>>();
 
-        class.cbSize = mem::size_of::<winapi::WNDCLASSEXW>() as winapi::UINT;
+        class.cbSize = mem::size_of::<WNDCLASSEXW>() as UINT;
         class.lpszClassName = class_name.as_ptr();
-        class.lpfnWndProc = Some(user32::DefWindowProcW);
+        class.lpfnWndProc = Some(DefWindowProcW);
 
         // this shouldn't fail if the registration of the real window class worked.
         // multiple registrations of the window class trigger an error which we want
         // to ignore silently (e.g for multi-window setups)
-        user32::RegisterClassExW(&class);
+        RegisterClassExW(&class);
 
         // this dummy window should match the real one enough to get the same OpenGL driver
         let title = OsStr::new("dummy window").encode_wide().chain(Some(0).into_iter())
                                               .collect::<Vec<_>>();
-        let win = user32::CreateWindowExW(ex_style, class_name.as_ptr(),
-                                          title.as_ptr() as winapi::LPCWSTR, style,
-                                          winapi::CW_USEDEFAULT, winapi::CW_USEDEFAULT,
+        let win = CreateWindowExW(ex_style, class_name.as_ptr(),
+                                          title.as_ptr() as LPCWSTR, style,
+                                          CW_USEDEFAULT, CW_USEDEFAULT,
                                           rect.right - rect.left,
                                           rect.bottom - rect.top,
                                           ptr::null_mut(), ptr::null_mut(),
-                                          kernel32::GetModuleHandleW(ptr::null()),
+                                          GetModuleHandleW(ptr::null()),
                                           ptr::null_mut());
 
         if win.is_null() {
@@ -736,7 +739,7 @@ unsafe fn load_extra_functions(window: winapi::HWND) -> Result<gl::wgl_extra::Wg
                                               format!("{}", io::Error::last_os_error()))));
         }
 
-        let hdc = user32::GetDC(win);
+        let hdc = GetDC(win);
         if hdc.is_null() {
             let err = Err(CreationError::OsError(format!("GetDC function failed: {}",
                                                format!("{}", io::Error::last_os_error()))));
@@ -767,13 +770,13 @@ unsafe fn load_extra_functions(window: winapi::HWND) -> Result<gl::wgl_extra::Wg
 
 /// This function chooses a pixel format that is likely to be provided by
 /// the main video driver of the system.
-fn choose_dummy_pixel_format(hdc: winapi::HDC) -> Result<c_int, CreationError> {
+fn choose_dummy_pixel_format(hdc: HDC) -> Result<c_int, CreationError> {
     // building the descriptor to pass to ChoosePixelFormat
-    let descriptor = winapi::PIXELFORMATDESCRIPTOR {
-        nSize: mem::size_of::<winapi::PIXELFORMATDESCRIPTOR>() as u16,
+    let descriptor = PIXELFORMATDESCRIPTOR {
+        nSize: mem::size_of::<PIXELFORMATDESCRIPTOR>() as u16,
         nVersion: 1,
-        dwFlags: winapi::PFD_DRAW_TO_WINDOW | winapi::PFD_SUPPORT_OPENGL | winapi::PFD_DOUBLEBUFFER,
-        iPixelType: winapi::PFD_TYPE_RGBA,
+        dwFlags: PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
+        iPixelType: PFD_TYPE_RGBA,
         cColorBits: 24,
         cRedBits: 0,
         cRedShift: 0,
@@ -791,7 +794,7 @@ fn choose_dummy_pixel_format(hdc: winapi::HDC) -> Result<c_int, CreationError> {
         cDepthBits: 24,
         cStencilBits: 8,
         cAuxBuffers: 0,
-        iLayerType: winapi::PFD_MAIN_PLANE,
+        iLayerType: PFD_MAIN_PLANE,
         bReserved: 0,
         dwLayerMask: 0,
         dwVisibleMask: 0,
@@ -799,7 +802,7 @@ fn choose_dummy_pixel_format(hdc: winapi::HDC) -> Result<c_int, CreationError> {
     };
 
     // now querying
-    let pf_id = unsafe { gdi32::ChoosePixelFormat(hdc, &descriptor) };
+    let pf_id = unsafe { ChoosePixelFormat(hdc, &descriptor) };
     if pf_id == 0 {
         return Err(CreationError::OsError("No available pixel format".to_owned()));
     }
