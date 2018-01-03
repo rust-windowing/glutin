@@ -3,8 +3,8 @@
 use std::ffi::CString;
 use std::ops::{Deref, DerefMut};
 
-use kernel32;
-use winapi;
+use winapi::shared::windef::HGLRC;
+use winapi::um::libloaderapi::*;
 use winit;
 
 use Api;
@@ -24,7 +24,7 @@ mod context;
 #[derive(Clone, Debug)]
 pub enum RawHandle {
     Egl(egl::ffi::EGLContext),
-    Wgl(winapi::HGLRC),
+    Wgl(HGLRC),
 }
 
 /// Stupid wrapper because `*const libc::c_void` doesn't implement `Sync`.
@@ -42,14 +42,14 @@ lazy_static! {
         };
 
         for dll_name in &[b"libEGL.dll\0" as &[u8], ati_dll_name] {
-            let dll = unsafe { kernel32::LoadLibraryA(dll_name.as_ptr() as *const _) };
+            let dll = unsafe { LoadLibraryA(dll_name.as_ptr() as *const _) };
             if dll.is_null() {
                 continue;
             }
 
             let egl = Egl::load_with(|name| {
                 let name = CString::new(name).unwrap();
-                unsafe { kernel32::GetProcAddress(dll, name.as_ptr()) as *const _ }
+                unsafe { GetProcAddress(dll, name.as_ptr()) as *const _ }
             });
 
             return Some(EglWrapper(egl))

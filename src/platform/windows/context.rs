@@ -2,7 +2,7 @@
 
 use std::ptr;
 
-use winapi;
+use winapi::shared::windef::HWND;
 use winit;
 
 use ContextError;
@@ -46,7 +46,7 @@ impl Context {
             }
         });
         let context_result = unsafe {
-            let w = window.platform_window() as winapi::HWND;
+            let w = window.platform_window() as HWND;
             match gl_attr.version {
                 GlRequest::Specific(Api::OpenGlEs, (_major, _minor)) => {
                     if let Some(egl) = egl {
