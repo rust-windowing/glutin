@@ -24,7 +24,11 @@ pub fn get_gl_profile<T>(
     } else if let Some(v) = version {
         // second, process exact requested version, if any
         if v < (3, 2) {
-            Err(CreationError::OpenGlVersionNotSupported)
+            if opengl.profile.is_none() && v <= (2, 1) {
+                Ok(NSOpenGLProfileVersionLegacy)
+            } else {
+                Err(CreationError::OpenGlVersionNotSupported)
+            }
         } else if v == (3, 2) {
             Ok(NSOpenGLProfileVersion3_2Core)
         } else {
