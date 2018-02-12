@@ -1,5 +1,9 @@
 # Unreleased
 
+# Version 0.12.2 (2018-02-12)
+
+- Don't use yanked version of winit
+
 # Version 0.12.1 (2018-02-05)
 
 - Add support for winapi 0.3 ([#975](https://github.com/tomaka/glutin/pull/975))
