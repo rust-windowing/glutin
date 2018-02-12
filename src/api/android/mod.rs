@@ -16,11 +16,34 @@ use PixelFormatRequirements;
 
 use api::egl;
 use api::egl::Context as EglContext;
+use std::cell::Cell;
+use std::sync::Arc;
+use winit::os::android::EventsLoopExt;
 
 mod ffi;
 
-pub struct Context {
+struct AndroidContext {
     egl_context: EglContext,
+    stopped: Cell<bool>,
+}
+
+pub struct Context(Arc<AndroidContext>);
+
+struct AndroidSyncEventHandler(Arc<AndroidContext>);
+
+impl android_glue::SyncEventHandler for AndroidSyncEventHandler {
+    fn handle(&mut self, event: &android_glue::Event) {
+        match *event {
+            // 'on_surface_destroyed' Android event can arrive with some delay because multithreading communication.
+            // Because of that, swap_buffers can be called before processing 'on_surface_destroyed' event, with the
+            // native window surface already destroyed. EGL generates a BAD_SURFACE error in this situation.
+            // Set stop to true to prevent swap_buffer call race conditions.
+            android_glue::Event::TermWindow => {
+                self.0.stopped.set(true);
+            },
+            _ => { return; }
+        };
+    }
 }
 
 impl Context {
@@ -32,7 +55,7 @@ impl Context {
     ) -> Result<(winit::Window, Self), CreationError>
     {
         let window = try!(window_builder.build(events_loop));
-        let gl_attr = gl_attr.clone().map_sharing(|c| &c.egl_context);
+        let gl_attr = gl_attr.clone().map_sharing(|c| &c.0.egl_context);
         let native_window = unsafe { android_glue::get_native_window() };
         if native_window.is_null() {
             return Err(OsError(format!("Android's native window is null")));
@@ -41,13 +64,42 @@ impl Context {
         let native_display = egl::NativeDisplay::Android;
         let context = try!(EglContext::new(egl, pf_reqs, &gl_attr, native_display)
             .and_then(|p| p.finish(native_window as *const _)));
-        let context = Context { egl_context: context };
+        let ctx = Arc::new(AndroidContext {
+            egl_context: context,
+            stopped: Cell::new(false),
+        });
+
+        let handler = Box::new(AndroidSyncEventHandler(ctx.clone()));
+        android_glue::add_sync_event_handler(handler);
+        let context = Context(ctx.clone());
+
+        events_loop.set_suspend_callback(Some(Box::new(move |suspended| {
+            ctx.stopped.set(suspended);
+            if suspended {
+                // Android has stopped the activity or sent it to background.
+                // Release the EGL surface and stop the animation loop.
+                unsafe {
+                    ctx.egl_context.on_surface_destroyed();
+                }
+            } else {
+                // Android has started the activity or sent it to foreground.
+                // Restore the EGL surface and animation loop.
+                unsafe {
+                    let native_window = android_glue::get_native_window();
+                    ctx.egl_context.on_surface_created(native_window as *const _);
+                }
+            }
+        })));
+
         Ok((window, context))
     }
 
     #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        self.egl_context.make_current()
+        if !self.0.stopped.get() {
+            return self.0.egl_context.make_current();
+        }
+        Err(ContextError::ContextLost)
     }
 
     #[inline]
@@ -56,32 +108,35 @@ impl Context {
 
     #[inline]
     pub fn is_current(&self) -> bool {
-        self.egl_context.is_current()
+        self.0.egl_context.is_current()
     }
 
     #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const () {
-        self.egl_context.get_proc_address(addr)
+        self.0.egl_context.get_proc_address(addr)
     }
 
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
-        self.egl_context.swap_buffers()
+        if !self.0.stopped.get() {
+            return self.0.egl_context.swap_buffers();
+        }
+        Err(ContextError::ContextLost)
     }
 
     #[inline]
     pub fn get_api(&self) -> Api {
-        self.egl_context.get_api()
+        self.0.egl_context.get_api()
     }
 
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
-        self.egl_context.get_pixel_format()
+        self.0.egl_context.get_pixel_format()
     }
 
     #[inline]
     pub unsafe fn raw_handle(&self) -> egl::ffi::EGLContext {
-        self.egl_context.raw_handle()
+        self.0.egl_context.raw_handle()
     }
 }
 
