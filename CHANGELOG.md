@@ -1,5 +1,7 @@
 # Unreleased
 
+# Version 0.13.0 (2018-02-28)
+
 - Update winit dependency to 0.11.1
 
 # Version 0.12.2 (2018-02-12)
