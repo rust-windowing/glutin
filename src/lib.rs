@@ -20,16 +20,6 @@
 //!
 //! For contexts that are *not* associated with any particular window, see the HeadlessContext
 //! type.
-//!
-//! # Features
-//!
-//! This crate has two Cargo features: `window` and `headless`.
-//!
-//!  - `window` allows you to create regular windows and enables the `WindowBuilder` object.
-//!  - `headless` allows you to do headless rendering, and enables
-//!     the `HeadlessRendererBuilder` object.
-//!
-//! By default only `window` is enabled.
 
 #[cfg(target_os = "windows")]
 #[macro_use]
