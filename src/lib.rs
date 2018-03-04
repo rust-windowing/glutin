@@ -20,6 +20,18 @@
 //!
 //! For contexts that are *not* associated with any particular window, see the HeadlessContext
 //! type.
+//!
+//! # Features
+//!
+//! This crate has one Cargo feature: `windows-static-egl`.
+//!
+//! On Windows, when the `windows-static-egl` feature is enabled,
+//! glutin assumes that `libEGL` is statically linked into the program, and uses it.
+//! Specifically, it will look for this `extern` symbol:
+//!
+//! ```ignore
+//! fn eglGetProcAddress(name: *const c_char) -> *const c_void;
+//! ```
 
 #[cfg(target_os = "windows")]
 #[macro_use]

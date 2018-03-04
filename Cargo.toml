@@ -1,6 +1,6 @@
 [package]
 name = "glutin"
-version = "0.13.0"
+version = "0.13.1"
 authors = ["The glutin contributors, Pierre Krieger <pierre.krieger1708@gmail.com>"]
 description = "Cross-platform OpenGL context provider."
 keywords = ["windowing", "opengl"]
@@ -9,6 +9,9 @@ readme = "README.md"
 repository = "https://github.com/tomaka/glutin"
 documentation = "https://docs.rs/glutin"
 build = "build.rs"
+
+[features]
+windows-static-egl = []
 
 [dependencies]
 lazy_static = "1"
