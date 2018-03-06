@@ -20,7 +20,7 @@ winit = "0.11.1"
 gl_generator = "0.9"
 
 [target.'cfg(target_os = "android")'.dependencies.android_glue]
-version = "0.2"
+version = "0.2.3"
 
 [target.'cfg(target_os = "ios")'.dependencies]
 objc = "0.2"
