@@ -15,3 +15,4 @@ build: false
 
 test_script:
   - cargo test --verbose
+  - cargo build --features windows-static-egl --example windows_static_egl

@@ -1,6 +1,7 @@
 # Unreleased
 
 - Fix android activity life cycle
+- Add the `windows-static-egl` Cargo feature. (See crate’s doc-comment.)
 
 # Version 0.13.0 (2018-02-28)
 

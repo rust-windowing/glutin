@@ -23,13 +23,15 @@
 //!
 //! # Features
 //!
-//! This crate has two Cargo features: `window` and `headless`.
+//! This crate has one Cargo feature: `windows-static-egl`.
 //!
-//!  - `window` allows you to create regular windows and enables the `WindowBuilder` object.
-//!  - `headless` allows you to do headless rendering, and enables
-//!     the `HeadlessRendererBuilder` object.
+//! On Windows, when the `windows-static-egl` feature is enabled,
+//! glutin assumes that `libEGL` is statically linked into the program, and uses it.
+//! Specifically, it will look for this `extern` symbol:
 //!
-//! By default only `window` is enabled.
+//! ```ignore
+//! fn eglGetProcAddress(name: *const c_char) -> *const c_void;
+//! ```
 
 #[cfg(target_os = "windows")]
 #[macro_use]

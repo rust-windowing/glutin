@@ -31,9 +31,28 @@ pub enum RawHandle {
 struct EglWrapper(Egl);
 unsafe impl Sync for EglWrapper {}
 
+#[cfg(feature = "windows-static-egl")]
+fn static_egl() -> Option<EglWrapper> {
+    use std::os::raw::{c_char, c_void};
+
+    extern {
+        fn eglGetProcAddress(name: *const c_char) -> *const c_void;
+    }
+
+    Some(EglWrapper(Egl::load_with(|name| {
+        let name = CString::new(name).unwrap();
+        unsafe { eglGetProcAddress(name.as_ptr()) }
+    })))
+}
+
+#[cfg(not(feature = "windows-static-egl"))]
+fn static_egl() -> Option<EglWrapper> {
+    None
+}
+
 lazy_static! {
     // An EGL implementation available on the system.
-    static ref EGL: Option<EglWrapper> = {
+    static ref EGL: Option<EglWrapper> = static_egl().or_else(|| {
         // the ATI drivers provide an EGL implementation in their DLLs
         let ati_dll_name = if cfg!(target_pointer_width = "64") {
             b"atio6axx.dll\0"
@@ -56,7 +75,7 @@ lazy_static! {
         }
 
         None
-    };
+    });
 }
 
 /// The Win32 implementation of the main `Context` object.
