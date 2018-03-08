@@ -1,6 +1,9 @@
 # Unreleased
 
+# Version 0.13.1 (2018-03-07)
+
 - Fix android activity life cycle
+- Update winit dependency to 0.11.2
 
 # Version 0.13.0 (2018-02-28)
 

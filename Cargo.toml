@@ -1,6 +1,6 @@
 [package]
 name = "glutin"
-version = "0.13.0"
+version = "0.13.1"
 authors = ["The glutin contributors, Pierre Krieger <pierre.krieger1708@gmail.com>"]
 description = "Cross-platform OpenGL context provider."
 keywords = ["windowing", "opengl"]
@@ -14,7 +14,7 @@ build = "build.rs"
 lazy_static = "1"
 libc = "0.2"
 shared_library = "0.1.0"
-winit = "0.11.1"
+winit = "0.11.2"
 
 [build-dependencies]
 gl_generator = "0.9"
