@@ -771,6 +771,7 @@ unsafe fn create_context(egl: &ffi::egl::Egl, display: ffi::egl::types::EGLDispl
 
     if context.is_null() {
         match egl.GetError() as u32 {
+            ffi::egl::BAD_MATCH |
             ffi::egl::BAD_ATTRIBUTE => return Err(CreationError::OpenGlVersionNotSupported),
             e => panic!("eglCreateContext failed: 0x{:x}", e),
         }
