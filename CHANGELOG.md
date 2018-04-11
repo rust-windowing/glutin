@@ -1,5 +1,10 @@
 # Unreleased
 
+# Version 0.14.0 (2018-04-06)
+
+- Update winit dependency to 0.12.0
+- Update wayland backend to not use deprecated `get_inner_size_points` method.
+
 # Version 0.13.1 (2018-03-07)
 
 - Fix android activity life cycle
