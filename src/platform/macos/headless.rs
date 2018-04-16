@@ -54,7 +54,7 @@ impl HeadlessContext {
 
     #[inline]
     pub fn is_current(&self) -> bool {
-        unimplemented!()
+        unsafe { id::currentContext(self.context) == self.context }
     }
 
     #[inline]
