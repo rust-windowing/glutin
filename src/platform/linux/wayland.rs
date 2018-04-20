@@ -20,7 +20,7 @@ impl Context {
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<(winit::Window, Self), CreationError>
     {
-        let window = try!(window_builder.build(events_loop));
+        let window = window_builder.build(events_loop)?;
         let (w_px, h_px) = window.get_inner_size().unwrap();
         let hidpi_factor = window.hidpi_factor();
         let w = (w_px as f32 / hidpi_factor) as u32;

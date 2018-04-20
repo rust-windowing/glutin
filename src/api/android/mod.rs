@@ -54,7 +54,7 @@ impl Context {
         gl_attr: &GlAttributes<&Self>,
     ) -> Result<(winit::Window, Self), CreationError>
     {
-        let window = try!(window_builder.build(events_loop));
+        let window = window_builder.build(events_loop)?;
         let gl_attr = gl_attr.clone().map_sharing(|c| &c.0.egl_context);
         let native_window = unsafe { android_glue::get_native_window() };
         if native_window.is_null() {
@@ -158,11 +158,11 @@ impl HeadlessContext {
     ) -> Result<Self, CreationError>
     {
         let gl_attr = gl_attr.clone().map_sharing(|c| &c.0);
-        let context = try!(EglContext::new(egl::ffi::egl::Egl,
+        let context = EglContext::new(egl::ffi::egl::Egl,
                                            pf_reqs,
                                            &gl_attr,
-                                           egl::NativeDisplay::Android));
-        let context = try!(context.finish_pbuffer(dimensions));     // TODO:
+                                           egl::NativeDisplay::Android)?;
+        let context = context.finish_pbuffer(dimensions)?;     // TODO:
         Ok(HeadlessContext(context))
     }
 
