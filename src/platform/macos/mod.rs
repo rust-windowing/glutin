@@ -45,7 +45,7 @@ impl Context {
     ) -> Result<(winit::Window, Self), CreationError>
     {
         let transparent = window_builder.window.transparent;
-        let window = try!(window_builder.build(events_loop));
+        let window = window_builder.build(events_loop)?;
 
         if gl_attr.sharing.is_some() {
             unimplemented!()

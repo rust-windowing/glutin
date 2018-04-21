@@ -253,7 +253,7 @@ impl Context {
         };
 
         let (config_id, pixel_format) = unsafe {
-            try!(choose_fbconfig(&egl, display, &egl_version, api, version, pf_reqs))
+            choose_fbconfig(&egl, display, &egl_version, api, version, pf_reqs)?
         };
 
         Ok(ContextPrototype {
@@ -446,9 +446,9 @@ impl<'a> ContextPrototype<'a> {
     {
         let context = unsafe {
             if let Some(version) = self.version {
-                try!(create_context(&self.egl, self.display, &self.egl_version,
+                create_context(&self.egl, self.display, &self.egl_version,
                                     &self.extensions, self.api, version, self.config_id,
-                                    self.opengl.debug, self.opengl.robustness))
+                                    self.opengl.debug, self.opengl.robustness)?
 
             } else if self.api == Api::OpenGlEs {
                 if let Ok(ctxt) = create_context(&self.egl, self.display, &self.egl_version,

@@ -90,7 +90,7 @@ impl Context {
         }
 
         // loading the functions that are not guaranteed to be supported
-        let extra_functions = try!(load_extra_functions(window));
+        let extra_functions = load_extra_functions(window)?;
 
         // getting the list of the supported extensions
         let extensions = if extra_functions.GetExtensionsStringARB.is_loaded() {
@@ -112,14 +112,14 @@ impl Context {
             let (id, f) = if extensions.split(' ').find(|&i| i == "WGL_ARB_pixel_format")
                                                   .is_some()
             {
-                try!(choose_arb_pixel_format(&extra_functions, &extensions, hdc, pf_reqs)
-                                            .map_err(|_| CreationError::NoAvailablePixelFormat))
+                choose_arb_pixel_format(&extra_functions, &extensions, hdc, pf_reqs)
+                                            .map_err(|_| CreationError::NoAvailablePixelFormat)?
             } else {
-                try!(choose_native_pixel_format(hdc, pf_reqs)
-                                            .map_err(|_| CreationError::NoAvailablePixelFormat))
+                choose_native_pixel_format(hdc, pf_reqs)
+                                            .map_err(|_| CreationError::NoAvailablePixelFormat)?
             };
 
-            try!(set_pixel_format(hdc, id));
+            set_pixel_format(hdc, id)?;
             f
         };
 
@@ -128,11 +128,11 @@ impl Context {
                                           window, hdc));
 
         // loading the opengl32 module
-        let gl_library = try!(load_opengl32_dll());
+        let gl_library = load_opengl32_dll()?;
 
         // handling vsync
         if extensions.split(' ').find(|&i| i == "WGL_EXT_swap_control").is_some() {
-            let _guard = try!(CurrentContextGuard::make_current(hdc, context.0));
+            let _guard = CurrentContextGuard::make_current(hdc, context.0)?;
 
             if extra_functions.SwapIntervalEXT(if opengl.vsync { 1 } else { 0 }) == 0 {
                 return Err(CreationError::OsError(format!("wglSwapIntervalEXT failed")));
@@ -751,14 +751,14 @@ unsafe fn load_extra_functions(window: HWND) -> Result<gl::wgl_extra::Wgl, Creat
 
     // getting the pixel format that we will use and setting it
     {
-        let id = try!(choose_dummy_pixel_format(dummy_window.1));
-        try!(set_pixel_format(dummy_window.1, id));
+        let id = choose_dummy_pixel_format(dummy_window.1)?;
+        set_pixel_format(dummy_window.1, id)?;
     }
 
     // creating the dummy OpenGL context and making it current
-    let dummy_context = try!(create_context(None, dummy_window.0, dummy_window.1));
-    let _current_context = try!(CurrentContextGuard::make_current(dummy_window.1,
-                                                                  dummy_context.0));
+    let dummy_context = create_context(None, dummy_window.0, dummy_window.1)?;
+    let _current_context = CurrentContextGuard::make_current(dummy_window.1,
+                                                                  dummy_context.0)?;
 
     // loading the extra WGL functions
     Ok(gl::wgl_extra::Wgl::load_with(|addr| {

@@ -37,7 +37,7 @@ impl Context {
         egl: Option<&Egl>,
     ) -> Result<(winit::Window, Self), CreationError>
     {
-        let window = try!(window_builder.build(events_loop));
+        let window = window_builder.build(events_loop)?;
         let gl_attr = gl_attr.clone().map_sharing(|ctxt| {
             match *ctxt {
                 Context::Wgl(ref c) => c.get_hglrc(),

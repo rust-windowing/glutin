@@ -143,7 +143,7 @@ impl Context {
                 // GLX should be preferred over EGL, otherwise crashes may occur
                 // on X11 – issue #314
                 if let Some(ref glx) = backend.glx {
-                    Prototype::Glx(try!(GlxContext::new(
+                    Prototype::Glx(GlxContext::new(
                         glx.clone(),
                         &display.xlib,
                         pf_reqs,
@@ -151,27 +151,27 @@ impl Context {
                         display.display,
                         screen_id,
                         window_builder.window.transparent,
-                    )))
+                    )?)
                 } else if let Some(ref egl) = backend.egl {
                     let native_display = egl::NativeDisplay::X11(Some(display.display as *const _));
-                    Prototype::Egl(try!(EglContext::new(
+                    Prototype::Egl(EglContext::new(
                         egl.clone(),
                         pf_reqs,
                         &builder_clone_opengl_egl,
                         native_display,
-                    )))
+                    )?)
                 } else {
                     return Err(CreationError::NotSupported);
                 }
             },
             GlRequest::Specific(Api::OpenGlEs, _) => {
                 if let Some(ref egl) = backend.egl {
-                    Prototype::Egl(try!(EglContext::new(
+                    Prototype::Egl(EglContext::new(
                         egl.clone(),
                         pf_reqs,
                         &builder_clone_opengl_egl,
                         egl::NativeDisplay::X11(Some(display.display as *const _)),
-                    )))
+                    )?)
                 } else {
                     return Err(CreationError::NotSupported);
                 }
@@ -203,21 +203,19 @@ impl Context {
             },
         };
 
-        let window = try! {
-            window_builder
+        let window = window_builder
                 .with_x11_visual(&visual_infos as *const _)
                 .with_x11_screen(screen_id)
-                .build(events_loop)
-        };
+                .build(events_loop)?;
 
         let xlib_window = window.get_xlib_window().unwrap();
         // finish creating the OpenGL context
         let context = match context {
             Prototype::Glx(ctxt) => {
-                GlContext::Glx(try!(ctxt.finish(xlib_window)))
+                GlContext::Glx(ctxt.finish(xlib_window)?)
             },
             Prototype::Egl(ctxt) => {
-                GlContext::Egl(try!(ctxt.finish(xlib_window as _)))
+                GlContext::Egl(ctxt.finish(xlib_window as _)?)
             },
         };
 
