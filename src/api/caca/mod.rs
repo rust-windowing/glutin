@@ -32,7 +32,7 @@ impl Context {
         let opengl_dimensions = opengl.get_dimensions();
 
         let libcaca = match ffi::LibCaca::open(&Path::new("libcaca.so.0")) {
-            Err(_) => return Err(CreationError::NotSupported),
+            Err(_) => return Err(CreationError::NotSupported("could not find libcaca.so")),
             Ok(l) => l
         };
 

@@ -30,7 +30,7 @@ impl Context {
         let context = {
             let libegl = unsafe { dlopen::dlopen(b"libEGL.so\0".as_ptr() as *const _, dlopen::RTLD_NOW) };
             if libegl.is_null() {
-                return Err(CreationError::NotSupported);
+                return Err(CreationError::NotSupported("could not find libEGL"));
             }
             let egl = ::api::egl::ffi::egl::Egl::load_with(|sym| {
                 let sym = CString::new(sym).unwrap();

@@ -400,7 +400,7 @@ impl std::ops::Deref for GlWindow {
 pub enum CreationError {
     OsError(String),
     /// TODO: remove this error
-    NotSupported,
+    NotSupported(&'static str),
     NoBackendAvailable(Box<std::error::Error + Send>),
     RobustnessNotSupported,
     OpenGlVersionNotSupported,
@@ -413,7 +413,8 @@ impl CreationError {
     fn to_string(&self) -> &str {
         match *self {
             CreationError::OsError(ref text) => &text,
-            CreationError::NotSupported => "Some of the requested attributes are not supported",
+            CreationError::NotSupported(text) => &text,
+            CreationError::NotSupported(_) => "Some of the requested attributes are not supported",
             CreationError::NoBackendAvailable(_) => "No backend is available",
             CreationError::RobustnessNotSupported => "You requested robustness, but it is \
                                                       not supported.",
@@ -430,6 +431,9 @@ impl CreationError {
 impl std::fmt::Display for CreationError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         formatter.write_str(self.to_string())?;
+        if let &CreationError::NotSupported(msg) = self {
+            write!(formatter, ": {}", msg)?;
+        }
         if let Some(err) = std::error::Error::cause(self) {
             write!(formatter, ": {}", err)?;
         }
