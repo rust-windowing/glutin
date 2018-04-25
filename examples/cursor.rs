@@ -42,7 +42,7 @@ fn main() {
                         cursor_idx = 0;
                     }
                 },
-                WindowEvent::Closed => return ControlFlow::Break,
+                WindowEvent::CloseRequested => return ControlFlow::Break,
                 WindowEvent::Resized(w, h) => gl_window.resize(w, h),
                 _ => (),
             }

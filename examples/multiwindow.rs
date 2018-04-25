@@ -25,7 +25,7 @@ fn main() {
                 glutin::WindowEvent::Resized(w, h) => {
                     windows[&window_id].0.resize(w, h)
                 },
-                glutin::WindowEvent::Closed => {
+                glutin::WindowEvent::CloseRequested => {
                     if windows.remove(&window_id).is_some() {
                         println!("Window with ID {:?} has been closed", window_id);
                         if windows.is_empty() {
