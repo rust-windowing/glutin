@@ -269,7 +269,8 @@ unsafe fn create_context(extra: Option<(&gl::wgl_extra::Wgl, &PixelFormatRequire
                     attributes.push(gl::wgl_extra::CONTEXT_PROFILE_MASK_ARB as c_int);
                     attributes.push(flag as c_int);
                 } else {
-                    return Err(CreationError::NotSupported);
+                    return Err(CreationError::NotSupported(
+                            "required extension \"WGL_ARB_create_context_profile\" not found"));
                 }
             }
 

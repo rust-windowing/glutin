@@ -76,7 +76,7 @@ impl Context {
                 .initWithFormat_shareContext_(*pixel_format, nil));
             let gl_context = match gl_context.non_nil() {
                 Some(gl_context) => gl_context,
-                None => return Err(CreationError::NotSupported),
+                None => return Err(CreationError::NotSupported("could not open gl context")),
             };
 
             let pixel_format = {

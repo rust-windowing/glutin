@@ -161,7 +161,7 @@ impl Context {
                         native_display,
                     )?)
                 } else {
-                    return Err(CreationError::NotSupported);
+                    return Err(CreationError::NotSupported("both libglx and libEGL not present"));
                 }
             },
             GlRequest::Specific(Api::OpenGlEs, _) => {
@@ -173,11 +173,11 @@ impl Context {
                         egl::NativeDisplay::X11(Some(display.display as *const _)),
                     )?)
                 } else {
-                    return Err(CreationError::NotSupported);
+                    return Err(CreationError::NotSupported("libEGL not present"));
                 }
             },
             GlRequest::Specific(_, _) => {
-                return Err(CreationError::NotSupported);
+                return Err(CreationError::NotSupported("requested specific without gl or gles"));
             },
         };
 
