@@ -34,7 +34,7 @@ fn main() {
     let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
 
     let _ = unsafe { gl_window.make_current() };
-    
+
     let gl = support::load(&gl_window);
 
     events_loop.run_forever(|event| {
@@ -42,7 +42,7 @@ fn main() {
         println!("{:?}", event);
         match event {
             Event::WindowEvent { event, .. } => match event {
-                WindowEvent::Closed => return ControlFlow::Break,
+                WindowEvent::CloseRequested => return ControlFlow::Break,
                 WindowEvent::Resized(w, h) => gl_window.resize(w, h),
                 WindowEvent::KeyboardInput { input, .. } => {
                     if let Some(VirtualKeyCode::Escape) = input.virtual_keycode {

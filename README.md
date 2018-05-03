@@ -63,7 +63,7 @@ fn main() {
         events_loop.poll_events(|event| {
             match event {
                 glutin::Event::WindowEvent{ event, .. } => match event {
-                    glutin::WindowEvent::Closed => running = false,
+                    glutin::WindowEvent::CloseRequested => running = false,
                     glutin::WindowEvent::Resized(w, h) => gl_window.resize(w, h),
                     _ => ()
                 },

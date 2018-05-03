@@ -1,5 +1,9 @@
 # Unreleased
 
+# Version 0.15.0 (2018-04-25)
+
+- Update winit dependency to 0.13.0. See [winit's CHANGELOG](https://github.com/tomaka/winit/blob/v0.13.0/CHANGELOG.md) for more info.
+
 # Version 0.14.0 (2018-04-06)
 
 - Update winit dependency to 0.12.0

@@ -23,7 +23,7 @@ fn main() {
         println!("{:?}", event);
         match event {
             glutin::Event::WindowEvent { event, .. } => match event {
-                glutin::WindowEvent::Closed => return glutin::ControlFlow::Break,
+                glutin::WindowEvent::CloseRequested => return glutin::ControlFlow::Break,
                 glutin::WindowEvent::Resized(w, h) => gl_window.resize(w, h),
                 _ => (),
             },

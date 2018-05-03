@@ -102,7 +102,7 @@ pub fn create_delegate_class() {
             let state = &mut *(state as *mut DelegateState);
             // push event to the front to guarantee that we'll process it
             // immediately after jump
-            state.events_queue.push_front(Event::Closed);
+            state.events_queue.push_front(Event::Destroyed);
             longjmp(mem::transmute(&mut jmpbuf),1);
         }
     }

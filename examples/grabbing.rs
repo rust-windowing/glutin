@@ -37,7 +37,7 @@ fn main() {
                         }
                     }
 
-                    WindowEvent::Closed => return ControlFlow::Break,
+                    WindowEvent::CloseRequested => return ControlFlow::Break,
                     WindowEvent::Resized(w, h) => gl_window.resize(w, h),
                     a @ WindowEvent::CursorMoved { .. } => {
                         println!("{:?}", a);
