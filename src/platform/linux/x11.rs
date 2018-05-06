@@ -31,13 +31,13 @@ impl fmt::Display for NoX11Connection {
     }
 }
 
-struct GlxOrEgl {
-    glx: Option<Glx>,
-    egl: Option<Egl>,
+pub(super) struct GlxOrEgl {
+    pub glx: Option<Glx>,
+    pub egl: Option<Egl>,
 }
 
 impl GlxOrEgl {
-    fn new() -> GlxOrEgl {
+    pub(super) fn new() -> GlxOrEgl {
         // TODO: use something safer than raw "dlopen"
         let glx = {
             let mut libglx = unsafe {
