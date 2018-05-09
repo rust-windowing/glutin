@@ -1,6 +1,6 @@
 [package]
 name = "glutin"
-version = "0.15.0"
+version = "0.16.0"
 authors = ["The glutin contributors, Pierre Krieger <pierre.krieger1708@gmail.com>"]
 description = "Cross-platform OpenGL context provider."
 keywords = ["windowing", "opengl"]
@@ -10,11 +10,14 @@ repository = "https://github.com/tomaka/glutin"
 documentation = "https://docs.rs/glutin"
 build = "build.rs"
 
+[features]
+icon_loading = ["winit/icon_loading"]
+
 [dependencies]
 lazy_static = "1"
 libc = "0.2"
 shared_library = "0.1.0"
-winit = "0.13.1"
+winit = "0.15.0"
 
 [build-dependencies]
 gl_generator = "0.9"
@@ -28,9 +31,9 @@ objc = "0.2"
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2"
 cgl = "0.2"
-cocoa = "0.14"
-core-foundation = "0.5"
-core-graphics = "0.13"
+cocoa = "0.15"
+core-foundation = "0.6"
+core-graphics = "0.14"
 
 [target.'cfg(target_os = "windows")'.dependencies.winapi]
 version = "0.3.2"
@@ -43,5 +46,5 @@ features = [
 
 [target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os="dragonfly", target_os="openbsd"))'.dependencies]
 osmesa-sys = "0.1.0"
-wayland-client = { version = "0.12", features = ["egl", "dlopen"] }
+wayland-client = { version = "0.20.4", features = ["egl", "dlopen"] }
 x11-dl = "2.17.5"
