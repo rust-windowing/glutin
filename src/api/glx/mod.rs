@@ -39,13 +39,6 @@ pub struct Context {
     pixel_format: PixelFormat,
 }
 
-// TODO: remove me
-fn with_c_str<F, T>(s: &str, f: F) -> T where F: FnOnce(*const libc::c_char) -> T {
-    use std::ffi::CString;
-    let c_str = CString::new(s.as_bytes().to_vec()).unwrap();
-    f(c_str.as_ptr())
-}
-
 impl Context {
     pub fn new<'a>(
         glx: ffi::glx::Glx,
@@ -189,10 +182,9 @@ impl<'a> ContextPrototype<'a> {
         };
 
         // loading the extra GLX functions
-        let extra_functions = ffi::glx_extra::Glx::load_with(|addr| {
-            with_c_str(addr, |s| {
-                unsafe { self.glx.GetProcAddress(s as *const u8) as *const _ }
-            })
+        let extra_functions = ffi::glx_extra::Glx::load_with(|proc_name| {
+            let c_str = CString::new(proc_name).unwrap();
+            unsafe { self.glx.GetProcAddress(c_str.as_ptr() as *const u8) as *const _ }
         });
 
         // creating GL context
