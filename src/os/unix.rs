@@ -5,6 +5,7 @@ pub use api::glx::ffi::GLXContext;
 pub use platform::RawHandle;
 
 pub use winit::os::unix::XNotSupported;
+pub use winit::os::unix::XWindowType;
 pub use winit::os::unix::EventsLoopExt;
 pub use winit::os::unix::MonitorIdExt;
 pub use winit::os::unix::WindowBuilderExt;

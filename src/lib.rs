@@ -62,13 +62,37 @@ extern crate x11_dl;
 extern crate wayland_client;
 
 pub use headless::{HeadlessRendererBuilder, HeadlessContext};
-pub use winit::{AvailableMonitorsIter, AxisId, ButtonId, ControlFlow,
-                CreationError as WindowCreationError, CursorState, DeviceEvent, DeviceId,
-                ElementState, Event, EventsLoop, EventsLoopClosed, EventsLoopProxy,
-                KeyboardInput, ModifiersState,
-                MonitorId, MouseButton, MouseCursor, MouseScrollDelta, ScanCode,
-                Touch, TouchPhase, VirtualKeyCode, Window, WindowAttributes, WindowBuilder,
-                WindowEvent, WindowId};
+pub use winit::{
+    AvailableMonitorsIter,
+    AxisId,
+    ButtonId,
+    ControlFlow,
+    CreationError as WindowCreationError,
+    CursorState,
+    DeviceEvent,
+    DeviceId,
+    ElementState,
+    Event,
+    EventsLoop,
+    EventsLoopClosed,
+    EventsLoopProxy,
+    Icon,
+    KeyboardInput,
+    ModifiersState,
+    MonitorId,
+    MouseButton,
+    MouseCursor,
+    MouseScrollDelta,
+    ScanCode,
+    Touch,
+    TouchPhase,
+    VirtualKeyCode,
+    Window,
+    WindowAttributes,
+    WindowBuilder,
+    WindowEvent,
+    WindowId,
+};
 
 use std::io;
 
@@ -744,4 +768,3 @@ impl<S> Default for GlAttributes<S> {
         }
     }
 }
-

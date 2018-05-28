@@ -1,7 +1,7 @@
 #![cfg(target_os = "windows")]
 
 pub use winapi::shared::windef::HGLRC;
-pub use winit::os::windows::{WindowBuilderExt, WindowExt, MonitorIdExt};
+pub use winit::os::windows::{DeviceIdExt, WindowBuilderExt, WindowExt, MonitorIdExt};
 
 pub use api::egl::ffi::EGLContext;
 pub use platform::RawHandle;
