@@ -172,7 +172,7 @@ impl Context {
         let addr = addr.as_ptr();
 
         unsafe {
-            let p = gl::wgl::GetProcAddress(addr) as *const _;
+            let p = gl::wgl::GetProcAddress(addr) as *const ();
             if !p.is_null() { return p; }
             GetProcAddress(self.gl_library, addr) as *const _
         }

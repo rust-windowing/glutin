@@ -21,10 +21,8 @@ impl Context {
     ) -> Result<(winit::Window, Self), CreationError>
     {
         let window = window_builder.build(events_loop)?;
-        let (w_px, h_px) = window.get_inner_size().unwrap();
-        let hidpi_factor = window.hidpi_factor();
-        let w = (w_px as f32 / hidpi_factor) as u32;
-        let h = (h_px as f32 / hidpi_factor) as u32;
+        let logical_size = window.get_inner_size().unwrap();
+        let (w, h) = (logical_size.width, logical_size.height);
         let surface = window.get_wayland_surface().unwrap();
         let egl_surface = unsafe { wegl::WlEglSurface::new_from_raw(surface as *mut _, w as i32, h as i32) };
         let context = {
