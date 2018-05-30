@@ -2,8 +2,6 @@
 
 pub use api::ios::*;
 
-pub use cocoa::base::id;
-
 use GlAttributes;
 use CreationError;
 use PixelFormat;

@@ -3,12 +3,14 @@
 //! Contains the following modules:
 //!
 //!  - `android`
+//!  - `ios`
 //!  - `macos`
 //!  - `unix`
 //!  - `windows`
 //!
 
 pub mod android;
+pub mod ios;
 pub mod macos;
 pub mod unix;
 pub mod windows;
