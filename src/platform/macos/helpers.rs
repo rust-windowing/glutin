@@ -10,7 +10,7 @@ use cocoa::base::nil;
 
 pub fn get_gl_profile<T>(
     opengl: &GlAttributes<&T>,
-    pf_reqs: &PixelFormatRequirements
+    pf_reqs: &PixelFormatRequirements,
 ) -> Result<NSOpenGLPFAOpenGLProfiles, CreationError> {
     let version = opengl.version.to_gl_version();
     // first, compatibility profile support is strict
@@ -36,28 +36,27 @@ pub fn get_gl_profile<T>(
             Ok(NSOpenGLProfileVersion4_1Core)
         }
     } else if let GlRequest::Latest = opengl.version {
-        // now, find the latest supported version automatically
-        let mut attributes = vec![
-            NSOpenGLPFAAllowOfflineRenderers as u32,
-        ];
+        // now, find the latest supported version automatically;
+        let mut attributes: [u32; 6] = [0; 6];
+        let mut current_idx = 0;
+        attributes[current_idx] = NSOpenGLPFAAllowOfflineRenderers as u32;
+        current_idx += 1;
         
         if let Some(true) = pf_reqs.hardware_accelerated {
-            attributes.push(NSOpenGLPFAAccelerated as u32);
+            attributes[current_idx] = NSOpenGLPFAAccelerated as u32;
+            current_idx += 1;
         }
 
         if pf_reqs.double_buffer != Some(false) {
-            attributes.push(NSOpenGLPFADoubleBuffer as u32);
+            attributes[current_idx] = NSOpenGLPFADoubleBuffer as u32;
+            current_idx += 1
         }
         
-        attributes.push(NSOpenGLPFAOpenGLProfile as u32);
-        // where the gl profile should be stored
-        attributes.push(0);
-        attributes.push(0);
-        
-        let profile_idx = attributes.len() - 2;
+        attributes[current_idx] = NSOpenGLPFAOpenGLProfile as u32;
+        current_idx += 1;
             
         for &profile in &[NSOpenGLProfileVersion4_1Core, NSOpenGLProfileVersion3_2Core] {
-            attributes[profile_idx] = profile as u32;
+            attributes[current_idx] = profile as u32;
             let id = unsafe {
                 NSOpenGLPixelFormat::alloc(nil).initWithAttributes_(&attributes)
             };
