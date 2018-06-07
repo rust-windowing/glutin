@@ -26,7 +26,7 @@ impl HeadlessContext {
                _: &PlatformSpecificHeadlessBuilderAttributes)
                -> Result<HeadlessContext, CreationError>
     {
-        let gl_profile = helpers::get_gl_profile(opengl)?;
+        let gl_profile = helpers::get_gl_profile(opengl, pf_reqs)?;
         let attributes = helpers::build_nsattributes(pf_reqs, gl_profile)?;
         let context = unsafe {
             let pixelformat = NSOpenGLPixelFormat::alloc(nil).initWithAttributes_(&attributes);

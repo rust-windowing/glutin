@@ -9,7 +9,8 @@ use cocoa::appkit::*;
 use cocoa::base::nil;
 
 pub fn get_gl_profile<T>(
-    opengl: &GlAttributes<&T>
+    opengl: &GlAttributes<&T>,
+    pf_reqs: &PixelFormatRequirements
 ) -> Result<NSOpenGLPFAOpenGLProfiles, CreationError> {
     let version = opengl.version.to_gl_version();
     // first, compatibility profile support is strict
@@ -37,14 +38,26 @@ pub fn get_gl_profile<T>(
     } else if let GlRequest::Latest = opengl.version {
         // now, find the latest supported version automatically
         let mut attributes = vec![
-            // Note: we assume here that non-accelerated contexts don't care
-            NSOpenGLPFAAccelerated as u32,
-            NSOpenGLPFAOpenGLProfile as u32,
-            0, // this is where we put the test profile
-            0,
+            NSOpenGLPFAAllowOfflineRenderers as u32,
         ];
+        
+        if let Some(true) = pf_reqs.hardware_accelerated {
+            attributes.push(NSOpenGLPFAAccelerated as u32);
+        }
+
+        if pf_reqs.double_buffer != Some(false) {
+            attributes.push(NSOpenGLPFADoubleBuffer as u32);
+        }
+        
+        attributes.push(NSOpenGLPFAOpenGLProfile as u32);
+        // where the gl profile should be stored
+        attributes.push(0);
+        attributes.push(0);
+        
+        let profile_idx = attributes.len() - 2;
+            
         for &profile in &[NSOpenGLProfileVersion4_1Core, NSOpenGLProfileVersion3_2Core] {
-            attributes[2] = profile as u32;
+            attributes[profile_idx] = profile as u32;
             let id = unsafe {
                 NSOpenGLPixelFormat::alloc(nil).initWithAttributes_(&attributes)
             };
