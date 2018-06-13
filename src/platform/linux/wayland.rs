@@ -48,6 +48,7 @@ impl Context {
         Ok((window, context))
     }
 
+    #[inline]
     pub fn resize(&self, width: u32, height: u32) {
         self.egl_surface.resize(width as i32, height as i32, 0, 0);
     }

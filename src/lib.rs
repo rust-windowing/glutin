@@ -18,18 +18,13 @@
 //! # }
 //! ```
 //!
-//! For contexts that are *not* associated with any particular window, see the HeadlessContext
-//! type.
-//!
 //! # Features
 //!
-//! This crate has two Cargo features: `window` and `headless`.
+//! This crate has one Cargo feature: `window`.
 //!
 //!  - `window` allows you to create regular windows and enables the `WindowBuilder` object.
-//!  - `headless` allows you to do headless rendering, and enables
-//!     the `HeadlessRendererBuilder` object.
 //!
-//! By default only `window` is enabled.
+//! By default `window` is enabled.
 
 #[cfg(target_os = "windows")]
 #[macro_use]
@@ -61,7 +56,6 @@ extern crate x11_dl;
 #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "dragonfly", target_os = "openbsd"))]
 extern crate wayland_client;
 
-pub use headless::{HeadlessRendererBuilder, HeadlessContext};
 pub use winit::{
     AvailableMonitorsIter,
     AxisId,
@@ -98,12 +92,14 @@ use std::io;
 
 mod api;
 mod platform;
-mod headless;
 
 pub mod os;
 
 /// A trait for types associated with a GL context.
-pub trait GlContext {
+pub trait GlContext
+where
+    Self: Sized,
+{
     /// Sets the context as the current context.
     unsafe fn make_current(&self) -> Result<(), ContextError>;
 
@@ -113,30 +109,8 @@ pub trait GlContext {
     /// Returns the address of an OpenGL function.
     fn get_proc_address(&self, addr: &str) -> *const ();
 
-    /// Swaps the buffers in case of double or triple buffering.
-    ///
-    /// You should call this function every time you have finished rendering, or the image may not
-    /// be displayed on the screen.
-    ///
-    /// **Warning**: if you enabled vsync, this function will block until the next time the screen
-    /// is refreshed. However drivers can choose to override your vsync settings, which means that
-    /// you can't know in advance whether `swap_buffers` will block or not.
-    fn swap_buffers(&self) -> Result<(), ContextError>;
-
     /// Returns the OpenGL API being used.
     fn get_api(&self) -> Api;
-
-    /// Returns the pixel format of the main framebuffer of the context.
-    fn get_pixel_format(&self) -> PixelFormat;
-
-    /// Resize the GL context.
-    ///
-    /// Some platforms (macos, wayland) require being manually updated when their window or
-    /// surface is resized.
-    ///
-    /// The easiest way of doing this is to call this method for each `Resized` window event that
-    /// is received with the width and height given by the event.
-    fn resize(&self, size: dpi::PhysicalSize);
 }
 
 /// Represents an OpenGL context.
@@ -361,8 +335,12 @@ impl GlWindow {
     /// Builds the given window along with the associated GL context, returning the pair as a
     /// `GlWindow`.
     ///
-    /// Error should be very rare and only occur in case of permission denied, incompatible system,
-    /// out of memory, etc.
+    /// The generated OpenGl context is shareable with other contexts made from
+    /// this function. It is also shareable with headless contexts made with the
+    /// `shareable_with_windowed_contexts` flag set to `true`.
+    ///
+    /// Error should be very rare and only occur in case of permission denied,
+    /// incompatible system out of memory, etc.
     pub fn new(
         window_builder: WindowBuilder,
         context_builder: ContextBuilder,
@@ -387,6 +365,36 @@ impl GlWindow {
     pub fn context(&self) -> &Context {
         &self.context
     }
+
+    /// Swaps the buffers in case of double or triple buffering.
+    ///
+    /// You should call this function every time you have finished rendering, or the image may not
+    /// be displayed on the screen.
+    ///
+    /// **Warning**: if you enabled vsync, this function will block until the next time the screen
+    /// is refreshed. However drivers can choose to override your vsync settings, which means that
+    /// you can't know in advance whether `swap_buffers` will block or not.
+    pub fn swap_buffers(&self) -> Result<(), ContextError> {
+        self.context.context.swap_buffers()
+    }
+
+    /// Returns the pixel format of the main framebuffer of the context.
+    pub fn get_pixel_format(&self) -> PixelFormat {
+        self.context.context.get_pixel_format()
+    }
+
+    /// Resize the context.
+    ///
+    /// Some platforms (macOS, Wayland) require being manually updated when their window or
+    /// surface is resized.
+    ///
+    /// The easiest way of doing this is to take every `Resized` window event that
+    /// is recieved with a `LogicalSize` and convert it to a `PhysicalSize` and
+    /// pass it into this function.
+    pub fn resize(&self, size: dpi::PhysicalSize) {
+        let (width, height) = size.into();
+        self.context.context.resize(width, height);
+    }
 }
 
 impl GlContext for Context {
@@ -402,21 +410,34 @@ impl GlContext for Context {
         self.context.get_proc_address(addr)
     }
 
-    fn swap_buffers(&self) -> Result<(), ContextError> {
-        self.context.swap_buffers()
-    }
-
     fn get_api(&self) -> Api {
         self.context.get_api()
     }
+}
 
-    fn get_pixel_format(&self) -> PixelFormat {
-        self.context.get_pixel_format()
-    }
-
-    fn resize(&self, size: dpi::PhysicalSize) {
-        let (width, height) = size.into();
-        self.context.resize(width, height);
+impl Context {
+    /// Builds the given GL context
+    ///
+    /// Contexts made with the `shareable_with_windowed_contexts` flag set to
+    /// `true` can be shared with both:
+    ///  - other contexts made with that flag set to `true`
+    ///  - and with contexts made when creating a `GlWindow`.
+    ///
+    ///  If the flag is not set on the otherhand, the context can only be shared
+    ///  with other contexts made with the flag unset.
+    ///
+    /// Error should be very rare and only occur in case of permission denied,
+    /// incompatible system, out of memory, etc.
+    pub fn new(
+        el: &winit::EventsLoop,
+        context_builder: ContextBuilder,
+        shareable_with_windowed_contexts: bool,
+    ) -> Result<Self, CreationError>
+    {
+        let ContextBuilder { pf_reqs, gl_attr } = context_builder;
+        let gl_attr = gl_attr.map_sharing(|ctxt| &ctxt.context);
+        platform::Context::new_context(el, &pf_reqs, &gl_attr, shareable_with_windowed_contexts)
+            .map(|context| Context { context })
     }
 }
 
@@ -433,20 +454,8 @@ impl GlContext for GlWindow {
         self.context.get_proc_address(addr)
     }
 
-    fn swap_buffers(&self) -> Result<(), ContextError> {
-        self.context.swap_buffers()
-    }
-
     fn get_api(&self) -> Api {
         self.context.get_api()
-    }
-
-    fn get_pixel_format(&self) -> PixelFormat {
-        self.context.get_pixel_format()
-    }
-
-    fn resize(&self, size: dpi::PhysicalSize) {
-        self.context.resize(size);
     }
 }
 
@@ -469,6 +478,8 @@ pub enum CreationError {
     NoAvailablePixelFormat,
     PlatformSpecific(String),
     Window(WindowCreationError),
+    /// We recieved two errors, instead of one.
+    CreationErrorPair(Box<CreationError>, Box<CreationError>),
 }
 
 impl CreationError {
@@ -476,7 +487,6 @@ impl CreationError {
         match *self {
             CreationError::OsError(ref text) => &text,
             CreationError::NotSupported(text) => &text,
-            CreationError::NotSupported(_) => "Some of the requested attributes are not supported",
             CreationError::NoBackendAvailable(_) => "No backend is available",
             CreationError::RobustnessNotSupported => "You requested robustness, but it is \
                                                       not supported.",
@@ -486,6 +496,7 @@ impl CreationError {
                                                       the criterias.",
             CreationError::PlatformSpecific(ref text) => &text,
             CreationError::Window(ref err) => std::error::Error::description(err),
+            CreationError::CreationErrorPair(ref _err1, ref _err2) => "Recieved two errors."
         }
     }
 }
@@ -493,6 +504,16 @@ impl CreationError {
 impl std::fmt::Display for CreationError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         formatter.write_str(self.to_string())?;
+
+        if let CreationError::CreationErrorPair(ref e1, ref e2) = *self {
+            write!(formatter, " Error 1: \"")?;
+            e1.fmt(formatter)?;
+            write!(formatter, "\"")?;
+            write!(formatter, " Error 2: \"")?;
+            e2.fmt(formatter)?;
+            write!(formatter, "\"")?;
+        }
+
         if let &CreationError::NotSupported(msg) = self {
             write!(formatter, ": {}", msg)?;
         }
