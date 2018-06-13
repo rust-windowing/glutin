@@ -338,7 +338,7 @@ impl Context {
     // Restore the EGLContext.
     #[cfg(target_os = "android")]
     pub unsafe fn on_surface_created(&self, native_window: ffi::EGLNativeWindowType) {
-        if (self.surface.get() != ffi::egl::NO_SURFACE) {
+        if self.surface.get() != ffi::egl::NO_SURFACE {
             return;
         }
         self.surface.set(self.egl.CreateWindowSurface(self.display, self.config_id, native_window, ptr::null()));
@@ -357,7 +357,7 @@ impl Context {
     // The EGLContext is not destroyed so it can be restored later.
     #[cfg(target_os = "android")]
     pub unsafe fn on_surface_destroyed(&self) {
-        if (self.surface.get() == ffi::egl::NO_SURFACE) {
+        if self.surface.get() == ffi::egl::NO_SURFACE {
             return;
         }
         let ret = self.egl.MakeCurrent(self.display, ffi::egl::NO_SURFACE, ffi::egl::NO_SURFACE, ffi::egl::NO_CONTEXT);

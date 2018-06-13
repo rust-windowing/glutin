@@ -1,5 +1,8 @@
 # Unreleased
 
+- ***Breaking*** The entire api for Headless contexts have been removed. Please instead use `Context::new()` when trying to make a context without a visible window. Also removed `headless` feature.
+- ***Breaking*** Structs implementing the `GlContext` trait must now be sized.
+- ***Breaking*** Added new `CreationErrorPair` enum variant to enum `CreationError`.
 - **Breaking:** Added `OsError` variant to `ContextError`.
 - Improved glX error reporting.
 - The iOS backend no longer fails to compile... again (added iOS testing on CI to prevent further issues).
