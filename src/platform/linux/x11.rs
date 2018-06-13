@@ -242,6 +242,23 @@ impl Context {
     }
 
     #[inline]
+    pub fn resize(&self, w: ffi::Window, width: u32, height: u32) {
+        unsafe {
+            match self.context {
+                GlContext::Egl(_) | GlContext::Glx(_) => {
+                    assert_eq!((self.display.xlib.XResizeWindow)(
+                        self.display.display,
+                        w,
+                        width as _,
+                        height as _
+                    ), 0);
+                }
+                GlContext::None => ()
+            }
+        }
+    }
+
+    #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
         match self.context {
             GlContext::Glx(ref ctxt) => ctxt.make_current(),
