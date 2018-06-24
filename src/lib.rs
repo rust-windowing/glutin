@@ -68,7 +68,6 @@ pub use winit::{
     ButtonId,
     ControlFlow,
     CreationError as WindowCreationError,
-    CursorState,
     DeviceEvent,
     DeviceId,
     dpi,
