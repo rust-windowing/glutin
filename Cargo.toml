@@ -10,6 +10,9 @@ repository = "https://github.com/tomaka/glutin"
 documentation = "https://docs.rs/glutin"
 build = "build.rs"
 
+[package.metadata.docs.rs]
+features = ["icon_loading"]
+
 [features]
 icon_loading = ["winit/icon_loading"]
 
