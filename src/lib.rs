@@ -12,7 +12,7 @@
 //! let events_loop = glutin::EventsLoop::new();
 //! let window = glutin::WindowBuilder::new()
 //!     .with_title("Hello world!")
-//!     .with_dimensions(1024, 768);
+//!     .with_dimensions(glutin::dpi::LogicalSize::new(1024.0, 768.0));
 //! let context = glutin::ContextBuilder::new();
 //! let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
 //! # }
