@@ -136,7 +136,7 @@ pub trait GlContext {
     ///
     /// The easiest way of doing this is to call this method for each `Resized` window event that
     /// is received with the width and height given by the event.
-    fn resize(&self, width: u32, height: u32);
+    fn resize(&self, size: dpi::PhysicalSize);
 }
 
 /// Represents an OpenGL context.
@@ -318,7 +318,7 @@ impl<'a> ContextBuilder<'a> {
         self.pf_reqs.srgb = srgb_enabled;
         self
     }
-    
+
     /// Sets whether double buffering should be enabled.
     ///
     /// The default value is `None`.
@@ -336,7 +336,7 @@ impl<'a> ContextBuilder<'a> {
         self.pf_reqs.double_buffer = double_buffer;
         self
     }
-    
+
     /// Sets whether hardware acceleration is required.
     ///
     /// The default value is `Some(true)`
@@ -414,7 +414,8 @@ impl GlContext for Context {
         self.context.get_pixel_format()
     }
 
-    fn resize(&self, width: u32, height: u32) {
+    fn resize(&self, size: dpi::PhysicalSize) {
+        let (width, height) = size.into();
         self.context.resize(width, height);
     }
 }
@@ -444,8 +445,8 @@ impl GlContext for GlWindow {
         self.context.get_pixel_format()
     }
 
-    fn resize(&self, width: u32, height: u32) {
-        self.context.resize(width, height);
+    fn resize(&self, size: dpi::PhysicalSize) {
+        self.context.resize(size);
     }
 }
 

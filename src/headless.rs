@@ -140,7 +140,7 @@ impl GlContext for HeadlessContext {
     }
 
     #[inline]
-    fn resize(&self, _width: u32, _height: u32) {
+    fn resize(&self, _size: ::dpi::PhysicalSize) {
         // This method does not mean anything for a HeadlessContext.
         unimplemented!()
     }
