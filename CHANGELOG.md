@@ -6,6 +6,7 @@
 - Add `ContextBuilder::with_double_buffer` function
 - Add `ContextBuilder::with_hardware_acceleration` function
 - Update winit dependency to 0.16.0. See [winit's CHANGELOG](https://github.com/tomaka/winit/blob/v0.16.0/CHANGELOG.md#version-0160-2018-06-25) for more info.
+- The iOS backend no longer fails to compile.
 
 # Version 0.16.0 (2018-05-09)
 
