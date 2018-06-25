@@ -8,8 +8,9 @@ fn main() {
     let mut events_loop = glutin::EventsLoop::new();
 
     let mut windows = std::collections::HashMap::new();
-    for _ in 0..3 {
-        let window = glutin::WindowBuilder::new();
+    for index in 0..3 {
+        let title = format!("Charming Window #{}", index + 1);
+        let window = glutin::WindowBuilder::new().with_title(title);
         let context = glutin::ContextBuilder::new();
         let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
         let _ = unsafe { gl_window.make_current() };

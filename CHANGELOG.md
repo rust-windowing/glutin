@@ -1,8 +1,11 @@
 # Unreleased
 
+# Version 0.16.0 (2018-06-27)
+
 - Fix regression that prevented automatic graphics switching in MacOS ([#980](https://github.com/tomaka/glutin/issues/980))
 - Add `ContextBuilder::with_double_buffer` function
 - Add `ContextBuilder::with_hardware_acceleration` function
+- Update winit dependency to 0.16.0. See [winit's CHANGELOG](https://github.com/tomaka/winit/blob/v0.16.0/CHANGELOG.md#version-0160-2018-06-25) for more info.
 
 # Version 0.16.0 (2018-05-09)
 

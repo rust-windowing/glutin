@@ -22,8 +22,7 @@ fn main() {
             println!("{:?}", event);
             match event {
                 glutin::Event::WindowEvent { event, .. } => match event {
-                    glutin::WindowEvent::CloseRequested
-                    | glutin::WindowEvent::Destroyed => running = false,
+                    glutin::WindowEvent::CloseRequested => running = false,
                     glutin::WindowEvent::Resized(logical_size) => {
                         let dpi_factor = gl_window.get_hidpi_factor();
                         gl_window.resize(logical_size.to_physical(dpi_factor));
@@ -33,10 +32,6 @@ fn main() {
                 _ => ()
             }
         });
-
-        if !running {
-            break;
-        }
 
         gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
         let _ = gl_window.swap_buffers();
