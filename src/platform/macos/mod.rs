@@ -61,7 +61,7 @@ impl Context {
 
         let view = window.get_nsview() as id;
 
-        let gl_profile = helpers::get_gl_profile(gl_attr)?;
+        let gl_profile = helpers::get_gl_profile(gl_attr, pf_reqs)?;
         let attributes = helpers::build_nsattributes(pf_reqs, gl_profile)?;
         unsafe {
             let pixel_format = IdRef::new(NSOpenGLPixelFormat::alloc(nil)

@@ -318,6 +318,43 @@ impl<'a> ContextBuilder<'a> {
         self.pf_reqs.srgb = srgb_enabled;
         self
     }
+    
+    /// Sets whether double buffering should be enabled.
+    ///
+    /// The default value is `None`.
+    ///
+    /// ## Platform-specific
+    ///
+    /// This option will be taken into account on the following platforms:
+    ///
+    ///   * MacOS
+    ///   * Linux using GLX with X
+    ///   * Windows using WGL
+    ///
+    #[inline]
+    pub fn with_double_buffer(mut self, double_buffer: Option<bool>) -> Self {
+        self.pf_reqs.double_buffer = double_buffer;
+        self
+    }
+    
+    /// Sets whether hardware acceleration is required.
+    ///
+    /// The default value is `Some(true)`
+    ///
+    /// ## Platform-specific
+    ///
+    /// This option will be taken into account on the following platforms:
+    ///
+    ///   * MacOS
+    ///   * Linux using EGL with either X or Wayland
+    ///   * Windows using EGL or WGL
+    ///   * Android using EGL
+    ///
+    #[inline]
+    pub fn with_hardware_acceleration(mut self, acceleration: Option<bool>) -> Self {
+        self.pf_reqs.hardware_accelerated = acceleration;
+        self
+    }
 }
 
 impl GlWindow {
