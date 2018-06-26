@@ -748,8 +748,13 @@ unsafe fn create_context(egl: &ffi::egl::Egl, display: ffi::egl::types::EGLDispl
             //flags = flags | ffi::egl::CONTEXT_OPENGL_DEBUG_BIT_KHR as i32;
         }
 
-        context_attributes.push(ffi::egl::CONTEXT_FLAGS_KHR as i32);
-        context_attributes.push(flags);
+        // In at least some configurations, the Android emulator’s GL implementation
+        // advertises support for the EGL_KHR_create_context extension
+        // but returns BAD_ATTRIBUTE when CONTEXT_FLAGS_KHR is used.
+        if flags != 0 {
+            context_attributes.push(ffi::egl::CONTEXT_FLAGS_KHR as i32);
+            context_attributes.push(flags);
+        }
 
     } else if egl_version >= &(1, 3) && api == Api::OpenGlEs {
         // robustness is not supported
