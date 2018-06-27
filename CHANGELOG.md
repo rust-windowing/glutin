@@ -3,6 +3,10 @@
 - Fix regression that prevented automatic graphics switching in MacOS ([#980](https://github.com/tomaka/glutin/issues/980))
 - Add `ContextBuilder::with_double_buffer` function
 - Add `ContextBuilder::with_hardware_acceleration` function
+- Work around a presumed bug Android emulator bug
+  that would cause context creation to return `CreationError::OpenGlVersionNotSupported`
+  in some configurations
+  ([1036](https://github.com/tomaka/glutin/pull/1036))
 
 # Version 0.16.0 (2018-05-09)
 
