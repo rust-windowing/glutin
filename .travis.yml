@@ -2,7 +2,9 @@ language: rust
 
 rust:
   - nightly
+  - beta
   - stable
+  - 1.24.1
 
 cache: cargo
 
@@ -24,7 +26,7 @@ os:
   - linux
   - osx
 
-after_success: 
+after_success:
   - |
       [ $TRAVIS_BRANCH = master ] &&
       [ $TRAVIS_PULL_REQUEST = false ] &&

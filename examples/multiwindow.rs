@@ -8,8 +8,9 @@ fn main() {
     let mut events_loop = glutin::EventsLoop::new();
 
     let mut windows = std::collections::HashMap::new();
-    for _ in 0..3 {
-        let window = glutin::WindowBuilder::new();
+    for index in 0..3 {
+        let title = format!("Charming Window #{}", index + 1);
+        let window = glutin::WindowBuilder::new().with_title(title);
         let context = glutin::ContextBuilder::new();
         let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
         let _ = unsafe { gl_window.make_current() };
@@ -18,34 +19,33 @@ fn main() {
         windows.insert(window_id, (gl_window, gl));
     }
 
-    events_loop.run_forever(|event| {
-        println!("{:?}", event);
-        match event {
-            glutin::Event::WindowEvent { event, window_id } => match event {
-                glutin::WindowEvent::Resized(w, h) => {
-                    windows[&window_id].0.resize(w, h)
-                },
-                glutin::WindowEvent::CloseRequested => {
-                    if windows.remove(&window_id).is_some() {
-                        println!("Window with ID {:?} has been closed", window_id);
-                        if windows.is_empty() {
-                            return glutin::ControlFlow::Break;
+    while !windows.is_empty() {
+        events_loop.poll_events(|event| {
+            println!("{:?}", event);
+            match event {
+                glutin::Event::WindowEvent { event, window_id } => match event {
+                    glutin::WindowEvent::Resized(logical_size) => {
+                        let gl_window = &windows[&window_id].0;
+                        let dpi_factor = gl_window.get_hidpi_factor();
+                        gl_window.resize(logical_size.to_physical(dpi_factor));
+                    },
+                    glutin::WindowEvent::CloseRequested => {
+                        if windows.remove(&window_id).is_some() {
+                            println!("Window with ID {:?} has been closed", window_id);
                         }
-                    }
+                    },
+                    _ => (),
                 },
                 _ => (),
-            },
-            _ => (),
-        }
+            }
+        });
 
-        for (i, window) in windows.values().enumerate() {
-            let mut color = [0.0, 0.0, 0.0, 1.0];
-            color[i] = 1.0; // Color each of the three windows a different color.
+        for (index, window) in windows.values().enumerate() {
+            let mut color = [1.0, 0.5, 0.7, 1.0];
+            color.swap(0, index % 3);
             let _ = unsafe { window.0.make_current() };
             window.1.draw_frame(color);
             let _ = window.0.swap_buffers();
         }
-
-        glutin::ControlFlow::Continue
-    });
+    }
 }

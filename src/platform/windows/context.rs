@@ -17,6 +17,7 @@ use api::wgl::Context as WglContext;
 use api::egl::Context as EglContext;
 use api::egl::ffi::egl::Egl;
 use api::egl;
+use os::windows::WindowExt;
 use platform::RawHandle;
 
 unsafe impl Send for Context {}
@@ -46,7 +47,7 @@ impl Context {
             }
         });
         let context_result = unsafe {
-            let w = window.platform_window() as HWND;
+            let w = window.get_hwnd() as HWND;
             match gl_attr.version {
                 GlRequest::Specific(Api::OpenGlEs, (_major, _minor)) => {
                     if let Some(egl) = egl {

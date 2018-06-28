@@ -37,25 +37,40 @@ fn main() {
 
     let gl = support::load(&gl_window);
 
-    events_loop.run_forever(|event| {
-        use glutin::{ControlFlow, Event, WindowEvent, VirtualKeyCode};
-        println!("{:?}", event);
-        match event {
-            Event::WindowEvent { event, .. } => match event {
-                WindowEvent::CloseRequested => return ControlFlow::Break,
-                WindowEvent::Resized(w, h) => gl_window.resize(w, h),
-                WindowEvent::KeyboardInput { input, .. } => {
-                    if let Some(VirtualKeyCode::Escape) = input.virtual_keycode {
-                        return ControlFlow::Break;
-                    }
+    let mut fullscreen = true;
+    let mut running = true;
+    while running {
+        events_loop.poll_events(|event| {
+            println!("{:?}", event);
+            match event {
+                glutin::Event::WindowEvent { event, .. } => match event {
+                    glutin::WindowEvent::CloseRequested => running = false,
+                    glutin::WindowEvent::Resized(logical_size) => {
+                        let dpi_factor = gl_window.get_hidpi_factor();
+                        gl_window.resize(logical_size.to_physical(dpi_factor));
+                    },
+                    glutin::WindowEvent::KeyboardInput { input, .. } => {
+                        match input.virtual_keycode {
+                            Some(glutin::VirtualKeyCode::Escape) => running = false,
+                            Some(glutin::VirtualKeyCode::F) => {
+                                let monitor = if fullscreen {
+                                    None
+                                } else {
+                                    Some(gl_window.get_current_monitor())
+                                };
+                                gl_window.set_fullscreen(monitor);
+                                fullscreen = !fullscreen;
+                            },
+                            _ => (),
+                        }
+                    },
+                    _ => (),
                 },
-                _ => (),
-            },
-            _ => (),
-        }
+                _ => ()
+            }
+        });
 
-        gl.draw_frame([0.0, 1.0, 0.0, 1.0]);
+        gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
         let _ = gl_window.swap_buffers();
-        ControlFlow::Continue
-    });
+    }
 }

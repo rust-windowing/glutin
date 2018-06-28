@@ -1,12 +1,16 @@
 # Unreleased
 
+# Version 0.17.0 (2018-06-27)
+
 - Fix regression that prevented automatic graphics switching in MacOS ([#980](https://github.com/tomaka/glutin/issues/980))
 - Add `ContextBuilder::with_double_buffer` function
 - Add `ContextBuilder::with_hardware_acceleration` function
 - Work around a presumed bug Android emulator bug
   that would cause context creation to return `CreationError::OpenGlVersionNotSupported`
   in some configurations
-  ([1036](https://github.com/tomaka/glutin/pull/1036))
+  ([#1036](https://github.com/tomaka/glutin/pull/1036))
+- Update winit dependency to 0.16.0. See [winit's CHANGELOG](https://github.com/tomaka/winit/blob/v0.16.0/CHANGELOG.md#version-0160-2018-06-25) for more info.
+- The iOS backend no longer fails to compile.
 
 # Version 0.16.0 (2018-05-09)
 
