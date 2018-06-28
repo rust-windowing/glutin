@@ -131,12 +131,9 @@ impl Context {
 #[derive(Clone, Default)]
 pub struct PlatformSpecificHeadlessBuilderAttributes;
 
-pub struct HeadlessContext(OsMesaContext);
-
-impl HeadlessContext {
-    fn from(mesa: OsMesaContext) -> Self {
-        HeadlessContext(mesa)
-    }
+pub enum HeadlessContext {
+    OsMesa(OsMesaContext),
+    Egl(egl::Context),
 }
 
 impl HeadlessContext {
@@ -145,43 +142,74 @@ impl HeadlessContext {
                _: &PlatformSpecificHeadlessBuilderAttributes)
                -> Result<HeadlessContext, CreationError>
     {
-        let opengl = opengl.clone().map_sharing(|c| &c.0);
+        let mut opengl = opengl.clone();
+        opengl.sharing = None;
+        let opengl = opengl.map_sharing(|_| unreachable!());
 
-        OsMesaContext::new(dimensions, pf_reqs, &opengl).map(HeadlessContext::from)
+        let backend = x11::GlxOrEgl::new();
+        let egl = backend.egl.unwrap();
+
+        Ok(HeadlessContext::Egl(
+            egl::Context::new(egl, pf_reqs, &opengl, egl::NativeDisplay::Gbm(None)).unwrap()
+            .finish_pbuffer(dimensions).unwrap()
+        ))
     }
 
     #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        self.0.make_current()
+        match *self {
+            HeadlessContext::OsMesa(ref mesa) => mesa.make_current(),
+            HeadlessContext::Egl(ref egl) => egl.make_current(),
+        }
     }
 
     #[inline]
     pub fn is_current(&self) -> bool {
-        self.0.is_current()
+        match *self {
+            HeadlessContext::OsMesa(ref mesa) => mesa.is_current(),
+            HeadlessContext::Egl(ref egl) => egl.is_current(),
+        }
     }
 
     #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const () {
-        self.0.get_proc_address(addr)
+        match *self {
+            HeadlessContext::OsMesa(ref mesa) => mesa.get_proc_address(addr),
+            HeadlessContext::Egl(ref egl) => egl.get_proc_address(addr),
+        }
     }
 
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
-        self.0.swap_buffers()
+        match *self {
+            HeadlessContext::OsMesa(ref mesa) => mesa.swap_buffers(),
+            HeadlessContext::Egl(ref egl) => egl.swap_buffers(),
+        }
     }
 
     #[inline]
     pub fn get_api(&self) -> Api {
-        self.0.get_api()
+        match *self {
+            HeadlessContext::OsMesa(ref mesa) => mesa.get_api(),
+            HeadlessContext::Egl(ref egl) => egl.get_api(),
+        }
     }
 
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
-        self.0.get_pixel_format()
+        match *self {
+            HeadlessContext::OsMesa(ref mesa) => mesa.get_pixel_format(),
+            HeadlessContext::Egl(ref egl) => egl.get_pixel_format(),
+        }
     }
 
     #[inline]
     pub unsafe fn raw_handle(&self) -> *mut c_void {
-        self.0.raw_handle()
+        let handle = match *self {
+             HeadlessContext::OsMesa(ref mesa) => mesa.raw_handle(),
+             HeadlessContext::Egl(ref egl) => egl.raw_handle(),
+        };
+
+        handle as *mut c_void
     }
 }
