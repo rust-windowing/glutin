@@ -117,6 +117,7 @@ impl Context {
 
     #[inline]
     pub fn new_context(
+        el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         windowed: bool,
@@ -124,7 +125,6 @@ impl Context {
     {
         if windowed {
             let wb = winit::WindowBuilder::new().with_visibility(false);
-            let el = winit::EventsLoop::new();
 
             if let Ok(env_var) = env::var(BACKEND_PREFERENCE_ENV_VAR) {
                 match env_var.as_str() {

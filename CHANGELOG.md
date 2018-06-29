@@ -1,4 +1,7 @@
 # Unreleased
+- On X11 and Wayland, you can now use shared contexts, however, one limitation 
+of the Wayland backend is that all shared contexts must use the same events
+pool as each other.
 
 # Version 0.17.0 (2018-06-27)
 

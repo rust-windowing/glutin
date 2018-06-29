@@ -332,13 +332,16 @@ impl<'a> ContextBuilder<'a> {
 }
 
 impl GlWindow {
-    /// Builds the given window along with the associated GL context, returning the pair as a
-    /// `GlWindow`.
+    /// Builds the given window along with the associated GL context, returning
+    /// the pair as a `GlWindow`.
     ///
     /// The GL context is windowed.
     ///
-    /// Error should be very rare and only occur in case of permission denied, incompatible system,
-    /// out of memory, etc.
+    /// One limitation of the wayland backend when it comes to shared contexts 
+    /// is tha both contexts must use the same events loop.
+    ///
+    /// Error should be very rare and only occur in case of permission denied,
+    /// incompatible system out of memory, etc.
     pub fn new(
         window_builder: WindowBuilder,
         context_builder: ContextBuilder,
@@ -417,13 +420,20 @@ impl Context {
     /// Windowed contexes cannot be shared with nonwindowed contextes, and vice
     /// versa.
     ///
-    /// Error should be very rare and only occur in case of permission denied, incompatible system,
-    /// out of memory, etc.
-    pub fn new(context_builder: ContextBuilder, windowed: bool) -> Result<Self, CreationError>
+    /// One limitation of the wayland backend when it comes to shared contexts 
+    /// is tha both contexts must use the same events loop.
+    ///
+    /// Error should be very rare and only occur in case of permission denied,
+    /// incompatible system, out of memory, etc.
+    pub fn new(
+        context_builder: ContextBuilder,
+        events_loop: &EventsLoop,
+        windowed: bool
+    ) -> Result<Self, CreationError>
     {
         let ContextBuilder { pf_reqs, gl_attr } = context_builder;
         let gl_attr = gl_attr.map_sharing(|ctxt| &ctxt.context);
-        platform::Context::new_context(&pf_reqs, &gl_attr, windowed)
+        platform::Context::new_context(events_loop, &pf_reqs, &gl_attr, windowed)
             .map(|context| Context {
                 context: context,
             })

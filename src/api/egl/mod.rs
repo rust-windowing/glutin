@@ -169,10 +169,6 @@ impl Context {
         native_display: NativeDisplay,
     ) -> Result<ContextPrototype<'a>, CreationError>
     {
-        if opengl.sharing.is_some() {
-            unimplemented!()
-        }
-
         // calling `eglGetDisplay` or equivalent
         let display = get_native_display(&egl, native_display);
 
@@ -444,22 +440,27 @@ impl<'a> ContextPrototype<'a> {
     fn finish_impl(self, surface: ffi::egl::types::EGLSurface)
                    -> Result<Context, CreationError>
     {
+        let share = match self.opengl.sharing {
+            Some(ctxt) => ctxt.context,
+            None => ptr::null()
+        };
+
         let context = unsafe {
             if let Some(version) = self.version {
                 create_context(&self.egl, self.display, &self.egl_version,
                                     &self.extensions, self.api, version, self.config_id,
-                                    self.opengl.debug, self.opengl.robustness)?
+                                    self.opengl.debug, self.opengl.robustness, share)?
 
             } else if self.api == Api::OpenGlEs {
                 if let Ok(ctxt) = create_context(&self.egl, self.display, &self.egl_version,
                                                  &self.extensions, self.api, (2, 0), self.config_id,
-                                                 self.opengl.debug, self.opengl.robustness)
+                                                 self.opengl.debug, self.opengl.robustness, share)
                 {
                     ctxt
                 } else if let Ok(ctxt) = create_context(&self.egl, self.display, &self.egl_version,
                                                         &self.extensions, self.api, (1, 0),
                                                         self.config_id, self.opengl.debug,
-                                                        self.opengl.robustness)
+                                                        self.opengl.robustness, share)
                 {
                     ctxt
                 } else {
@@ -469,19 +470,19 @@ impl<'a> ContextPrototype<'a> {
             } else {
                 if let Ok(ctxt) = create_context(&self.egl, self.display, &self.egl_version,
                                                  &self.extensions, self.api, (3, 2), self.config_id,
-                                                 self.opengl.debug, self.opengl.robustness)
+                                                 self.opengl.debug, self.opengl.robustness, share)
                 {
                     ctxt
                 } else if let Ok(ctxt) = create_context(&self.egl, self.display, &self.egl_version,
                                                         &self.extensions, self.api, (3, 1),
                                                         self.config_id, self.opengl.debug,
-                                                        self.opengl.robustness)
+                                                        self.opengl.robustness, share)
                 {
                     ctxt
                 } else if let Ok(ctxt) = create_context(&self.egl, self.display, &self.egl_version,
                                                         &self.extensions, self.api, (1, 0),
                                                         self.config_id, self.opengl.debug,
-                                                        self.opengl.robustness)
+                                                        self.opengl.robustness, share)
                 {
                     ctxt
                 } else {
@@ -664,7 +665,7 @@ unsafe fn create_context(egl: &ffi::egl::Egl, display: ffi::egl::types::EGLDispl
                          egl_version: &(ffi::egl::types::EGLint, ffi::egl::types::EGLint),
                          extensions: &[String], api: Api, version: (u8, u8),
                          config_id: ffi::egl::types::EGLConfig, gl_debug: bool,
-                         gl_robustness: Robustness)
+                         gl_robustness: Robustness, share: ffi::EGLContext)
                          -> Result<ffi::egl::types::EGLContext, CreationError>
 {
     let mut context_attributes = Vec::with_capacity(10);
@@ -771,7 +772,7 @@ unsafe fn create_context(egl: &ffi::egl::Egl, display: ffi::egl::types::EGLDispl
 
     context_attributes.push(ffi::egl::NONE as i32);
 
-    let context = egl.CreateContext(display, config_id, ptr::null(),
+    let context = egl.CreateContext(display, config_id, share,
                                     context_attributes.as_ptr());
 
     if context.is_null() {
