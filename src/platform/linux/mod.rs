@@ -106,10 +106,10 @@ impl Context {
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-        shareable_with_windowed_contextes: bool,
+        shareable_with_windowed_contexts: bool,
     ) -> Result<Self, CreationError>
     {
-        if shareable_with_windowed_contextes {
+        if shareable_with_windowed_contexts {
             let wb = winit::WindowBuilder::new().with_visibility(false);
 
             if el.is_wayland() {

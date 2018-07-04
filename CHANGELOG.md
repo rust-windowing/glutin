@@ -1,4 +1,6 @@
 # Unreleased
+- ***BREAKING*** Headless contexts have been removed. Please instead use 
+`Context::new()` when trying to make a context without a visible window.
 
 # Version 0.17.0 (2018-06-27)
 
