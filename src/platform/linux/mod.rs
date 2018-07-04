@@ -44,7 +44,7 @@ impl Context {
                     match c {
                         Context::OsMesa(_) => Ok(()),
                         _ => {
-                            let msg = "Cannot share a windowless context with an windowed context";
+                            let msg = "Cannot share a osmesa context with an non-osmesa context";
                             return Err(CreationError::PlatformSpecific(msg.into()));
                         }
                     }
@@ -106,10 +106,10 @@ impl Context {
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-        windowed: bool,
+        shareable_with_windowed_contextes: bool,
     ) -> Result<Self, CreationError>
     {
-        if windowed {
+        if shareable_with_windowed_contextes {
             let wb = winit::WindowBuilder::new().with_visibility(false);
 
             if el.is_wayland() {

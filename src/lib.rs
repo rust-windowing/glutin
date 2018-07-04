@@ -335,12 +335,12 @@ impl GlWindow {
     /// Builds the given window along with the associated GL context, returning
     /// the pair as a `GlWindow`.
     ///
-    /// The generated gl context is of course shareable with other contextes 
+    /// The generated gl context is of course shareable with other contextes
     /// made from this function. It is possible to also share it with a headless
     /// context made with the shareable_with_windowed_contextes flag set to true.
     ///
     ///
-    /// One limitation of the wayland backend when it comes to shared contexts 
+    /// One limitation of the wayland backend when it comes to shared contexts
     /// is tha both contexts must use the same events loop.
     ///
     /// Error should be very rare and only occur in case of permission denied,
@@ -421,21 +421,21 @@ impl GlContext for Context {
 impl Context {
     /// Builds the given GL context
     ///
-    /// Contextes made with the shareable_with_windowed_contextes flag set to 
+    /// Contextes made with the shareable_with_windowed_contextes flag set to
     /// true can be both shared with other contextes made with that flag set to
-    /// true and with contextes made when creating a GlWindow. If the flag is 
+    /// true and with contextes made when creating a GlWindow. If the flag is
     /// not set however, then the context can only be shared with other contextes
     /// made with that flag unset.
     ///
-    /// One limitation of the wayland backend when it comes to shared contexts 
+    /// One limitation of the wayland backend when it comes to shared contexts
     /// is tha both contexts must use the same events loop.
     ///
     /// Error should be very rare and only occur in case of permission denied,
     /// incompatible system, out of memory, etc.
     pub fn new(
-        el: &winit::EventsLoop, 
-        context_builder: ContextBuilder, 
-        shareable_with_windowed_contextes: bool
+        el: &winit::EventsLoop,
+        context_builder: ContextBuilder,
+        shareable_with_windowed_contextes: bool,
     ) -> Result<Self, CreationError>
     {
         let ContextBuilder { pf_reqs, gl_attr } = context_builder;
