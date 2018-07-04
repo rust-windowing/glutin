@@ -384,15 +384,16 @@ impl GlWindow {
         self.context.context.get_pixel_format()
     }
 
-    /// Resize the GL context.
+    /// Resize the GL window.
     ///
     /// Some platforms (macos, wayland) require being manually updated when their window or
     /// surface is resized.
     ///
     /// The easiest way of doing this is to call this method for each `Resized` window event that
     /// is received with the width and height given by the event.
-    pub fn resize(&self, window: Window, width: u32, height: u32) {
-        self.context.context.resize(window, width, height);
+    pub fn resize(&self, size: dpi::PhysicalSize) {
+        let (width, height) = size.into();
+        self.context.context.resize(&self.window, width, height);
     }
 }
 

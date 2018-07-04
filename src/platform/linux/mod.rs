@@ -198,7 +198,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn resize(&self, window: winit::Window, width: u32, height: u32) {
+    pub fn resize(&self, window: &winit::Window, width: u32, height: u32) {
         match *self {
             Context::X11(ref ctxt) => ctxt.resize(window.get_xlib_window().unwrap(), width, height),
             Context::Wayland(ref ctxt) => ctxt.resize(width, height),
