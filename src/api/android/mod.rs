@@ -39,7 +39,7 @@ impl android_glue::SyncEventHandler for AndroidSyncEventHandler {
             // native window surface already destroyed. EGL generates a BAD_SURFACE error in this situation.
             // Set stop to true to prevent swap_buffer call race conditions.
             android_glue::Event::TermWindow => {
-                self.0.stopped.set(true);
+                self.0.stopped.as_ref().unwrap().set(true);
             },
             _ => { return; }
         };
@@ -74,7 +74,7 @@ impl Context {
         let context = Context(ctx.clone());
 
         events_loop.set_suspend_callback(Some(Box::new(move |suspended| {
-            ctx.stopped.set(suspended);
+            ctx.stopped.as_ref().unwrap().set(suspended);
             if suspended {
                 // Android has stopped the activity or sent it to background.
                 // Release the EGL surface and stop the animation loop.
@@ -103,7 +103,7 @@ impl Context {
     ) -> Result<Self, CreationError> {
         assert!(shareable_with_windowed_contexts); // TODO: Implement if possible
 
-        let gl_attr = gl_attr.clone().map_sharing(|c| &c.0);
+        let gl_attr = gl_attr.clone().map_sharing(|c| &c.0.egl_context);
         let context = EglContext::new(
             egl::ffi::egl::Egl,
             pf_reqs,
@@ -130,7 +130,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn resize(&self, _: winit::Window, _: u32, _: u32) {
+    pub fn resize(&self, _: &winit::Window, _: u32, _: u32) {
     }
 
     #[inline]
