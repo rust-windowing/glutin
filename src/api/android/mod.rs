@@ -24,7 +24,7 @@ mod ffi;
 
 struct AndroidContext {
     egl_context: EglContext,
-    stopped: Cell<bool>,
+    stopped: Option<Cell<bool>>,
 }
 
 pub struct Context(Arc<AndroidContext>);
@@ -66,7 +66,7 @@ impl Context {
             .and_then(|p| p.finish(native_window as *const _)));
         let ctx = Arc::new(AndroidContext {
             egl_context: context,
-            stopped: Cell::new(false),
+            stopped: Some(Cell::new(false)),
         });
 
         let handler = Box::new(AndroidSyncEventHandler(ctx.clone()));
@@ -95,15 +95,42 @@ impl Context {
     }
 
     #[inline]
-    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        if !self.0.stopped.get() {
-            return self.0.egl_context.make_current();
-        }
-        Err(ContextError::ContextLost)
+    pub fn new_context(
+        _el: &winit::EventsLoop,
+        pf_reqs: &PixelFormatRequirements,
+        gl_attr: &GlAttributes<&Context>,
+        shareable_with_windowed_contextes: bool,
+    ) -> Result<Self, CreationError> {
+        assert!(shareable_with_windowed_contextes); // TODO: Implement if possible
+
+        let gl_attr = gl_attr.clone().map_sharing(|c| &c.0);
+        let context = EglContext::new(
+            egl::ffi::egl::Egl,
+            pf_reqs,
+            &gl_attr,
+            egl::NativeDisplay::Android
+        )?;
+        let context = context.finish_pbuffer((1, 1))?;// TODO:
+        let ctx = Arc::new(AndroidContext {
+            egl_context: context,
+            stopped: None,
+        });
+        Ok(Context(ctx))
     }
 
     #[inline]
-    pub fn resize(&self, _: u32, _: u32) {
+    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
+        if let Some(stopped) = self.0.stopped {
+            if stopped.get() {
+                return Err(ContextError::ContextLost);
+            }
+        }
+
+        self.0.egl_context.make_current()
+    }
+
+    #[inline]
+    pub fn resize(&self, _: winit::Window, _: u32, _: u32) {
     }
 
     #[inline]
@@ -118,10 +145,12 @@ impl Context {
 
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
-        if !self.0.stopped.get() {
-            return self.0.egl_context.swap_buffers();
+        if let Some(stopped) = self.0.stopped {
+            if stopped.get() {
+                return Err(ContextError::ContextLost);
+            }
         }
-        Err(ContextError::ContextLost)
+        self.0.egl_context.swap_buffers()
     }
 
     #[inline]
@@ -137,67 +166,5 @@ impl Context {
     #[inline]
     pub unsafe fn raw_handle(&self) -> egl::ffi::EGLContext {
         self.0.egl_context.raw_handle()
-    }
-}
-
-#[derive(Clone, Default)]
-pub struct PlatformSpecificHeadlessBuilderAttributes;
-
-pub struct HeadlessContext(EglContext);
-
-unsafe impl Send for HeadlessContext {}
-unsafe impl Sync for HeadlessContext {}
-
-impl HeadlessContext {
-    /// See the docs in the crate root file.
-    pub fn new(
-        dimensions: (u32, u32),
-        pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&HeadlessContext>,
-        _: &PlatformSpecificHeadlessBuilderAttributes,
-    ) -> Result<Self, CreationError>
-    {
-        let gl_attr = gl_attr.clone().map_sharing(|c| &c.0);
-        let context = EglContext::new(egl::ffi::egl::Egl,
-                                           pf_reqs,
-                                           &gl_attr,
-                                           egl::NativeDisplay::Android)?;
-        let context = context.finish_pbuffer(dimensions)?;     // TODO:
-        Ok(HeadlessContext(context))
-    }
-
-    #[inline]
-    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        self.0.make_current()
-    }
-
-    #[inline]
-    pub fn is_current(&self) -> bool {
-        self.0.is_current()
-    }
-
-    #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const () {
-        self.0.get_proc_address(addr)
-    }
-
-    #[inline]
-    pub fn swap_buffers(&self) -> Result<(), ContextError> {
-        self.0.swap_buffers()
-    }
-
-    #[inline]
-    pub fn get_api(&self) -> Api {
-        self.0.get_api()
-    }
-
-    #[inline]
-    pub fn get_pixel_format(&self) -> PixelFormat {
-        self.0.get_pixel_format()
-    }
-
-    #[inline]
-    pub unsafe fn raw_handle(&self) -> egl::ffi::EGLContext {
-        self.0.raw_handle()
     }
 }
