@@ -335,9 +335,9 @@ impl GlWindow {
     /// Builds the given window along with the associated GL context, returning
     /// the pair as a `GlWindow`.
     ///
-    /// The generated gl context is of course shareable with other contextes
+    /// The generated gl context is of course shareable with other contexts
     /// made from this function. It is possible to also share it with a headless
-    /// context made with the shareable_with_windowed_contextes flag set to true.
+    /// context made with the shareable_with_windowed_contexts flag set to true.
     ///
     ///
     /// One limitation of the wayland backend when it comes to shared contexts
@@ -421,10 +421,10 @@ impl GlContext for Context {
 impl Context {
     /// Builds the given GL context
     ///
-    /// Contextes made with the shareable_with_windowed_contextes flag set to
-    /// true can be both shared with other contextes made with that flag set to
-    /// true and with contextes made when creating a GlWindow. If the flag is
-    /// not set however, then the context can only be shared with other contextes
+    /// Contexts made with the shareable_with_windowed_contexts flag set to
+    /// true can be both shared with other contexts made with that flag set to
+    /// true and with contexts made when creating a GlWindow. If the flag is
+    /// not set however, then the context can only be shared with other contexts
     /// made with that flag unset.
     ///
     /// One limitation of the wayland backend when it comes to shared contexts
@@ -435,12 +435,12 @@ impl Context {
     pub fn new(
         el: &winit::EventsLoop,
         context_builder: ContextBuilder,
-        shareable_with_windowed_contextes: bool,
+        shareable_with_windowed_contexts: bool,
     ) -> Result<Self, CreationError>
     {
         let ContextBuilder { pf_reqs, gl_attr } = context_builder;
         let gl_attr = gl_attr.map_sharing(|ctxt| &ctxt.context);
-        platform::Context::new_context(el, &pf_reqs, &gl_attr, shareable_with_windowed_contextes)
+        platform::Context::new_context(el, &pf_reqs, &gl_attr, shareable_with_windowed_contexts)
             .map(|context| Context {
                 context: context,
             })
