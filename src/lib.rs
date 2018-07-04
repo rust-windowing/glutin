@@ -420,11 +420,11 @@ impl Context {
     ///
     /// Error should be very rare and only occur in case of permission denied, incompatible system,
     /// out of memory, etc.
-    pub fn new(context_builder: ContextBuilder, windowed: bool) -> Result<Self, CreationError>
+    pub fn new(el: &winit::EventsLoop, context_builder: ContextBuilder, windowed: bool) -> Result<Self, CreationError>
     {
         let ContextBuilder { pf_reqs, gl_attr } = context_builder;
         let gl_attr = gl_attr.map_sharing(|ctxt| &ctxt.context);
-        platform::Context::new_context(&pf_reqs, &gl_attr, windowed)
+        platform::Context::new_context(el, &pf_reqs, &gl_attr, windowed)
             .map(|context| Context {
                 context: context,
             })
