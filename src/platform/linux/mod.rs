@@ -38,10 +38,10 @@ pub enum Context {
 
 impl Context {
     fn is_compatible(c: &Option<&Context>, ct: ContextType) -> Result<(), CreationError> {
-        if let Some(c) = c {
+        if let Some(c) = *c {
             match ct {
                 ContextType::OsMesa => {
-                    match c {
+                    match *c {
                         Context::OsMesa(_) => Ok(()),
                         _ => {
                             let msg = "Cannot share a osmesa context with an non-osmesa context";
@@ -50,7 +50,7 @@ impl Context {
                     }
                 }
                 ContextType::X11 => {
-                    match c {
+                    match *c {
                         Context::X11(_) | Context::X11Context(_, _) => Ok(()),
                         _ => {
                             let msg = "Cannot share a X11 context with an non-X11 context";
@@ -59,7 +59,7 @@ impl Context {
                     }
                 }
                 ContextType::Wayland => {
-                    match c {
+                    match *c {
                         Context::Wayland(_) | Context::WaylandContext(_, _) => Ok(()),
                         _ => {
                             let msg = "Cannot share a wayland context with an non-wayland context";
