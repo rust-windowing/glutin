@@ -335,7 +335,10 @@ impl GlWindow {
     /// Builds the given window along with the associated GL context, returning the pair as a
     /// `GlWindow`.
     ///
-    /// The GL context is windowed.
+    /// The generated gl context is of course shareable with other contextes 
+    /// made from this function. It is possible to also share it with a headless
+    /// context made with the shareable_with_windowed_contextes flag set to true.
+    ///
     ///
     /// Error should be very rare and only occur in case of permission denied, incompatible system,
     /// out of memory, etc.
@@ -415,16 +418,23 @@ impl GlContext for Context {
 impl Context {
     /// Builds the given GL context
     ///
-    /// Windowed contexes cannot be shared with nonwindowed contextes, and vice
-    /// versa.
+    /// Contextes made with the shareable_with_windowed_contextes flag set to 
+    /// true can be both shared with other contextes made with that flag set to
+    /// true and with contextes made when creating a GlWindow. If the flag is 
+    /// not set however, then the context can only be shared with other contextes
+    /// made with that flag unset.
     ///
     /// Error should be very rare and only occur in case of permission denied, incompatible system,
     /// out of memory, etc.
-    pub fn new(el: &winit::EventsLoop, context_builder: ContextBuilder, windowed: bool) -> Result<Self, CreationError>
+    pub fn new(
+        el: &winit::EventsLoop, 
+        context_builder: ContextBuilder, 
+        shareable_with_windowed_contextes: bool
+    ) -> Result<Self, CreationError>
     {
         let ContextBuilder { pf_reqs, gl_attr } = context_builder;
         let gl_attr = gl_attr.map_sharing(|ctxt| &ctxt.context);
-        platform::Context::new_context(el, &pf_reqs, &gl_attr, windowed)
+        platform::Context::new_context(el, &pf_reqs, &gl_attr, shareable_with_windowed_contextes)
             .map(|context| Context {
                 context: context,
             })
