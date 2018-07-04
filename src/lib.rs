@@ -503,7 +503,7 @@ impl std::fmt::Display for CreationError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         formatter.write_str(self.to_string())?;
 
-        if let CreationError::CreationErrorPair(e1, e2) = self {
+        if let CreationError::CreationErrorPair(ref e1, ref e2) = *self {
             write!(formatter, " Error 1: \"")?;
             e1.fmt(formatter)?;
             write!(formatter, "\"")?;
