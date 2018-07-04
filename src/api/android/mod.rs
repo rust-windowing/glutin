@@ -120,7 +120,7 @@ impl Context {
 
     #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        if let Some(stopped) = self.0.stopped {
+        if let Some(ref stopped) = self.0.stopped {
             if stopped.get() {
                 return Err(ContextError::ContextLost);
             }
@@ -145,7 +145,7 @@ impl Context {
 
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
-        if let Some(stopped) = self.0.stopped {
+        if let Some(ref stopped) = self.0.stopped {
             if stopped.get() {
                 return Err(ContextError::ContextLost);
             }
