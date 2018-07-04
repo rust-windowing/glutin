@@ -14,20 +14,6 @@ mod wayland;
 mod x11;
 use api::osmesa;
 
-/// Environment variable specifying which backend should be used on unix
-/// platform.
-///
-/// Legal values are `x11` and `wayland`. If this variable is set to `x11` we
-/// will try x11. If it is set to `wayland` we will try wayland. Otherwise, we
-/// will panic. If this variable is unset, we will try wayland, then if wayland
-/// fails we will try x11.
-///
-/// This variable is only used when creating a windowed context separate from
-/// a window. If we are also creating a window, we will just use the events
-/// loop's type. If it's not windowed, we will use the OsMesa backend.
-///
-/// Note: We MUST use the same variable as winit.
-const BACKEND_PREFERENCE_ENV_VAR: &str = "WINIT_UNIX_BACKEND";
 
 /// Context handles available on Unix-like platforms.
 #[derive(Clone, Debug)]
@@ -126,65 +112,22 @@ impl Context {
         if windowed {
             let wb = winit::WindowBuilder::new().with_visibility(false);
 
-            if let Ok(env_var) = env::var(BACKEND_PREFERENCE_ENV_VAR) {
-                match env_var.as_str() {
-                    "wayland" => {
-                        Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
-                        let gl_attr = gl_attr.clone().map_sharing(|ctxt| match ctxt {
-                            &Context::Wayland(ref ctxt) | &Context::WaylandContext(_, ref ctxt) => ctxt,
-                            _ => unreachable!(),
-                        });
-                        return wayland::Context::new(wb, &el, pf_reqs, &gl_attr)
-                            .map(|(window, context)| Context::WaylandContext(window, context))
-                    },
-                    "x11" => {
-                        Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
-                        let gl_attr = gl_attr.clone().map_sharing(|ctxt| match ctxt {
-                            &Context::X11(ref ctxt) | &Context::X11Context(_, ref ctxt) => ctxt,
-                            _ => unreachable!(),
-                        });
-                        return x11::Context::new(wb, &el, pf_reqs, &gl_attr)
-                            .map(|(window, context)| Context::X11Context(window, context));
-                    },
-                    _ => panic!(
-                        "Unknown environment variable value for {}, try one of `x11`,`wayland`",
-                        BACKEND_PREFERENCE_ENV_VAR,
-                    ),
-                }
-            }
-
-            // Try Wayland then fallback on X11
-            match {
-                if let Err(e) = Context::is_compatible(&gl_attr.sharing, ContextType::Wayland) {
-                    Err(e)
-                } else {
-                    let gl_attr = gl_attr.clone().map_sharing(|ctxt| match ctxt {
-                        &Context::Wayland(ref ctxt) | &Context::WaylandContext(_, ref ctxt) => ctxt,
-                        _ => unreachable!(),
-                    });
-                    wayland::Context::new(wb, &el, pf_reqs, &gl_attr)
-                        .map(|(window, context)| Context::WaylandContext(window, context))
-                }
-            } {
-                Ok(v) => Ok(v),
-                Err(e) => {
-                    match {
-                        if let Err(e2) = Context::is_compatible(&gl_attr.sharing, ContextType::X11) {
-                            Err(e2)
-                        } else {
-                            let wb = winit::WindowBuilder::new().with_visibility(false);
-                            let gl_attr = gl_attr.clone().map_sharing(|ctxt| match ctxt {
-                                &Context::X11(ref ctxt) | &Context::X11Context(_, ref ctxt) => ctxt,
-                                _ => unreachable!(),
-                            });
-                            x11::Context::new(wb, &el, pf_reqs, &gl_attr)
-                                .map(|(window, context)| Context::X11Context(window, context))
-                        }
-                    } {
-                        Ok(v) => Ok(v),
-                        Err(e2) => Err(CreationError::CreationErrorPair(Box::new(e), Box::new(e2))),
-                    }
-                }
+            if el.is_wayland() {
+                Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
+                let gl_attr = gl_attr.clone().map_sharing(|ctxt| match ctxt {
+                    &Context::Wayland(ref ctxt) | &Context::WaylandContext(_, ref ctxt) => ctxt,
+                    _ => unreachable!(),
+                });
+                wayland::Context::new(wb, &el, pf_reqs, &gl_attr)
+                    .map(|(window, context)| Context::WaylandContext(window, context))
+            } else {
+                Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
+                let gl_attr = gl_attr.clone().map_sharing(|ctxt| match ctxt {
+                    &Context::X11(ref ctxt) | &Context::X11Context(_, ref ctxt) => ctxt,
+                    _ => unreachable!(),
+                });
+                x11::Context::new(wb, &el, pf_reqs, &gl_attr)
+                    .map(|(window, context)| Context::X11Context(window, context))
             }
         } else {
             Context::is_compatible(&gl_attr.sharing, ContextType::OsMesa)?;
