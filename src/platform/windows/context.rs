@@ -84,6 +84,7 @@ impl Context {
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         shareable_with_windowed_contexts: bool,
+        egl: Option<&Egl>,
     ) -> Result<Self, CreationError> {
         assert!(!shareable_with_windowed_contexts); // TODO: Implement if possible
 

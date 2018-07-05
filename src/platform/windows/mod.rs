@@ -78,6 +78,23 @@ impl Context {
             EGL.as_ref().map(|w| &w.0),
         ).map(|(w, c)| (w, Context(c)))
     }
+
+    /// See the docs in the crate root file.
+    #[inline]
+    pub fn new_context(
+        events_loop: &winit::EventsLoop,
+        pf_reqs: &PixelFormatRequirements,
+        shareable_with_windowed_contexts: bool,
+        opengl: &GlAttributes<&Self>,
+    ) -> Result<(winit::Window, Self), CreationError> {
+        context::Context::new(
+            events_loop,
+            pf_reqs,
+            shareable_with_windowed_contexts,
+            &opengl.clone().map_sharing(|w| &w.0),
+            EGL.as_ref().map(|w| &w.0),
+        ).map(|(w, c)| (w, Context(c)))
+    }
 }
 
 impl Deref for Context {
