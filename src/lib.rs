@@ -20,7 +20,7 @@
 //!
 //! # Features
 //!
-//! This crate has two Cargo features: `window` and `headless`.
+//! This crate has two Cargo features: `window`.
 //!
 //!  - `window` allows you to create regular windows and enables the `WindowBuilder` object.
 //!

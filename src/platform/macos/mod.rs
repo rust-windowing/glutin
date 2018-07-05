@@ -1,8 +1,5 @@
 #![cfg(target_os = "macos")]
 
-pub use self::headless::HeadlessContext;
-pub use self::headless::PlatformSpecificHeadlessBuilderAttributes;
-
 pub use winit::MonitorId;
 
 use CreationError;
@@ -13,9 +10,9 @@ use PixelFormatRequirements;
 use Robustness;
 
 use cgl::{CGLEnable, kCGLCECrashOnRemovedFunctions, CGLSetParameter, kCGLCPSurfaceOpacity};
+use cocoa::appkit::*;
 use cocoa::base::{id, nil};
 use cocoa::foundation::NSAutoreleasePool;
-use cocoa::appkit::{self, NSOpenGLContext, NSOpenGLPixelFormat};
 use core_foundation::base::TCFType;
 use core_foundation::string::CFString;
 use core_foundation::bundle::{CFBundleGetBundleWithIdentifier, CFBundleGetFunctionPointerForName};
@@ -27,13 +24,21 @@ use std::str::FromStr;
 use std::ops::Deref;
 use std::os::raw::c_void;
 
-mod headless;
 mod helpers;
 
-pub struct Context {
+pub enum Context {
+    WindowedContext(WindowedContext),
+    HeadlessContext(HeadlessContext),
+}
+
+pub struct WindowedContext {
     // NSOpenGLContext
-    gl: IdRef,
+    context: IdRef,
     pixel_format: PixelFormat,
+}
+
+pub struct HeadlessContext {
+    context: id,
 }
 
 impl Context {
@@ -118,35 +123,79 @@ impl Context {
 
             CGLEnable(gl_context.CGLContextObj() as *mut _, kCGLCECrashOnRemovedFunctions);
 
-            let context = Context { gl: gl_context, pixel_format: pixel_format };
-            Ok((window, context))
+            let context = Context { context: gl_context, pixel_format: pixel_format };
+            Ok((window, Context::WindowedContext(context)))
         }
     }
 
+    #[inline]
+    pub fn new_context(
+        _el: &winit::EventsLoop,
+        pf_reqs: &PixelFormatRequirements,
+        gl_attr: &GlAttributes<&Context>,
+        shareable_with_windowed_contexts: bool,
+    ) -> Result<Self, CreationError> {
+        assert!(!shareable_with_windowed_contexts); // TODO: Implement if possible
+
+        let gl_profile = helpers::get_gl_profile(gl_attr, pf_reqs)?;
+        let attributes = helpers::build_nsattributes(pf_reqs, gl_profile)?;
+        let context = unsafe {
+            let pixelformat = NSOpenGLPixelFormat::alloc(nil).initWithAttributes_(&attributes);
+            if pixelformat == nil {
+                return Err(CreationError::OsError(format!("Could not create the pixel format")));
+            }
+            let context = NSOpenGLContext::alloc(nil).initWithFormat_shareContext_(pixelformat, nil);
+            if context == nil {
+                return Err(CreationError::OsError(format!("Could not create the rendering context")));
+            }
+            context
+        };
+
+        let headless = HeadlessContext {
+            context,
+        };
+
+        Ok(Context::HeadlessContext(headless))
+    }
+
     pub fn resize(&self, _width: u32, _height: u32) {
-        unsafe { self.gl.update(); }
+        match *self {
+            Context::WindowedContext(ref c) => unsafe { c.context.update() },
+            _ => panic!(),
+        }
     }
 
     #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        let _: () = msg_send![*self.gl, update];
-        self.gl.makeCurrentContext();
+        match *self {
+            Context::WindowedContext(ref c) => {
+                let _: () = msg_send![*c.context, update];
+                c.context.makeCurrentContext();
+                *c.context
+            }
+            Context::HeadlessContext(ref c) => c.context.makeCurrentContext(),
+        }
         Ok(())
     }
 
     #[inline]
     pub fn is_current(&self) -> bool {
         unsafe {
-            let pool = NSAutoreleasePool::new(nil);
-            let current = NSOpenGLContext::currentContext(nil);
-            let res = if current != nil {
-                let is_equal: BOOL = msg_send![current, isEqual:*self.gl];
-                is_equal != NO
-            } else {
-                false
-            };
-            let _: () = msg_send![pool, release];
-            res
+            match *self {
+                Context::WindowedContext(ref c) => {
+                    let pool = NSAutoreleasePool::new(nil);
+                    let current = NSOpenGLContext::currentContext(nil);
+                    let res = if current != nil {
+                        let is_equal: BOOL = msg_send![current, isEqual:*c.context];
+                        is_equal != NO
+                    } else {
+                        false
+                    };
+                    let _: () = msg_send![pool, release];
+                    res
+                },
+                Context::HeadlessContext(ref c) => id::currentContext(self.context) == self.context,
+            }
         }
     }
 
@@ -164,9 +213,14 @@ impl Context {
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
         unsafe {
-            let pool = NSAutoreleasePool::new(nil);
-            self.gl.flushBuffer();
-            let _: () = msg_send![pool, release];
+            match *self {
+                Context::WindowedContext(ref c) => {
+                    let pool = NSAutoreleasePool::new(nil);
+                    c.context.flushBuffer();
+                    let _: () = msg_send![pool, release];
+                }
+                Context::HeadlessContext(ref c) => c.context.flushBuffer(),
+            }
         }
         Ok(())
     }
@@ -178,12 +232,18 @@ impl Context {
 
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
-        self.pixel_format.clone()
+        match *self {
+            Context::WindowedContext(ref c) => c.pixel_format.clone(),
+            Context::HeadlessContext(_) => unimplemented!(),
+        }
     }
 
     #[inline]
     pub unsafe fn raw_handle(&self) -> *mut c_void {
-        *self.gl.deref() as *mut _
+        match *self {
+            Context::WindowedContext(ref c) => *c.context.deref(),
+            Context::HeadlessContext(ref c) => c.context,
+        } as *mut _
     }
 }
 
