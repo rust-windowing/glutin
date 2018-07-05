@@ -48,7 +48,10 @@ impl Context {
             match *ctxt {
                 Context::Wgl(ref c) => c.get_hglrc(),
                 // FIXME
-                Context::Egl(_) => unimplemented!(),
+                Context::HiddenWindowWgl(_, _) => unimplemented!(),
+                Context::Egl(_) | Context::EglPbuffer(_) | Context::HiddenWindowEgl(_, _) => {
+                    unimplemented!()
+                }
             }
         });
         let context_result = unsafe {
@@ -90,10 +93,10 @@ impl Context {
 
         // if EGL is available, we try using EGL first
         // if EGL returns an error, we try the hidden window method
-        if let &Some(ref egl) = &*egl {
+        if let Some(egl) = egl {
             let gl_attr = &gl_attr.clone().map_sharing(|_| unimplemented!()); // TODO
             let native_display = egl::NativeDisplay::Other(None);
-            let context = EglContext::new(egl.0.clone(), pf_reqs, &gl_attr, native_display)
+            let context = EglContext::new(egl.clone(), pf_reqs, &gl_attr, native_display)
                 .and_then(|prototype| prototype.finish_pbuffer((1, 1)))
                 .map(|ctxt| Context::EglPbuffer(ctxt));
             if let Ok(context) = context {
@@ -101,12 +104,12 @@ impl Context {
             }
         }
         let window_builder = winit::WindowBuilder::new().with_visibility(false);
-        let gl_attr = &gl_attr.clone().map_sharing(|_| unimplemented!());
-        let egl = egl.as_ref().map(|w| &w.0);
+        let gl_attr = &gl_attr.clone().map_sharing(|_| unimplemented!()); // TODO
         Self::new(window_builder, &el, pf_reqs, gl_attr, egl).map(|(window, context)| match context
         {
             Context::Egl(context) => Context::HiddenWindowEgl(window, context),
             Context::Wgl(context) => Context::HiddenWindowWgl(window, context),
+            _ => unreachable!(),
         })
     }
 
@@ -171,7 +174,7 @@ impl Context {
             Context::Wgl(ref c) | Context::HiddenWindowWgl(_, ref c) => c.get_pixel_format(),
             Context::Egl(ref c)
             | Context::HiddenWindowEgl(_, ref c)
-            | Context::EglPbuffer(ref c) => c.pixel_format(),
+            | Context::EglPbuffer(ref c) => c.get_pixel_format(),
         }
     }
 
