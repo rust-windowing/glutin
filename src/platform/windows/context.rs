@@ -90,11 +90,11 @@ impl Context {
 
         // if EGL is available, we try using EGL first
         // if EGL returns an error, we try the hidden window method
-        if let &Some(ref egl) = &*EGL {
+        if let &Some(ref egl) = &*egl {
             let gl_attr = &gl_attr.clone().map_sharing(|_| unimplemented!()); // TODO
             let native_display = egl::NativeDisplay::Other(None);
             let context = EglContext::new(egl.0.clone(), pf_reqs, &gl_attr, native_display)
-                .and_then(|prototype| prototype.finish_pbuffer(dimensions))
+                .and_then(|prototype| prototype.finish_pbuffer((1, 1)))
                 .map(|ctxt| Context::EglPbuffer(ctxt));
             if let Ok(context) = context {
                 return Ok(context);
@@ -102,7 +102,7 @@ impl Context {
         }
         let window_builder = winit::WindowBuilder::new().with_visibility(false);
         let gl_attr = &gl_attr.clone().map_sharing(|_| unimplemented!());
-        let egl = EGL.as_ref().map(|w| &w.0);
+        let egl = egl.as_ref().map(|w| &w.0);
         Self::new(window_builder, &el, pf_reqs, gl_attr, egl).map(|(window, context)| match context
         {
             Context::Egl(context) => Context::HiddenWindowEgl(window, context),
@@ -111,7 +111,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn resize(&self, _window: &winit::window, _width: u32, _height: u32) {
+    pub fn resize(&self, _window: &winit::Window, _width: u32, _height: u32) {
         // Method is for API consistency.
     }
 
