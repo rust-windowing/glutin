@@ -10,7 +10,7 @@ use PixelFormatRequirements;
 use Robustness;
 
 use cgl::{CGLEnable, kCGLCECrashOnRemovedFunctions, CGLSetParameter, kCGLCPSurfaceOpacity};
-use cocoa::appkit::*;
+use cocoa::appkit::{self, NSOpenGLContext, NSOpenGLPixelFormat};
 use cocoa::base::{id, nil};
 use cocoa::foundation::NSAutoreleasePool;
 use core_foundation::base::TCFType;
@@ -123,7 +123,7 @@ impl Context {
 
             CGLEnable(gl_context.CGLContextObj() as *mut _, kCGLCECrashOnRemovedFunctions);
 
-            let context = Context { context: gl_context, pixel_format: pixel_format };
+            let context = WindowedContext { context: gl_context, pixel_format: pixel_format };
             Ok((window, Context::WindowedContext(context)))
         }
     }
@@ -158,7 +158,7 @@ impl Context {
         Ok(Context::HeadlessContext(headless))
     }
 
-    pub fn resize(&self, _width: u32, _height: u32) {
+    pub fn resize(&self, _window: &winit::Window, _width: u32, _height: u32) {
         match *self {
             Context::WindowedContext(ref c) => unsafe { c.context.update() },
             _ => panic!(),
@@ -171,7 +171,6 @@ impl Context {
             Context::WindowedContext(ref c) => {
                 let _: () = msg_send![*c.context, update];
                 c.context.makeCurrentContext();
-                *c.context
             }
             Context::HeadlessContext(ref c) => c.context.makeCurrentContext(),
         }
@@ -194,7 +193,7 @@ impl Context {
                     let _: () = msg_send![pool, release];
                     res
                 },
-                Context::HeadlessContext(ref c) => id::currentContext(self.context) == self.context,
+                Context::HeadlessContext(ref c) => id::currentContext(c.context) == c.context,
             }
         }
     }
@@ -241,9 +240,9 @@ impl Context {
     #[inline]
     pub unsafe fn raw_handle(&self) -> *mut c_void {
         match *self {
-            Context::WindowedContext(ref c) => *c.context.deref(),
-            Context::HeadlessContext(ref c) => c.context,
-        } as *mut _
+            Context::WindowedContext(ref c) => *c.context.deref() as *mut _,
+            Context::HeadlessContext(ref c) => c.context as *mut _,
+        }
     }
 }
 
