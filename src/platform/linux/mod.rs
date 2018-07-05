@@ -216,6 +216,3 @@ impl Context {
         }
     }
 }
-
-#[derive(Clone, Default)]
-pub struct PlatformSpecificHeadlessBuilderAttributes;
