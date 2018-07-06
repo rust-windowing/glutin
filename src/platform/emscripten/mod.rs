@@ -9,8 +9,9 @@ use winit;
 
 mod ffi;
 
-pub struct Context {
-    context: ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE,
+pub enum Context {
+    Window(ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE),
+    WindowedContext(winit::Window, ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE),
 }
 
 impl Context {
@@ -52,29 +53,43 @@ impl Context {
 
         // TODO: emscripten_set_webglcontextrestored_callback
 
-        let ctxt = Context {
-            context: context
-        };
-
-        Ok((window, ctxt))
+        Ok((window, Context::Window(context)))
     }
 
     #[inline]
-    pub fn resize(&self, width: u32, height: u32) {
-        // TODO: ?
+    pub fn new_context(
+        el: &winit::EventsLoop,
+        pf_reqs: &PixelFormatRequirements,
+        gl_attr: &GlAttributes<&Context>,
+        shareable_with_windowed_contexts: bool,
+    ) -> Result<Self, CreationError> {
+        assert!(shareable_with_windowed_contexts); // TODO: Implement if possible
+        let wb = winit::WindowBuilder::new().with_visibility(false);
+        Self::new(wb, el, pf_reqs, gl_attr).map(|(w, c)| match c {
+            Context::Window(c) => Context::WindowedContext(w, c),
+            _ => panic!(),
+        })
+    }
+
+    #[inline]
+    pub fn resize(&self, window: &winit::Window, width: u32, height: u32) {
+        match self {
+            Context::Window(_) => (), // TODO: ?
+            Context::WindowedContext(_, _) => panic!(),
+        }
     }
 
     #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
         // TOOD: check if == EMSCRIPTEN_RESULT
-        ffi::emscripten_webgl_make_context_current(self.context);
+        ffi::emscripten_webgl_make_context_current(self.raw_handle());
         Ok(())
     }
 
     #[inline]
     pub fn is_current(&self) -> bool {
         unsafe {
-            ffi::emscripten_webgl_get_current_context() == self.context
+            ffi::emscripten_webgl_get_current_context() == self.raw_handle()
         }
     }
 
@@ -116,76 +131,18 @@ impl Context {
 
     #[inline]
     pub unsafe fn raw_handle(&self) -> ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE {
-        self.context
+        match self {
+            Context::Window(c) => *c,
+            Context::WindowedContext(_, c) => *c,
+        }
     }
 }
 
 impl Drop for Context {
     fn drop(&mut self) {
         unsafe {
-            ffi::emscripten_webgl_destroy_context(self.context);
+            ffi::emscripten_webgl_destroy_context(self.raw_handle());
         }
-    }
-}
-
-#[derive(Clone, Default)]
-pub struct PlatformSpecificHeadlessBuilderAttributes;
-
-pub struct HeadlessContext {
-    context: ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE,
-}
-
-impl HeadlessContext {
-    pub fn new(dimensions: (u32, u32), pf_reqs: &PixelFormatRequirements,
-               opengl: &GlAttributes<&HeadlessContext>,
-               _: &PlatformSpecificHeadlessBuilderAttributes)
-               -> Result<HeadlessContext, CreationError>
-    {
-        unimplemented!()
-    }
-
-    #[inline]
-    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        // TOOD: check if == EMSCRIPTEN_RESULT
-        ffi::emscripten_webgl_make_context_current(self.context);
-        Ok(())
-    }
-
-    #[inline]
-    pub fn is_current(&self) -> bool {
-        unsafe {
-            ffi::emscripten_webgl_get_current_context() == self.context
-        }
-    }
-
-    #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const () {
-        let addr = CString::new(addr).unwrap();
-
-        unsafe {
-            // FIXME: if `as_ptr()` is used, then wrong data is passed to emscripten
-            ffi::emscripten_GetProcAddress(addr.into_raw() as *const _) as *const _
-        }
-    }
-
-    #[inline]
-    pub fn swap_buffers(&self) -> Result<(), ContextError> {
-        Ok(())
-    }
-
-    #[inline]
-    pub fn get_api(&self) -> Api {
-        Api::WebGl
-    }
-
-    #[inline]
-    pub fn get_pixel_format(&self) -> PixelFormat {
-        unimplemented!()
-    }
-
-    #[inline]
-    pub unsafe fn raw_handle(&self) -> ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE {
-        self.context
     }
 }
 

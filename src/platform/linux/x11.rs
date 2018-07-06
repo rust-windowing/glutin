@@ -111,7 +111,6 @@ impl Drop for Context {
 }
 
 impl Context {
-
     pub fn new(
         window_builder: winit::WindowBuilder,
         events_loop: &winit::EventsLoop,
@@ -133,8 +132,11 @@ impl Context {
             Egl(::api::egl::ContextPrototype<'a>),
         }
 
-        let builder_clone_opengl_glx = gl_attr.clone().map_sharing(|_| unimplemented!());      // FIXME:
-        let builder_clone_opengl_egl = gl_attr.clone().map_sharing(|_| unimplemented!());      // FIXME:
+        let builder = gl_attr.clone();
+
+        let builder_glx_u;
+        let builder_egl_u;
+
         let backend = GlxOrEgl::new();
         let context = match gl_attr.version {
             GlRequest::Latest |
@@ -143,21 +145,29 @@ impl Context {
                 // GLX should be preferred over EGL, otherwise crashes may occur
                 // on X11 – issue #314
                 if let Some(ref glx) = backend.glx {
+                    builder_glx_u = builder.map_sharing(|c| match c.context {
+                        GlContext::Glx(ref c) => c,
+                        _ => panic!(),
+                    });
                     Prototype::Glx(GlxContext::new(
                         glx.clone(),
                         &display.xlib,
                         pf_reqs,
-                        &builder_clone_opengl_glx,
+                        &builder_glx_u,
                         display.display,
                         screen_id,
                         window_builder.window.transparent,
                     )?)
                 } else if let Some(ref egl) = backend.egl {
+                    builder_egl_u = builder.map_sharing(|c| match c.context {
+                        GlContext::Egl(ref c) => c,
+                        _ => panic!(),
+                    });
                     let native_display = egl::NativeDisplay::X11(Some(display.display as *const _));
                     Prototype::Egl(EglContext::new(
                         egl.clone(),
                         pf_reqs,
-                        &builder_clone_opengl_egl,
+                        &builder_egl_u,
                         native_display,
                     )?)
                 } else {
@@ -166,10 +176,14 @@ impl Context {
             },
             GlRequest::Specific(Api::OpenGlEs, _) => {
                 if let Some(ref egl) = backend.egl {
+                    builder_egl_u = builder.map_sharing(|c| match c.context {
+                        GlContext::Egl(ref c) => c,
+                        _ => panic!(),
+                    });
                     Prototype::Egl(EglContext::new(
                         egl.clone(),
                         pf_reqs,
-                        &builder_clone_opengl_egl,
+                        &builder_egl_u,
                         egl::NativeDisplay::X11(Some(display.display as *const _)),
                     )?)
                 } else {
@@ -239,6 +253,23 @@ impl Context {
         };
 
         Ok((window, context))
+    }
+
+    #[inline]
+    pub fn resize(&self, w: ffi::Window, width: u32, height: u32) {
+        unsafe {
+            match self.context {
+                GlContext::Egl(_) | GlContext::Glx(_) => {
+                    assert_eq!((self.display.xlib.XResizeWindow)(
+                        self.display.display,
+                        w,
+                        width as _,
+                        height as _
+                    ), 0);
+                }
+                GlContext::None => ()
+            }
+        }
     }
 
     #[inline]

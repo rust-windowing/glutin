@@ -23,7 +23,13 @@ impl Context {
         let window = window_builder.build(events_loop)?;
         let logical_size = window.get_inner_size().unwrap();
         let (w, h) = (logical_size.width, logical_size.height);
-        let surface = window.get_wayland_surface().unwrap();
+
+        let surface = window.get_wayland_surface();
+        let surface = match surface {
+            Some(s) => s,
+            None => return Err(CreationError::NotSupported("Wayland not found")),
+        };
+
         let egl_surface = unsafe { wegl::WlEglSurface::new_from_raw(surface as *mut _, w as i32, h as i32) };
         let context = {
             let libegl = unsafe { dlopen::dlopen(b"libEGL.so\0".as_ptr() as *const _, dlopen::RTLD_NOW) };
@@ -34,7 +40,7 @@ impl Context {
                 let sym = CString::new(sym).unwrap();
                 unsafe { dlopen::dlsym(libegl, sym.as_ptr()) }
             });
-            let gl_attr = gl_attr.clone().map_sharing(|_| unimplemented!()); // TODO
+            let gl_attr = gl_attr.clone().map_sharing(|c| &c.context);
             let native_display = egl::NativeDisplay::Wayland(Some(
                 window.get_wayland_display().unwrap() as *const _
             ));
@@ -48,6 +54,7 @@ impl Context {
         Ok((window, context))
     }
 
+    #[inline]
     pub fn resize(&self, width: u32, height: u32) {
         self.egl_surface.resize(width as i32, height as i32, 0, 0);
     }
