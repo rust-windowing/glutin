@@ -1,14 +1,13 @@
 pub use winit::os::unix::x11::{XError, XNotSupported, XConnection};
 
 use std::{mem, ptr, fmt, error};
+use std::ffi::CString;
 use std::sync::Arc;
 
 use winit;
 use winit::os::unix::{EventsLoopExt, WindowExt, WindowBuilderExt};
 
 use {Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat, PixelFormatRequirements};
-
-use std::ffi::CString;
 
 use api::glx::{ffi, Context as GlxContext};
 use api::{dlopen, egl};
@@ -90,7 +89,7 @@ pub enum GlContext {
 }
 
 pub struct Context {
-    display: Arc<XConnection>,
+    xconn: Arc<XConnection>,
     colormap: ffi::Colormap,
     context: GlContext,
 }
@@ -105,7 +104,7 @@ impl Drop for Context {
             // is still the current one
             self.context = GlContext::None;
 
-            (self.display.xlib.XFreeColormap)(self.display.display, self.colormap);
+            (self.xconn.xlib.XFreeColormap)(self.xconn.display, self.colormap);
         }
     }
 }
@@ -119,13 +118,13 @@ impl Context {
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<(winit::Window, Self), CreationError>
     {
-        let display = match events_loop.get_xlib_xconnection() {
-            Some(display) => display,
+        let xconn = match events_loop.get_xlib_xconnection() {
+            Some(xconn) => xconn,
             None => return Err(CreationError::NoBackendAvailable(Box::new(NoX11Connection))),
         };
 
         // Get the screen_id for the window being built.
-        let screen_id = unsafe { (display.xlib.XDefaultScreen)(display.display) };
+        let screen_id = unsafe { (xconn.xlib.XDefaultScreen)(xconn.display) };
 
         // start the context building process
         enum Prototype<'a> {
@@ -145,15 +144,14 @@ impl Context {
                 if let Some(ref glx) = backend.glx {
                     Prototype::Glx(GlxContext::new(
                         glx.clone(),
-                        &display.xlib,
+                        Arc::clone(&xconn),
                         pf_reqs,
                         &builder_clone_opengl_glx,
-                        display.display,
                         screen_id,
                         window_builder.window.transparent,
                     )?)
                 } else if let Some(ref egl) = backend.egl {
-                    let native_display = egl::NativeDisplay::X11(Some(display.display as *const _));
+                    let native_display = egl::NativeDisplay::X11(Some(xconn.display as *const _));
                     Prototype::Egl(EglContext::new(
                         egl.clone(),
                         pf_reqs,
@@ -170,7 +168,7 @@ impl Context {
                         egl.clone(),
                         pf_reqs,
                         &builder_clone_opengl_egl,
-                        egl::NativeDisplay::X11(Some(display.display as *const _)),
+                        egl::NativeDisplay::X11(Some(xconn.display as *const _)),
                     )?)
                 } else {
                     return Err(CreationError::NotSupported("libEGL not present"));
@@ -190,14 +188,14 @@ impl Context {
                     template.visualid = p.get_native_visual_id() as ffi::VisualID;
 
                     let mut num_visuals = 0;
-                    let vi = (display.xlib.XGetVisualInfo)(display.display, ffi::VisualIDMask,
+                    let vi = (xconn.xlib.XGetVisualInfo)(xconn.display, ffi::VisualIDMask,
                                                            &mut template, &mut num_visuals);
-                    display.check_errors().expect("Failed to call XGetVisualInfo");
+                    xconn.check_errors().expect("Failed to call `XGetVisualInfo`");
                     assert!(!vi.is_null());
                     assert!(num_visuals == 1);
 
                     let vi_copy = ptr::read(vi as *const _);
-                    (display.xlib.XFree)(vi as *mut _);
+                    (xconn.xlib.XFree)(vi as *mut _);
                     vi_copy
                 }
             },
@@ -220,22 +218,22 @@ impl Context {
         };
 
         // getting the root window
-        let root = unsafe { (display.xlib.XDefaultRootWindow)(display.display) };
-        display.check_errors().expect("Failed to get root window");
+        let root = unsafe { (xconn.xlib.XDefaultRootWindow)(xconn.display) };
+        xconn.check_errors().expect("Failed to get root window");
 
         // creating the color map
-        let cmap = unsafe {
-            let cmap = (display.xlib.XCreateColormap)(display.display, root,
+        let colormap = unsafe {
+            let cmap = (xconn.xlib.XCreateColormap)(xconn.display, root,
                                                       visual_infos.visual as *mut _,
                                                       ffi::AllocNone);
-            display.check_errors().expect("Failed to call XCreateColormap");
+            xconn.check_errors().expect("Failed to call XCreateColormap");
             cmap
         };
 
         let context = Context {
-            display: display.clone(),
-            context: context,
-            colormap: cmap,
+            xconn: Arc::clone(&xconn),
+            context,
+            colormap,
         };
 
         Ok((window, context))

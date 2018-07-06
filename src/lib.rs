@@ -526,6 +526,8 @@ impl From<WindowCreationError> for CreationError {
 /// Error that can happen when manipulating an OpenGL context.
 #[derive(Debug)]
 pub enum ContextError {
+    /// General platform error.
+    OsError(String),
     IoError(io::Error),
     ContextLost,
 }
@@ -534,6 +536,7 @@ impl ContextError {
     fn to_string(&self) -> &str {
         use std::error::Error;
         match *self {
+            ContextError::OsError(ref string) => string,
             ContextError::IoError(ref err) => err.description(),
             ContextError::ContextLost => "Context lost"
         }

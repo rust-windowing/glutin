@@ -1,20 +1,25 @@
 #![cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "openbsd"))]
 
-use ContextError;
-use CreationError;
-use GlAttributes;
-use GlProfile;
-use GlRequest;
-use Api;
-use PixelFormat;
-use PixelFormatRequirements;
-use ReleaseBehavior;
-use Robustness;
+use {
+    Api,
+    ContextError,
+    CreationError,
+    GlAttributes,
+    GlProfile,
+    GlRequest,
+    PixelFormat,
+    PixelFormatRequirements,
+    ReleaseBehavior,
+    Robustness,
+};
 
-use libc;
-use libc::c_int;
-use std::ffi::{CStr, CString};
 use std::{mem, ptr, slice};
+use std::ffi::{CStr, CString};
+use std::sync::Arc;
+
+use libc::{self, c_int};
+
+use winit::os::unix::x11::XConnection;
 
 pub mod ffi {
     pub use x11_dl::xlib::*;
@@ -33,7 +38,7 @@ pub mod ffi {
 
 pub struct Context {
     glx: ffi::glx::Glx,
-    display: *mut ffi::Display,
+    xconn: Arc<XConnection>,
     window: ffi::Window,
     context: ffi::GLXContext,
     pixel_format: PixelFormat,
@@ -42,10 +47,9 @@ pub struct Context {
 impl Context {
     pub fn new<'a>(
         glx: ffi::glx::Glx,
-        xlib: &'a ffi::Xlib,
+        xconn: Arc<XConnection>,
         pf_reqs: &PixelFormatRequirements,
         opengl: &'a GlAttributes<&'a Context>,
-        display: *mut ffi::Display,
         screen_id: libc::c_int,
         transparent: bool,
     ) -> Result<ContextPrototype<'a>, CreationError>
@@ -59,52 +63,64 @@ impl Context {
         // else. See: https://www.virtualbox.org/ticket/8293
         let (mut major, mut minor) = (0, 0);
         unsafe {
-            glx.QueryVersion(display as *mut _, &mut major, &mut minor);
+            glx.QueryVersion(xconn.display as *mut _, &mut major, &mut minor);
         }
 
         // loading the list of extensions
         let extensions = unsafe {
-            let extensions = glx.QueryExtensionsString(display as *mut _, screen_id);
+            let extensions = glx.QueryExtensionsString(xconn.display as *mut _, screen_id);
+            if extensions.is_null() {
+                return Err(CreationError::OsError(format!("`glXQueryExtensionsString` found no glX extensions")));
+            }
             let extensions = CStr::from_ptr(extensions).to_bytes().to_vec();
             String::from_utf8(extensions).unwrap()
         };
 
         // finding the pixel format we want
         let (fb_config, pixel_format) = unsafe {
-            choose_fbconfig(&glx, &extensions, xlib, display, screen_id, pf_reqs, transparent)
-                                          .map_err(|_| CreationError::NoAvailablePixelFormat)?
+            choose_fbconfig(
+                &glx,
+                &extensions,
+                &xconn.xlib,
+                xconn.display,
+                screen_id,
+                pf_reqs,
+                transparent,
+            ).map_err(|_| CreationError::NoAvailablePixelFormat)?
         };
 
         // getting the visual infos
         let visual_infos: ffi::glx::types::XVisualInfo = unsafe {
-            let vi = glx.GetVisualFromFBConfig(display as *mut _, fb_config);
+            let vi = glx.GetVisualFromFBConfig(xconn.display as *mut _, fb_config);
             if vi.is_null() {
-                return Err(CreationError::OsError(format!("glxGetVisualFromFBConfig failed")));
+                return Err(CreationError::OsError(
+                    format!("`glXGetVisualFromFBConfig` failed: invalid `GLXFBConfig`")
+                ));
             }
             let vi_copy = ptr::read(vi as *const _);
-            (xlib.XFree)(vi as *mut _);
+            (xconn.xlib.XFree)(vi as *mut _);
             vi_copy
         };
 
         Ok(ContextPrototype {
-            glx: glx,
-            extensions: extensions,
-            xlib: xlib,
-            opengl: opengl,
-            display: display,
-            fb_config: fb_config,
+            glx,
+            extensions,
+            xconn,
+            opengl,
+            fb_config,
             visual_infos: unsafe { mem::transmute(visual_infos) },
-            pixel_format: pixel_format,
+            pixel_format,
         })
     }
 
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        // TODO: glutin needs some internal changes for proper error recovery
-        let res = self.glx.MakeCurrent(self.display as *mut _, self.window, self.context);
+        let res = self.glx.MakeCurrent(self.xconn.display as *mut _, self.window, self.context);
         if res == 0 {
-            panic!("glx::MakeCurrent failed");
+            let err = self.xconn.check_errors();
+            Err(ContextError::OsError(format!("`glXMakeCurrent` failed: {:?}", err)))
+        } else {
+            Ok(())
         }
-        Ok(())
     }
 
     #[inline]
@@ -122,9 +138,12 @@ impl Context {
 
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
-        // TODO: glutin needs some internal changes for proper error recovery
-        unsafe { self.glx.SwapBuffers(self.display as *mut _, self.window); }
-        Ok(())
+        unsafe { self.glx.SwapBuffers(self.xconn.display as *mut _, self.window); }
+        if let Err(err) = self.xconn.check_errors() {
+            Err(ContextError::OsError(format!("`glXSwapBuffers` failed: {:?}", err)))
+        } else {
+            Ok(())
+        }
     }
 
     #[inline]
@@ -150,10 +169,10 @@ impl Drop for Context {
     fn drop(&mut self) {
         unsafe {
             if self.is_current() {
-                self.glx.MakeCurrent(self.display as *mut _, 0, ptr::null_mut());
+                self.glx.MakeCurrent(self.xconn.display as *mut _, 0, ptr::null_mut());
             }
 
-            self.glx.DestroyContext(self.display as *mut _, self.context);
+            self.glx.DestroyContext(self.xconn.display as *mut _, self.context);
         }
     }
 }
@@ -161,9 +180,8 @@ impl Drop for Context {
 pub struct ContextPrototype<'a> {
     glx: ffi::glx::Glx,
     extensions: String,
-    xlib: &'a ffi::Xlib,
+    xconn: Arc<XConnection>,
     opengl: &'a GlAttributes<&'a Context>,
-    display: *mut ffi::Display,
     fb_config: ffi::glx::types::GLXFBConfig,
     visual_infos: ffi::XVisualInfo,
     pixel_format: PixelFormat,
@@ -199,10 +217,10 @@ impl<'a> ContextPrototype<'a> {
                     // drivers don't return the latest supported version but the one requested
                     for opengl_version in opengl_versions.iter()
                     {
-                        match create_context(&self.glx, &extra_functions, &self.extensions, &self.xlib,
+                        match create_context(&self.glx, &extra_functions, &self.extensions, &self.xconn.xlib,
                                              *opengl_version, self.opengl.profile,
                                              self.opengl.debug, self.opengl.robustness, share,
-                                             self.display, self.fb_config, &self.visual_infos)
+                                             self.xconn.display, self.fb_config, &self.visual_infos)
                         {
                             Ok(x) => {
                                 ctxt = x;
@@ -211,37 +229,37 @@ impl<'a> ContextPrototype<'a> {
                             Err(_) => continue
                         }
                     }
-                    ctxt = create_context(&self.glx, &extra_functions, &self.extensions, &self.xlib, (1, 0),
+                    ctxt = create_context(&self.glx, &extra_functions, &self.extensions, &self.xconn.xlib, (1, 0),
                                                self.opengl.profile, self.opengl.debug,
                                                self.opengl.robustness, share,
-                                               self.display, self.fb_config, &self.visual_infos)?;
+                                               self.xconn.display, self.fb_config, &self.visual_infos)?;
                     break;
                 }
                 ctxt
             },
             GlRequest::Specific(Api::OpenGl, (major, minor)) => {
-                create_context(&self.glx, &extra_functions, &self.extensions, &self.xlib, (major, minor),
+                create_context(&self.glx, &extra_functions, &self.extensions, &self.xconn.xlib, (major, minor),
                                     self.opengl.profile, self.opengl.debug,
-                                    self.opengl.robustness, share, self.display, self.fb_config,
+                                    self.opengl.robustness, share, self.xconn.display, self.fb_config,
                                     &self.visual_infos)?
             },
             GlRequest::Specific(_, _) => panic!("Only OpenGL is supported"),
             GlRequest::GlThenGles { opengl_version: (major, minor), .. } => {
-                create_context(&self.glx, &extra_functions, &self.extensions, &self.xlib, (major, minor),
+                create_context(&self.glx, &extra_functions, &self.extensions, &self.xconn.xlib, (major, minor),
                                     self.opengl.profile, self.opengl.debug,
-                                    self.opengl.robustness, share, self.display, self.fb_config,
+                                    self.opengl.robustness, share, self.xconn.display, self.fb_config,
                                     &self.visual_infos)?
             },
         };
 
         // vsync
         if self.opengl.vsync {
-            unsafe { self.glx.MakeCurrent(self.display as *mut _, window, context) };
+            unsafe { self.glx.MakeCurrent(self.xconn.display as *mut _, window, context) };
 
             if check_ext(&self.extensions, "GLX_EXT_swap_control") && extra_functions.SwapIntervalEXT.is_loaded() {
                 // this should be the most common extension
                 unsafe {
-                    extra_functions.SwapIntervalEXT(self.display as *mut _, window, 1);
+                    extra_functions.SwapIntervalEXT(self.xconn.display as *mut _, window, 1);
                 }
 
                 // checking that it worked
@@ -249,7 +267,7 @@ impl<'a> ContextPrototype<'a> {
                 /*if self.builder.strict {
                     let mut swap = unsafe { mem::uninitialized() };
                     unsafe {
-                        self.glx.QueryDrawable(self.display as *mut _, window,
+                        self.glx.QueryDrawable(self.xconn.display as *mut _, window,
                                                ffi::glx_extra::SWAP_INTERVAL_EXT as i32,
                                                &mut swap);
                     }
@@ -276,14 +294,14 @@ impl<'a> ContextPrototype<'a> {
                 return Err(CreationError::OsError(format!("Couldn't find any available vsync extension")));
             }*/
 
-            unsafe { self.glx.MakeCurrent(self.display as *mut _, 0, ptr::null()) };
+            unsafe { self.glx.MakeCurrent(self.xconn.display as *mut _, 0, ptr::null()) };
         }
 
         Ok(Context {
             glx: self.glx,
-            display: self.display,
-            window: window,
-            context: context,
+            xconn: self.xconn,
+            window,
+            context,
             pixel_format: self.pixel_format,
         })
     }

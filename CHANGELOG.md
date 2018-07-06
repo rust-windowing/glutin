@@ -1,5 +1,8 @@
 # Unreleased
 
+- **Breaking:** Added `OsError` variant to `ContextError`.
+- Improved glX error reporting.
+
 # Version 0.17.0 (2018-06-27)
 
 - Fix regression that prevented automatic graphics switching in MacOS ([#980](https://github.com/tomaka/glutin/issues/980))
