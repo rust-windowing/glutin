@@ -2,6 +2,7 @@
 
 - **Breaking:** Added `OsError` variant to `ContextError`.
 - Improved glX error reporting.
+- The iOS backend no longer fails to compile... again (added iOS testing on CI to prevent further issues).
 
 # Version 0.17.0 (2018-06-27)
 
