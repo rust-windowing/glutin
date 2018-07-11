@@ -415,8 +415,7 @@ impl GlContext for Context {
     }
 
     fn resize(&self, size: dpi::PhysicalSize) {
-        let (width, height) = size.into();
-        self.context.resize(width, height);
+        self.context.resize(size);
     }
 }
 

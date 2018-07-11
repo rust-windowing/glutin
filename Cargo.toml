@@ -10,6 +10,9 @@ repository = "https://github.com/tomaka/glutin"
 documentation = "https://docs.rs/glutin"
 build = "build.rs"
 
+[lib]
+crate-type = ["staticlib", "rlib"]
+
 [package.metadata.docs.rs]
 features = ["icon_loading"]
 

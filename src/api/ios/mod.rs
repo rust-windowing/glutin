@@ -61,6 +61,9 @@
 use std::io;
 use std::ffi::CString;
 use std::os::raw::*;
+pub use winit::{
+    dpi,
+};
 
 use objc::runtime::{BOOL, Class, NO, YES};
 
@@ -342,7 +345,7 @@ impl GlContext for Context {
     }
 
     #[inline]
-    fn resize(&self, _width: u32, _height: u32) {
+    fn resize(&self, size: dpi::PhysicalSize) {
         // N/A
     }
 }
