@@ -70,7 +70,6 @@ use {
     CreationError,
     EventsLoop,
     GlAttributes,
-    GlContext,
     GlRequest,
     PixelFormat,
     PixelFormatRequirements,
@@ -267,17 +266,9 @@ impl Context {
             panic!("framebuffer status: {:?}", status);
         }
     }
-}
 
-impl Drop for Context {
-    fn drop(&mut self) {
-        let _: () = unsafe { msg_send![self.eagl_context, release] };
-    }
-}
-
-impl GlContext for Context {
     #[inline]
-    unsafe fn make_current(&self) -> Result<(), ContextError> {
+    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
         let context_class = Class::get("EAGLContext").expect("Failed to get class `EAGLContext`");
         let res: BOOL = msg_send![context_class, setCurrentContext: self.eagl_context];
         if res == YES {
@@ -290,12 +281,13 @@ impl GlContext for Context {
     }
 
     #[inline]
-    fn is_current(&self) -> bool {
-        false
+    pub fn is_current(&self) -> bool {
+        // TODO: This can likely be implemented using `currentContext`/`getCurrentContext`
+        true
     }
 
     #[inline]
-    fn get_proc_address(&self, proc_name: &str) -> *const () {
+    pub fn get_proc_address(&self, proc_name: &str) -> *const () {
         let proc_name_c = CString::new(proc_name).expect("proc name contained interior nul byte");
         let path = b"/System/Library/Frameworks/OpenGLES.framework/OpenGLES\0";
         let addr = unsafe {
@@ -307,7 +299,7 @@ impl GlContext for Context {
     }
 
     #[inline]
-    fn swap_buffers(&self) -> Result<(), ContextError> {
+    pub fn swap_buffers(&self) -> Result<(), ContextError> {
         unsafe {
             let res: BOOL = msg_send![self.eagl_context, presentRenderbuffer:gles::RENDERBUFFER];
             if res == YES {
@@ -321,12 +313,12 @@ impl GlContext for Context {
     }
 
     #[inline]
-    fn get_api(&self) -> Api {
+    pub fn get_api(&self) -> Api {
         Api::OpenGlEs
     }
 
     #[inline]
-    fn get_pixel_format(&self) -> PixelFormat {
+    pub fn get_pixel_format(&self) -> PixelFormat {
         let color_format = ColorFormat::for_view(self.view);
         PixelFormat {
             hardware_accelerated: true,
@@ -342,8 +334,14 @@ impl GlContext for Context {
     }
 
     #[inline]
-    fn resize(&self, _width: u32, _height: u32) {
+    pub fn resize(&self, _width: u32, _height: u32) {
         // N/A
+    }
+}
+
+impl Drop for Context {
+    fn drop(&mut self) {
+        let _: () = unsafe { msg_send![self.eagl_context, release] };
     }
 }
 
