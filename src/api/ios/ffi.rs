@@ -2,6 +2,7 @@
 
 use std::os::raw::*;
 
+use objc::{Encode, Encoding};
 use objc::runtime::Object;
 
 pub mod gles {
@@ -10,6 +11,9 @@ pub mod gles {
 
 pub type id = *mut Object;
 pub const nil: id = 0 as id;
+
+pub const UIViewAutoresizingFlexibleWidth: NSUInteger = 1 << 1;
+pub const UIViewAutoresizingFlexibleHeight: NSUInteger = 1 << 4;
 
 #[cfg(target_pointer_width = "32")]
 pub type CGFloat = f32;
@@ -33,6 +37,19 @@ pub struct CGPoint {
 pub struct CGRect {
     pub origin: CGPoint,
     pub size: CGSize,
+}
+
+unsafe impl Encode for CGRect {
+    fn encode() -> Encoding {
+        #[cfg(target_pointer_width = "32")]
+        unsafe {
+            Encoding::from_str("{CGRect={CGPoint=ff}{CGSize=ff}}")
+        }
+        #[cfg(target_pointer_width = "64")]
+        unsafe {
+            Encoding::from_str("{CGRect={CGPoint=dd}{CGSize=dd}}")
+        }
+    }
 }
 
 #[repr(C)]
