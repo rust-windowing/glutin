@@ -312,13 +312,6 @@ impl Context {
     pub fn resize(&self, _width: u32, _height: u32) {
         // N/A
     }
-}
-
-impl Drop for Context {
-    fn drop(&mut self) {
-        let _: () = unsafe { msg_send![self.eagl_context, release] };
-    }
-}
 
     #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
