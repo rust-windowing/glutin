@@ -12,7 +12,7 @@ fn main() {
         let title = format!("Charming Window #{}", index + 1);
         let window = glutin::WindowBuilder::new().with_title(title);
         let context = glutin::ContextBuilder::new();
-        let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
+        let gl_window = unsafe { glutin::GlWindow::new(window, context, &events_loop).unwrap() };
         let _ = unsafe { gl_window.make_current() };
         let gl = support::load(&gl_window.context());
         let window_id = gl_window.id();

@@ -13,13 +13,13 @@ fn main() {
     };
 
     let context = glutin::ContextBuilder::new();
-    let gl_context = glutin::Context::new(&events_loop, context, true).unwrap();
+    let gl_context = unsafe { glutin::Context::new(&events_loop, context, true).unwrap() };
 
     let window = glutin::WindowBuilder::new().with_title("A fantastic window!")
         .with_dimensions(glutin::dpi::LogicalSize::from_physical(size, 1.0));
     let context = glutin::ContextBuilder::new()
         .with_shared_lists(&gl_context);
-    let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
+    let gl_window = unsafe { glutin::GlWindow::new(window, context, &events_loop).unwrap() };
 
     let _ = unsafe { gl_window.make_current() };
     println!("Pixel format of the window's GL context: {:?}", gl_window.get_pixel_format());
