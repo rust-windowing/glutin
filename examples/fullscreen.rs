@@ -35,7 +35,7 @@ fn main() {
 
     let _ = unsafe { gl_window.make_current() };
 
-    let gl = support::load(&gl_window);
+    let gl = support::load(&gl_window.context());
 
     let mut fullscreen = true;
     let mut running = true;
