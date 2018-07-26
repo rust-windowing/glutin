@@ -78,6 +78,22 @@ impl Context {
 
     /// See the docs in the crate root file.
     #[inline]
+    pub unsafe fn new_separate(
+        window: &winit::Window,
+        _events_loop: &winit::EventsLoop,
+        pf_reqs: &PixelFormatRequirements,
+        gl_attr: &GlAttributes<&Context>,
+    ) -> Result<Self, CreationError> {
+        context::Context::new_separate(
+            window,
+            pf_reqs,
+            &gl_attr.clone().map_sharing(|w| &w.0),
+            EGL.as_ref().map(|w| &w.0),
+        ).map(|c| Context(c))
+    }
+
+    /// See the docs in the crate root file.
+    #[inline]
     pub unsafe fn new_context(
         events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,

@@ -47,7 +47,7 @@ impl android_glue::SyncEventHandler for AndroidSyncEventHandler {
 }
 
 impl Context {
-    pub fn new(
+    pub unsafe fn new(
         window_builder: winit::WindowBuilder,
         events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
@@ -56,7 +56,7 @@ impl Context {
     {
         let window = window_builder.build(events_loop)?;
         let gl_attr = gl_attr.clone().map_sharing(|c| &c.0.egl_context);
-        let native_window = unsafe { android_glue::get_native_window() };
+        let native_window = android_glue::get_native_window();
         if native_window.is_null() {
             return Err(OsError(format!("Android's native window is null")));
         }
@@ -78,16 +78,12 @@ impl Context {
             if suspended {
                 // Android has stopped the activity or sent it to background.
                 // Release the EGL surface and stop the animation loop.
-                unsafe {
-                    ctx.egl_context.on_surface_destroyed();
-                }
+                ctx.egl_context.on_surface_destroyed();
             } else {
                 // Android has started the activity or sent it to foreground.
                 // Restore the EGL surface and animation loop.
-                unsafe {
-                    let native_window = android_glue::get_native_window();
-                    ctx.egl_context.on_surface_created(native_window as *const _);
-                }
+                let native_window = android_glue::get_native_window();
+                ctx.egl_context.on_surface_created(native_window as *const _);
             }
         })));
 
@@ -95,7 +91,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn new_context(
+    pub unsafe fn new_context(
         _el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
@@ -114,6 +110,17 @@ impl Context {
             stopped: None,
         });
         Ok(Context(ctx))
+    }
+
+    /// See the docs in the crate root file.
+    #[inline]
+    pub unsafe fn new_separate(
+        _window: &winit::Window,
+        _events_loop: &winit::EventsLoop,
+        _pf_reqs: &PixelFormatRequirements,
+        _gl_attr: &GlAttributes<&Context>,
+    ) -> Result<Self, CreationError> {
+        unimplemented!()
     }
 
     #[inline]

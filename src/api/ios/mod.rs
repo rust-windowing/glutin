@@ -220,6 +220,17 @@ impl Context {
             .map(|(_window, context)| context)
     }
 
+    /// See the docs in the crate root file.
+    #[inline]
+    pub unsafe fn new_separate(
+        _window: &Window,
+        _events_loop: &EventsLoop,
+        _pf_reqs: &PixelFormatRequirements,
+        _gl_attr: &GlAttributes<&Context>,
+    ) -> Result<Self, CreationError> {
+        unimplemented!()
+    }
+
     unsafe fn create_context(mut version: NSUInteger) -> Result<id, CreationError> {
         let context_class = Class::get("EAGLContext").expect("Failed to get class `EAGLContext`");
         let eagl_context: id = msg_send![context_class, alloc];

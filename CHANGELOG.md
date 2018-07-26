@@ -1,5 +1,9 @@
 # Unreleased
 
+- On X11 and Wayland, you can now use shared contexts, however, one limitation 
+of the Wayland backend is that all shared contexts must use the same events
+pool as each other.
+
 # Version 0.19.0 (2018-11-09)
 
 - **Breaking:** The entire API for headless contexts has been removed. Please instead use `Context::new()` when trying to make a context without a visible window. Also removed `headless` feature.

@@ -413,8 +413,14 @@ unsafe fn choose_fbconfig(glx: &ffi::glx::Glx, extensions: &str, xlib: &ffi::Xli
         out.push(ffi::glx::X_RENDERABLE as c_int);
         out.push(1);
 
+        // TODO: If passed an visual xid, maybe we should stop assuming TRUE_COLOR.
         out.push(ffi::glx::X_VISUAL_TYPE as c_int);
         out.push(ffi::glx::TRUE_COLOR as c_int);
+
+        if let Some(xid) = reqs.x11_visual_xid {
+            out.push(ffi::glx::VISUAL_ID as c_int);
+            out.push(xid as c_int);
+        }
 
         out.push(ffi::glx::DRAWABLE_TYPE as c_int);
         out.push(ffi::glx::WINDOW_BIT as c_int);

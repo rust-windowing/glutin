@@ -159,6 +159,17 @@ impl Context {
         Ok(Context::HeadlessContext(headless))
     }
 
+    /// See the docs in the crate root file.
+    #[inline]
+    pub unsafe fn new_separate(
+        _window: &winit::Window,
+        _events_loop: &winit::EventsLoop,
+        _pf_reqs: &PixelFormatRequirements,
+        _gl_attr: &GlAttributes<&Context>,
+    ) -> Result<Self, CreationError> {
+        unimplemented!()
+    }
+
     pub fn resize(&self, _width: u32, _height: u32) {
         match *self {
             Context::WindowedContext(ref c) => unsafe { c.context.update() },

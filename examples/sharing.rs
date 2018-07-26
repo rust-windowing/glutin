@@ -1,3 +1,5 @@
+//! Requires OpenGL 4.2 minimium.
+
 extern crate glutin;
 
 mod support;

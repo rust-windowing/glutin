@@ -139,6 +139,33 @@ impl Context {
     }
 
     #[inline]
+    pub unsafe fn new_separate(
+        window: &winit::Window,
+        events_loop: &winit::EventsLoop,
+        pf_reqs: &PixelFormatRequirements,
+        gl_attr: &GlAttributes<&Context>,
+    ) -> Result<Self, CreationError> {
+        if events_loop.is_wayland() {
+            Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
+
+            let gl_attr = gl_attr.clone().map_sharing(|ctxt| match ctxt {
+                &Context::WindowedWayland(ref ctxt) | &Context::HeadlessWayland(_, ref ctxt) => ctxt,
+                _ => unreachable!(),
+            });
+            wayland::Context::new_separate(window, events_loop, pf_reqs, &gl_attr)
+                .map(|context| Context::WindowedWayland(context))
+        } else {
+            Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
+            let gl_attr = gl_attr.clone().map_sharing(|ctxt| match ctxt {
+                &Context::WindowedX11(ref ctxt) | &Context::HeadlessX11(_, ref ctxt) => ctxt,
+                _ => unreachable!(),
+            });
+            x11::Context::new_separate(window, events_loop, pf_reqs, &gl_attr)
+                .map(|context| Context::WindowedX11(context))
+        }
+    }
+
+    #[inline]
     pub fn resize(&self, width: u32, height: u32) {
         match *self {
             Context::WindowedX11(_) => (),

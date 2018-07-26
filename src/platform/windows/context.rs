@@ -44,41 +44,88 @@ impl Context {
         egl: Option<&Egl>,
     ) -> Result<(winit::Window, Self), CreationError> {
         let window = window_builder.build(events_loop)?;
-        let gl_attr = gl_attr.clone().map_sharing(|ctxt| {
-            match *ctxt {
-                Context::Wgl(ref c) => c.get_hglrc(),
-                // FIXME
-                Context::HiddenWindowWgl(_, _) => unimplemented!(),
-                Context::Egl(_) | Context::EglPbuffer(_) | Context::HiddenWindowEgl(_, _) => {
-                    unimplemented!()
-                }
-            }
-        });
-        let context_result = {
-            let w = window.get_hwnd() as HWND;
-            match gl_attr.version {
-                GlRequest::Specific(Api::OpenGlEs, (_major, _minor)) => {
-                    if let Some(egl) = egl {
+        let ctxt = Self::new_separate(
+            &window,
+            pf_reqs,
+            gl_attr,
+            egl,
+        )?;
+
+        Ok((window, ctxt))
+    }
+
+    pub unsafe fn new_separate(
+        window: &winit::Window,
+        pf_reqs: &PixelFormatRequirements,
+        gl_attr: &GlAttributes<&Self>,
+        egl: Option<&Egl>,
+    ) -> Result<Self, CreationError> {
+        let w = window.get_hwnd() as HWND;
+        match gl_attr.version {
+            GlRequest::Specific(Api::OpenGlEs, (_major, _minor)) => {
+                match (gl_attr.sharing, egl) {
+                    // We must use WGL.
+                    (Some(&Context::HiddenWindowWgl(_, _)), _)
+                        | (Some(&Context::Wgl(_)), _)
+                        | (None, None) => {
+                        let gl_attr_wgl = gl_attr.clone().map_sharing(|ctxt| {
+                            match *ctxt {
+                                Context::HiddenWindowWgl(_, ref c)
+                                    | Context::Wgl(ref c) => c.get_hglrc(),
+                                _ => unreachable!(),
+                            }
+                        });
+                        WglContext::new(&pf_reqs, &gl_attr_wgl, w).map(Context::Wgl)
+                    }
+                    // We must use EGL.
+                    (Some(_), Some(egl)) => {
+                        let gl_attr_egl = gl_attr.clone().map_sharing(|ctxt| {
+                            match *ctxt {
+                                Context::Egl(ref c)
+                                    | Context::EglPbuffer(ref c)
+                                    | Context::HiddenWindowEgl(_, ref c) => c,
+                                _ => unreachable!(),
+                            }
+                        });
+
+                        EglContext::new(
+                            egl.clone(),
+                            &pf_reqs,
+                            &gl_attr_egl,
+                            egl::NativeDisplay::Other(Some(ptr::null())),
+                        ).and_then(|p| p.finish(w)).map(|c| Context::Egl(c))
+                    }
+                    // Try EGL, fallback to WGL.
+                    (None, Some(egl)) => {
+                        let gl_attr_egl = gl_attr.clone().map_sharing(|_| unreachable!());
+                        let gl_attr_wgl = gl_attr.clone().map_sharing(|_| unreachable!());
+
                         if let Ok(c) = EglContext::new(
                             egl.clone(),
                             &pf_reqs,
-                            &gl_attr.clone().map_sharing(|_| unimplemented!()),
+                            &gl_attr_egl,
                             egl::NativeDisplay::Other(Some(ptr::null())),
                         ).and_then(|p| p.finish(w))
                         {
                             Ok(Context::Egl(c))
                         } else {
-                            WglContext::new(&pf_reqs, &gl_attr, w).map(Context::Wgl)
+                            WglContext::new(&pf_reqs, &gl_attr_wgl, w).map(Context::Wgl)
                         }
-                    } else {
-                        // falling back to WGL, which is always available
-                        WglContext::new(&pf_reqs, &gl_attr, w).map(Context::Wgl)
                     }
+                    _ => panic!(),
                 }
-                _ => WglContext::new(&pf_reqs, &gl_attr, w).map(Context::Wgl),
             }
-        };
-        context_result.map(|context| (window, context))
+            _ => {
+                let gl_attr_wgl = gl_attr.clone().map_sharing(|ctxt| {
+                    match *ctxt {
+                        Context::HiddenWindowWgl(_, ref c)
+                            | Context::Wgl(ref c) => c.get_hglrc(),
+                        _ => panic!(),
+                    }
+                });
+                WglContext::new(&pf_reqs, &gl_attr_wgl, w).map(Context::Wgl)
+            }
+        }
     }
 
     #[inline]
@@ -86,25 +133,39 @@ impl Context {
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-        shareable_with_windowed_contexts: bool,
+        _shareable_with_windowed_contexts: bool,
         egl: Option<&Egl>,
     ) -> Result<Self, CreationError> {
-        assert!(!shareable_with_windowed_contexts); // TODO: Implement if possible
-
         // if EGL is available, we try using EGL first
         // if EGL returns an error, we try the hidden window method
-        if let Some(egl) = egl {
-            let gl_attr = &gl_attr.clone().map_sharing(|_| unimplemented!()); // TODO
-            let native_display = egl::NativeDisplay::Other(None);
-            let context = EglContext::new(egl.clone(), pf_reqs, &gl_attr, native_display)
-                .and_then(|prototype| prototype.finish_pbuffer((1, 1)))
-                .map(|ctxt| Context::EglPbuffer(ctxt));
-            if let Ok(context) = context {
-                return Ok(context);
+        match (gl_attr.sharing, egl) {
+            (None, Some(egl))
+                | (Some(&Context::Egl(_)), Some(egl))
+                | (Some(&Context::HiddenWindowEgl(_, _)), Some(egl))
+                | (Some(&Context::EglPbuffer(_)), Some(egl)) => {
+
+                let gl_attr_egl = gl_attr.clone().map_sharing(|ctxt| {
+                    match *ctxt {
+                        Context::Egl(ref c)
+                            | Context::EglPbuffer(ref c)
+                            | Context::HiddenWindowEgl(_, ref c) => c,
+                        _ => unreachable!(),
+                    }
+                });
+
+                let native_display = egl::NativeDisplay::Other(None);
+                let context = EglContext::new(egl.clone(), pf_reqs, &gl_attr_egl, native_display)
+                    .and_then(|prototype| prototype.finish_pbuffer((1, 1)))
+                    .map(|ctxt| Context::EglPbuffer(ctxt));
+
+                if let Ok(context) = context {
+                    return Ok(context);
+                }
             }
+            _ => (),
         }
+
         let window_builder = winit::WindowBuilder::new().with_visibility(false);
-        let gl_attr = &gl_attr.clone().map_sharing(|_| unimplemented!()); // TODO
         Self::new(window_builder, &el, pf_reqs, gl_attr, egl).map(|(window, context)| match context
         {
             Context::Egl(context) => Context::HiddenWindowEgl(window, context),
