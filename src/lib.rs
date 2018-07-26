@@ -423,8 +423,16 @@ impl Context {
     ///  - other contexts made with that flag set to `true`
     ///  - and with contexts made when creating a `GlWindow`.
     ///
-    ///  If the flag is not set on the otherhand, the context can only be shared
-    ///  with other contexts made with the flag unset.
+    /// If the flag is not set on the otherhand, the context should only be 
+    /// shared with other contexts made with the flag unset. 
+    ///
+    /// Some platforms might not implement contexts which aren't shareable with 
+    /// windowed contexts. If so, those platforms will fallback to making a
+    /// context which is shareable with windowed contexts.
+    ///
+    /// You are not garunteed to recieve an error if you share a context made 
+    /// with the 'shareable_with_windowed_contexts` unset with a windowed 
+    /// context.
     ///
     /// Error should be very rare and only occur in case of permission denied,
     /// incompatible system, out of memory, etc.
