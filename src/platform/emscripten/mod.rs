@@ -25,6 +25,8 @@ impl Context {
     {
         let window = window_builder.build(events_loop)?;
 
+        let gl_attr = gl_attr.map_sharing(|_| unimplemented!("Shared contexts are unimplemented in WebGL."));
+
         // getting the default values of attributes
         let mut attributes = unsafe {
             use std::mem;
@@ -63,7 +65,7 @@ impl Context {
         gl_attr: &GlAttributes<&Context>,
         shareable_with_windowed_contexts: bool,
     ) -> Result<Self, CreationError> {
-        assert!(shareable_with_windowed_contexts); // TODO: Implement if possible
+        assert!(!shareable_with_windowed_contexts); // TODO: Implement if possible
         let wb = winit::WindowBuilder::new().with_visibility(false);
         Self::new(wb, el, pf_reqs, gl_attr).map(|(w, c)| match c {
             Context::Window(c) => Context::WindowedContext(w, c),

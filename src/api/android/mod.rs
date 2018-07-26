@@ -101,8 +101,6 @@ impl Context {
         gl_attr: &GlAttributes<&Context>,
         shareable_with_windowed_contexts: bool,
     ) -> Result<Self, CreationError> {
-        assert!(shareable_with_windowed_contexts); // TODO: Implement if possible
-
         let gl_attr = gl_attr.clone().map_sharing(|c| &c.0.egl_context);
         let context = EglContext::new(
             egl::ffi::egl::Egl,
