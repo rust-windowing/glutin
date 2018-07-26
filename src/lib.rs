@@ -332,8 +332,8 @@ impl<'a> ContextBuilder<'a> {
 }
 
 impl GlWindow {
-    /// Builds the given window along with the associated GL context, returning the pair as a
-    /// `GlWindow`.
+    /// Builds the given window along with the associated GL context, returning
+    /// the pair as a `GlWindow`.
     ///
     /// The context made can be shared with:
     ///  - headless contexts made with the `shareable_with_windowed_contexts` 
@@ -352,6 +352,9 @@ impl GlWindow {
     ///
     /// This safe variant of `new_shared` will panic if you try to share it with
     /// an existing context.
+    ///
+    /// One noteable limitation of the wayland backend when it comes to shared 
+    /// contexts is that both contexts must use the same events loop.
     ///
     /// Error should be very rare and only occur in case of permission denied,
     /// incompatible system out of memory, etc.
@@ -493,6 +496,9 @@ impl Context {
     ///
     /// This safe variant of `new_shared` will panic if you try to share it with
     /// an existing context.
+    ///
+    /// One noteable limitation of the wayland backend when it comes to shared 
+    /// contexts is that both contexts must use the same events loop.
     ///
     /// Error should be very rare and only occur in case of permission denied,
     /// incompatible system, out of memory, etc.

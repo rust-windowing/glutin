@@ -110,8 +110,7 @@ impl Drop for Context {
 }
 
 impl Context {
-
-    pub fn new(
+    pub unsafe fn new(
         window_builder: winit::WindowBuilder,
         events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
@@ -124,7 +123,7 @@ impl Context {
         };
 
         // Get the screen_id for the window being built.
-        let screen_id = unsafe { (xconn.xlib.XDefaultScreen)(xconn.display) };
+        let screen_id = (xconn.xlib.XDefaultScreen)(xconn.display);
 
         // start the context building process
         enum Prototype<'a> {
@@ -132,8 +131,11 @@ impl Context {
             Egl(::api::egl::ContextPrototype<'a>),
         }
 
-        let builder_clone_opengl_glx = gl_attr.clone().map_sharing(|_| unimplemented!());      // FIXME:
-        let builder_clone_opengl_egl = gl_attr.clone().map_sharing(|_| unimplemented!());      // FIXME:
+        let builder = gl_attr.clone();
+
+        let builder_glx_u;
+        let builder_egl_u;
+
         let backend = GlxOrEgl::new();
         let context = match gl_attr.version {
             GlRequest::Latest |
@@ -142,20 +144,28 @@ impl Context {
                 // GLX should be preferred over EGL, otherwise crashes may occur
                 // on X11 – issue #314
                 if let Some(ref glx) = backend.glx {
+                    builder_glx_u = builder.map_sharing(|c| match c.context {
+                        GlContext::Glx(ref c) => c,
+                        _ => panic!(),
+                    });
                     Prototype::Glx(GlxContext::new(
                         glx.clone(),
                         Arc::clone(&xconn),
                         pf_reqs,
-                        &builder_clone_opengl_glx,
+                        &builder_glx_u,
                         screen_id,
                         window_builder.window.transparent,
                     )?)
                 } else if let Some(ref egl) = backend.egl {
+                    builder_egl_u = builder.map_sharing(|c| match c.context {
+                        GlContext::Egl(ref c) => c,
+                        _ => panic!(),
+                    });
                     let native_display = egl::NativeDisplay::X11(Some(xconn.display as *const _));
                     Prototype::Egl(EglContext::new(
                         egl.clone(),
                         pf_reqs,
-                        &builder_clone_opengl_egl,
+                        &builder_egl_u,
                         native_display,
                     )?)
                 } else {
@@ -164,10 +174,14 @@ impl Context {
             },
             GlRequest::Specific(Api::OpenGlEs, _) => {
                 if let Some(ref egl) = backend.egl {
+                    builder_egl_u = builder.map_sharing(|c| match c.context {
+                        GlContext::Egl(ref c) => c,
+                        _ => panic!(),
+                    });
                     Prototype::Egl(EglContext::new(
                         egl.clone(),
                         pf_reqs,
-                        &builder_clone_opengl_egl,
+                        &builder_egl_u,
                         egl::NativeDisplay::X11(Some(xconn.display as *const _)),
                     )?)
                 } else {
@@ -183,21 +197,19 @@ impl Context {
         let visual_infos = match context {
             Prototype::Glx(ref p) => p.get_visual_infos().clone(),
             Prototype::Egl(ref p) => {
-                unsafe {
-                    let mut template: ffi::XVisualInfo = mem::zeroed();
-                    template.visualid = p.get_native_visual_id() as ffi::VisualID;
+                let mut template: ffi::XVisualInfo = mem::zeroed();
+                template.visualid = p.get_native_visual_id() as ffi::VisualID;
 
-                    let mut num_visuals = 0;
-                    let vi = (xconn.xlib.XGetVisualInfo)(xconn.display, ffi::VisualIDMask,
-                                                           &mut template, &mut num_visuals);
-                    xconn.check_errors().expect("Failed to call `XGetVisualInfo`");
-                    assert!(!vi.is_null());
-                    assert!(num_visuals == 1);
+                let mut num_visuals = 0;
+                let vi = (xconn.xlib.XGetVisualInfo)(xconn.display, ffi::VisualIDMask,
+                                                       &mut template, &mut num_visuals);
+                xconn.check_errors().expect("Failed to call `XGetVisualInfo`");
+                assert!(!vi.is_null());
+                assert!(num_visuals == 1);
 
-                    let vi_copy = ptr::read(vi as *const _);
-                    (xconn.xlib.XFree)(vi as *mut _);
-                    vi_copy
-                }
+                let vi_copy = ptr::read(vi as *const _);
+                (xconn.xlib.XFree)(vi as *mut _);
+                vi_copy
             },
         };
 
@@ -218,11 +230,11 @@ impl Context {
         };
 
         // getting the root window
-        let root = unsafe { (xconn.xlib.XDefaultRootWindow)(xconn.display) };
+        let root = (xconn.xlib.XDefaultRootWindow)(xconn.display);
         xconn.check_errors().expect("Failed to get root window");
 
         // creating the color map
-        let colormap = unsafe {
+        let colormap = {
             let cmap = (xconn.xlib.XCreateColormap)(xconn.display, root,
                                                       visual_infos.visual as *mut _,
                                                       ffi::AllocNone);
