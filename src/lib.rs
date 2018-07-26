@@ -14,7 +14,7 @@
 //!     .with_title("Hello world!")
 //!     .with_dimensions(glutin::dpi::LogicalSize::new(1024.0, 768.0));
 //! let context = glutin::ContextBuilder::new();
-//! let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
+//! let gl_window = unsafe { glutin::GlWindow::new(window, context, &events_loop).unwrap() };
 //! # }
 //! ```
 //!
@@ -127,7 +127,7 @@ where
 /// # let events_loop = glutin::EventsLoop::new();
 /// # let window = glutin::WindowBuilder::new();
 /// # let context = glutin::ContextBuilder::new();
-/// # let some_gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
+/// # let some_gl_window = unsafe { glutin::GlWindow::new(window, context, &events_loop).unwrap() };
 /// let context = glutin::ContextBuilder::new()
 ///     .with_vsync(true)
 ///     .with_multisampling(8)
@@ -157,7 +157,7 @@ pub struct ContextBuilder<'a> {
 /// let mut events_loop = glutin::EventsLoop::new();
 /// let window = glutin::WindowBuilder::new();
 /// let context = glutin::ContextBuilder::new();
-/// let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
+/// let gl_window = unsafe { glutin::GlWindow::new(window, context, &events_loop).unwrap() };
 ///
 /// unsafe { gl_window.make_current().unwrap() };
 ///
@@ -335,13 +335,24 @@ impl GlWindow {
     /// Builds the given window along with the associated GL context, returning the pair as a
     /// `GlWindow`.
     ///
-    /// The generated OpenGl context is shareable with other contexts made from
-    /// this function. It is also shareable with headless contexts made with the
-    /// `shareable_with_windowed_contexts` flag set to `true`.
+    /// The context made can be shared with:
+    ///  - headless contexts made with the `shareable_with_windowed_contexts` 
+    ///  flag set to `true`; and
+    ///  - contexts made when creating a `GlWindow`.
+    ///
+    /// You are not garunteed to recieve an error if you share a context with an
+    /// other context which you're not permited to share it with, as according
+    /// to:
+    ///  - the restrictions stated by us above; and
+    ///  - the restrictions imposed on you by the platform your application runs 
+    ///  on.
+    ///
+    /// Failing to follow all the context sharing restrictions imposed on you 
+    /// may result in unsafe behaviour.
     ///
     /// Error should be very rare and only occur in case of permission denied,
     /// incompatible system out of memory, etc.
-    pub fn new(
+    pub unsafe fn new(
         window_builder: WindowBuilder,
         context_builder: ContextBuilder,
         events_loop: &EventsLoop,
@@ -419,24 +430,30 @@ impl Context {
     /// Builds the given GL context
     ///
     /// Contexts made with the `shareable_with_windowed_contexts` flag set to
-    /// `true` can be shared with both:
-    ///  - other contexts made with that flag set to `true`
-    ///  - and with contexts made when creating a `GlWindow`.
+    /// `true` can be shared with:
+    ///  - contexts made with that flag set to `true`; and
+    ///  - contexts made when creating a `GlWindow`.
     ///
-    /// If the flag is not set on the otherhand, the context should only be 
-    /// shared with other contexts made with the flag unset. 
+    /// If the flag is set to `false` on the otherhand, the context should only 
+    /// be shared with other contexts made with the flag set to `false`. 
     ///
     /// Some platforms might not implement contexts which aren't shareable with 
     /// windowed contexts. If so, those platforms will fallback to making a
-    /// context which is shareable with windowed contexts.
+    /// contexts which are shareable with windowed contexts.
     ///
-    /// You are not garunteed to recieve an error if you share a context made 
-    /// with the 'shareable_with_windowed_contexts` unset with a windowed 
-    /// context.
+    /// You are not garunteed to recieve an error if you share a context with an
+    /// other context which you're not permited to share it with, as according
+    /// to:
+    ///  - the restrictions stated by us above; and
+    ///  - the restrictions imposed on you by the platform your application runs 
+    ///  on.
+    ///
+    /// Failing to follow all the context sharing restrictions imposed on you 
+    /// may result in unsafe behaviour.
     ///
     /// Error should be very rare and only occur in case of permission denied,
     /// incompatible system, out of memory, etc.
-    pub fn new(
+    pub unsafe fn new(
         el: &winit::EventsLoop,
         context_builder: ContextBuilder,
         shareable_with_windowed_contexts: bool,

@@ -11,7 +11,7 @@ fn main() {
         .with_decorations(false)
         .with_transparency(true);
     let context = glutin::ContextBuilder::new();
-    let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
+    let gl_window = unsafe { glutin::GlWindow::new(window, context, &events_loop).unwrap() };
 
     let _ = unsafe { gl_window.make_current() };
 

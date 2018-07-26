@@ -31,7 +31,7 @@ fn main() {
         .with_title("Hello world!")
         .with_fullscreen(Some(monitor));
     let context = glutin::ContextBuilder::new();
-    let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
+    let gl_window = unsafe { glutin::GlWindow::new(window, context, &events_loop).unwrap() };
 
     let _ = unsafe { gl_window.make_current() };
 

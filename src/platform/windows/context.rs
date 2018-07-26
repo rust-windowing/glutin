@@ -36,7 +36,7 @@ pub enum Context {
 
 impl Context {
     /// See the docs in the crate root file.
-    pub fn new(
+    pub unsafe fn new(
         window_builder: winit::WindowBuilder,
         events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
@@ -54,7 +54,7 @@ impl Context {
                 }
             }
         });
-        let context_result = unsafe {
+        let context_result = {
             let w = window.get_hwnd() as HWND;
             match gl_attr.version {
                 GlRequest::Specific(Api::OpenGlEs, (_major, _minor)) => {
@@ -82,7 +82,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn new_context(
+    pub unsafe fn new_context(
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,

@@ -25,7 +25,7 @@ impl Context {
     {
         let window = window_builder.build(events_loop)?;
 
-        let gl_attr = gl_attr.map_sharing(|_| unimplemented!("Shared contexts are unimplemented in WebGL."));
+        let gl_attr = gl_attr.clone().map_sharing(|_| unimplemented!("Shared contexts are unimplemented in WebGL."));
 
         // getting the default values of attributes
         let mut attributes = unsafe {
