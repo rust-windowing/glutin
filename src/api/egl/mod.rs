@@ -167,6 +167,7 @@ impl Context {
         pf_reqs: &PixelFormatRequirements,
         opengl: &'a GlAttributes<&'a Context>,
         native_display: NativeDisplay,
+        visual: Option<c_int>,
     ) -> Result<ContextPrototype<'a>, CreationError>
     {
         // calling `eglGetDisplay` or equivalent
@@ -249,7 +250,7 @@ impl Context {
         };
 
         let (config_id, pixel_format) = unsafe {
-            choose_fbconfig(&egl, display, &egl_version, api, version, pf_reqs)?
+            choose_fbconfig(&egl, display, &egl_version, api, version, pf_reqs, visual)?
         };
 
         Ok(ContextPrototype {
@@ -503,13 +504,20 @@ impl<'a> ContextPrototype<'a> {
     }
 }
 
-unsafe fn choose_fbconfig(egl: &ffi::egl::Egl, display: ffi::egl::types::EGLDisplay,
-                          egl_version: &(ffi::egl::types::EGLint, ffi::egl::types::EGLint),
-                          api: Api, version: Option<(u8, u8)>, reqs: &PixelFormatRequirements)
-                          -> Result<(ffi::egl::types::EGLConfig, PixelFormat), CreationError>
+unsafe fn choose_fbconfig(
+    egl: &ffi::egl::Egl, display: ffi::egl::types::EGLDisplay,
+    egl_version: &(ffi::egl::types::EGLint, ffi::egl::types::EGLint),
+    api: Api, version: Option<(u8, u8)>, reqs: &PixelFormatRequirements,
+    visual: Option<c_int>,
+) -> Result<(ffi::egl::types::EGLConfig, PixelFormat), CreationError>
 {
     let descriptor = {
         let mut out: Vec<c_int> = Vec::with_capacity(37);
+
+        if let Some(visual) = visual {
+            out.push(ffi::egl::NATIVE_VISUAL_TYPE as c_int);
+            out.push(visual);
+        }
 
         if egl_version >= &(1, 2) {
             out.push(ffi::egl::COLOR_BUFFER_TYPE as c_int);

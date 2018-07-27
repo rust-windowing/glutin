@@ -9,11 +9,14 @@ use winit;
 use winit::os::unix::{EventsLoopExt, WindowExt};
 
 use std::env;
+use std::sync::Arc;
 
 mod wayland;
 mod x11;
 use api::osmesa;
 
+use wayland_client::sys as wsys;
+use libc;
 
 /// Context handles available on Unix-like platforms.
 #[derive(Clone, Debug)]
@@ -34,6 +37,18 @@ pub enum Context {
     WindowedWayland(wayland::Context),
     HeadlessWayland(winit::Window, wayland::Context),
     OsMesa(osmesa::OsMesaContext),
+}
+
+pub enum RawWindow {
+    /// EGLX11(xconn, window, visual)
+    /// FIXME: List requirments.
+    EGLX11(Arc<winit::os::unix::x11::XConnection>, *const libc::c_void, libc::c_int),
+    /// GLX11(xconn, screen, window, visual, transparency)
+    /// FIXME: List requirments.
+    GLXX11(Arc<winit::os::unix::x11::XConnection>, libc::c_int, *const libc::c_void, libc::c_int, bool),
+    /// EGLWayland(dpy, surface, w, h)
+    /// FIXME: List requirments.
+    EGLWayland(*const libc::c_void, *mut wsys::client::wl_proxy, i32, i32),
 }
 
 impl Context {
@@ -137,6 +152,35 @@ impl Context {
             });
             osmesa::OsMesaContext::new((1, 1), pf_reqs, &gl_attr)
                 .map(|context| Context::OsMesa(context))
+        }
+    }
+
+    #[inline]
+    pub unsafe fn new_raw(
+        rwindow: &RawWindow,
+        pf_reqs: &PixelFormatRequirements,
+        gl_attr: &GlAttributes<&Context>,
+    ) -> Result<Self, CreationError>
+    {
+        match *rwindow {
+            RawWindow::EGLWayland(_, _, _, _) => {
+                Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
+                let gl_attr = gl_attr.clone().map_sharing(|ctxt| match ctxt {
+                    &Context::WindowedWayland(ref ctxt) | &Context::HeadlessWayland(_, ref ctxt) => ctxt,
+                    _ => unreachable!(),
+                });
+                wayland::Context::new_raw(rwindow, pf_reqs, &gl_attr)
+                    .map(|context| Context::WindowedWayland(context))
+            }
+            _ => {
+                Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
+                let gl_attr = gl_attr.clone().map_sharing(|ctxt| match ctxt {
+                    &Context::WindowedX11(ref ctxt) | &Context::HeadlessX11(_, ref ctxt) => ctxt,
+                    _ => unreachable!(),
+                });
+                x11::Context::new_raw(rwindow, pf_reqs, &gl_attr)
+                    .map(|context| Context::WindowedX11(context))
+            }
         }
     }
 

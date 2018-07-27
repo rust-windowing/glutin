@@ -155,6 +155,7 @@ impl Context {
                         &builder_glx_u,
                         screen_id,
                         window_builder.window.transparent,
+                        None,
                     )?)
                 } else if let Some(ref egl) = backend.egl {
                     builder_egl_u = builder.map_sharing(|c| match c.context {
@@ -167,6 +168,7 @@ impl Context {
                         pf_reqs,
                         &builder_egl_u,
                         native_display,
+                        None,
                     )?)
                 } else {
                     return Err(CreationError::NotSupported("both libglx and libEGL not present"));
@@ -183,6 +185,7 @@ impl Context {
                         pf_reqs,
                         &builder_egl_u,
                         egl::NativeDisplay::X11(Some(xconn.display as *const _)),
+                        None,
                     )?)
                 } else {
                     return Err(CreationError::NotSupported("libEGL not present"));
@@ -249,6 +252,92 @@ impl Context {
         };
 
         Ok((window, context))
+    }
+
+    pub unsafe fn new_raw(
+        rwindow: &super::RawWindow,
+        pf_reqs: &PixelFormatRequirements,
+        gl_attr: &GlAttributes<&Context>,
+    ) -> Result<Self, CreationError>
+    {
+        match gl_attr.version {
+            GlRequest::Specific(Api::OpenGl, _) | GlRequest::Specific(Api::OpenGlEs, _) => (),
+            GlRequest::Specific(_, _) => {
+                return Err(CreationError::NotSupported("requested specific without gl or gles"));
+            },
+            _ => (),
+        }
+
+        let backend = GlxOrEgl::new();
+        let builder = gl_attr.clone();
+        let (context, xconn, visual) = match *rwindow {
+            super::RawWindow::EGLX11(ref xconn, window, visual) => {
+                let builder = builder.map_sharing(|c| match c.context {
+                    GlContext::Egl(ref c) => c,
+                    _ => panic!(),
+                });
+
+                let native_display = egl::NativeDisplay::X11(Some(xconn.display as *const _));
+                (
+                    GlContext::Egl(EglContext::new(
+                        backend.egl.ok_or(CreationError::NotSupported("libEGL not present"))?.clone(),
+                        pf_reqs,
+                        &builder,
+                        native_display,
+                        Some(visual),
+                    )?.finish(window)?),
+                    xconn,
+                    visual,
+                )
+            },
+            super::RawWindow::GLXX11(ref xconn, screen, window, visual, transparent) => {
+                match gl_attr.version {
+                    GlRequest::Specific(Api::OpenGlEs, _) => panic!(),
+                    _ => (),
+                }
+
+                let builder = builder.map_sharing(|c| match c.context {
+                    GlContext::Glx(ref c) => c,
+                    _ => panic!(),
+                });
+
+                (
+                    GlContext::Glx(GlxContext::new(
+                        backend.glx.ok_or(CreationError::NotSupported("libglx not present"))?.clone(),
+                        Arc::clone(&xconn),
+                        pf_reqs,
+                        &builder,
+                        screen,
+                        transparent,
+                        Some(visual),
+                    )?.finish(window as _)?),
+                    xconn,
+                    visual,
+                )
+            },
+            _ => unimplemented!(),
+        };
+
+        // getting the root window
+        let root = (xconn.xlib.XDefaultRootWindow)(xconn.display);
+        xconn.check_errors().expect("Failed to get root window");
+
+        // creating the color map
+        let colormap = {
+            let cmap = (xconn.xlib.XCreateColormap)(xconn.display, root,
+                                                      visual as *mut _,
+                                                      ffi::AllocNone);
+            xconn.check_errors().expect("Failed to call XCreateColormap");
+            cmap
+        };
+
+        let context = Context {
+            xconn: Arc::clone(&xconn),
+            context,
+            colormap,
+        };
+
+        Ok(context)
     }
 
     #[inline]
