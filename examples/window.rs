@@ -8,7 +8,7 @@ fn main() {
     let mut events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new().with_title("A fantastic window!");
     let context = glutin::ContextBuilder::new();
-    let gl_window = unsafe { glutin::GlWindow::new(window, context, &events_loop).unwrap() };
+    let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
 
     let _ = unsafe { gl_window.make_current() };
 
