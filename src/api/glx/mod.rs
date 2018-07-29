@@ -52,6 +52,7 @@ impl Context {
         opengl: &'a GlAttributes<&'a Context>,
         screen_id: libc::c_int,
         transparent: bool,
+        visual: Option<libc::c_int>,
     ) -> Result<ContextPrototype<'a>, CreationError>
     {
         // This is completely ridiculous, but VirtualBox's OpenGL driver needs some call handled by
@@ -86,6 +87,7 @@ impl Context {
                 screen_id,
                 pf_reqs,
                 transparent,
+                visual,
             ).map_err(|_| CreationError::NoAvailablePixelFormat)?
         };
 
@@ -402,10 +404,11 @@ fn create_context(glx: &ffi::glx::Glx, extra_functions: &ffi::glx_extra::Glx, ex
 }
 
 /// Enumerates all available FBConfigs
-unsafe fn choose_fbconfig(glx: &ffi::glx::Glx, extensions: &str, xlib: &ffi::Xlib,
-                          display: *mut ffi::Display, screen_id: libc::c_int,
-                          reqs: &PixelFormatRequirements, transparent: bool)
-                          -> Result<(ffi::glx::types::GLXFBConfig, PixelFormat), ()>
+unsafe fn choose_fbconfig(
+    glx: &ffi::glx::Glx, extensions: &str, xlib: &ffi::Xlib,
+    display: *mut ffi::Display, screen_id: libc::c_int,
+    reqs: &PixelFormatRequirements, transparent: bool, visual: Option<libc::c_int>,
+) -> Result<(ffi::glx::types::GLXFBConfig, PixelFormat), ()>
 {
     let descriptor = {
         let mut out: Vec<c_int> = Vec::with_capacity(37);
@@ -414,7 +417,11 @@ unsafe fn choose_fbconfig(glx: &ffi::glx::Glx, extensions: &str, xlib: &ffi::Xli
         out.push(1);
 
         out.push(ffi::glx::X_VISUAL_TYPE as c_int);
-        out.push(ffi::glx::TRUE_COLOR as c_int);
+        if let Some(visual) = visual {
+            out.push(visual);
+        } else {
+            out.push(ffi::glx::TRUE_COLOR as c_int);
+        }
 
         out.push(ffi::glx::DRAWABLE_TYPE as c_int);
         out.push(ffi::glx::WINDOW_BIT as c_int);

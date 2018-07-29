@@ -204,6 +204,17 @@ impl Context {
         Ok((window, context))
     }
 
+    pub fn new_context(
+        el: &EventsLoop,
+        pf_reqs: &PixelFormatRequirements,
+        gl_attr: &GlAttributes<&Context>,
+        _shareable_with_windowed_contexts: bool,
+    ) -> Result<Self, CreationError> {
+        let wb = WindowBuilder::new().with_visibility(false);
+        Self::new(wb, el, pf_reqs, gl_attr)
+            .map(|(_window, context)| context)
+    }
+
     unsafe fn create_context(mut version: NSUInteger) -> Result<id, CreationError> {
         let context_class = Class::get("EAGLContext").expect("Failed to get class `EAGLContext`");
         let eagl_context: id = msg_send![context_class, alloc];
@@ -268,6 +279,41 @@ impl Context {
     }
 
     #[inline]
+    pub fn swap_buffers(&self) -> Result<(), ContextError> {
+        unsafe {
+            let res: BOOL = msg_send![self.eagl_context, presentRenderbuffer:gles::RENDERBUFFER];
+            if res == YES {
+                Ok(())
+            } else {
+                Err(ContextError::IoError(
+                    io::Error::new(io::ErrorKind::Other, "`EAGLContext presentRenderbuffer` failed")
+                ))
+            }
+        }
+    }
+
+    #[inline]
+    pub fn get_pixel_format(&self) -> PixelFormat {
+        let color_format = ColorFormat::for_view(self.view);
+        PixelFormat {
+            hardware_accelerated: true,
+            color_bits: color_format.color_bits(),
+            alpha_bits: color_format.alpha_bits(),
+            depth_bits: depth_for_view(self.view),
+            stencil_bits: stencil_for_view(self.view),
+            stereoscopy: false,
+            double_buffer: true,
+            multisampling: multisampling_for_view(self.view),
+            srgb: color_format.srgb(),
+        }
+    }
+
+    #[inline]
+    pub fn resize(&self, _width: u32, _height: u32) {
+        // N/A
+    }
+
+    #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
         let context_class = Class::get("EAGLContext").expect("Failed to get class `EAGLContext`");
         let res: BOOL = msg_send![context_class, setCurrentContext: self.eagl_context];
@@ -299,43 +345,8 @@ impl Context {
     }
 
     #[inline]
-    pub fn swap_buffers(&self) -> Result<(), ContextError> {
-        unsafe {
-            let res: BOOL = msg_send![self.eagl_context, presentRenderbuffer:gles::RENDERBUFFER];
-            if res == YES {
-                Ok(())
-            } else {
-                Err(ContextError::IoError(
-                    io::Error::new(io::ErrorKind::Other, "`EAGLContext presentRenderbuffer` failed")
-                ))
-            }
-        }
-    }
-
-    #[inline]
     pub fn get_api(&self) -> Api {
         Api::OpenGlEs
-    }
-
-    #[inline]
-    pub fn get_pixel_format(&self) -> PixelFormat {
-        let color_format = ColorFormat::for_view(self.view);
-        PixelFormat {
-            hardware_accelerated: true,
-            color_bits: color_format.color_bits(),
-            alpha_bits: color_format.alpha_bits(),
-            depth_bits: depth_for_view(self.view),
-            stencil_bits: stencil_for_view(self.view),
-            stereoscopy: false,
-            double_buffer: true,
-            multisampling: multisampling_for_view(self.view),
-            srgb: color_format.srgb(),
-        }
-    }
-
-    #[inline]
-    pub fn resize(&self, _width: u32, _height: u32) {
-        // N/A
     }
 }
 

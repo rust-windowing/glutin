@@ -18,18 +18,13 @@
 //! # }
 //! ```
 //!
-//! For contexts that are *not* associated with any particular window, see the HeadlessContext
-//! type.
-//!
 //! # Features
 //!
-//! This crate has two Cargo features: `window` and `headless`.
+//! This crate has one Cargo feature: `window`.
 //!
 //!  - `window` allows you to create regular windows and enables the `WindowBuilder` object.
-//!  - `headless` allows you to do headless rendering, and enables
-//!     the `HeadlessRendererBuilder` object.
 //!
-//! By default only `window` is enabled.
+//! By default `window` is enabled.
 
 #[cfg(target_os = "windows")]
 #[macro_use]
@@ -61,7 +56,6 @@ extern crate x11_dl;
 #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "dragonfly", target_os = "openbsd"))]
 extern crate wayland_client;
 
-pub use headless::{HeadlessRendererBuilder, HeadlessContext};
 pub use winit::{
     AvailableMonitorsIter,
     AxisId,
@@ -98,12 +92,16 @@ use std::io;
 
 mod api;
 mod platform;
-mod headless;
+
+pub use platform::RawWindow;
 
 pub mod os;
 
 /// A trait for types associated with a GL context.
-pub trait GlContext {
+pub trait GlContext
+where
+    Self: Sized,
+{
     /// Sets the context as the current context.
     unsafe fn make_current(&self) -> Result<(), ContextError>;
 
@@ -113,30 +111,8 @@ pub trait GlContext {
     /// Returns the address of an OpenGL function.
     fn get_proc_address(&self, addr: &str) -> *const ();
 
-    /// Swaps the buffers in case of double or triple buffering.
-    ///
-    /// You should call this function every time you have finished rendering, or the image may not
-    /// be displayed on the screen.
-    ///
-    /// **Warning**: if you enabled vsync, this function will block until the next time the screen
-    /// is refreshed. However drivers can choose to override your vsync settings, which means that
-    /// you can't know in advance whether `swap_buffers` will block or not.
-    fn swap_buffers(&self) -> Result<(), ContextError>;
-
     /// Returns the OpenGL API being used.
     fn get_api(&self) -> Api;
-
-    /// Returns the pixel format of the main framebuffer of the context.
-    fn get_pixel_format(&self) -> PixelFormat;
-
-    /// Resize the GL context.
-    ///
-    /// Some platforms (macos, wayland) require being manually updated when their window or
-    /// surface is resized.
-    ///
-    /// The easiest way of doing this is to call this method for each `Resized` window event that
-    /// is received with the width and height given by the event.
-    fn resize(&self, size: dpi::PhysicalSize);
 }
 
 /// Represents an OpenGL context.
@@ -162,6 +138,120 @@ pub trait GlContext {
 /// ```
 pub struct Context {
     context: platform::Context,
+}
+
+/// A context which was made from a raw window.
+pub struct RawWindowContext(Context);
+
+impl RawWindowContext {
+    /// Builds a GL context associated with your raw window, returning
+    /// the built context.
+    ///
+    /// In most cases, the context made can be shared with:
+    ///  - headless contexts made with the `shareable_with_windowed_contexts`
+    ///  flag set to `true`; and
+    ///  - contexts made when creating a `GlWindow`.
+    /// This is of course dependant on the restrictions your platform imposes 
+    /// upon you, and what parameters you pass in the `RawWindow` enum (e.g. 
+    /// X11 would require that the contexts exist on the same X11 screen (not 
+    /// physical screen, mind you)).
+    ///
+    /// You are not guaranteed to receive an error if you share a context with
+    /// an other context which you're not permitted to share it with, as
+    /// according to:
+    ///  - the restrictions stated by us above; and
+    ///  - the restrictions imposed on you by the platform your application runs
+    ///  on.
+    ///
+    /// Failing to follow all the context sharing restrictions imposed on you
+    /// may result in unsafe behavior.
+    ///
+    /// Please refer to each platform's `RawWindow` enum for a list of some of
+    /// the restrictions that platform requires. For a full list, refer to your
+    /// platforms specs/docs. Failure to follow those restrictions may result
+    /// in unsafe behavior.
+    ///
+    /// Error should be very rare and only occur in case of permission denied,
+    /// incompatible system out of memory, etc.
+    pub unsafe fn new(
+        rwindow: &RawWindow,
+        context_builder: ContextBuilder,
+    ) -> Result<Self, CreationError>
+    {
+        let ContextBuilder { pf_reqs, gl_attr } = context_builder;
+        let gl_attr = gl_attr.map_sharing(|ctxt| &ctxt.context);
+        platform::Context::new_raw(rwindow, &pf_reqs, &gl_attr)
+            .map(|context| RawWindowContext(Context { context: context }))
+    }
+
+    /// Borrow the inner GL `Context`.
+    pub fn context(&self) -> &Context {
+        &self.0
+    }
+
+    /// Swaps the buffers in case of double or triple buffering.
+    ///
+    /// You should call this function every time you have finished rendering, or the image may not
+    /// be displayed on the screen.
+    ///
+    /// **Warning**: if you enabled vsync, this function will block until the next time the screen
+    /// is refreshed. However drivers can choose to override your vsync settings, which means that
+    /// you can't know in advance whether `swap_buffers` will block or not.
+    ///
+    /// It is unsafe to call this on a context which doesn't possess a window,
+    /// or if it's window which doesn't support this functionality.
+    pub unsafe fn swap_buffers(&self) -> Result<(), ContextError> {
+        self.0.context.swap_buffers()
+    }
+
+    /// Returns the pixel format of the main framebuffer of the context.
+    ///
+    /// It is unsafe to call this on a context which doesn't possess a window,
+    /// or if it's window which doesn't support this functionality.
+    pub unsafe fn get_pixel_format(&self) -> PixelFormat {
+        self.0.context.get_pixel_format()
+    }
+
+    /// Resize the context.
+    ///
+    /// Some platforms (macOS, Wayland) require being manually updated when their window or
+    /// surface is resized.
+    ///
+    /// The easiest way of doing this is to take every `Resized` window event that
+    /// is received with a `LogicalSize` and convert it to a `PhysicalSize` and
+    /// pass it into this function.
+    ///
+    /// It is unsafe to call this on a context which doesn't possess a window,
+    /// or if it's window which doesn't support this functionality.
+    pub unsafe fn resize(&self, size: dpi::PhysicalSize) {
+        let (width, height) = size.into();
+        self.0.context.resize(width, height);
+    }
+}
+
+impl GlContext for RawWindowContext {
+    unsafe fn make_current(&self) -> Result<(), ContextError> {
+        self.0.make_current()
+    }
+
+    fn is_current(&self) -> bool {
+        self.0.is_current()
+    }
+
+    fn get_proc_address(&self, addr: &str) -> *const () {
+        self.0.get_proc_address(addr)
+    }
+
+    fn get_api(&self) -> Api {
+        self.0.get_api()
+    }
+}
+
+impl std::ops::Deref for RawWindowContext {
+    type Target = Context;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 /// Object that allows you to build `Context`s.
@@ -358,12 +448,70 @@ impl<'a> ContextBuilder<'a> {
 }
 
 impl GlWindow {
+    /// Builds the given window along with the associated GL context, returning
+    /// the pair as a `GlWindow`.
+    ///
+    /// The context made can be shared with:
+    ///  - headless contexts made with the `shareable_with_windowed_contexts`
+    ///  flag set to `true`; and
+    ///  - contexts made when creating a `GlWindow`.
+    ///
+    /// You are not guaranteed to receive an error if you share a context with an
+    /// other context which you're not permitted to share it with, as according
+    /// to:
+    ///  - the restrictions stated by us above; and
+    ///  - the restrictions imposed on you by the platform your application runs 
+    ///  on. (Please refer to `README-SHARING.md`)
+    ///
+    /// Failing to follow all the context sharing restrictions imposed on you
+    /// may result in unsafe behavior.
+    ///
+    /// This safe variant of `new_shared` will panic if you try to share it with
+    /// an existing context.
+    ///
+    /// One noteable limitation of the wayland backend when it comes to shared 
+    /// contexts is that both contexts must use the same events loop.
+    ///
+    /// Error should be very rare and only occur in case of permission denied,
+    /// incompatible system out of memory, etc.
+    pub fn new(
+        window_builder: WindowBuilder,
+        context_builder: ContextBuilder,
+        events_loop: &EventsLoop,
+    ) -> Result<Self, CreationError>
+    {
+        let ContextBuilder { pf_reqs, gl_attr } = context_builder;
+        let gl_attr = gl_attr.map_sharing(|ctxt| panic!());
+        unsafe {
+            platform::Context::new(window_builder, events_loop, &pf_reqs, &gl_attr)
+                .map(|(window, context)| GlWindow {
+                    window: window,
+                    context: Context { context: context },
+                })
+        }
+    }
+
     /// Builds the given window along with the associated GL context, returning the pair as a
     /// `GlWindow`.
     ///
-    /// Error should be very rare and only occur in case of permission denied, incompatible system,
-    /// out of memory, etc.
-    pub fn new(
+    /// The context made can be shared with:
+    ///  - headless contexts made with the `shareable_with_windowed_contexts` 
+    ///  flag set to `true`; and
+    ///  - contexts made when creating a `GlWindow`.
+    ///
+    /// You are not garunteed to recieve an error if you share a context with an
+    /// other context which you're not permited to share it with, as according
+    /// to:
+    ///  - the restrictions stated by us above; and
+    ///  - the restrictions imposed on you by the platform your application runs 
+    ///  on. (Please refer to `README-SHARING.md`)
+    ///
+    /// Failing to follow all the context sharing restrictions imposed on you 
+    /// may result in unsafe behaviour.
+    ///
+    /// Error should be very rare and only occur in case of permission denied,
+    /// incompatible system out of memory, etc.
+    pub unsafe fn new_shared(
         window_builder: WindowBuilder,
         context_builder: ContextBuilder,
         events_loop: &EventsLoop,
@@ -387,6 +535,36 @@ impl GlWindow {
     pub fn context(&self) -> &Context {
         &self.context
     }
+
+    /// Swaps the buffers in case of double or triple buffering.
+    ///
+    /// You should call this function every time you have finished rendering, or the image may not
+    /// be displayed on the screen.
+    ///
+    /// **Warning**: if you enabled vsync, this function will block until the next time the screen
+    /// is refreshed. However drivers can choose to override your vsync settings, which means that
+    /// you can't know in advance whether `swap_buffers` will block or not.
+    pub fn swap_buffers(&self) -> Result<(), ContextError> {
+        self.context.context.swap_buffers()
+    }
+
+    /// Returns the pixel format of the main framebuffer of the context.
+    pub fn get_pixel_format(&self) -> PixelFormat {
+        self.context.context.get_pixel_format()
+    }
+
+    /// Resize the context.
+    ///
+    /// Some platforms (macOS, Wayland) require being manually updated when their window or
+    /// surface is resized.
+    ///
+    /// The easiest way of doing this is to take every `Resized` window event that
+    /// is received with a `LogicalSize` and convert it to a `PhysicalSize` and
+    /// pass it into this function.
+    pub fn resize(&self, size: dpi::PhysicalSize) {
+        let (width, height) = size.into();
+        self.context.context.resize(width, height);
+    }
 }
 
 impl GlContext for Context {
@@ -402,21 +580,94 @@ impl GlContext for Context {
         self.context.get_proc_address(addr)
     }
 
-    fn swap_buffers(&self) -> Result<(), ContextError> {
-        self.context.swap_buffers()
-    }
-
     fn get_api(&self) -> Api {
         self.context.get_api()
     }
+}
 
-    fn get_pixel_format(&self) -> PixelFormat {
-        self.context.get_pixel_format()
+impl Context {
+    /// Builds the given GL context
+    ///
+    /// Contexts made with the `shareable_with_windowed_contexts` flag set to
+    /// `true` can be shared with:
+    ///  - contexts made with that flag set to `true`; and
+    ///  - contexts made when creating a `GlWindow`.
+    ///
+    /// If the flag is set to `false` on the other hand, the context should only
+    /// be shared with other contexts made with the flag set to `false`.
+    ///
+    /// Some platforms might not implement contexts which aren't shareable with
+    /// windowed contexts. If so, those platforms will fallback to making a
+    /// contexts which are shareable with windowed contexts.
+    ///
+    /// You are not guaranteed to receive an error if you share a context with an
+    /// other context which you're not permitted to share it with, as according
+    /// to:
+    ///  - the restrictions stated by us above; and
+    ///  - the restrictions imposed on you by the platform your application runs 
+    ///  on. (Please refer to `README-SHARING.md`)
+    ///
+    /// Failing to follow all the context sharing restrictions imposed on you
+    /// may result in unsafe behavior.
+    ///
+    /// This safe variant of `new_shared` will panic if you try to share it with
+    /// an existing context.
+    ///
+    /// One noteable limitation of the wayland backend when it comes to shared 
+    /// contexts is that both contexts must use the same events loop.
+    ///
+    /// Error should be very rare and only occur in case of permission denied,
+    /// incompatible system, out of memory, etc.
+    pub fn new(
+        el: &winit::EventsLoop,
+        context_builder: ContextBuilder,
+        shareable_with_windowed_contexts: bool,
+    ) -> Result<Self, CreationError>
+    {
+        let ContextBuilder { pf_reqs, gl_attr } = context_builder;
+        let gl_attr = gl_attr.map_sharing(|ctxt| panic!());
+        unsafe {
+            platform::Context::new_context(el, &pf_reqs, &gl_attr, shareable_with_windowed_contexts)
+                .map(|context| Context { context })
+        }
     }
 
-    fn resize(&self, size: dpi::PhysicalSize) {
-        let (width, height) = size.into();
-        self.context.resize(width, height);
+    /// Builds the given GL context
+    ///
+    /// Contexts made with the `shareable_with_windowed_contexts` flag set to
+    /// `true` can be shared with:
+    ///  - contexts made with that flag set to `true`; and
+    ///  - contexts made when creating a `GlWindow`.
+    ///
+    /// If the flag is set to `false` on the otherhand, the context should only 
+    /// be shared with other contexts made with the flag set to `false`. 
+    ///
+    /// Some platforms might not implement contexts which aren't shareable with 
+    /// windowed contexts. If so, those platforms will fallback to making a
+    /// contexts which are shareable with windowed contexts.
+    ///
+    /// You are not garunteed to recieve an error if you share a context with an
+    /// other context which you're not permited to share it with, as according
+    /// to:
+    ///  - the restrictions stated by us above; and
+    ///  - the restrictions imposed on you by the platform your application runs 
+    ///  on. (Please refer to `README-SHARING.md`)
+    ///
+    /// Failing to follow all the context sharing restrictions imposed on you 
+    /// may result in unsafe behaviour.
+    ///
+    /// Error should be very rare and only occur in case of permission denied,
+    /// incompatible system, out of memory, etc.
+    pub unsafe fn new_shared(
+        el: &winit::EventsLoop,
+        context_builder: ContextBuilder,
+        shareable_with_windowed_contexts: bool,
+    ) -> Result<Self, CreationError>
+    {
+        let ContextBuilder { pf_reqs, gl_attr } = context_builder;
+        let gl_attr = gl_attr.map_sharing(|ctxt| &ctxt.context);
+        platform::Context::new_context(el, &pf_reqs, &gl_attr, shareable_with_windowed_contexts)
+            .map(|context| Context { context })
     }
 }
 
@@ -433,20 +684,8 @@ impl GlContext for GlWindow {
         self.context.get_proc_address(addr)
     }
 
-    fn swap_buffers(&self) -> Result<(), ContextError> {
-        self.context.swap_buffers()
-    }
-
     fn get_api(&self) -> Api {
         self.context.get_api()
-    }
-
-    fn get_pixel_format(&self) -> PixelFormat {
-        self.context.get_pixel_format()
-    }
-
-    fn resize(&self, size: dpi::PhysicalSize) {
-        self.context.resize(size);
     }
 }
 
@@ -469,6 +708,8 @@ pub enum CreationError {
     NoAvailablePixelFormat,
     PlatformSpecific(String),
     Window(WindowCreationError),
+    /// We recieved two errors, instead of one.
+    CreationErrorPair(Box<CreationError>, Box<CreationError>),
 }
 
 impl CreationError {
@@ -476,7 +717,6 @@ impl CreationError {
         match *self {
             CreationError::OsError(ref text) => &text,
             CreationError::NotSupported(text) => &text,
-            CreationError::NotSupported(_) => "Some of the requested attributes are not supported",
             CreationError::NoBackendAvailable(_) => "No backend is available",
             CreationError::RobustnessNotSupported => "You requested robustness, but it is \
                                                       not supported.",
@@ -486,6 +726,7 @@ impl CreationError {
                                                       the criterias.",
             CreationError::PlatformSpecific(ref text) => &text,
             CreationError::Window(ref err) => std::error::Error::description(err),
+            CreationError::CreationErrorPair(ref _err1, ref _err2) => "Recieved two errors."
         }
     }
 }
@@ -493,6 +734,16 @@ impl CreationError {
 impl std::fmt::Display for CreationError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         formatter.write_str(self.to_string())?;
+
+        if let CreationError::CreationErrorPair(ref e1, ref e2) = *self {
+            write!(formatter, " Error 1: \"")?;
+            e1.fmt(formatter)?;
+            write!(formatter, "\"")?;
+            write!(formatter, " Error 2: \"")?;
+            e2.fmt(formatter)?;
+            write!(formatter, "\"")?;
+        }
+
         if let &CreationError::NotSupported(msg) = self {
             write!(formatter, ": {}", msg)?;
         }
@@ -627,7 +878,7 @@ pub enum Robustness {
     /// doing before using it. See the `GL_KHR_no_error` extension.
     ///
     /// Since this option is purely an optimisation, no error will be returned if the backend
-    /// doesn't support it. Instead it will automatically fall back to `NotRobust`.
+    /// doesn't support it. Instead it will automatically fallback to `NotRobust`.
     NoError,
 
     /// Everything is checked to avoid any crash. The driver will attempt to avoid any problem,
