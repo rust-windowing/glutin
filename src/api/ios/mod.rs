@@ -60,9 +60,11 @@
 
 use std::io;
 use std::ffi::CString;
+use std::mem;
 use std::os::raw::*;
 
-use objc::runtime::{BOOL, Class, NO, YES};
+use objc::declare::ClassDecl;
+use objc::runtime::{BOOL, Class, NO, Object, Sel, YES};
 
 use {
     Api,
@@ -77,7 +79,7 @@ use {
     WindowBuilder,
 };
 use os::GlContextExt;
-use os::ios::WindowExt;
+use os::ios::{WindowExt, WindowBuilderExt};
 
 mod ffi;
 use self::ffi::*;
@@ -178,6 +180,9 @@ impl Context {
         _: &PixelFormatRequirements,
         gl_attrs: &GlAttributes<&Context>,
     ) -> Result<(Window, Self), CreationError> {
+        create_view_class();
+        let view_class = Class::get("MainGLView").expect("Failed to get class `MainGLView`");
+        let builder = builder.with_root_view_class(view_class as *const _ as *const _);
         if gl_attrs.sharing.is_some() { unimplemented!("Shared contexts are unimplemented on iOS."); }
         let version = match gl_attrs.version {
             GlRequest::Latest => kEAGLRenderingAPIOpenGLES3,
@@ -238,7 +243,7 @@ impl Context {
         ];
         let _ = self.make_current();
 
-        let view = window.get_uiview() as id;
+        let view = self.view;
         let scale_factor = window.get_hidpi_factor() as CGFloat;
         let _: () = msg_send![view, setContentScaleFactor:scale_factor];
         let layer: id = msg_send![view, layer];
@@ -336,6 +341,35 @@ impl Context {
     #[inline]
     pub fn resize(&self, _width: u32, _height: u32) {
         // N/A
+    }
+}
+
+fn create_view_class() {
+    extern fn init_with_frame(this: &Object, _: Sel, frame: CGRect) -> id {
+        unsafe {
+            let view: id = msg_send![super(this, class!(GLKView)), initWithFrame:frame];
+
+            let mask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+            let _: () = msg_send![view, setAutoresizingMask:mask];
+            let _: () = msg_send![view, setAutoresizesSubviews:YES];
+
+            let layer: id = msg_send![view, layer];
+            let _ : () = msg_send![layer, setOpaque:YES];
+
+            view
+        }
+    }
+
+    extern fn layer_class(_: &Class, _: Sel) -> *const Class {
+        unsafe { mem::transmute(Class::get("CAEAGLLayer").expect("Failed to get class `CAEAGLLayer`")) }
+    }
+
+    let superclass = Class::get("GLKView").expect("Failed to get class `GLKView`");
+    let mut decl = ClassDecl::new("MainGLView", superclass).expect("Failed to declare class `MainGLView`");
+    unsafe {
+        decl.add_method(sel!(initWithFrame:), init_with_frame as extern fn(&Object, Sel, CGRect) -> id);
+        decl.add_class_method(sel!(layerClass), layer_class as extern fn(&Class, Sel) -> *const Class);
+        decl.register();
     }
 }
 
