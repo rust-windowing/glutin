@@ -20,7 +20,7 @@ icon_loading = ["winit/icon_loading"]
 lazy_static = "1"
 libc = "0.2"
 shared_library = "0.1.0"
-winit = "0.16.0"
+winit = "0.17.0"
 
 [build-dependencies]
 gl_generator = "0.9"
