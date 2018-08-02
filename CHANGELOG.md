@@ -3,6 +3,7 @@
 - **Breaking:** Added `OsError` variant to `ContextError`.
 - Improved glX error reporting.
 - The iOS backend no longer fails to compile... again (added iOS testing on CI to prevent further issues).
+- Update winit dependency to 0.17.0. See [winit's CHANGELOG](https://github.com/tomaka/winit/blob/v0.17.0/CHANGELOG.md#version-0170-2018-08-02) for more info.
 
 # Version 0.17.0 (2018-06-27)
 
