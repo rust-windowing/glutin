@@ -1,5 +1,8 @@
 # Unreleased
 
+# Version 0.18.0 (2018-08-03)
+
+- cocoa and core-graphics updates.
 - **Breaking:** Added `OsError` variant to `ContextError`.
 - Improved glX error reporting.
 - The iOS backend no longer fails to compile... again (added iOS testing on CI to prevent further issues).
