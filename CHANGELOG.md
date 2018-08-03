@@ -1,5 +1,6 @@
 # Unreleased
 
+- cocoa and core-graphics updates.
 - **Breaking:** Added `OsError` variant to `ContextError`.
 - Improved glX error reporting.
 - The iOS backend no longer fails to compile... again (added iOS testing on CI to prevent further issues).
