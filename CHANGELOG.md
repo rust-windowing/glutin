@@ -1,7 +1,7 @@
 # Unreleased
 
-- ***Breaking*** The entire api for Headless contexts have been removed. Please instead use `Context::new()` when trying to make a context without a visible window. Also removed `headless` feature.
-- ***Breaking*** Structs implementing the `GlContext` trait must now be sized.
+- ***Breaking*** The entire API for headless contexts has been removed. Please instead use `Context::new()` when trying to make a context without a visible window. Also removed `headless` feature.
+- ***Breaking*** Types implementing the `GlContext` trait must now be sized.
 - ***Breaking*** Added new `CreationErrorPair` enum variant to enum `CreationError`.
 
 # Version 0.18.0 (2018-08-03)

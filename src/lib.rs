@@ -362,12 +362,12 @@ impl GlWindow {
     ) -> Result<Self, CreationError>
     {
         let ContextBuilder { pf_reqs, gl_attr } = context_builder;
-        let gl_attr = gl_attr.map_sharing(|ctxt| panic!());
+        let gl_attr = gl_attr.map_sharing(|_ctxt| panic!("Context sharing is not allowed when using `new()`. Please instead use `new_shared()`."));
         unsafe {
             platform::Context::new(window_builder, events_loop, &pf_reqs, &gl_attr)
                 .map(|(window, context)| GlWindow {
-                    window: window,
-                    context: Context { context: context },
+                    window,
+                    context: Context { context },
                 })
         }
     }
@@ -402,8 +402,8 @@ impl GlWindow {
         let gl_attr = gl_attr.map_sharing(|ctxt| &ctxt.context);
         platform::Context::new(window_builder, events_loop, &pf_reqs, &gl_attr)
             .map(|(window, context)| GlWindow {
-                window: window,
-                context: Context { context: context },
+                window,
+                context: Context { context },
             })
     }
 
@@ -503,7 +503,7 @@ impl Context {
     ) -> Result<Self, CreationError>
     {
         let ContextBuilder { pf_reqs, gl_attr } = context_builder;
-        let gl_attr = gl_attr.map_sharing(|ctxt| panic!());
+        let gl_attr = gl_attr.map_sharing(|_ctxt| panic!("Context sharing is not allowed when using `new()`. Please instead use `new_shared()`."));
         unsafe {
             platform::Context::new_context(el, &pf_reqs, &gl_attr, shareable_with_windowed_contexts)
                 .map(|context| Context { context })

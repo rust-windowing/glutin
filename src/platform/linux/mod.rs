@@ -1,14 +1,12 @@
 #![cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "openbsd"))]
 
-use {Api, ContextError, CreationError, GlAttributes, PixelFormat, PixelFormatRequirements};
+use {ContextError, CreationError, GlAttributes, PixelFormat, PixelFormatRequirements};
 use api::egl;
 use api::glx;
 use self::x11::GlContext;
 
 use winit;
-use winit::os::unix::{EventsLoopExt, WindowExt};
-
-use std::env;
+use winit::os::unix::EventsLoopExt;
 
 mod wayland;
 mod x11;

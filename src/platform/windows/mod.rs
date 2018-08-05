@@ -7,11 +7,8 @@ use winapi::shared::windef::HGLRC;
 use winapi::um::libloaderapi::*;
 use winit;
 
-use Api;
-use ContextError;
 use CreationError;
 use GlAttributes;
-use PixelFormat;
 use PixelFormatRequirements;
 
 use api::egl;

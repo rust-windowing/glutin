@@ -20,6 +20,7 @@ use std::cell::Cell;
 pub mod ffi;
 
 /// Specifies the type of display passed as `native_display`.
+#[allow(dead_code)]
 pub enum NativeDisplay {
     /// `None` means `EGL_DEFAULT_DISPLAY`.
     X11(Option<ffi::EGLNativeDisplayType>),
@@ -42,6 +43,7 @@ pub struct Context {
     surface: Cell<ffi::egl::types::EGLSurface>,
     api: Api,
     pixel_format: PixelFormat,
+    #[cfg(target_os = "android")]
     config_id: ffi::egl::types::EGLConfig,
 }
 
@@ -497,7 +499,8 @@ impl<'a> ContextPrototype<'a> {
             surface: Cell::new(surface),
             api: self.api,
             pixel_format: self.pixel_format,
-            config_id: self.config_id
+            #[cfg(target_os = "android")]
+            config_id: self.config_id,
         })
     }
 }

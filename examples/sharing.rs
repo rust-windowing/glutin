@@ -7,10 +7,7 @@ use glutin::GlContext;
 
 fn main() {
     let mut events_loop = glutin::EventsLoop::new();
-    let mut size = glutin::dpi::PhysicalSize {
-        width: 768.,
-        height: 480.,
-    };
+    let mut size = glutin::dpi::PhysicalSize::new(768., 480.);
 
     let context = glutin::ContextBuilder::new();
     let gl_context = glutin::Context::new(&events_loop, context, true).unwrap();
