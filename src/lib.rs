@@ -340,15 +340,15 @@ impl GlWindow {
     ///  flag set to `true`; and
     ///  - contexts made when creating a `GlWindow`.
     ///
-    /// You are not garunteed to recieve an error if you share a context with an
-    /// other context which you're not permited to share it with, as according
+    /// You are not guaranteed to receive an error if you share a context with an
+    /// other context which you're not permitted to share it with, as according
     /// to:
     ///  - the restrictions stated by us above; and
     ///  - the restrictions imposed on you by the platform your application runs 
     ///  on. (Please refer to `README-SHARING.md`)
     ///
     /// Failing to follow all the context sharing restrictions imposed on you 
-    /// may result in unsafe behaviour.
+    /// may result in unsafe behavior.
     ///
     /// This safe variant of `new_shared` will panic if you try to share it with
     /// an existing context.
@@ -380,15 +380,15 @@ impl GlWindow {
     ///  flag set to `true`; and
     ///  - contexts made when creating a `GlWindow`.
     ///
-    /// You are not garunteed to recieve an error if you share a context with an
-    /// other context which you're not permited to share it with, as according
+    /// You are not guaranteed to receive an error if you share a context with an
+    /// other context which you're not permitted to share it with, as according
     /// to:
     ///  - the restrictions stated by us above; and
     ///  - the restrictions imposed on you by the platform your application runs 
     ///  on. (Please refer to `README-SHARING.md`)
     ///
     /// Failing to follow all the context sharing restrictions imposed on you 
-    /// may result in unsafe behaviour.
+    /// may result in unsafe behavior.
     ///
     /// Error should be very rare and only occur in case of permission denied,
     /// incompatible system out of memory, etc.
@@ -440,7 +440,7 @@ impl GlWindow {
     /// surface is resized.
     ///
     /// The easiest way of doing this is to take every `Resized` window event that
-    /// is recieved with a `LogicalSize` and convert it to a `PhysicalSize` and
+    /// is received with a `LogicalSize` and convert it to a `PhysicalSize` and
     /// pass it into this function.
     pub fn resize(&self, size: dpi::PhysicalSize) {
         let (width, height) = size.into();
@@ -474,22 +474,22 @@ impl Context {
     ///  - contexts made with that flag set to `true`; and
     ///  - contexts made when creating a `GlWindow`.
     ///
-    /// If the flag is set to `false` on the otherhand, the context should only 
+    /// If the flag is set to `false` on the other hand, the context should only 
     /// be shared with other contexts made with the flag set to `false`. 
     ///
     /// Some platforms might not implement contexts which aren't shareable with 
     /// windowed contexts. If so, those platforms will fallback to making a
     /// contexts which are shareable with windowed contexts.
     ///
-    /// You are not garunteed to recieve an error if you share a context with an
-    /// other context which you're not permited to share it with, as according
+    /// You are not guaranteed to receive an error if you share a context with an
+    /// other context which you're not permitted to share it with, as according
     /// to:
     ///  - the restrictions stated by us above; and
     ///  - the restrictions imposed on you by the platform your application runs 
     ///  on. (Please refer to `README-SHARING.md`)
     ///
     /// Failing to follow all the context sharing restrictions imposed on you 
-    /// may result in unsafe behaviour.
+    /// may result in unsafe behavior.
     ///
     /// This safe variant of `new_shared` will panic if you try to share it with
     /// an existing context.
@@ -517,22 +517,22 @@ impl Context {
     ///  - contexts made with that flag set to `true`; and
     ///  - contexts made when creating a `GlWindow`.
     ///
-    /// If the flag is set to `false` on the otherhand, the context should only 
+    /// If the flag is set to `false` on the other hand, the context should only 
     /// be shared with other contexts made with the flag set to `false`. 
     ///
     /// Some platforms might not implement contexts which aren't shareable with 
     /// windowed contexts. If so, those platforms will fallback to making a
     /// contexts which are shareable with windowed contexts.
     ///
-    /// You are not garunteed to recieve an error if you share a context with an
-    /// other context which you're not permited to share it with, as according
+    /// You are not guaranteed to receive an error if you share a context with an
+    /// other context which you're not permitted to share it with, as according
     /// to:
     ///  - the restrictions stated by us above; and
     ///  - the restrictions imposed on you by the platform your application runs 
     ///  on. (Please refer to `README-SHARING.md`)
     ///
     /// Failing to follow all the context sharing restrictions imposed on you 
-    /// may result in unsafe behaviour.
+    /// may result in unsafe behavior.
     ///
     /// Error should be very rare and only occur in case of permission denied,
     /// incompatible system, out of memory, etc.
@@ -586,7 +586,7 @@ pub enum CreationError {
     NoAvailablePixelFormat,
     PlatformSpecific(String),
     Window(WindowCreationError),
-    /// We recieved two errors, instead of one.
+    /// We received two errors, instead of one.
     CreationErrorPair(Box<CreationError>, Box<CreationError>),
 }
 
@@ -601,10 +601,10 @@ impl CreationError {
             CreationError::OpenGlVersionNotSupported => "The requested OpenGL version is not \
                                                          supported.",
             CreationError::NoAvailablePixelFormat => "Couldn't find any pixel format that matches \
-                                                      the criterias.",
+                                                      the criteria.",
             CreationError::PlatformSpecific(ref text) => &text,
             CreationError::Window(ref err) => std::error::Error::description(err),
-            CreationError::CreationErrorPair(ref _err1, ref _err2) => "Recieved two errors."
+            CreationError::CreationErrorPair(ref _err1, ref _err2) => "Received two errors."
         }
     }
 }
@@ -755,7 +755,7 @@ pub enum Robustness {
     /// The driver doesn't check anything. This option is very dangerous. Please know what you're
     /// doing before using it. See the `GL_KHR_no_error` extension.
     ///
-    /// Since this option is purely an optimisation, no error will be returned if the backend
+    /// Since this option is purely an optimization, no error will be returned if the backend
     /// doesn't support it. Instead it will automatically fall back to `NotRobust`.
     NoError,
 
