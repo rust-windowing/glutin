@@ -336,7 +336,7 @@ impl GlWindow {
     /// `GlWindow`.
     ///
     /// The context made can be shared with:
-    ///  - headless contexts made with the `shareable_with_windowed_contexts` 
+    ///  - headless contexts made with the `shareable_with_windowed_contexts`
     ///  flag set to `true`; and
     ///  - contexts made when creating a `GlWindow`.
     ///
@@ -344,10 +344,10 @@ impl GlWindow {
     /// other context which you're not permitted to share it with, as according
     /// to:
     ///  - the restrictions stated by us above; and
-    ///  - the restrictions imposed on you by the platform your application runs 
+    ///  - the restrictions imposed on you by the platform your application runs
     ///  on. (Please refer to `README-SHARING.md`)
     ///
-    /// Failing to follow all the context sharing restrictions imposed on you 
+    /// Failing to follow all the context sharing restrictions imposed on you
     /// may result in unsafe behavior.
     ///
     /// This safe variant of `new_shared` will panic if you try to share it with
@@ -376,7 +376,7 @@ impl GlWindow {
     /// `GlWindow`.
     ///
     /// The context made can be shared with:
-    ///  - headless contexts made with the `shareable_with_windowed_contexts` 
+    ///  - headless contexts made with the `shareable_with_windowed_contexts`
     ///  flag set to `true`; and
     ///  - contexts made when creating a `GlWindow`.
     ///
@@ -384,10 +384,10 @@ impl GlWindow {
     /// other context which you're not permitted to share it with, as according
     /// to:
     ///  - the restrictions stated by us above; and
-    ///  - the restrictions imposed on you by the platform your application runs 
+    ///  - the restrictions imposed on you by the platform your application runs
     ///  on. (Please refer to `README-SHARING.md`)
     ///
-    /// Failing to follow all the context sharing restrictions imposed on you 
+    /// Failing to follow all the context sharing restrictions imposed on you
     /// may result in unsafe behavior.
     ///
     /// Error should be very rare and only occur in case of permission denied,
@@ -474,10 +474,10 @@ impl Context {
     ///  - contexts made with that flag set to `true`; and
     ///  - contexts made when creating a `GlWindow`.
     ///
-    /// If the flag is set to `false` on the other hand, the context should only 
-    /// be shared with other contexts made with the flag set to `false`. 
+    /// If the flag is set to `false` on the other hand, the context should only
+    /// be shared with other contexts made with the flag set to `false`.
     ///
-    /// Some platforms might not implement contexts which aren't shareable with 
+    /// Some platforms might not implement contexts which aren't shareable with
     /// windowed contexts. If so, those platforms will fallback to making a
     /// contexts which are shareable with windowed contexts.
     ///
@@ -485,10 +485,10 @@ impl Context {
     /// other context which you're not permitted to share it with, as according
     /// to:
     ///  - the restrictions stated by us above; and
-    ///  - the restrictions imposed on you by the platform your application runs 
+    ///  - the restrictions imposed on you by the platform your application runs
     ///  on. (Please refer to `README-SHARING.md`)
     ///
-    /// Failing to follow all the context sharing restrictions imposed on you 
+    /// Failing to follow all the context sharing restrictions imposed on you
     /// may result in unsafe behavior.
     ///
     /// This safe variant of `new_shared` will panic if you try to share it with
@@ -517,10 +517,10 @@ impl Context {
     ///  - contexts made with that flag set to `true`; and
     ///  - contexts made when creating a `GlWindow`.
     ///
-    /// If the flag is set to `false` on the other hand, the context should only 
-    /// be shared with other contexts made with the flag set to `false`. 
+    /// If the flag is set to `false` on the other hand, the context should only
+    /// be shared with other contexts made with the flag set to `false`.
     ///
-    /// Some platforms might not implement contexts which aren't shareable with 
+    /// Some platforms might not implement contexts which aren't shareable with
     /// windowed contexts. If so, those platforms will fallback to making a
     /// contexts which are shareable with windowed contexts.
     ///
@@ -528,10 +528,10 @@ impl Context {
     /// other context which you're not permitted to share it with, as according
     /// to:
     ///  - the restrictions stated by us above; and
-    ///  - the restrictions imposed on you by the platform your application runs 
+    ///  - the restrictions imposed on you by the platform your application runs
     ///  on. (Please refer to `README-SHARING.md`)
     ///
-    /// Failing to follow all the context sharing restrictions imposed on you 
+    /// Failing to follow all the context sharing restrictions imposed on you
     /// may result in unsafe behavior.
     ///
     /// Error should be very rare and only occur in case of permission denied,
