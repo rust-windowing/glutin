@@ -170,16 +170,12 @@ impl OsMesaContext {
         unsafe { osmesa_sys::OSMesaGetCurrentContext() == self.context }
     }
 
+    #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const () {
         unsafe {
             let c_str = CString::new(addr.as_bytes().to_vec()).unwrap();
             mem::transmute(osmesa_sys::OSMesaGetProcAddress(mem::transmute(c_str.as_ptr())))
         }
-    }
-
-    #[inline]
-    pub fn swap_buffers(&self) -> Result<(), ContextError> {
-        Ok(())
     }
 
     #[inline]
