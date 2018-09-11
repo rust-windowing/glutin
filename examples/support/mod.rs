@@ -3,17 +3,17 @@ use std::mem;
 use std::ptr;
 use glutin::{self, GlContext};
 
-mod gl {
+pub mod gl {
     pub use self::Gles2 as Gl;
     include!(concat!(env!("OUT_DIR"), "/test_gl_bindings.rs"));
 }
 
 pub struct Gl {
-    gl: gl::Gl
+    pub gl: gl::Gl,
 }
 
-pub fn load(gl_window: &glutin::GlWindow) -> Gl {
-    let gl = gl::Gl::load_with(|ptr| gl_window.get_proc_address(ptr) as *const _);
+pub fn load(gl_context: &glutin::Context) -> Gl {
+    let gl = gl::Gl::load_with(|ptr| gl_context.get_proc_address(ptr) as *const _);
 
     let version = unsafe {
         let data = CStr::from_ptr(gl.GetString(gl::VERSION) as *const _).to_bytes().to_vec();
