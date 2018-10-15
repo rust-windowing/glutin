@@ -52,7 +52,7 @@ fn main() {
                     glutin::WindowEvent::KeyboardInput { input, .. } => {
                         match input.virtual_keycode {
                             Some(glutin::VirtualKeyCode::Escape) => running = false,
-                            Some(glutin::VirtualKeyCode::F) => {
+                            Some(glutin::VirtualKeyCode::F) if input.state == glutin::ElementState::Pressed => {
                                 let monitor = if fullscreen {
                                     None
                                 } else {
