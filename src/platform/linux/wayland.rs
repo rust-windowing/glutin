@@ -26,7 +26,10 @@ impl Context {
         let surface = window.get_wayland_surface().unwrap();
         let egl_surface = unsafe { wegl::WlEglSurface::new_from_raw(surface as *mut _, w as i32, h as i32) };
         let context = {
-            let libegl = unsafe { dlopen::dlopen(b"libEGL.so\0".as_ptr() as *const _, dlopen::RTLD_NOW) };
+            let mut libegl = unsafe { dlopen::dlopen(b"libEGL.so.1\0".as_ptr() as *const _, dlopen::RTLD_NOW) };
+            if libegl.is_null() {
+                libegl = unsafe { dlopen::dlopen(b"libEGL.so\0".as_ptr() as *const _, dlopen::RTLD_NOW) };
+            }
             if libegl.is_null() {
                 return Err(CreationError::NotSupported("could not find libEGL"));
             }
