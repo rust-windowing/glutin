@@ -1,7 +1,7 @@
 [package]
 name = "glutin"
 version = "0.18.0"
-authors = ["The glutin contributors, Pierre Krieger <pierre.krieger1708@gmail.com>"]
+authors = ["The glutin contributors", "Pierre Krieger <pierre.krieger1708@gmail.com>"]
 description = "Cross-platform OpenGL context provider."
 keywords = ["windowing", "opengl"]
 license = "Apache-2.0"
@@ -11,16 +11,17 @@ documentation = "https://docs.rs/glutin"
 build = "build.rs"
 
 [package.metadata.docs.rs]
-features = ["icon_loading"]
+features = ["icon_loading", "serde"]
 
 [features]
 icon_loading = ["winit/icon_loading"]
+serde = ["winit/serde"]
 
 [dependencies]
 lazy_static = "1"
 libc = "0.2"
 shared_library = "0.1.0"
-winit = "0.17.0"
+winit = "0.18.0"
 
 [build-dependencies]
 gl_generator = "0.10"
@@ -34,12 +35,12 @@ objc = "0.2"
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2"
 cgl = "0.2"
-cocoa = "0.17"
+cocoa = "0.18.4"
 core-foundation = "0.6"
-core-graphics = "0.16"
+core-graphics = "0.17.3"
 
 [target.'cfg(target_os = "windows")'.dependencies.winapi]
-version = "0.3.2"
+version = "0.3.6"
 features = [
     "winnt",
     "winuser",
@@ -49,5 +50,5 @@ features = [
 
 [target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os="dragonfly", target_os="openbsd"))'.dependencies]
 osmesa-sys = "0.1.0"
-wayland-client = { version = "0.20.4", features = ["egl", "dlopen"] }
+wayland-client = { version = "0.21", features = ["egl", "dlopen"] }
 x11-dl = "2.18.3"
