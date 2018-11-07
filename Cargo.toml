@@ -20,7 +20,7 @@ icon_loading = ["winit/icon_loading"]
 lazy_static = "1"
 libc = "0.2"
 shared_library = "0.1.0"
-winit = "0.17.0"
+winit = "0.18.0"
 
 [build-dependencies]
 gl_generator = "0.9"
@@ -34,9 +34,9 @@ objc = "0.2"
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2"
 cgl = "0.2"
-cocoa = "0.17"
+cocoa = "0.18"
 core-foundation = "0.6"
-core-graphics = "0.16"
+core-graphics = "0.17"
 
 [target.'cfg(target_os = "windows")'.dependencies.winapi]
 version = "0.3.2"
@@ -49,5 +49,5 @@ features = [
 
 [target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os="dragonfly", target_os="openbsd"))'.dependencies]
 osmesa-sys = "0.1.0"
-wayland-client = { version = "0.20.4", features = ["egl", "dlopen"] }
+wayland-client = { version = "0.21", features = ["egl", "dlopen"] }
 x11-dl = "2.18.3"
