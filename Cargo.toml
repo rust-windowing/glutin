@@ -23,7 +23,7 @@ shared_library = "0.1.0"
 winit = "0.17.0"
 
 [build-dependencies]
-gl_generator = "0.9"
+gl_generator = "0.10"
 
 [target.'cfg(target_os = "android")'.dependencies.android_glue]
 version = "0.2.3"
