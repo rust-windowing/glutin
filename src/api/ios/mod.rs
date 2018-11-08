@@ -393,7 +393,7 @@ impl Drop for Context {
 impl GlContextExt for Context {
     type Handle = *mut c_void;
     #[inline]
-    unsafe fn raw_handle(&self) -> *mut c_void {
+    unsafe fn raw_handle(&self) -> Self::Handle {
         self.eagl_context as *mut c_void
     }
 }
