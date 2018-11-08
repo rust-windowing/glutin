@@ -17,4 +17,9 @@ impl GlContextExt for Context {
     unsafe fn raw_handle(&self) -> Self::Handle {
         self.context.raw_handle()
     }
+
+    #[inline]
+    unsafe fn get_egl_display(&self) -> Option<*const c_void> {
+        None
+    }
 }

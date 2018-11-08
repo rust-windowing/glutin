@@ -6,6 +6,8 @@ pub use winit::os::windows::{DeviceIdExt, MonitorIdExt, WindowBuilderExt, Window
 pub use api::egl::ffi::EGLContext;
 pub use platform::RawHandle;
 
+use std::os::raw;
+
 use os::GlContextExt;
 use Context;
 
@@ -15,5 +17,10 @@ impl GlContextExt for Context {
     #[inline]
     unsafe fn raw_handle(&self) -> Self::Handle {
         self.context.raw_handle()
+    }
+
+    #[inline]
+    unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
+        self.context.get_egl_display()
     }
 }
