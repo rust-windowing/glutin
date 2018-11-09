@@ -1,6 +1,6 @@
 # Unreleased
 
-# Version 0.19.0 (2018-11-08)
+# Version 0.19.0 (2018-11-09)
 
 - **Breaking:** The entire API for headless contexts has been removed. Please instead use `Context::new()` when trying to make a context without a visible window. Also removed `headless` feature.
 - **Breaking:** Types implementing the `GlContext` trait must now be sized.
