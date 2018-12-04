@@ -425,6 +425,7 @@ impl<'a> ContextPrototype<'a> {
         self.finish_impl(surface)
     }
 
+    #[cfg(any(target_os = "android", target_os = "windows"))]
     pub fn finish_pbuffer(self, dimensions: (u32, u32)) -> Result<Context, CreationError> {
         let attrs = &[
             ffi::egl::WIDTH as c_int, dimensions.0 as c_int,
