@@ -1,5 +1,7 @@
 # Unreleased
 
+- Added NetBSD support.
+
 # Version 0.19.0 (2018-11-09)
 
 - **Breaking:** minimum supported Rust version increased to 1.28.0.
