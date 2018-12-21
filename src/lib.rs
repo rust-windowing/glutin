@@ -341,7 +341,7 @@ impl GlWindow {
     /// `GlWindow`.
     ///
     /// Errors can occur in two scenarios:
-    ///  - If the Window could not be created (via permission denied, incompatible system, out of
+    ///  - If the window could not be created (via permission denied, incompatible system, out of
     ///    memory, etc.). This should be very rare.
     ///  - If the OpenGL context could not be created. This generally happens because the underlying
     ///    platform doesn't support a requested feature.
@@ -436,8 +436,8 @@ impl Context {
     /// If the flag is set to `false` on the other hand, the context should only
     /// be shared with other contexts made with the flag set to `false`.
     ///
-    /// Some platforms only implement contexts that are sharable with windowed contexts. On those
-    /// platforms, the `shareable_with_windowed_contexts` flag wil be ignored and always behave as
+    /// Some platforms only implement contexts that are shareable with windowed contexts. On those
+    /// platforms, the `shareable_with_windowed_contexts` flag will be ignored and always behave as
     /// if it were set to `true`.
     ///
     /// Errors can occur if the OpenGL context could not be created. This generally happens because
