@@ -53,7 +53,7 @@ fn main() {
             .write_bindings(gl_generator::StructGenerator, &mut file).unwrap();
     }
 
-    if target.contains("linux") || target.contains("dragonfly") || target.contains("freebsd") || target.contains("openbsd") {
+    if target.contains("linux") || target.contains("dragonfly") || target.contains("freebsd") || target.contains("netbsd") || target.contains("openbsd") {
         let mut file = File::create(&dest.join("glx_bindings.rs")).unwrap();
         Registry::new(Api::Glx, (1, 4), Profile::Core, Fallbacks::All, [])
             .write_bindings(gl_generator::StructGenerator, &mut file).unwrap();

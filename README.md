@@ -86,6 +86,8 @@ fn main() {
 
 Note that glutin aims at being a low-level brick in your rendering infrastructure. You are encouraged to write another layer of abstraction between glutin and your application.
 
+Also note that glutin requires Rust 1.28.0 or later.
+
 ## Platform-specific notes
 
 ### Android
