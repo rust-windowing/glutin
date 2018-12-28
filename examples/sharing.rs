@@ -18,7 +18,7 @@ fn main() {
         .with_dimensions(glutin::dpi::LogicalSize::from_physical(size, 1.0));
     let context = glutin::ContextBuilder::new()
         .with_shared_lists(&gl_context);
-    let gl_window = unsafe { glutin::GlWindow::new_shared(window, context, &events_loop).unwrap() };
+    let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
 
     let _ = unsafe { gl_window.make_current() };
     println!("Pixel format of the window's GL context: {:?}", gl_window.get_pixel_format());

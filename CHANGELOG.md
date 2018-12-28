@@ -4,6 +4,8 @@
 of the Wayland backend is that all shared contexts must use the same events
 pool as each other.
 - Added NetBSD support.
+- Removed `new_shared` function from `Context` and `GlWindow`, in favor of `new`.
+- Added `build` method to `ContextBuilder`.
 
 # Version 0.19.0 (2018-11-09)
 
