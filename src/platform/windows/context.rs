@@ -77,7 +77,7 @@ impl Context {
                                 _ => unreachable!(),
                             }
                         });
-                        WglContext::new(&pf_reqs, &gl_attr_wgl, w).map(Context::Wgl)
+                        unsafe { WglContext::new(&pf_reqs, &gl_attr_wgl, w).map(Context::Wgl) }
                     }
                     // We must use EGL.
                     (Some(_), Some(egl)) => {
@@ -111,7 +111,7 @@ impl Context {
                         {
                             Ok(Context::Egl(c))
                         } else {
-                            WglContext::new(&pf_reqs, &gl_attr_wgl, w).map(Context::Wgl)
+                            unsafe { WglContext::new(&pf_reqs, &gl_attr_wgl, w).map(Context::Wgl) }
                         }
                     }
                     _ => panic!(),
@@ -125,7 +125,7 @@ impl Context {
                         _ => panic!(),
                     }
                 });
-                WglContext::new(&pf_reqs, &gl_attr_wgl, w).map(Context::Wgl)
+                unsafe { WglContext::new(&pf_reqs, &gl_attr_wgl, w).map(Context::Wgl) }
             }
         }
     }

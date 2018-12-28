@@ -80,7 +80,7 @@ impl Context {
     ///
     /// The `window` must continue to exist as long as the resulting `Context` exists.
     #[inline]
-    pub fn new(pf_reqs: &PixelFormatRequirements, opengl: &GlAttributes<HGLRC>,
+    pub unsafe fn new(pf_reqs: &PixelFormatRequirements, opengl: &GlAttributes<HGLRC>,
                       window: HWND) -> Result<Context, CreationError>
     {
         let hdc = GetDC(window);
