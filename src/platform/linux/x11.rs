@@ -110,7 +110,8 @@ impl Drop for Context {
 }
 
 impl Context {
-    pub unsafe fn new(
+    #[inline]
+    pub fn new(
         window_builder: winit::WindowBuilder,
         events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
@@ -123,7 +124,7 @@ impl Context {
         };
 
         // Get the screen_id for the window being built.
-        let screen_id = (xconn.xlib.XDefaultScreen)(xconn.display);
+        let screen_id = unsafe { (xconn.xlib.XDefaultScreen)(xconn.display) };
 
         // start the context building process
         enum Prototype<'a> {
@@ -197,18 +198,22 @@ impl Context {
         let visual_infos = match context {
             Prototype::Glx(ref p) => p.get_visual_infos().clone(),
             Prototype::Egl(ref p) => {
-                let mut template: ffi::XVisualInfo = mem::zeroed();
+                let mut template: ffi::XVisualInfo = unsafe { mem::zeroed() };
                 template.visualid = p.get_native_visual_id() as ffi::VisualID;
 
                 let mut num_visuals = 0;
-                let vi = (xconn.xlib.XGetVisualInfo)(xconn.display, ffi::VisualIDMask,
-                                                       &mut template, &mut num_visuals);
+                let vi = unsafe {(xconn.xlib.XGetVisualInfo)(
+                    xconn.display,
+                    ffi::VisualIDMask,
+                    &mut template,
+                    &mut num_visuals
+                )};
                 xconn.check_errors().expect("Failed to call `XGetVisualInfo`");
                 assert!(!vi.is_null());
                 assert!(num_visuals == 1);
 
-                let vi_copy = ptr::read(vi as *const _);
-                (xconn.xlib.XFree)(vi as *mut _);
+                let vi_copy = unsafe { ptr::read(vi as *const _) };
+                unsafe { (xconn.xlib.XFree)(vi as *mut _); }
                 vi_copy
             },
         };
@@ -230,14 +235,17 @@ impl Context {
         };
 
         // getting the root window
-        let root = (xconn.xlib.XDefaultRootWindow)(xconn.display);
+        let root = unsafe { (xconn.xlib.XDefaultRootWindow)(xconn.display) };
         xconn.check_errors().expect("Failed to get root window");
 
         // creating the color map
         let colormap = {
-            let cmap = (xconn.xlib.XCreateColormap)(xconn.display, root,
-                                                      visual_infos.visual as *mut _,
-                                                      ffi::AllocNone);
+            let cmap = unsafe {(xconn.xlib.XCreateColormap)(
+                xconn.display,
+                root,
+                visual_infos.visual as *mut _,
+                ffi::AllocNone
+            )};
             xconn.check_errors().expect("Failed to call XCreateColormap");
             cmap
         };
@@ -251,7 +259,8 @@ impl Context {
         Ok((window, context))
     }
 
-    pub unsafe fn new_separate(
+    #[inline]
+    pub fn new_separate(
         window: &winit::Window,
         events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
@@ -267,16 +276,18 @@ impl Context {
 
         let xlib_window = window.get_xlib_window().unwrap();
         let attrs = {
-            let mut attrs = ::std::mem::uninitialized();
-            (xconn.xlib.XGetWindowAttributes)(
-                xconn.display,
-                xlib_window,
-                &mut attrs,
-            );
+            let mut attrs = unsafe { ::std::mem::uninitialized() };
+            unsafe {
+                (xconn.xlib.XGetWindowAttributes)(
+                    xconn.display,
+                    xlib_window,
+                    &mut attrs,
+                );
+            }
             attrs
         };
 
-        let visual_xid = (xconn.xlib.XVisualIDFromVisual)(attrs.visual);
+        let visual_xid = unsafe {(xconn.xlib.XVisualIDFromVisual)(attrs.visual)};
         let mut pf_reqs = pf_reqs.clone();
         pf_reqs.x11_visual_xid = Some(visual_xid);
         pf_reqs.depth_bits = Some(attrs.depth as _);
@@ -362,14 +373,17 @@ impl Context {
         };
 
         // getting the root window
-        let root = (xconn.xlib.XDefaultRootWindow)(xconn.display);
+        let root = unsafe { (xconn.xlib.XDefaultRootWindow)(xconn.display) };
         xconn.check_errors().expect("Failed to get root window");
 
         // creating the color map
         let colormap = {
-            let cmap = (xconn.xlib.XCreateColormap)(xconn.display, root,
-                                                      attrs.visual as *mut _,
-                                                      ffi::AllocNone);
+            let cmap = unsafe{(xconn.xlib.XCreateColormap)(
+                xconn.display,
+                root,
+                attrs.visual as *mut _,
+                ffi::AllocNone
+            )};
             xconn.check_errors().expect("Failed to call XCreateColormap");
             cmap
         };

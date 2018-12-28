@@ -36,7 +36,8 @@ pub enum Context {
 
 impl Context {
     /// See the docs in the crate root file.
-    pub unsafe fn new(
+    #[inline]
+    pub fn new(
         window_builder: winit::WindowBuilder,
         events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
@@ -54,7 +55,8 @@ impl Context {
         Ok((window, ctxt))
     }
 
-    pub unsafe fn new_separate(
+    #[inline]
+    pub fn new_separate(
         window: &winit::Window,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Self>,
@@ -129,7 +131,7 @@ impl Context {
     }
 
     #[inline]
-    pub unsafe fn new_context(
+    pub fn new_context(
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,

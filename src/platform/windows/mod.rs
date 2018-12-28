@@ -61,7 +61,7 @@ pub struct Context(context::Context);
 impl Context {
     /// See the docs in the crate root file.
     #[inline]
-    pub unsafe fn new(
+    pub fn new(
         window_builder: winit::WindowBuilder,
         events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
@@ -78,7 +78,7 @@ impl Context {
 
     /// See the docs in the crate root file.
     #[inline]
-    pub unsafe fn new_separate(
+    pub fn new_separate(
         window: &winit::Window,
         _events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
@@ -94,7 +94,7 @@ impl Context {
 
     /// See the docs in the crate root file.
     #[inline]
-    pub unsafe fn new_context(
+    pub fn new_context(
         events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Self>,

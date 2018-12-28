@@ -174,6 +174,7 @@ fn validate_version(version: u8) -> Result<NSUInteger, CreationError> {
 }
 
 impl Context {
+    #[inline]
     pub fn new(
         builder: WindowBuilder,
         event_loop: &EventsLoop,
@@ -209,6 +210,7 @@ impl Context {
         Ok((window, context))
     }
 
+    #[inline]
     pub fn new_context(
         el: &EventsLoop,
         pf_reqs: &PixelFormatRequirements,
@@ -222,7 +224,7 @@ impl Context {
 
     /// See the docs in the crate root file.
     #[inline]
-    pub unsafe fn new_separate(
+    pub fn new_separate(
         _window: &Window,
         _events_loop: &EventsLoop,
         _pf_reqs: &PixelFormatRequirements,

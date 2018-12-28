@@ -191,11 +191,9 @@ impl Context {
     ) -> Result<Self, CreationError>
     {
         let ContextBuilder { pf_reqs, gl_attr } = context_builder;
-        #[allow(unused_unsafe)]
-        unsafe {
-            platform::Context::new_context(el, &pf_reqs, &gl_attr, shareable_with_windowed_contexts)
-                .map(|context| Context { context })
-        }
+        let gl_attr = gl_attr.map_sharing(|ctxt| &ctxt.context);
+        platform::Context::new_context(el, &pf_reqs, &gl_attr, shareable_with_windowed_contexts)
+            .map(|context| Context { context })
     }
 }
 
@@ -254,13 +252,11 @@ impl GlWindow {
     {
         let ContextBuilder { pf_reqs, gl_attr } = context_builder;
         let gl_attr = gl_attr.map_sharing(|ctxt| &ctxt.context);
-        unsafe {
-            platform::Context::new(window_builder, events_loop, &pf_reqs, &gl_attr)
-                .map(|(window, context)| GlWindow {
-                    window,
-                    context: Context { context },
-                })
-        }
+        platform::Context::new(window_builder, events_loop, &pf_reqs, &gl_attr)
+            .map(|(window, context)| GlWindow {
+                window,
+                context: Context { context },
+            })
     }
 
     /// Borrow the inner `Window`.
@@ -339,30 +335,12 @@ impl GlSeparatedContext {
     /// Builds the GL context using the passed `Window`, returning the context
     /// as a `GlSeparatedContext`.
     ///
-    /// Contexts made with the `shareable_with_windowed_contexts` flag set to
-    /// `true` can be shared with:
-    ///  - contexts made with that flag set to `true`; and
-    ///  - contexts made when creating a `GlWindow` or `GlSeparatedContext`.
-    ///
     /// If the flag is set to `false` on the other hand, the context should only
     /// be shared with other contexts made with the flag set to `false`.
     ///
     /// Some platforms only implement contexts which are shareable with
     /// windowed contexts. If so, those platforms will fallback to making a
     /// context with the `shareable_with_windowed_contexts` flag set to true.
-    ///
-    /// You are not guaranteed to receive an error if you share a context with an
-    /// other context which you're not permitted to share it with, as according
-    /// to:
-    ///  - the restrictions stated by us above; and
-    ///  - the restrictions imposed on you by the platform your application runs
-    ///  on. (Please refer to `README-SHARING.md`)
-    ///
-    /// Failing to follow all the context sharing restrictions imposed on you
-    /// may result in unsafe behavior.
-    ///
-    /// This safe variant of `new_shared` will panic if you try to share it with
-    /// an existing context.
     ///
     /// One notable limitation of the Wayland backend when it comes to shared
     /// contexts is that both contexts must use the same events loop.
@@ -376,57 +354,8 @@ impl GlSeparatedContext {
     ) -> Result<Self, CreationError>
     {
         let ContextBuilder { pf_reqs, gl_attr } = context_builder;
-        let gl_attr = gl_attr.map_sharing(|_ctxt| panic!("Context sharing is not allowed when using `new()`. Please instead use `new_shared()`."));
-
-        // Not all platforms support context sharing yet, when they do, their
-        // `new.*` functions should be marked unsafe.
-        #[allow(unused_unsafe)]
-        unsafe {
-            platform::Context::new_separate(window, events_loop, &pf_reqs, &gl_attr)
-                .map(|context| GlSeparatedContext {
-                    context: Context { context },
-                })
-        }
-    }
-
-    /// Builds the GL context using the passed `Window`, returning the context
-    /// as a `GlSeparatedContext`.
-    ///
-    /// Contexts made with the `shareable_with_windowed_contexts` flag set to
-    /// `true` can be shared with:
-    ///  - contexts made with that flag set to `true`; and
-    ///  - contexts made when creating a `GlWindow` or `GlSeparatedContext`.
-    ///
-    /// If the flag is set to `false` on the other hand, the context should only
-    /// be shared with other contexts made with the flag set to `false`.
-    ///
-    /// Some platforms only implement contexts which are shareable with
-    /// windowed contexts. If so, those platforms will fallback to making a
-    /// context with the `shareable_with_windowed_contexts` flag set to true.
-    ///
-    /// You are not guaranteed to receive an error if you share a context with an
-    /// other context which you're not permitted to share it with, as according
-    /// to:
-    ///  - the restrictions stated by us above; and
-    ///  - the restrictions imposed on you by the platform your application runs
-    ///  on. (Please refer to `README-SHARING.md`)
-    ///
-    /// Failing to follow all the context sharing restrictions imposed on you
-    /// may result in unsafe behavior.
-    ///
-    /// One notable limitation of the Wayland backend when it comes to shared
-    /// contexts is that both contexts must use the same events loop.
-    ///
-    /// Errors should be very rare and only occur in case of permission denied,
-    /// incompatible system out of memory, etc.
-    pub unsafe fn new_shared(
-        window: &Window,
-        context_builder: ContextBuilder,
-        events_loop: &EventsLoop,
-    ) -> Result<Self, CreationError>
-    {
-        let ContextBuilder { pf_reqs, gl_attr } = context_builder;
         let gl_attr = gl_attr.map_sharing(|ctxt| &ctxt.context);
+
         platform::Context::new_separate(window, events_loop, &pf_reqs, &gl_attr)
             .map(|context| GlSeparatedContext {
                 context: Context { context },

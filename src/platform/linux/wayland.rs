@@ -13,7 +13,8 @@ pub struct Context {
 }
 
 impl Context {
-    pub unsafe fn new(
+    #[inline]
+    pub fn new(
         window_builder: winit::WindowBuilder,
         events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
@@ -25,7 +26,8 @@ impl Context {
         Ok((window, context))
     }
 
-    pub unsafe fn new_separate(
+    #[inline]
+    pub fn new_separate(
         window: &winit::Window,
         _events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
@@ -39,18 +41,18 @@ impl Context {
             Some(s) => s,
             None => return Err(CreationError::NotSupported("Wayland not found")),
         };
-        let egl_surface = wegl::WlEglSurface::new_from_raw(surface as *mut _, w as i32, h as i32);
+        let egl_surface = unsafe { wegl::WlEglSurface::new_from_raw(surface as *mut _, w as i32, h as i32) };
         let context = {
-            let mut libegl = dlopen::dlopen(b"libEGL.so.1\0".as_ptr() as *const _, dlopen::RTLD_NOW);
+            let mut libegl = unsafe { dlopen::dlopen(b"libEGL.so.1\0".as_ptr() as *const _, dlopen::RTLD_NOW) };
             if libegl.is_null() {
-                libegl = dlopen::dlopen(b"libEGL.so\0".as_ptr() as *const _, dlopen::RTLD_NOW);
+                libegl = unsafe { dlopen::dlopen(b"libEGL.so\0".as_ptr() as *const _, dlopen::RTLD_NOW) };
             }
             if libegl.is_null() {
                 return Err(CreationError::NotSupported("could not find libEGL"));
             }
             let egl = ::api::egl::ffi::egl::Egl::load_with(|sym| {
                 let sym = CString::new(sym).unwrap();
-                dlopen::dlsym(libegl, sym.as_ptr())
+                unsafe { dlopen::dlsym(libegl, sym.as_ptr()) }
             });
             let gl_attr = gl_attr.clone().map_sharing(|c| &c.context);
             let native_display = egl::NativeDisplay::Wayland(Some(

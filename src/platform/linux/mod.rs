@@ -72,7 +72,7 @@ impl Context {
     }
 
     #[inline]
-    pub unsafe fn new(
+    pub fn new(
         window_builder: winit::WindowBuilder,
         events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
@@ -100,7 +100,7 @@ impl Context {
     }
 
     #[inline]
-    pub unsafe fn new_context(
+    pub fn new_context(
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
@@ -139,7 +139,7 @@ impl Context {
     }
 
     #[inline]
-    pub unsafe fn new_separate(
+    pub fn new_separate(
         window: &winit::Window,
         events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
