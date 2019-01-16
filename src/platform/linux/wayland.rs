@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use std::ffi::CString;
+use std::os::raw;
 use winit;
 use winit::os::unix::WindowExt;
 use {ContextError, CreationError, GlAttributes, PixelFormat, PixelFormatRequirements};
@@ -89,5 +90,10 @@ impl Context {
     #[inline]
     pub unsafe fn raw_handle(&self) -> ffi::EGLContext {
         self.context.raw_handle()
+    }
+
+    #[inline]
+    pub unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
+        Some(self.context.get_egl_display())
     }
 }

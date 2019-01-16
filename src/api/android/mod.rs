@@ -165,4 +165,9 @@ impl Context {
     pub unsafe fn raw_handle(&self) -> egl::ffi::EGLContext {
         self.0.egl_context.raw_handle()
     }
+
+    #[inline]
+    pub unsafe fn get_egl_display(&self) -> egl::ffi::EGLDisplay {
+        self.0.egl_context.get_egl_display()
+    }
 }

@@ -14,11 +14,18 @@ pub use winit::os::unix::WindowExt;
 use Context;
 use os::GlContextExt;
 
+use std::os::raw;
+
 impl GlContextExt for Context {
     type Handle = RawHandle;
 
     #[inline]
     unsafe fn raw_handle(&self) -> Self::Handle {
         self.context.raw_handle()
+    }
+
+    #[inline]
+    unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
+        self.context.get_egl_display()
     }
 }

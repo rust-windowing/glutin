@@ -4,6 +4,7 @@
 extern crate winapi;
 
 pub use self::egl::types::EGLContext;
+pub use self::egl::types::EGLDisplay;
 
 use libc;
 

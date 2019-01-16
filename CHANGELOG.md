@@ -3,6 +3,7 @@
 - Added NetBSD support.
 - **Breaking:** Removed `new_shared` function from `Context` and `GlWindow`, in favor of `new`.
 - Added `build` method to `ContextBuilder`.
+- Added `get_egl_display` method to `GlContextExt` trait and its implementation for platforms.
 - Removed minimum supported Rust version guarantee.
 
 # Version 0.19.0 (2018-11-09)
