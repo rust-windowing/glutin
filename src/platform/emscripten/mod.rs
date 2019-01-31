@@ -63,9 +63,7 @@ impl Context {
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-        shareable_with_windowed_contexts: bool,
     ) -> Result<Self, CreationError> {
-        assert!(!shareable_with_windowed_contexts); // TODO: Implement if possible
         let wb = winit::WindowBuilder::new().with_visibility(false);
         Self::new(wb, el, pf_reqs, gl_attr).map(|(w, c)| match c {
             Context::Window(c) => Context::WindowedContext(w, c),

@@ -135,7 +135,6 @@ impl Context {
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-        _shareable_with_windowed_contexts: bool,
         egl: Option<&Egl>,
     ) -> Result<Self, CreationError> {
         // if EGL is available, we try using EGL first

@@ -215,7 +215,6 @@ impl Context {
         el: &EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-        _shareable_with_windowed_contexts: bool,
     ) -> Result<Self, CreationError> {
         let wb = WindowBuilder::new().with_visibility(false);
         Self::new(wb, el, pf_reqs, gl_attr)

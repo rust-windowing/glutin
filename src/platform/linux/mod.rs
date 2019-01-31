@@ -104,37 +104,26 @@ impl Context {
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-        shareable_with_windowed_contexts: bool,
     ) -> Result<Self, CreationError>
     {
-        if shareable_with_windowed_contexts {
-            let wb = winit::WindowBuilder::new().with_visibility(false);
+        let wb = winit::WindowBuilder::new().with_visibility(false);
 
-            if el.is_wayland() {
-                Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
-                let gl_attr = gl_attr.clone().map_sharing(|ctxt| match ctxt {
-                    &Context::WindowedWayland(ref ctxt) | &Context::HeadlessWayland(_, ref ctxt) => ctxt,
-                    _ => unreachable!(),
-                });
-                wayland::Context::new(wb, &el, pf_reqs, &gl_attr)
-                    .map(|(window, context)| Context::HeadlessWayland(window, context))
-            } else {
-                Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
-                let gl_attr = gl_attr.clone().map_sharing(|ctxt| match ctxt {
-                    &Context::WindowedX11(ref ctxt) | &Context::HeadlessX11(_, ref ctxt) => ctxt,
-                    _ => unreachable!(),
-                });
-                x11::Context::new(wb, &el, pf_reqs, &gl_attr)
-                    .map(|(window, context)| Context::HeadlessX11(window, context))
-            }
-        } else {
-            Context::is_compatible(&gl_attr.sharing, ContextType::OsMesa)?;
+        if el.is_wayland() {
+            Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
             let gl_attr = gl_attr.clone().map_sharing(|ctxt| match ctxt {
-                &Context::OsMesa(ref ctxt) => ctxt,
+                &Context::WindowedWayland(ref ctxt) | &Context::HeadlessWayland(_, ref ctxt) => ctxt,
                 _ => unreachable!(),
             });
-            osmesa::OsMesaContext::new((1, 1), pf_reqs, &gl_attr)
-                .map(|context| Context::OsMesa(context))
+            wayland::Context::new(wb, &el, pf_reqs, &gl_attr)
+                .map(|(window, context)| Context::HeadlessWayland(window, context))
+        } else {
+            Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
+            let gl_attr = gl_attr.clone().map_sharing(|ctxt| match ctxt {
+                &Context::WindowedX11(ref ctxt) | &Context::HeadlessX11(_, ref ctxt) => ctxt,
+                _ => unreachable!(),
+            });
+            x11::Context::new(wb, &el, pf_reqs, &gl_attr)
+                .map(|(window, context)| Context::HeadlessX11(window, context))
         }
     }
 
@@ -239,5 +228,33 @@ impl Context {
             Context::WindowedWayland(ref ctxt) | Context::HeadlessWayland(_, ref ctxt) => RawHandle::Egl(ctxt.raw_handle()),
             Context::OsMesa(ref ctxt) => RawHandle::Egl(ctxt.raw_handle()),
         }
+    }
+}
+
+pub trait ContextExt {
+    fn new_osmesa(
+        pf_reqs: &PixelFormatRequirements,
+        gl_attr: &GlAttributes<&Context>,
+    ) -> Result<Self, CreationError>
+    where
+        Self: Sized;
+}
+
+impl ContextExt for Context {
+    #[inline]
+    fn new_osmesa(
+        pf_reqs: &PixelFormatRequirements,
+        gl_attr: &GlAttributes<&Context>,
+    ) -> Result<Self, CreationError>
+    where
+        Self: Sized,
+    {
+        Context::is_compatible(&gl_attr.sharing, ContextType::OsMesa)?;
+        let gl_attr = gl_attr.clone().map_sharing(|ctxt| match ctxt {
+            &Context::OsMesa(ref ctxt) => ctxt,
+            _ => unreachable!(),
+        });
+        osmesa::OsMesaContext::new((1, 1), pf_reqs, &gl_attr)
+            .map(|context| Context::OsMesa(context))
     }
 }

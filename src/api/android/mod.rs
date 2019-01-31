@@ -98,7 +98,6 @@ impl Context {
         _el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-        _shareable_with_windowed_contexts: bool,
     ) -> Result<Self, CreationError> {
         let gl_attr = gl_attr.clone().map_sharing(|c| &c.0.egl_context);
         let context = EglContext::new(

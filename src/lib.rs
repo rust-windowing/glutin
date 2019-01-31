@@ -165,18 +165,6 @@ impl GlContext for Context {
 impl Context {
     /// Builds the given GL context.
     ///
-    /// Contexts made with the `shareable_with_windowed_contexts` flag set to
-    /// `true` can be shared with:
-    ///  - contexts made with that flag set to `true`; and
-    ///  - contexts made when creating a `GlWindow` or `GlSeparatedContext`.
-    ///
-    /// If the flag is set to `false` on the other hand, the context should only
-    /// be shared with other contexts made with the flag set to `false`.
-    ///
-    /// Some platforms only implement contexts that are shareable with windowed
-    /// contexts. On those platforms, the `shareable_with_windowed_contexts`
-    /// flag will be ignored and always behave as if it were set to `true`.
-    ///
     /// One notable limitation of the Wayland backend when it comes to shared
     /// contexts is that both contexts must use the same events loop.
     ///
@@ -187,12 +175,11 @@ impl Context {
     pub fn new(
         el: &winit::EventsLoop,
         context_builder: ContextBuilder,
-        shareable_with_windowed_contexts: bool,
     ) -> Result<Self, CreationError>
     {
         let ContextBuilder { pf_reqs, gl_attr } = context_builder;
         let gl_attr = gl_attr.map_sharing(|ctxt| &ctxt.context);
-        platform::Context::new_context(el, &pf_reqs, &gl_attr, shareable_with_windowed_contexts)
+        platform::Context::new_context(el, &pf_reqs, &gl_attr)
             .map(|context| Context { context })
     }
 }
@@ -334,13 +321,6 @@ pub struct GlSeparatedContext {
 impl GlSeparatedContext {
     /// Builds the GL context using the passed `Window`, returning the context
     /// as a `GlSeparatedContext`.
-    ///
-    /// If the flag is set to `false` on the other hand, the context should only
-    /// be shared with other contexts made with the flag set to `false`.
-    ///
-    /// Some platforms only implement contexts which are shareable with
-    /// windowed contexts. If so, those platforms will fallback to making a
-    /// context with the `shareable_with_windowed_contexts` flag set to true.
     ///
     /// One notable limitation of the Wayland backend when it comes to shared
     /// contexts is that both contexts must use the same events loop.
@@ -581,8 +561,8 @@ impl<'a> ContextBuilder<'a> {
     }
 
     /// Builds the context as a headless context.
-    pub fn build(self, el: &EventsLoop, shareable_with_windowed_contexts: bool) -> Result<Context, CreationError> {
-        Context::new(el, self, shareable_with_windowed_contexts)
+    pub fn build(self, el: &EventsLoop) -> Result<Context, CreationError> {
+        Context::new(el, self)
     }
 }
 

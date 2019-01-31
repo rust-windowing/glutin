@@ -12,7 +12,7 @@ fn main() {
     let mut size = glutin::dpi::PhysicalSize::new(768., 480.);
 
     let context = glutin::ContextBuilder::new();
-    let gl_context = glutin::Context::new(&events_loop, context, true).unwrap();
+    let gl_context = glutin::Context::new(&events_loop, context).unwrap();
 
     let window = glutin::WindowBuilder::new().with_title("A fantastic window!")
         .with_dimensions(glutin::dpi::LogicalSize::from_physical(size, 1.0));

@@ -98,13 +98,11 @@ impl Context {
         events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Self>,
-        shareable_with_windowed_contexts: bool,
     ) -> Result<Self, CreationError> {
         context::Context::new_context(
             events_loop,
             pf_reqs,
             &gl_attr.clone().map_sharing(|w| &w.0),
-            shareable_with_windowed_contexts,
             EGL.as_ref().map(|w| &w.0),
         ).map(|c| Context(c))
     }
