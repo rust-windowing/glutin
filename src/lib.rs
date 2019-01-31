@@ -170,8 +170,7 @@ impl Context {
     ///
     /// Errors can occur if the OpenGL context could not be created. This
     /// generally happens because the underlying platform doesn't support a
-    /// requested feature, or if one of the sharing restrictions above wasn't
-    /// abided by.
+    /// requested feature.
     pub fn new(
         el: &winit::EventsLoop,
         context_builder: ContextBuilder,

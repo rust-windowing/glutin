@@ -272,8 +272,7 @@ impl ContextExt for crate::Context {
     ///
     /// Errors can occur if the OpenGL context could not be created. This
     /// generally happens because the underlying platform doesn't support a
-    /// requested feature, or if one of the sharing restrictions above wasn't
-    /// abided by.
+    /// requested feature.
     #[inline]
     fn new_osmesa(
         context_builder: crate::ContextBuilder,
