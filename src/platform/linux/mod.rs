@@ -274,6 +274,7 @@ impl ContextExt for crate::Context {
     /// generally happens because the underlying platform doesn't support a
     /// requested feature, or if one of the sharing restrictions above wasn't
     /// abided by.
+    #[inline]
     fn new_osmesa(
         context_builder: crate::ContextBuilder,
     ) -> Result<Self, CreationError>
