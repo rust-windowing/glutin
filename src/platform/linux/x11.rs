@@ -2,6 +2,7 @@ pub use winit::os::unix::x11::{XError, XNotSupported, XConnection};
 
 use std::{mem, ptr, fmt, error};
 use std::ffi::CString;
+use std::os::raw;
 use std::sync::Arc;
 
 use winit;
@@ -454,5 +455,13 @@ impl Context {
     #[inline]
     pub unsafe fn raw_handle(&self) -> &GlContext {
         &self.context
+    }
+
+    #[inline]
+    pub unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
+        match self.context {
+            GlContext::Egl(ref ctxt) => Some(ctxt.get_egl_display()),
+            _ => None,
+        }
     }
 }

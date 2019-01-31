@@ -1,5 +1,6 @@
 #![cfg(target_os = "windows")]
 
+use std::os::raw;
 use std::ptr;
 
 use winapi::shared::windef::HWND;
@@ -247,6 +248,16 @@ impl Context {
             Context::Egl(ref c)
             | Context::HiddenWindowEgl(_, ref c)
             | Context::EglPbuffer(ref c) => RawHandle::Egl(c.raw_handle()),
+        }
+    }
+
+    #[inline]
+    pub unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
+        match *self {
+            Context::Egl(ref c)
+            | Context::HiddenWindowEgl(_, ref c)
+            | Context::EglPbuffer(ref c) => Some(c.get_egl_display()),
+            _ => None,
         }
     }
 }

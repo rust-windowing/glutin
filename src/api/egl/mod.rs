@@ -331,6 +331,11 @@ impl Context {
         self.context
     }
 
+    #[inline]
+    pub unsafe fn get_egl_display(&self) -> ffi::egl::types::EGLDisplay {
+        self.display
+    }
+
     // Handle Android Life Cycle.
     // Android has started the activity or sent it to foreground.
     // Create a new surface and attach it to the recreated ANativeWindow.

@@ -408,4 +408,9 @@ impl GlContextExt for Context {
     unsafe fn raw_handle(&self) -> Self::Handle {
         self.eagl_context as *mut c_void
     }
+
+    #[inline]
+    unsafe fn get_egl_display(&self) -> Option<*const c_void> {
+        None
+    }
 }

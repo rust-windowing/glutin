@@ -12,6 +12,7 @@ mod wayland;
 mod x11;
 use api::osmesa;
 
+use std::os::raw;
 
 /// Context handles available on Unix-like platforms.
 #[derive(Clone, Debug)]
@@ -227,6 +228,19 @@ impl Context {
             },
             Context::WindowedWayland(ref ctxt) | Context::HeadlessWayland(_, ref ctxt) => RawHandle::Egl(ctxt.raw_handle()),
             Context::OsMesa(ref ctxt) => RawHandle::Egl(ctxt.raw_handle()),
+        }
+    }
+
+    #[inline]
+    pub unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
+        match *self {
+            Context::WindowedX11(ref ctxt) | Context::HeadlessX11(_, ref ctxt) => {
+                ctxt.get_egl_display()
+            }
+            Context::WindowedWayland(ref ctxt) | Context::HeadlessWayland(_, ref ctxt) => {
+                ctxt.get_egl_display()
+            }
+            _ => None,
         }
     }
 }
