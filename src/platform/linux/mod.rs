@@ -243,26 +243,12 @@ impl Context {
             _ => None,
         }
     }
-}
 
-pub trait ContextExt {
-    fn new_osmesa(
-        pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context>,
-    ) -> Result<Self, CreationError>
-    where
-        Self: Sized;
-}
-
-impl ContextExt for Context {
     #[inline]
     fn new_osmesa(
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-    ) -> Result<Self, CreationError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<Self, CreationError> {
         Context::is_compatible(&gl_attr.sharing, ContextType::OsMesa)?;
         let gl_attr = gl_attr.clone().map_sharing(|ctxt| match ctxt {
             &Context::OsMesa(ref ctxt) => ctxt,
@@ -270,5 +256,33 @@ impl ContextExt for Context {
         });
         osmesa::OsMesaContext::new((1, 1), pf_reqs, &gl_attr)
             .map(|context| Context::OsMesa(context))
+    }
+}
+
+pub trait ContextExt {
+    fn new_osmesa(
+        context_builder: crate::ContextBuilder,
+    ) -> Result<Self, CreationError>
+    where
+        Self: Sized;
+}
+
+impl ContextExt for crate::Context {
+    /// Builds the given OsMesa context.
+    ///
+    /// Errors can occur if the OpenGL context could not be created. This
+    /// generally happens because the underlying platform doesn't support a
+    /// requested feature, or if one of the sharing restrictions above wasn't
+    /// abided by.
+    fn new_osmesa(
+        context_builder: crate::ContextBuilder,
+    ) -> Result<Self, CreationError>
+    where
+        Self: Sized,
+    {
+        let crate::ContextBuilder { pf_reqs, gl_attr } = context_builder;
+        let gl_attr = gl_attr.map_sharing(|ctxt| &ctxt.context);
+        Context::new_osmesa(&pf_reqs, &gl_attr)
+            .map(|context| crate::Context { context })
     }
 }
