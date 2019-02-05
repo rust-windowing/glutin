@@ -185,8 +185,8 @@ impl Context {
     pub fn is_current(&self) -> bool {
         unsafe {
             let context = match *self {
-                Context::WindowedContext(ref c) => &c.context,
-                Context::HeadlessContext(ref c) => &c.context,
+                Context::WindowedContext(ref c) => *c.context,
+                Context::HeadlessContext(ref c) => *c.context,
             };
 
             let pool = NSAutoreleasePool::new(nil);
