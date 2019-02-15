@@ -191,12 +191,7 @@ impl Context {
 
             let pool = NSAutoreleasePool::new(nil);
             let current = NSOpenGLContext::currentContext(nil);
-            let res = if current != nil {
-                let is_equal: BOOL = msg_send![current, isEqual: context];
-                is_equal != NO
-            } else {
-                false
-            };
+            let res = current == **context;
             let _: () = msg_send![pool, release];
             res
         }
