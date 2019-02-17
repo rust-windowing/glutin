@@ -1,8 +1,7 @@
 pub use winit::os::unix::x11::{XConnection, XError, XNotSupported};
 
-use std::ffi::CString;
 use std::os::raw;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::{error, fmt, mem, ptr};
 
 use winit;
@@ -13,11 +12,13 @@ use {
     PixelFormatRequirements,
 };
 
-use api::egl::ffi::egl::Egl;
-use api::egl::Context as EglContext;
-use api::glx::ffi::glx::Glx;
+use api::egl::{self, Context as EglContext};
 use api::glx::{ffi, Context as GlxContext};
-use api::{dlopen, egl};
+use api::dlloader::GlxOrEgl;
+
+lazy_static! {
+    static ref GLX_OR_EGL: Mutex<GlxOrEgl> = Mutex::new(GlxOrEgl::new(true));
+}
 
 #[derive(Debug)]
 struct NoX11Connection;
@@ -31,67 +32,6 @@ impl error::Error for NoX11Connection {
 impl fmt::Display for NoX11Connection {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str(error::Error::description(self))
-    }
-}
-
-struct GlxOrEgl {
-    glx: Option<Glx>,
-    egl: Option<Egl>,
-}
-
-impl GlxOrEgl {
-    fn new() -> GlxOrEgl {
-        // TODO: use something safer than raw "dlopen"
-        let glx = {
-            let mut libglx = unsafe {
-                dlopen::dlopen(
-                    b"libGL.so.1\0".as_ptr() as *const _,
-                    dlopen::RTLD_NOW,
-                )
-            };
-            if libglx.is_null() {
-                libglx = unsafe {
-                    dlopen::dlopen(
-                        b"libGL.so\0".as_ptr() as *const _,
-                        dlopen::RTLD_NOW,
-                    )
-                };
-            }
-            if libglx.is_null() {
-                None
-            } else {
-                Some(Glx::load_with(|sym| {
-                    let sym = CString::new(sym).unwrap();
-                    unsafe { dlopen::dlsym(libglx, sym.as_ptr()) }
-                }))
-            }
-        };
-        // TODO: use something safer than raw "dlopen"
-        let egl = {
-            let mut libegl = unsafe {
-                dlopen::dlopen(
-                    b"libEGL.so.1\0".as_ptr() as *const _,
-                    dlopen::RTLD_NOW,
-                )
-            };
-            if libegl.is_null() {
-                libegl = unsafe {
-                    dlopen::dlopen(
-                        b"libEGL.so\0".as_ptr() as *const _,
-                        dlopen::RTLD_NOW,
-                    )
-                };
-            }
-            if libegl.is_null() {
-                None
-            } else {
-                Some(Egl::load_with(|sym| {
-                    let sym = CString::new(sym).unwrap();
-                    unsafe { dlopen::dlsym(libegl, sym.as_ptr()) }
-                }))
-            }
-        };
-        GlxOrEgl { glx: glx, egl: egl }
     }
 }
 
@@ -153,14 +93,14 @@ impl Context {
         let builder_glx_u;
         let builder_egl_u;
 
-        let backend = GlxOrEgl::new();
+        let glx_or_egl = GLX_OR_EGL.lock().unwrap();
         let context = match gl_attr.version {
             GlRequest::Latest
             | GlRequest::Specific(Api::OpenGl, _)
             | GlRequest::GlThenGles { .. } => {
                 // GLX should be preferred over EGL, otherwise crashes may occur
                 // on X11 – issue #314
-                if let Some(ref glx) = backend.glx {
+                if let Some(ref glx) = glx_or_egl.glx {
                     builder_glx_u = builder.map_sharing(|c| match c.context {
                         X11Context::Glx(ref c) => c,
                         _ => panic!(),
@@ -173,7 +113,7 @@ impl Context {
                         screen_id,
                         wb.window.transparent,
                     )?)
-                } else if let Some(ref egl) = backend.egl {
+                } else if let Some(ref egl) = glx_or_egl.egl {
                     builder_egl_u = builder.map_sharing(|c| match c.context {
                         X11Context::Egl(ref c) => c,
                         _ => panic!(),
@@ -194,7 +134,7 @@ impl Context {
                 }
             }
             GlRequest::Specific(Api::OpenGlEs, _) => {
-                if let Some(ref egl) = backend.egl {
+                if let Some(ref egl) = glx_or_egl.egl {
                     builder_egl_u = builder.map_sharing(|c| match c.context {
                         X11Context::Egl(ref c) => c,
                         _ => panic!(),
@@ -342,14 +282,14 @@ impl Context {
         let builder_glx_u;
         let builder_egl_u;
 
-        let backend = GlxOrEgl::new();
+        let glx_or_egl = GLX_OR_EGL.lock().unwrap();
         let context = match gl_attr.version {
             GlRequest::Latest
             | GlRequest::Specific(Api::OpenGl, _)
             | GlRequest::GlThenGles { .. } => {
                 // GLX should be preferred over EGL, otherwise crashes may occur
                 // on X11 – issue #314
-                if let Some(ref glx) = backend.glx {
+                if let Some(ref glx) = glx_or_egl.glx {
                     builder_glx_u = builder.map_sharing(|c| match c.context {
                         X11Context::Glx(ref c) => c,
                         _ => panic!(),
@@ -364,7 +304,7 @@ impl Context {
                         // know.
                         false,
                     )?)
-                } else if let Some(ref egl) = backend.egl {
+                } else if let Some(ref egl) = glx_or_egl.egl {
                     builder_egl_u = builder.map_sharing(|c| match c.context {
                         X11Context::Egl(ref c) => c,
                         _ => panic!(),
@@ -385,7 +325,7 @@ impl Context {
                 }
             }
             GlRequest::Specific(Api::OpenGlEs, _) => {
-                if let Some(ref egl) = backend.egl {
+                if let Some(ref egl) = glx_or_egl.egl {
                     builder_egl_u = builder.map_sharing(|c| match c.context {
                         X11Context::Egl(ref c) => c,
                         _ => panic!(),

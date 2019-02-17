@@ -26,7 +26,6 @@
 //! window, however that may result in an suboptimal configuration of the window
 //! on some platforms. In that case use "SeparatedContext".
 
-#[cfg(target_os = "windows")]
 #[macro_use]
 extern crate lazy_static;
 #[cfg(any(
@@ -52,6 +51,7 @@ extern crate core_foundation;
 #[cfg(target_os = "macos")]
 extern crate core_graphics;
 extern crate libc;
+extern crate libloading;
 #[cfg(any(
     target_os = "linux",
     target_os = "freebsd",
