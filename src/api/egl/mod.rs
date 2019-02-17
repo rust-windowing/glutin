@@ -69,7 +69,7 @@ mod egl {
 
     impl Egl {
         pub fn new() -> Result<Self, ()> {
-            Egl(ffi::egl::Egl)
+            Ok(Egl(ffi::egl::Egl))
         }
     }
 }

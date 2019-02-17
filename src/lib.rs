@@ -51,7 +51,7 @@ extern crate core_foundation;
 #[cfg(target_os = "macos")]
 extern crate core_graphics;
 extern crate libc;
-#![cfg(any(
+#[cfg(any(
     target_os = "windows",
     target_os = "linux",
     target_os = "dragonfly",
