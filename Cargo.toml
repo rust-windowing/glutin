@@ -22,7 +22,6 @@ lazy_static = "1.1"
 libc = "0.2"
 shared_library = "0.1"
 winit = "0.18"
-libloading = "0.5"
 
 [build-dependencies]
 gl_generator = "0.10"
@@ -49,7 +48,11 @@ features = [
     "libloaderapi",
 ]
 
+[target.'cfg(target_os = "windows")'.dependencies]
+libloading = "0.5"
+
 [target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os="dragonfly", target_os="netbsd", target_os="openbsd"))'.dependencies]
 osmesa-sys = "0.1.0"
 wayland-client = { version = "0.21", features = ["egl", "dlopen"] }
 x11-dl = "2.18.3"
+libloading = "0.5"
