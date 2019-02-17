@@ -1,6 +1,6 @@
 use api::egl::{self, ffi, Context as EglContext};
 use std::os::raw;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use wayland_client::egl as wegl;
 use winit;
 use winit::os::unix::WindowExt;
@@ -8,11 +8,6 @@ use {
     ContextError, CreationError, GlAttributes, PixelFormat,
     PixelFormatRequirements,
 };
-use api::dlloader::GlxOrEgl;
-
-lazy_static! {
-    static ref GLX_OR_EGL: Mutex<GlxOrEgl> = Mutex::new(GlxOrEgl::new(false));
-}
 
 pub struct Context {
     egl_surface: Arc<wegl::WlEglSurface>,
@@ -56,16 +51,11 @@ impl Context {
             )
         };
         let context = {
-            let glx_or_egl = GLX_OR_EGL.lock().unwrap();
-            let egl = glx_or_egl.egl.as_ref().ok_or(
-                CreationError::NotSupported("could not find libEGL")
-            )?;
-
             let gl_attr = gl_attr.clone().map_sharing(|c| &c.context);
             let native_display = egl::NativeDisplay::Wayland(Some(
                 window.get_wayland_display().unwrap() as *const _,
             ));
-            EglContext::new(egl.clone(), pf_reqs, &gl_attr, native_display)
+            EglContext::new(pf_reqs, &gl_attr, native_display)
                 .and_then(|p| p.finish(egl_surface.ptr() as *const _))?
         };
         let context = Context {

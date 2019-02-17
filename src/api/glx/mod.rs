@@ -34,8 +34,56 @@ pub mod ffi {
     }
 }
 
+mod glx {
+    use api::dlloader::{SymWrapper, SymTrait};
+    use super::ffi;
+    use std::ops::{DerefMut, Deref};
+
+    #[derive(Clone)]
+    pub struct Glx(SymWrapper<ffi::glx::Glx>);
+
+    /// Because `*const libc::c_void` doesn't implement `Sync`.
+    unsafe impl Sync for Glx {}
+
+    impl SymTrait for ffi::glx::Glx {
+        fn load_with<F>(loadfn: F) -> Self
+            where F: FnMut(&'static str) -> *const std::os::raw::c_void {
+            Self::load_with(loadfn)
+        }
+    }
+
+    impl Glx {
+        pub fn new() -> Result<Self, ()> {
+            let paths = vec![
+                "libGLX.so.1",
+                "libGLX.so",
+            ];
+
+            SymWrapper::new(paths).map(|i| Glx(i))
+        }
+    }
+
+    impl Deref for Glx {
+        type Target = ffi::glx::Glx;
+
+        fn deref(&self) -> &ffi::glx::Glx {
+            &self.0
+        }
+    }
+
+    impl DerefMut for Glx {
+        fn deref_mut(&mut self) -> &mut ffi::glx::Glx {
+            &mut self.0
+        }
+    }
+}
+pub use self::glx::Glx;
+
+lazy_static! {
+    pub static ref GLX: Option<Glx> = Glx::new().ok();
+}
+
 pub struct Context {
-    glx: ffi::glx::Glx,
     xconn: Arc<XConnection>,
     window: ffi::Window,
     context: ffi::GLXContext,
@@ -44,13 +92,13 @@ pub struct Context {
 
 impl Context {
     pub fn new<'a>(
-        glx: ffi::glx::Glx,
         xconn: Arc<XConnection>,
         pf_reqs: &PixelFormatRequirements,
         opengl: &'a GlAttributes<&'a Context>,
         screen_id: libc::c_int,
         transparent: bool,
     ) -> Result<ContextPrototype<'a>, CreationError> {
+        let glx = GLX.as_ref().unwrap();
         // This is completely ridiculous, but VirtualBox's OpenGL driver needs
         // some call handled by *it* (i.e. not Mesa) to occur before
         // anything else can happen. That is because VirtualBox's OpenGL
@@ -106,7 +154,6 @@ impl Context {
         };
 
         Ok(ContextPrototype {
-            glx,
             extensions,
             xconn,
             opengl,
@@ -117,7 +164,8 @@ impl Context {
     }
 
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        let res = self.glx.MakeCurrent(
+        let glx = GLX.as_ref().unwrap();
+        let res = glx.MakeCurrent(
             self.xconn.display as *mut _,
             self.window,
             self.context,
@@ -135,19 +183,22 @@ impl Context {
 
     #[inline]
     pub fn is_current(&self) -> bool {
-        unsafe { self.glx.GetCurrentContext() == self.context }
+        let glx = GLX.as_ref().unwrap();
+        unsafe { glx.GetCurrentContext() == self.context }
     }
 
     pub fn get_proc_address(&self, addr: &str) -> *const () {
+        let glx = GLX.as_ref().unwrap();
         let addr = CString::new(addr.as_bytes()).unwrap();
         let addr = addr.as_ptr();
-        unsafe { self.glx.GetProcAddress(addr as *const _) as *const _ }
+        unsafe { glx.GetProcAddress(addr as *const _) as *const _ }
     }
 
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
+        let glx = GLX.as_ref().unwrap();
         unsafe {
-            self.glx
+            glx
                 .SwapBuffers(self.xconn.display as *mut _, self.window);
         }
         if let Err(err) = self.xconn.check_errors() {
@@ -181,23 +232,23 @@ unsafe impl Sync for Context {}
 
 impl Drop for Context {
     fn drop(&mut self) {
+        let glx = GLX.as_ref().unwrap();
         unsafe {
             if self.is_current() {
-                self.glx.MakeCurrent(
+                glx.MakeCurrent(
                     self.xconn.display as *mut _,
                     0,
                     ptr::null_mut(),
                 );
             }
 
-            self.glx
+            glx
                 .DestroyContext(self.xconn.display as *mut _, self.context);
         }
     }
 }
 
 pub struct ContextPrototype<'a> {
-    glx: ffi::glx::Glx,
     extensions: String,
     xconn: Arc<XConnection>,
     opengl: &'a GlAttributes<&'a Context>,
@@ -213,6 +264,7 @@ impl<'a> ContextPrototype<'a> {
     }
 
     pub fn finish(self, window: ffi::Window) -> Result<Context, CreationError> {
+        let glx = GLX.as_ref().unwrap();
         let share = match self.opengl.sharing {
             Some(ctx) => ctx.context,
             None => ptr::null(),
@@ -222,7 +274,7 @@ impl<'a> ContextPrototype<'a> {
         let extra_functions = ffi::glx_extra::Glx::load_with(|proc_name| {
             let c_str = CString::new(proc_name).unwrap();
             unsafe {
-                self.glx.GetProcAddress(c_str.as_ptr() as *const u8) as *const _
+                glx.GetProcAddress(c_str.as_ptr() as *const u8) as *const _
             }
         });
 
@@ -248,7 +300,6 @@ impl<'a> ContextPrototype<'a> {
                     // the latest supported version but the one requested
                     for opengl_version in opengl_versions.iter() {
                         match create_context(
-                            &self.glx,
                             &extra_functions,
                             &self.extensions,
                             &self.xconn.xlib,
@@ -269,7 +320,6 @@ impl<'a> ContextPrototype<'a> {
                         }
                     }
                     ctx = create_context(
-                        &self.glx,
                         &extra_functions,
                         &self.extensions,
                         &self.xconn.xlib,
@@ -287,7 +337,6 @@ impl<'a> ContextPrototype<'a> {
                 ctx
             }
             GlRequest::Specific(Api::OpenGl, (major, minor)) => create_context(
-                &self.glx,
                 &extra_functions,
                 &self.extensions,
                 &self.xconn.xlib,
@@ -305,7 +354,6 @@ impl<'a> ContextPrototype<'a> {
                 opengl_version: (major, minor),
                 ..
             } => create_context(
-                &self.glx,
                 &extra_functions,
                 &self.extensions,
                 &self.xconn.xlib,
@@ -323,7 +371,7 @@ impl<'a> ContextPrototype<'a> {
         // vsync
         if self.opengl.vsync {
             unsafe {
-                self.glx
+                glx
                     .MakeCurrent(self.xconn.display as *mut _, window, context)
             };
 
@@ -340,7 +388,7 @@ impl<'a> ContextPrototype<'a> {
             /*if self.builder.strict {
                 let mut swap = unsafe { mem::uninitialized() };
                 unsafe {
-                    self.glx.QueryDrawable(self.xconn.display as *mut _, window,
+                    glx.QueryDrawable(self.xconn.display as *mut _, window,
                                            ffi::glx_extra::SWAP_INTERVAL_EXT as i32,
                                            &mut swap);
                 }
@@ -368,13 +416,12 @@ impl<'a> ContextPrototype<'a> {
               }*/
 
             unsafe {
-                self.glx
+                glx
                     .MakeCurrent(self.xconn.display as *mut _, 0, ptr::null())
             };
         }
 
         Ok(Context {
-            glx: self.glx,
             xconn: self.xconn,
             window,
             context,
@@ -391,7 +438,6 @@ extern "C" fn x_error_callback(
 }
 
 fn create_context(
-    glx: &ffi::glx::Glx,
     extra_functions: &ffi::glx_extra::Glx,
     extensions: &str,
     xlib: &ffi::Xlib,
@@ -404,6 +450,7 @@ fn create_context(
     fb_config: ffi::glx::types::GLXFBConfig,
     visual_infos: &ffi::XVisualInfo,
 ) -> Result<ffi::GLXContext, CreationError> {
+    let glx = GLX.as_ref().unwrap();
     unsafe {
         let old_callback = (xlib.XSetErrorHandler)(Some(x_error_callback));
         let context = if check_ext(extensions, "GLX_ARB_create_context") {
@@ -519,7 +566,7 @@ fn create_context(
 
 /// Enumerates all available FBConfigs
 unsafe fn choose_fbconfig(
-    glx: &ffi::glx::Glx,
+    glx: &Glx,
     extensions: &str,
     xlib: &ffi::Xlib,
     display: *mut ffi::Display,

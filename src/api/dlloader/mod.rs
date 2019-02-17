@@ -1,51 +1,30 @@
 use std::ffi::CString;
+use std::ops::{DerefMut, Deref};
+use std::sync::Arc;
+
 use libloading::Library;
 
-use api::egl::ffi::egl::Egl;
-use api::glx::ffi::glx::Glx;
-
-// You have to make sure the symbols don't outlive the library,
-// easiest way is to just make the whole thing lazy_static.
-pub struct GlxOrEgl {
-    pub glx: Option<Glx>,
-    pub egl: Option<Egl>,
-    _libglx: Option<Library>,
-    _libegl: Option<Library>,
+#[derive(Clone)]
+pub struct SymWrapper<T> {
+    inner: T,
+    _lib: Arc<Library>,
 }
 
-impl GlxOrEgl {
-    pub fn new(do_glx: bool) -> GlxOrEgl {
-        let glx = if do_glx {
-            let libglx = Library::new("libGL.so.1")
-                .or_else(|_| Library::new("libGL.so"))
-                .ok();
-            (
-                libglx.as_ref().map(|libglx| {
-                    Glx::load_with(|sym| unsafe {
-                        libglx
-                            .get(
-                                CString::new(sym.as_bytes())
-                                    .unwrap()
-                                    .as_bytes_with_nul(),
-                            )
-                            .map(|sym| *sym)
-                            .unwrap_or(std::ptr::null_mut())
-                    })
-                }),
-                libglx,
-            )
-        } else {
-            (None, None)
-        };
-        let egl = {
-            let libegl = Library::new("libEGL.so.1")
-                .or_else(|_| Library::new("libEGL.so"))
-                .ok();
+pub trait SymTrait {
+    fn load_with<F>(loadfn: F) -> Self
+        where F: FnMut(&'static str) -> *const std::os::raw::c_void;
+}
 
-            (
-                libegl.as_ref().map(|libegl| {
-                    Egl::load_with(|sym| unsafe {
-                        libegl
+impl<T: SymTrait> SymWrapper<T> {
+    pub fn new(lib_paths: Vec<&str>) -> Result<Self, ()> {
+        for path in lib_paths {
+            let lib = Library::new(path);
+            if lib.is_ok() {
+                return Ok(SymWrapper {
+                    inner: T::load_with(|sym| unsafe {
+                        lib
+                            .as_ref()
+                            .unwrap()
                             .get(
                                 CString::new(sym.as_bytes())
                                     .unwrap()
@@ -53,16 +32,26 @@ impl GlxOrEgl {
                             )
                             .map(|sym| *sym)
                             .unwrap_or(std::ptr::null_mut())
-                    })
-                }),
-                libegl,
-            )
-        };
-        GlxOrEgl {
-            glx: glx.0,
-            egl: egl.0,
-            _libglx: glx.1,
-            _libegl: egl.1,
+                    }),
+                    _lib: Arc::new(lib.unwrap()),
+                });
+            }
         }
+
+        Err(())
+    }
+}
+
+impl<T> Deref for SymWrapper<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        &self.inner
+    }
+}
+
+impl<T> DerefMut for SymWrapper<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        &mut self.inner
     }
 }

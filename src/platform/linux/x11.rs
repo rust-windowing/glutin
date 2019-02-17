@@ -1,7 +1,7 @@
 pub use winit::os::unix::x11::{XConnection, XError, XNotSupported};
 
 use std::os::raw;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::{error, fmt, mem, ptr};
 
 use winit;
@@ -12,13 +12,9 @@ use {
     PixelFormatRequirements,
 };
 
-use api::egl::{self, Context as EglContext};
-use api::glx::{ffi, Context as GlxContext};
-use api::dlloader::GlxOrEgl;
-
-lazy_static! {
-    static ref GLX_OR_EGL: Mutex<GlxOrEgl> = Mutex::new(GlxOrEgl::new(true));
-}
+use api::egl::{EGL, Context as EglContext};
+use api::glx::{GLX, ffi, Context as GlxContext};
+use api::egl;
 
 #[derive(Debug)]
 struct NoX11Connection;
@@ -93,27 +89,25 @@ impl Context {
         let builder_glx_u;
         let builder_egl_u;
 
-        let glx_or_egl = GLX_OR_EGL.lock().unwrap();
         let context = match gl_attr.version {
             GlRequest::Latest
             | GlRequest::Specific(Api::OpenGl, _)
             | GlRequest::GlThenGles { .. } => {
                 // GLX should be preferred over EGL, otherwise crashes may occur
                 // on X11 – issue #314
-                if let Some(ref glx) = glx_or_egl.glx {
+                if let Some(_) = *GLX {
                     builder_glx_u = builder.map_sharing(|c| match c.context {
                         X11Context::Glx(ref c) => c,
                         _ => panic!(),
                     });
                     Prototype::Glx(GlxContext::new(
-                        glx.clone(),
                         Arc::clone(&xconn),
                         pf_reqs,
                         &builder_glx_u,
                         screen_id,
                         wb.window.transparent,
                     )?)
-                } else if let Some(ref egl) = glx_or_egl.egl {
+                } else if let Some(_) = *EGL {
                     builder_egl_u = builder.map_sharing(|c| match c.context {
                         X11Context::Egl(ref c) => c,
                         _ => panic!(),
@@ -122,7 +116,6 @@ impl Context {
                         xconn.display as *const _,
                     ));
                     Prototype::Egl(EglContext::new(
-                        egl.clone(),
                         pf_reqs,
                         &builder_egl_u,
                         native_display,
@@ -134,13 +127,12 @@ impl Context {
                 }
             }
             GlRequest::Specific(Api::OpenGlEs, _) => {
-                if let Some(ref egl) = glx_or_egl.egl {
+                if let Some(_) = *EGL {
                     builder_egl_u = builder.map_sharing(|c| match c.context {
                         X11Context::Egl(ref c) => c,
                         _ => panic!(),
                     });
                     Prototype::Egl(EglContext::new(
-                        egl.clone(),
                         pf_reqs,
                         &builder_egl_u,
                         egl::NativeDisplay::X11(Some(
@@ -282,20 +274,18 @@ impl Context {
         let builder_glx_u;
         let builder_egl_u;
 
-        let glx_or_egl = GLX_OR_EGL.lock().unwrap();
         let context = match gl_attr.version {
             GlRequest::Latest
             | GlRequest::Specific(Api::OpenGl, _)
             | GlRequest::GlThenGles { .. } => {
                 // GLX should be preferred over EGL, otherwise crashes may occur
                 // on X11 – issue #314
-                if let Some(ref glx) = glx_or_egl.glx {
+                if let Some(_) = *GLX {
                     builder_glx_u = builder.map_sharing(|c| match c.context {
                         X11Context::Glx(ref c) => c,
                         _ => panic!(),
                     });
                     Prototype::Glx(GlxContext::new(
-                        glx.clone(),
                         Arc::clone(&xconn),
                         &pf_reqs,
                         &builder_glx_u,
@@ -304,7 +294,7 @@ impl Context {
                         // know.
                         false,
                     )?)
-                } else if let Some(ref egl) = glx_or_egl.egl {
+                } else if let Some(_) = *EGL {
                     builder_egl_u = builder.map_sharing(|c| match c.context {
                         X11Context::Egl(ref c) => c,
                         _ => panic!(),
@@ -313,7 +303,6 @@ impl Context {
                         xconn.display as *const _,
                     ));
                     Prototype::Egl(EglContext::new(
-                        egl.clone(),
                         &pf_reqs,
                         &builder_egl_u,
                         native_display,
@@ -325,13 +314,12 @@ impl Context {
                 }
             }
             GlRequest::Specific(Api::OpenGlEs, _) => {
-                if let Some(ref egl) = glx_or_egl.egl {
+                if let Some(_) = *EGL {
                     builder_egl_u = builder.map_sharing(|c| match c.context {
                         X11Context::Egl(ref c) => c,
                         _ => panic!(),
                     });
                     Prototype::Egl(EglContext::new(
-                        egl.clone(),
                         &pf_reqs,
                         &builder_egl_u,
                         egl::NativeDisplay::X11(Some(
