@@ -122,7 +122,7 @@ where
 /// Represents an OpenGL context.
 ///
 /// A `Context` is normally associated with a single Window, however `Context`s can be *shared*
-/// between multiple windows.
+/// between multiple windows or be headless.
 ///
 /// # Example
 ///
@@ -168,9 +168,11 @@ impl Context {
     /// One notable limitation of the Wayland backend when it comes to shared
     /// contexts is that both contexts must use the same events loop.
     ///
-    /// Errors can occur if the OpenGL context could not be created. This
-    /// generally happens because the underlying platform doesn't support a
-    /// requested feature.
+    /// Errors can occur in two scenarios:
+    ///  - If the window could not be created (via permission denied,
+    ///  incompatible system, out of memory, etc.). This should be very rare.
+    ///  - If the OpenGL context could not be created. This generally happens
+    ///  because the underlying platform doesn't support a requested feature.
     pub fn new(
         el: &winit::EventsLoop,
         context_builder: ContextBuilder,
@@ -324,8 +326,11 @@ impl GlSeparatedContext {
     /// One notable limitation of the Wayland backend when it comes to shared
     /// contexts is that both contexts must use the same events loop.
     ///
-    /// Errors should be very rare and only occur in case of permission denied,
-    /// incompatible system out of memory, etc.
+    /// Errors can occur in two scenarios:
+    ///  - If the window could not be created (via permission denied,
+    ///  incompatible system, out of memory, etc.). This should be very rare.
+    ///  - If the OpenGL context could not be created. This generally happens
+    ///  because the underlying platform doesn't support a requested feature.
     pub fn new(
         window: &Window,
         context_builder: ContextBuilder,
@@ -563,6 +568,24 @@ impl<'a> ContextBuilder<'a> {
     pub fn build(self, el: &EventsLoop) -> Result<Context, CreationError> {
         Context::new(el, self)
     }
+
+    /// Builds a context and it's associated window.
+    pub fn build_window(
+        self,
+        wb: WindowBuilder,
+        el: &EventsLoop,
+    ) -> Result<Context, CreationError> {
+        GlWindow::new(wb, self, el)
+    }
+
+    /// Builds a separated context.
+    pub fn build_separate(
+        self,
+        win: &Window,
+        el: &EventsLoop
+    ) -> Result<Context, CreationError> {
+        GlSeparatedContext::new(win, self, el)
+    }
 }
 
 /// Error that can happen while creating a window or a headless renderer.
@@ -616,7 +639,7 @@ impl std::fmt::Display for CreationError {
         if let &CreationError::NotSupported(msg) = self {
             write!(formatter, ": {}", msg)?;
         }
-        if let Some(err) = std::error::Error::cause(self) {
+        if let Some(err) = std::error::Error::source(self) {
             write!(formatter, ": {}", err)?;
         }
         Ok(())

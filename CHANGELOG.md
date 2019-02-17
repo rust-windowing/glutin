@@ -1,5 +1,8 @@
 # Unreleased
 
+- **Breaking:** Removed `shareable_with_windowed_contexts`. Now you must build
+OsMesa contexts via a separate extension.
+- Added `ContextBuilder::build` method.
 - On X11 and Wayland, you can now use shared contexts, however, one limitation 
 of the Wayland backend is that all shared contexts must use the same events
 pool as each other.
