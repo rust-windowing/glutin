@@ -35,9 +35,9 @@ pub mod ffi {
 }
 
 mod glx {
-    use api::dlloader::{SymWrapper, SymTrait};
     use super::ffi;
-    use std::ops::{DerefMut, Deref};
+    use api::dlloader::{SymTrait, SymWrapper};
+    use std::ops::{Deref, DerefMut};
 
     #[derive(Clone)]
     pub struct Glx(SymWrapper<ffi::glx::Glx>);
@@ -47,17 +47,16 @@ mod glx {
 
     impl SymTrait for ffi::glx::Glx {
         fn load_with<F>(loadfn: F) -> Self
-            where F: FnMut(&'static str) -> *const std::os::raw::c_void {
+        where
+            F: FnMut(&'static str) -> *const std::os::raw::c_void,
+        {
             Self::load_with(loadfn)
         }
     }
 
     impl Glx {
         pub fn new() -> Result<Self, ()> {
-            let paths = vec![
-                "libGLX.so.1",
-                "libGLX.so",
-            ];
+            let paths = vec!["libGLX.so.1", "libGLX.so"];
 
             SymWrapper::new(paths).map(|i| Glx(i))
         }
@@ -198,8 +197,7 @@ impl Context {
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
         let glx = GLX.as_ref().unwrap();
         unsafe {
-            glx
-                .SwapBuffers(self.xconn.display as *mut _, self.window);
+            glx.SwapBuffers(self.xconn.display as *mut _, self.window);
         }
         if let Err(err) = self.xconn.check_errors() {
             Err(ContextError::OsError(format!(
@@ -242,8 +240,7 @@ impl Drop for Context {
                 );
             }
 
-            glx
-                .DestroyContext(self.xconn.display as *mut _, self.context);
+            glx.DestroyContext(self.xconn.display as *mut _, self.context);
         }
     }
 }

@@ -1,5 +1,13 @@
+#![cfg(any(
+    target_os = "windows",
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd"
+))]
 use std::ffi::CString;
-use std::ops::{DerefMut, Deref};
+use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use libloading::Library;
@@ -12,7 +20,8 @@ pub struct SymWrapper<T> {
 
 pub trait SymTrait {
     fn load_with<F>(loadfn: F) -> Self
-        where F: FnMut(&'static str) -> *const std::os::raw::c_void;
+    where
+        F: FnMut(&'static str) -> *const std::os::raw::c_void;
 }
 
 impl<T: SymTrait> SymWrapper<T> {
@@ -22,8 +31,7 @@ impl<T: SymTrait> SymWrapper<T> {
             if lib.is_ok() {
                 return Ok(SymWrapper {
                     inner: T::load_with(|sym| unsafe {
-                        lib
-                            .as_ref()
+                        lib.as_ref()
                             .unwrap()
                             .get(
                                 CString::new(sym.as_bytes())

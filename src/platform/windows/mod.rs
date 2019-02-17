@@ -3,20 +3,20 @@
 use std::os::raw;
 use std::ptr;
 
-use winapi::shared::windef::{HWND, HGLRC};
+use winapi::shared::windef::{HGLRC, HWND};
 use winit;
 
-use CreationError;
-use GlAttributes;
-use PixelFormatRequirements;
 use Api;
 use ContextError;
+use CreationError;
+use GlAttributes;
 use GlRequest;
 use PixelFormat;
+use PixelFormatRequirements;
 
 use api::egl;
-use api::egl::EGL;
 use api::egl::Context as EglContext;
+use api::egl::EGL;
 use api::wgl::Context as WglContext;
 use os::windows::WindowExt;
 
@@ -161,13 +161,10 @@ impl Context {
                     });
 
                 let native_display = egl::NativeDisplay::Other(None);
-                let context = EglContext::new(
-                    pf_reqs,
-                    &gl_attr_egl,
-                    native_display,
-                )
-                .and_then(|prototype| prototype.finish_pbuffer((1, 1)))
-                .map(|ctx| Context::EglPbuffer(ctx));
+                let context =
+                    EglContext::new(pf_reqs, &gl_attr_egl, native_display)
+                        .and_then(|prototype| prototype.finish_pbuffer((1, 1)))
+                        .map(|ctx| Context::EglPbuffer(ctx));
 
                 if let Ok(context) = context {
                     return Ok(context);

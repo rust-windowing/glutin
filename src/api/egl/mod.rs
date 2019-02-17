@@ -26,13 +26,10 @@ use std::{mem, ptr};
 
 pub mod ffi;
 
-#[cfg(not(
-    target_os = "android",
-))]
+#[cfg(not(target_os = "android",))]
 mod egl {
-    use api::dlloader::{SymWrapper, SymTrait};
     use super::ffi;
-    use std::ops::{DerefMut, Deref};
+    use api::dlloader::{SymTrait, SymWrapper};
 
     #[derive(Clone)]
     pub struct Egl(SymWrapper<ffi::egl::Egl>);
@@ -42,33 +39,42 @@ mod egl {
 
     impl SymTrait for ffi::egl::Egl {
         fn load_with<F>(loadfn: F) -> Self
-            where F: FnMut(&'static str) -> *const std::os::raw::c_void {
+        where
+            F: FnMut(&'static str) -> *const std::os::raw::c_void,
+        {
             Self::load_with(loadfn)
         }
     }
 
     impl Egl {
         pub fn new() -> Result<Self, ()> {
-            #[cfg(any(
-                target_os = "windows",
-            ))]
-            let paths = vec![
-                "libEGL.dll",
-                "atioglxx.dll",
-            ];
+            #[cfg(target_os = "windows")]
+            let paths = vec!["libEGL.dll", "atioglxx.dll"];
 
-            #[cfg(not(
-                target_os = "windows",
-            ))]
-            let paths = vec![
-                "libEGL.so.1",
-                "libEGL.so",
-            ];
+            #[cfg(not(target_os = "windows",))]
+            let paths = vec!["libEGL.so.1", "libEGL.so"];
 
             SymWrapper::new(paths).map(|i| Egl(i))
         }
     }
+}
 
+#[cfg(target_os = "android")]
+mod egl {
+    use super::ffi;
+
+    #[derive(Clone)]
+    pub struct Egl(ffi::egl::Egl);
+
+    impl Egl {
+        pub fn new() -> Result<Self, ()> {
+            Egl(ffi::egl::Egl)
+        }
+    }
+}
+
+mod egl {
+    use std::ops::{Deref, DerefMut};
     impl Deref for Egl {
         type Target = ffi::egl::Egl;
 
@@ -457,8 +463,7 @@ impl Context {
             return Err(ContextError::ContextLost);
         }
 
-        let ret =
-            unsafe { egl.SwapBuffers(self.display, self.surface.get()) };
+        let ret = unsafe { egl.SwapBuffers(self.display, self.surface.get()) };
 
         if ret == 0 {
             match unsafe { egl.GetError() } as u32 {

@@ -12,9 +12,9 @@ use {
     PixelFormatRequirements,
 };
 
-use api::egl::{EGL, Context as EglContext};
-use api::glx::{GLX, ffi, Context as GlxContext};
 use api::egl;
+use api::egl::{Context as EglContext, EGL};
+use api::glx::{ffi, Context as GlxContext, GLX};
 
 #[derive(Debug)]
 struct NoX11Connection;
