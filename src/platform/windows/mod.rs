@@ -1,11 +1,9 @@
 #![cfg(target_os = "windows")]
 
-use std::ops::{Deref, DerefMut};
 use std::os::raw;
 use std::ptr;
 
 use winapi::shared::windef::{HWND, HGLRC};
-use winapi::um::libloaderapi::*;
 use winit;
 
 use CreationError;
@@ -53,7 +51,7 @@ impl Context {
         gl_attr: &GlAttributes<&Self>,
     ) -> Result<(winit::Window, Self), CreationError> {
         let window = wb.build(el)?;
-        let ctx = Self::new_separated(&window, pf_reqs, gl_attr)?;
+        let ctx = Self::new_separated(&window, el, pf_reqs, gl_attr)?;
 
         Ok((window, ctx))
     }
@@ -61,13 +59,14 @@ impl Context {
     #[inline]
     pub fn new_separated(
         window: &winit::Window,
+        _el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Self>,
     ) -> Result<Self, CreationError> {
         let w = window.get_hwnd() as HWND;
         match gl_attr.version {
             GlRequest::Specific(Api::OpenGlEs, (_major, _minor)) => {
-                match (gl_attr.sharing, *EGL) {
+                match (gl_attr.sharing, &*EGL) {
                     // We must use WGL.
                     (Some(&Context::HiddenWindowWgl(_, _)), _)
                     | (Some(&Context::Wgl(_)), _)
@@ -148,11 +147,11 @@ impl Context {
     ) -> Result<Self, CreationError> {
         // if EGL is available, we try using EGL first
         // if EGL returns an error, we try the hidden window method
-        match (gl_attr.sharing, *EGL) {
+        match (gl_attr.sharing, &*EGL) {
             (None, Some(_))
-            | (Some(&Context::Egl(_)), Some(egl))
-            | (Some(&Context::HiddenWindowEgl(_, _)), Some(egl))
-            | (Some(&Context::EglPbuffer(_)), Some(egl)) => {
+            | (Some(&Context::Egl(_)), Some(_))
+            | (Some(&Context::HiddenWindowEgl(_, _)), Some(_))
+            | (Some(&Context::EglPbuffer(_)), Some(_)) => {
                 let gl_attr_egl =
                     gl_attr.clone().map_sharing(|ctx| match *ctx {
                         Context::Egl(ref c)
