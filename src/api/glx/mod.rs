@@ -195,7 +195,7 @@ impl<'a> ContextPrototype<'a> {
 
     pub fn finish(self, window: ffi::Window) -> Result<Context, CreationError> {
         let share = match self.opengl.sharing {
-            Some(ctxt) => ctxt.context,
+            Some(ctx) => ctx.context,
             None => ptr::null()
         };
 
@@ -210,7 +210,7 @@ impl<'a> ContextPrototype<'a> {
             GlRequest::Latest => {
                 let opengl_versions = [(4, 6), (4, 5), (4, 4), (4, 3), (4, 2), (4, 1), (4, 0),
                                        (3, 3), (3, 2), (3, 1)];
-                let ctxt;
+                let ctx;
                 'outer: loop
                 {
                     // Try all OpenGL versions in descending order because some non-compliant
@@ -223,19 +223,19 @@ impl<'a> ContextPrototype<'a> {
                                              self.xconn.display, self.fb_config, &self.visual_infos)
                         {
                             Ok(x) => {
-                                ctxt = x;
+                                ctx = x;
                                 break 'outer;
                             },
                             Err(_) => continue
                         }
                     }
-                    ctxt = create_context(&self.glx, &extra_functions, &self.extensions, &self.xconn.xlib, (1, 0),
+                    ctx = create_context(&self.glx, &extra_functions, &self.extensions, &self.xconn.xlib, (1, 0),
                                                self.opengl.profile, self.opengl.debug,
                                                self.opengl.robustness, share,
                                                self.xconn.display, self.fb_config, &self.visual_infos)?;
                     break;
                 }
-                ctxt
+                ctx
             },
             GlRequest::Specific(Api::OpenGl, (major, minor)) => {
                 create_context(&self.glx, &extra_functions, &self.extensions, &self.xconn.xlib, (major, minor),

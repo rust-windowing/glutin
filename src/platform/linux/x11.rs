@@ -113,13 +113,13 @@ impl Drop for Context {
 impl Context {
     #[inline]
     pub fn new(
-        window_builder: winit::WindowBuilder,
-        events_loop: &winit::EventsLoop,
+        wb: winit::WindowBuilder,
+        el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<(winit::Window, Self), CreationError>
     {
-        let xconn = match events_loop.get_xlib_xconnection() {
+        let xconn = match el.get_xlib_xconnection() {
             Some(xconn) => xconn,
             None => return Err(CreationError::NoBackendAvailable(Box::new(NoX11Connection))),
         };
@@ -156,7 +156,7 @@ impl Context {
                         pf_reqs,
                         &builder_glx_u,
                         screen_id,
-                        window_builder.window.transparent,
+                        wb.window.transparent,
                     )?)
                 } else if let Some(ref egl) = backend.egl {
                     builder_egl_u = builder.map_sharing(|c| match c.context {
@@ -219,19 +219,19 @@ impl Context {
             },
         };
 
-        let window = window_builder
+        let window = wb
                 .with_x11_visual(&visual_infos as *const _)
                 .with_x11_screen(screen_id)
-                .build(events_loop)?;
+                .build(el)?;
 
         let xlib_window = window.get_xlib_window().unwrap();
         // finish creating the OpenGL context
         let context = match context {
-            Prototype::Glx(ctxt) => {
-                GlContext::Glx(ctxt.finish(xlib_window)?)
+            Prototype::Glx(ctx) => {
+                GlContext::Glx(ctx.finish(xlib_window)?)
             },
-            Prototype::Egl(ctxt) => {
-                GlContext::Egl(ctxt.finish(xlib_window as _)?)
+            Prototype::Egl(ctx) => {
+                GlContext::Egl(ctx.finish(xlib_window as _)?)
             },
         };
 
@@ -261,14 +261,14 @@ impl Context {
     }
 
     #[inline]
-    pub fn new_separate(
+    pub fn new_separated(
         window: &winit::Window,
-        events_loop: &winit::EventsLoop,
+        el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<Self, CreationError>
     {
-        let xconn = match events_loop.get_xlib_xconnection() {
+        let xconn = match el.get_xlib_xconnection() {
             Some(xconn) => xconn,
             None => return Err(CreationError::NoBackendAvailable(Box::new(NoX11Connection))),
         };
@@ -365,11 +365,11 @@ impl Context {
 
         // finish creating the OpenGL context
         let context = match context {
-            Prototype::Glx(ctxt) => {
-                GlContext::Glx(ctxt.finish(xlib_window)?)
+            Prototype::Glx(ctx) => {
+                GlContext::Glx(ctx.finish(xlib_window)?)
             },
-            Prototype::Egl(ctxt) => {
-                GlContext::Egl(ctxt.finish(xlib_window as _)?)
+            Prototype::Egl(ctx) => {
+                GlContext::Egl(ctx.finish(xlib_window as _)?)
             },
         };
 
@@ -401,8 +401,8 @@ impl Context {
     #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
         match self.context {
-            GlContext::Glx(ref ctxt) => ctxt.make_current(),
-            GlContext::Egl(ref ctxt) => ctxt.make_current(),
+            GlContext::Glx(ref ctx) => ctx.make_current(),
+            GlContext::Egl(ref ctx) => ctx.make_current(),
             GlContext::None => Ok(())
         }
     }
@@ -410,8 +410,8 @@ impl Context {
     #[inline]
     pub fn is_current(&self) -> bool {
         match self.context {
-            GlContext::Glx(ref ctxt) => ctxt.is_current(),
-            GlContext::Egl(ref ctxt) => ctxt.is_current(),
+            GlContext::Glx(ref ctx) => ctx.is_current(),
+            GlContext::Egl(ref ctx) => ctx.is_current(),
             GlContext::None => panic!()
         }
     }
@@ -419,8 +419,8 @@ impl Context {
     #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const () {
         match self.context {
-            GlContext::Glx(ref ctxt) => ctxt.get_proc_address(addr),
-            GlContext::Egl(ref ctxt) => ctxt.get_proc_address(addr),
+            GlContext::Glx(ref ctx) => ctx.get_proc_address(addr),
+            GlContext::Egl(ref ctx) => ctx.get_proc_address(addr),
             GlContext::None => ptr::null()
         }
     }
@@ -428,8 +428,8 @@ impl Context {
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
         match self.context {
-            GlContext::Glx(ref ctxt) => ctxt.swap_buffers(),
-            GlContext::Egl(ref ctxt) => ctxt.swap_buffers(),
+            GlContext::Glx(ref ctx) => ctx.swap_buffers(),
+            GlContext::Egl(ref ctx) => ctx.swap_buffers(),
             GlContext::None => Ok(())
         }
     }
@@ -437,8 +437,8 @@ impl Context {
     #[inline]
     pub fn get_api(&self) -> Api {
         match self.context {
-            GlContext::Glx(ref ctxt) => ctxt.get_api(),
-            GlContext::Egl(ref ctxt) => ctxt.get_api(),
+            GlContext::Glx(ref ctx) => ctx.get_api(),
+            GlContext::Egl(ref ctx) => ctx.get_api(),
             GlContext::None => panic!()
         }
     }
@@ -446,8 +446,8 @@ impl Context {
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         match self.context {
-            GlContext::Glx(ref ctxt) => ctxt.get_pixel_format(),
-            GlContext::Egl(ref ctxt) => ctxt.get_pixel_format(),
+            GlContext::Glx(ref ctx) => ctx.get_pixel_format(),
+            GlContext::Egl(ref ctx) => ctx.get_pixel_format(),
             GlContext::None => panic!()
         }
     }
@@ -460,7 +460,7 @@ impl Context {
     #[inline]
     pub unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
         match self.context {
-            GlContext::Egl(ref ctxt) => Some(ctxt.get_egl_display()),
+            GlContext::Egl(ref ctx) => Some(ctx.get_egl_display()),
             _ => None,
         }
     }

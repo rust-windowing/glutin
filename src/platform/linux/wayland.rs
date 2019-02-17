@@ -16,21 +16,21 @@ pub struct Context {
 impl Context {
     #[inline]
     pub fn new(
-        window_builder: winit::WindowBuilder,
-        events_loop: &winit::EventsLoop,
+        wb: winit::WindowBuilder,
+        el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<(winit::Window, Self), CreationError>
     {
-        let window = window_builder.build(events_loop)?;
-        let context = Self::new_separate(&window, events_loop, pf_reqs, gl_attr)?;
+        let window = wb.build(el)?;
+        let context = Self::new_separated(&window, el, pf_reqs, gl_attr)?;
         Ok((window, context))
     }
 
     #[inline]
-    pub fn new_separate(
+    pub fn new_separated(
         window: &winit::Window,
-        _events_loop: &winit::EventsLoop,
+        _el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<Self, CreationError>

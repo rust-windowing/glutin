@@ -1,5 +1,8 @@
 # Unreleased
 
+- Implemented context sharing support for Windows and Linux.
+- Added `SeparatedContext`.
+- **Breaking:** Renamed `GlWindow` to `CombinedContext`.
 - **Breaking:** Removed `shareable_with_windowed_contexts`. Now you must build
 OsMesa contexts via a separate extension.
 - Added `ContextBuilder::build` method.

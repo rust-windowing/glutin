@@ -39,25 +39,25 @@ impl Context {
     /// See the docs in the crate root file.
     #[inline]
     pub fn new(
-        window_builder: winit::WindowBuilder,
-        events_loop: &winit::EventsLoop,
+        wb: winit::WindowBuilder,
+        el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Self>,
         egl: Option<&Egl>,
     ) -> Result<(winit::Window, Self), CreationError> {
-        let window = window_builder.build(events_loop)?;
-        let ctxt = Self::new_separate(
+        let window = wb.build(el)?;
+        let ctx = Self::new_separated(
             &window,
             pf_reqs,
             gl_attr,
             egl,
         )?;
 
-        Ok((window, ctxt))
+        Ok((window, ctx))
     }
 
     #[inline]
-    pub fn new_separate(
+    pub fn new_separated(
         window: &winit::Window,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Self>,
@@ -71,8 +71,8 @@ impl Context {
                     (Some(&Context::HiddenWindowWgl(_, _)), _)
                         | (Some(&Context::Wgl(_)), _)
                         | (None, None) => {
-                        let gl_attr_wgl = gl_attr.clone().map_sharing(|ctxt| {
-                            match *ctxt {
+                        let gl_attr_wgl = gl_attr.clone().map_sharing(|ctx| {
+                            match *ctx {
                                 Context::HiddenWindowWgl(_, ref c)
                                     | Context::Wgl(ref c) => c.get_hglrc(),
                                 _ => unreachable!(),
@@ -82,8 +82,8 @@ impl Context {
                     }
                     // We must use EGL.
                     (Some(_), Some(egl)) => {
-                        let gl_attr_egl = gl_attr.clone().map_sharing(|ctxt| {
-                            match *ctxt {
+                        let gl_attr_egl = gl_attr.clone().map_sharing(|ctx| {
+                            match *ctx {
                                 Context::Egl(ref c)
                                     | Context::EglPbuffer(ref c)
                                     | Context::HiddenWindowEgl(_, ref c) => c,
@@ -119,8 +119,8 @@ impl Context {
                 }
             }
             _ => {
-                let gl_attr_wgl = gl_attr.clone().map_sharing(|ctxt| {
-                    match *ctxt {
+                let gl_attr_wgl = gl_attr.clone().map_sharing(|ctx| {
+                    match *ctx {
                         Context::HiddenWindowWgl(_, ref c)
                             | Context::Wgl(ref c) => c.get_hglrc(),
                         _ => panic!(),
@@ -146,8 +146,8 @@ impl Context {
                 | (Some(&Context::HiddenWindowEgl(_, _)), Some(egl))
                 | (Some(&Context::EglPbuffer(_)), Some(egl)) => {
 
-                let gl_attr_egl = gl_attr.clone().map_sharing(|ctxt| {
-                    match *ctxt {
+                let gl_attr_egl = gl_attr.clone().map_sharing(|ctx| {
+                    match *ctx {
                         Context::Egl(ref c)
                             | Context::EglPbuffer(ref c)
                             | Context::HiddenWindowEgl(_, ref c) => c,
@@ -158,7 +158,7 @@ impl Context {
                 let native_display = egl::NativeDisplay::Other(None);
                 let context = EglContext::new(egl.clone(), pf_reqs, &gl_attr_egl, native_display)
                     .and_then(|prototype| prototype.finish_pbuffer((1, 1)))
-                    .map(|ctxt| Context::EglPbuffer(ctxt));
+                    .map(|ctx| Context::EglPbuffer(ctx));
 
                 if let Ok(context) = context {
                     return Ok(context);
@@ -167,8 +167,8 @@ impl Context {
             _ => (),
         }
 
-        let window_builder = winit::WindowBuilder::new().with_visibility(false);
-        Self::new(window_builder, &el, pf_reqs, gl_attr, egl).map(|(window, context)| match context
+        let wb = winit::WindowBuilder::new().with_visibility(false);
+        Self::new(wb, &el, pf_reqs, gl_attr, egl).map(|(window, context)| match context
         {
             Context::Egl(context) => Context::HiddenWindowEgl(window, context),
             Context::Wgl(context) => Context::HiddenWindowWgl(window, context),

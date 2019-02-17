@@ -5,25 +5,26 @@ mod support;
 use glutin::GlContext;
 
 fn main() {
-    let mut evlp = glutin::EventsLoop::new();
+    let mut el = glutin::EventsLoop::new();
     let win = glutin::WindowBuilder::new()
         .with_title("A fantastic window!")
-        .build(&evlp)
+        .build(&el)
         .unwrap();
 
-    let ctx = glutin::ContextBuilder::new();
-    let ctx = glutin::GlSeparatedContext::new(&win, ctx, &evlp).unwrap();
+    let separated_context = glutin::ContextBuilder::new()
+        .build_separated(&win, &el)
+        .unwrap();
 
-    let _ = unsafe { ctx.make_current() };
+    let _ = unsafe { separated_context.make_current() };
 
-    println!("Pixel format of the window's GL context: {:?}", ctx.get_pixel_format());
+    println!("Pixel format of the window's GL context: {:?}", separated_context.get_pixel_format());
 
-    let gl = support::load(&ctx.context());
+    let gl = support::load(&separated_context.context());
 
     let mut running = true;
     while running {
-        evlp.poll_events(|event| {
-            println!("Evlp {:?}", event);
+        el.poll_events(|event| {
+            println!("el {:?}", event);
             match event {
                 glutin::Event::WindowEvent { event, .. } => match event {
                     glutin::WindowEvent::KeyboardInput {
@@ -37,7 +38,7 @@ fn main() {
                     | glutin::WindowEvent::CloseRequested => running = false,
                     glutin::WindowEvent::Resized(logical_size) => {
                         let dpi_factor = win.get_hidpi_factor();
-                        ctx.resize(logical_size.to_physical(dpi_factor));
+                        separated_context.resize(logical_size.to_physical(dpi_factor));
                     },
                     _ => (),
                 },
@@ -46,6 +47,6 @@ fn main() {
         });
 
         gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
-        let _ = ctx.swap_buffers();
+        let _ = separated_context.swap_buffers();
     }
 }

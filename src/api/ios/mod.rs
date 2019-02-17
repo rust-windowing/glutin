@@ -223,9 +223,9 @@ impl Context {
 
     /// See the docs in the crate root file.
     #[inline]
-    pub fn new_separate(
+    pub fn new_separated(
         _window: &Window,
-        _events_loop: &EventsLoop,
+        _el: &EventsLoop,
         _pf_reqs: &PixelFormatRequirements,
         _gl_attr: &GlAttributes<&Context>,
     ) -> Result<Self, CreationError> {

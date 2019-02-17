@@ -5,29 +5,30 @@ mod support;
 use glutin::GlContext;
 
 fn main() {
-    let mut events_loop = glutin::EventsLoop::new();
+    let mut el = glutin::EventsLoop::new();
 
     let mut windows = std::collections::HashMap::new();
     for index in 0..3 {
         let title = format!("Charming Window #{}", index + 1);
-        let window = glutin::WindowBuilder::new().with_title(title);
-        let context = glutin::ContextBuilder::new();
-        let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
-        let _ = unsafe { gl_window.make_current() };
-        let gl = support::load(&gl_window.context());
-        let window_id = gl_window.id();
-        windows.insert(window_id, (gl_window, gl));
+        let wb = glutin::WindowBuilder::new().with_title(title);
+        let combined_context = glutin::ContextBuilder::new()
+            .build_combined(wb, &el)
+            .unwrap();
+        let _ = unsafe { combined_context.make_current() };
+        let gl = support::load(&combined_context.context());
+        let window_id = combined_context.id();
+        windows.insert(window_id, (combined_context, gl));
     }
 
     while !windows.is_empty() {
-        events_loop.poll_events(|event| {
+        el.poll_events(|event| {
             println!("{:?}", event);
             match event {
                 glutin::Event::WindowEvent { event, window_id } => match event {
                     glutin::WindowEvent::Resized(logical_size) => {
-                        let gl_window = &windows[&window_id].0;
-                        let dpi_factor = gl_window.get_hidpi_factor();
-                        gl_window.resize(logical_size.to_physical(dpi_factor));
+                        let combined_context = &windows[&window_id].0;
+                        let dpi_factor = combined_context.get_hidpi_factor();
+                        combined_context.resize(logical_size.to_physical(dpi_factor));
                     },
                     glutin::WindowEvent::CloseRequested => {
                         if windows.remove(&window_id).is_some() {

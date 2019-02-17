@@ -315,15 +315,15 @@ unsafe fn create_context(extra: Option<(&gl::wgl_extra::Wgl, &PixelFormatRequire
 
             attributes.push(0);
 
-            let ctxt = extra_functions.CreateContextAttribsARB(hdc as *const c_void,
+            let ctx = extra_functions.CreateContextAttribsARB(hdc as *const c_void,
                                                                share as *const c_void,
                                                                attributes.as_ptr());
 
-            if ctxt.is_null() {
+            if ctx.is_null() {
                 return Err(CreationError::OsError(format!("wglCreateContextAttribsARB failed: {}",
                                                       format!("{}", io::Error::last_os_error()))));
             } else {
-                return Ok(ContextWrapper(ctxt as HGLRC));
+                return Ok(ContextWrapper(ctx as HGLRC));
             }
         }
 
@@ -331,20 +331,20 @@ unsafe fn create_context(extra: Option<(&gl::wgl_extra::Wgl, &PixelFormatRequire
         share = ptr::null_mut();
     }
 
-    let ctxt = gl::wgl::CreateContext(hdc as *const c_void);
-    if ctxt.is_null() {
+    let ctx = gl::wgl::CreateContext(hdc as *const c_void);
+    if ctx.is_null() {
         return Err(CreationError::OsError(format!("wglCreateContext failed: {}",
                                                   format!("{}", io::Error::last_os_error()))));
     }
 
     if !share.is_null() {
-        if gl::wgl::ShareLists(share as *const c_void, ctxt) == 0 {
+        if gl::wgl::ShareLists(share as *const c_void, ctx) == 0 {
             return Err(CreationError::OsError(format!("wglShareLists failed: {}",
                                                       format!("{}", io::Error::last_os_error()))));
         }
     };
 
-    Ok(ContextWrapper(ctxt as HGLRC))
+    Ok(ContextWrapper(ctx as HGLRC))
 }
 
 /// Chooses a pixel formats without using WGL.

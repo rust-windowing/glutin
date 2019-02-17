@@ -62,14 +62,14 @@ impl Context {
     /// See the docs in the crate root file.
     #[inline]
     pub fn new(
-        window_builder: winit::WindowBuilder,
-        events_loop: &winit::EventsLoop,
+        wb: winit::WindowBuilder,
+        el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         opengl: &GlAttributes<&Self>,
     ) -> Result<(winit::Window, Self), CreationError> {
         context::Context::new(
-            window_builder,
-            events_loop,
+            wb,
+            el,
             pf_reqs,
             &opengl.clone().map_sharing(|w| &w.0),
             EGL.as_ref().map(|w| &w.0),
@@ -78,13 +78,13 @@ impl Context {
 
     /// See the docs in the crate root file.
     #[inline]
-    pub fn new_separate(
+    pub fn new_separated(
         window: &winit::Window,
-        _events_loop: &winit::EventsLoop,
+        _el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<Self, CreationError> {
-        context::Context::new_separate(
+        context::Context::new_separated(
             window,
             pf_reqs,
             &gl_attr.clone().map_sharing(|w| &w.0),
@@ -95,12 +95,12 @@ impl Context {
     /// See the docs in the crate root file.
     #[inline]
     pub fn new_context(
-        events_loop: &winit::EventsLoop,
+        el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Self>,
     ) -> Result<Self, CreationError> {
         context::Context::new_context(
-            events_loop,
+            el,
             pf_reqs,
             &gl_attr.clone().map_sharing(|w| &w.0),
             EGL.as_ref().map(|w| &w.0),

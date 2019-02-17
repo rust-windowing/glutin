@@ -131,11 +131,11 @@ impl OsMesaContext {
             buffer: ::std::iter::repeat(unsafe { mem::uninitialized() })
                 .take((dimensions.0 * dimensions.1) as usize).collect(),
             context: unsafe {
-                let ctxt = osmesa_sys::OSMesaCreateContextAttribs(attribs.as_ptr(), ptr::null_mut());
-                if ctxt.is_null() {
+                let ctx = osmesa_sys::OSMesaCreateContextAttribs(attribs.as_ptr(), ptr::null_mut());
+                if ctx.is_null() {
                     return Err(CreationError::OsError("OSMesaCreateContextAttribs failed".to_string()));
                 }
-                ctxt
+                ctx
             }
         })
     }

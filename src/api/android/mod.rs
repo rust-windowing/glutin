@@ -49,13 +49,13 @@ impl android_glue::SyncEventHandler for AndroidSyncEventHandler {
 impl Context {
     #[inline]
     pub fn new(
-        window_builder: winit::WindowBuilder,
-        events_loop: &winit::EventsLoop,
+        wb: winit::WindowBuilder,
+        el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Self>,
     ) -> Result<(winit::Window, Self), CreationError>
     {
-        let window = window_builder.build(events_loop)?;
+        let window = wb.build(el)?;
         let gl_attr = gl_attr.clone().map_sharing(|c| &c.0.egl_context);
         let native_window = unsafe { android_glue::get_native_window() };
         if native_window.is_null() {
@@ -74,7 +74,7 @@ impl Context {
         android_glue::add_sync_event_handler(handler);
         let context = Context(ctx.clone());
 
-        events_loop.set_suspend_callback(Some(Box::new(move |suspended| {
+        el.set_suspend_callback(Some(Box::new(move |suspended| {
             ctx.stopped.as_ref().unwrap().set(suspended);
             if suspended {
                 // Android has stopped the activity or sent it to background.
@@ -116,9 +116,9 @@ impl Context {
 
     /// See the docs in the crate root file.
     #[inline]
-    pub fn new_separate(
+    pub fn new_separated(
         _window: &winit::Window,
-        _events_loop: &winit::EventsLoop,
+        _el: &winit::EventsLoop,
         _pf_reqs: &PixelFormatRequirements,
         _gl_attr: &GlAttributes<&Context>,
     ) -> Result<Self, CreationError> {

@@ -1,36 +1,29 @@
 //! The purpose of this library is to provide an OpenGL context on as many platforms as possible.
 //!
-//! # Building a GlWindow
+//! # Building a CombinedContext
 //!
-//! A `GlWindow` is composed of a `Window` and an OpenGL `Context`.
+//! A `CombinedContext` is composed of a `Window` and an OpenGL `Context`.
 //!
 //! Due to some operating-system-specific quirks, glutin prefers control over
 //! the order of creation of the `Context` and `Window`. Here is an example of
-//! building a GlWindow the prefered way:
+//! building a CombinedContext the prefered way:
 //!
 //! ```no_run
 //! # extern crate glutin;
 //! # fn main() {
-//! let events_loop = glutin::EventsLoop::new();
-//! let window = glutin::WindowBuilder::new()
+//! let el = glutin::EventsLoop::new();
+//! let wb = glutin::WindowBuilder::new()
 //!     .with_title("Hello world!")
 //!     .with_dimensions(glutin::dpi::LogicalSize::new(1024.0, 768.0));
-//! let context = glutin::ContextBuilder::new();
-//! let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
+//! let combined_context = glutin::ContextBuilder::new()
+//!     .build_combined(wb, &el)
+//!     .unwrap();
 //! # }
 //! ```
 //!
 //! You can, of course, create an OpenGL `Context` separately from an existing
 //! window, however that may result in an suboptimal configuration of the window
-//! on some platforms. In that case use "GlSeparatedContext".
-//!
-//! # Features
-//!
-//! This crate has one Cargo feature: `window`.
-//!
-//!  - `window` allows you to create regular windows and enables the `WindowBuilder` object.
-//!
-//! By default `window` is enabled.
+//! on some platforms. In that case use "SeparatedContext".
 
 #[cfg(target_os = "windows")]
 #[macro_use]
@@ -130,14 +123,15 @@ where
 /// # extern crate glutin;
 /// # use glutin::GlContext;
 /// # fn main() {
-/// # let events_loop = glutin::EventsLoop::new();
-/// # let window = glutin::WindowBuilder::new();
-/// # let context = glutin::ContextBuilder::new();
-/// # let some_gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
-/// let context = glutin::ContextBuilder::new()
+/// # let el = glutin::EventsLoop::new();
+/// # let wb = glutin::WindowBuilder::new();
+/// # let some_context = glutin::ContextBuilder::new()
+/// #    .build_combined(wb, &el)
+/// #    .unwrap();
+/// let cb = glutin::ContextBuilder::new()
 ///     .with_vsync(true)
 ///     .with_multisampling(8)
-///     .with_shared_lists(some_gl_window.context());
+///     .with_shared_lists(some_context.context());
 /// # }
 /// ```
 pub struct Context {
@@ -175,11 +169,11 @@ impl Context {
     ///  because the underlying platform doesn't support a requested feature.
     pub fn new(
         el: &winit::EventsLoop,
-        context_builder: ContextBuilder,
+        cb: ContextBuilder,
     ) -> Result<Self, CreationError>
     {
-        let ContextBuilder { pf_reqs, gl_attr } = context_builder;
-        let gl_attr = gl_attr.map_sharing(|ctxt| &ctxt.context);
+        let ContextBuilder { pf_reqs, gl_attr } = cb;
+        let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
         platform::Context::new_context(el, &pf_reqs, &gl_attr)
             .map(|context| Context { context })
     }
@@ -193,15 +187,16 @@ impl Context {
 /// # extern crate glutin;
 /// # use glutin::GlContext;
 /// # fn main() {
-/// let mut events_loop = glutin::EventsLoop::new();
-/// let window = glutin::WindowBuilder::new();
-/// let context = glutin::ContextBuilder::new();
-/// let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
+/// let mut el = glutin::EventsLoop::new();
+/// let wb = glutin::WindowBuilder::new();
+/// let combined_context = glutin::ContextBuilder::new()
+///     .build_combined(wb, &el)
+///     .unwrap();
 ///
-/// unsafe { gl_window.make_current().unwrap() };
+/// unsafe { combined_context.make_current().unwrap() };
 ///
 /// loop {
-///     events_loop.poll_events(|event| {
+///     el.poll_events(|event| {
 ///         match event {
 ///             // process events here
 ///             _ => ()
@@ -210,19 +205,19 @@ impl Context {
 ///
 ///     // draw everything here
 ///
-///     gl_window.swap_buffers();
+///     combined_context.swap_buffers();
 ///     std::thread::sleep(std::time::Duration::from_millis(17));
 /// }
 /// # }
 /// ```
-pub struct GlWindow {
+pub struct CombinedContext {
     context: Context,
     window: Window,
 }
 
-impl GlWindow {
+impl CombinedContext {
     /// Builds the given window along with the associated GL context, returning
-    /// the pair as a `GlWindow`.
+    /// the pair as a `CombinedContext`.
     ///
     /// One notable limitation of the Wayland backend when it comes to shared
     /// contexts is that both contexts must use the same events loop.
@@ -233,15 +228,15 @@ impl GlWindow {
     ///  - If the OpenGL context could not be created. This generally happens
     ///  because the underlying platform doesn't support a requested feature.
     pub fn new(
-        window_builder: WindowBuilder,
-        context_builder: ContextBuilder,
-        events_loop: &EventsLoop,
+        wb: WindowBuilder,
+        cb: ContextBuilder,
+        el: &EventsLoop,
     ) -> Result<Self, CreationError>
     {
-        let ContextBuilder { pf_reqs, gl_attr } = context_builder;
-        let gl_attr = gl_attr.map_sharing(|ctxt| &ctxt.context);
-        platform::Context::new(window_builder, events_loop, &pf_reqs, &gl_attr)
-            .map(|(window, context)| GlWindow {
+        let ContextBuilder { pf_reqs, gl_attr } = cb;
+        let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
+        platform::Context::new(wb, el, &pf_reqs, &gl_attr)
+            .map(|(window, context)| CombinedContext {
                 window,
                 context: Context { context },
             })
@@ -288,7 +283,7 @@ impl GlWindow {
     }
 }
 
-impl GlContext for GlWindow {
+impl GlContext for CombinedContext {
     unsafe fn make_current(&self) -> Result<(), ContextError> {
         self.context.make_current()
     }
@@ -306,7 +301,7 @@ impl GlContext for GlWindow {
     }
 }
 
-impl std::ops::Deref for GlWindow {
+impl std::ops::Deref for CombinedContext {
     type Target = Window;
     fn deref(&self) -> &Self::Target {
         &self.window
@@ -315,13 +310,13 @@ impl std::ops::Deref for GlWindow {
 
 /// Represents an OpenGL context which has been associated with an existing
 /// window.
-pub struct GlSeparatedContext {
+pub struct SeparatedContext {
     context: Context,
 }
 
-impl GlSeparatedContext {
+impl SeparatedContext {
     /// Builds the GL context using the passed `Window`, returning the context
-    /// as a `GlSeparatedContext`.
+    /// as a `SeparatedContext`.
     ///
     /// One notable limitation of the Wayland backend when it comes to shared
     /// contexts is that both contexts must use the same events loop.
@@ -333,15 +328,15 @@ impl GlSeparatedContext {
     ///  because the underlying platform doesn't support a requested feature.
     pub fn new(
         window: &Window,
-        context_builder: ContextBuilder,
-        events_loop: &EventsLoop,
+        cb: ContextBuilder,
+        el: &EventsLoop,
     ) -> Result<Self, CreationError>
     {
-        let ContextBuilder { pf_reqs, gl_attr } = context_builder;
-        let gl_attr = gl_attr.map_sharing(|ctxt| &ctxt.context);
+        let ContextBuilder { pf_reqs, gl_attr } = cb;
+        let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
 
-        platform::Context::new_separate(window, events_loop, &pf_reqs, &gl_attr)
-            .map(|context| GlSeparatedContext {
+        platform::Context::new_separated(window, el, &pf_reqs, &gl_attr)
+            .map(|context| SeparatedContext {
                 context: Context { context },
             })
     }
@@ -382,7 +377,7 @@ impl GlSeparatedContext {
     }
 }
 
-impl GlContext for GlSeparatedContext {
+impl GlContext for SeparatedContext {
     unsafe fn make_current(&self) -> Result<(), ContextError> {
         self.context.make_current()
     }
@@ -400,7 +395,7 @@ impl GlContext for GlSeparatedContext {
     }
 }
 
-impl std::ops::Deref for GlSeparatedContext {
+impl std::ops::Deref for SeparatedContext {
     type Target = Context;
     fn deref(&self) -> &Self::Target {
         &self.context
@@ -564,27 +559,27 @@ impl<'a> ContextBuilder<'a> {
         self
     }
 
-    /// Builds the context as a headless context.
-    pub fn build(self, el: &EventsLoop) -> Result<Context, CreationError> {
+    /// Builds a headless context.
+    pub fn build_headless(self, el: &EventsLoop) -> Result<Context, CreationError> {
         Context::new(el, self)
     }
 
     /// Builds a context and it's associated window.
-    pub fn build_window(
+    pub fn build_combined(
         self,
         wb: WindowBuilder,
         el: &EventsLoop,
-    ) -> Result<Context, CreationError> {
-        GlWindow::new(wb, self, el)
+    ) -> Result<CombinedContext, CreationError> {
+        CombinedContext::new(wb, self, el)
     }
 
     /// Builds a separated context.
-    pub fn build_separate(
+    pub fn build_separated(
         self,
         win: &Window,
         el: &EventsLoop
-    ) -> Result<Context, CreationError> {
-        GlSeparatedContext::new(win, self, el)
+    ) -> Result<SeparatedContext, CreationError> {
+        SeparatedContext::new(win, self, el)
     }
 }
 

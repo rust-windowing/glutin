@@ -44,14 +44,14 @@ pub struct HeadlessContext {
 impl Context {
     #[inline]
     pub fn new(
-        window_builder: winit::WindowBuilder,
-        events_loop: &winit::EventsLoop,
+        wb: winit::WindowBuilder,
+        el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<(winit::Window, Self), CreationError>
     {
-        let transparent = window_builder.window.transparent;
-        let window = window_builder.build(events_loop)?;
+        let transparent = wb.window.transparent;
+        let window = wb.build(el)?;
 
         if gl_attr.sharing.is_some() {
             unimplemented!()
@@ -159,9 +159,9 @@ impl Context {
 
     /// See the docs in the crate root file.
     #[inline]
-    pub fn new_separate(
+    pub fn new_separated(
         _window: &winit::Window,
-        _events_loop: &winit::EventsLoop,
+        _el: &winit::EventsLoop,
         _pf_reqs: &PixelFormatRequirements,
         _gl_attr: &GlAttributes<&Context>,
     ) -> Result<Self, CreationError> {

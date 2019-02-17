@@ -450,7 +450,7 @@ impl<'a> ContextPrototype<'a> {
                    -> Result<Context, CreationError>
     {
         let share = match self.opengl.sharing {
-            Some(ctxt) => ctxt.context,
+            Some(ctx) => ctx.context,
             None => ptr::null()
         };
 
@@ -461,39 +461,39 @@ impl<'a> ContextPrototype<'a> {
                                     self.opengl.debug, self.opengl.robustness, share)?
 
             } else if self.api == Api::OpenGlEs {
-                if let Ok(ctxt) = create_context(&self.egl, self.display, &self.egl_version,
+                if let Ok(ctx) = create_context(&self.egl, self.display, &self.egl_version,
                                                  &self.extensions, self.api, (2, 0), self.config_id,
                                                  self.opengl.debug, self.opengl.robustness, share)
                 {
-                    ctxt
-                } else if let Ok(ctxt) = create_context(&self.egl, self.display, &self.egl_version,
+                    ctx
+                } else if let Ok(ctx) = create_context(&self.egl, self.display, &self.egl_version,
                                                         &self.extensions, self.api, (1, 0),
                                                         self.config_id, self.opengl.debug,
                                                         self.opengl.robustness, share)
                 {
-                    ctxt
+                    ctx
                 } else {
                     return Err(CreationError::OpenGlVersionNotSupported);
                 }
 
             } else {
-                if let Ok(ctxt) = create_context(&self.egl, self.display, &self.egl_version,
+                if let Ok(ctx) = create_context(&self.egl, self.display, &self.egl_version,
                                                  &self.extensions, self.api, (3, 2), self.config_id,
                                                  self.opengl.debug, self.opengl.robustness, share)
                 {
-                    ctxt
-                } else if let Ok(ctxt) = create_context(&self.egl, self.display, &self.egl_version,
+                    ctx
+                } else if let Ok(ctx) = create_context(&self.egl, self.display, &self.egl_version,
                                                         &self.extensions, self.api, (3, 1),
                                                         self.config_id, self.opengl.debug,
                                                         self.opengl.robustness, share)
                 {
-                    ctxt
-                } else if let Ok(ctxt) = create_context(&self.egl, self.display, &self.egl_version,
+                    ctx
+                } else if let Ok(ctx) = create_context(&self.egl, self.display, &self.egl_version,
                                                         &self.extensions, self.api, (1, 0),
                                                         self.config_id, self.opengl.debug,
                                                         self.opengl.robustness, share)
                 {
-                    ctxt
+                    ctx
                 } else {
                     return Err(CreationError::OpenGlVersionNotSupported);
                 }
