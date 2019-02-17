@@ -22,7 +22,7 @@ fn main() {
         .build_combined(wb, &el)
         .unwrap();
 
-    let _ = unsafe { combined_context.make_current() };
+    unsafe { combined_context.make_current().unwrap() }
     println!(
         "Pixel format of the window's GL context: {:?}",
         combined_context.get_pixel_format()
@@ -56,7 +56,7 @@ fn main() {
         );
     }
 
-    let _ = unsafe { headless_context.make_current() };
+    unsafe { headless_context.make_current().unwrap() }
     let glc = support::load(&headless_context);
 
     let mut context_fb = 0;
@@ -81,7 +81,7 @@ fn main() {
                 glutin::Event::WindowEvent { event, .. } => match event {
                     glutin::WindowEvent::CloseRequested => running = false,
                     glutin::WindowEvent::Resized(logical_size) => {
-                        let _ = unsafe { combined_context.make_current() };
+                        unsafe { combined_context.make_current().unwrap() }
                         let dpi_factor = combined_context.get_hidpi_factor();
                         size = logical_size.to_physical(dpi_factor);
                         combined_context.resize(size);
@@ -142,10 +142,10 @@ fn main() {
             }
         });
 
-        let _ = unsafe { headless_context.make_current() };
+        unsafe { headless_context.make_current().unwrap() }
         glc.draw_frame([1.0, 0.5, 0.7, 1.0]);
 
-        let _ = unsafe { combined_context.make_current() };
+        unsafe { combined_context.make_current().unwrap() }
         unsafe {
             glw.gl.BlitFramebuffer(
                 0,

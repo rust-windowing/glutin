@@ -14,7 +14,7 @@ fn main() {
         let combined_context = glutin::ContextBuilder::new()
             .build_combined(wb, &el)
             .unwrap();
-        let _ = unsafe { combined_context.make_current() };
+        unsafe { combined_context.make_current().unwrap() }
         let gl = support::load(&combined_context.context());
         let window_id = combined_context.id();
         windows.insert(window_id, (combined_context, gl));

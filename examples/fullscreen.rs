@@ -37,7 +37,7 @@ fn main() {
         .build_combined(wb, &el)
         .unwrap();
 
-    let _ = unsafe { combined_context.make_current() };
+    unsafe { combined_context.make_current().unwrap() }
 
     let gl = support::load(&combined_context.context());
 

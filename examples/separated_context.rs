@@ -15,7 +15,7 @@ fn main() {
         .build_separated(&win, &el)
         .unwrap();
 
-    let _ = unsafe { separated_context.make_current() };
+    unsafe { separated_context.make_current().unwrap() }
 
     println!(
         "Pixel format of the window's GL context: {:?}",
