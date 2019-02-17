@@ -39,7 +39,7 @@ extern crate gl;
 extern crate glutin;
 
 use glutin::dpi::*;
-use glutin::GlContext;
+use glutin::ContextTrait;
 
 fn main() {
     let mut el = glutin::EventsLoop::new();

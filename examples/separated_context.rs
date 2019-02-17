@@ -2,7 +2,7 @@ extern crate glutin;
 
 mod support;
 
-use glutin::GlContext;
+use glutin::ContextTrait;
 
 fn main() {
     let mut el = glutin::EventsLoop::new();
@@ -17,7 +17,10 @@ fn main() {
 
     let _ = unsafe { separated_context.make_current() };
 
-    println!("Pixel format of the window's GL context: {:?}", separated_context.get_pixel_format());
+    println!(
+        "Pixel format of the window's GL context: {:?}",
+        separated_context.get_pixel_format()
+    );
 
     let gl = support::load(&separated_context.context());
 
@@ -30,7 +33,8 @@ fn main() {
                     glutin::WindowEvent::KeyboardInput {
                         input:
                             glutin::KeyboardInput {
-                                virtual_keycode: Some(glutin::VirtualKeyCode::Escape),
+                                virtual_keycode:
+                                    Some(glutin::VirtualKeyCode::Escape),
                                 ..
                             },
                         ..
@@ -38,11 +42,12 @@ fn main() {
                     | glutin::WindowEvent::CloseRequested => running = false,
                     glutin::WindowEvent::Resized(logical_size) => {
                         let dpi_factor = win.get_hidpi_factor();
-                        separated_context.resize(logical_size.to_physical(dpi_factor));
-                    },
+                        separated_context
+                            .resize(logical_size.to_physical(dpi_factor));
+                    }
                     _ => (),
                 },
-                _ => ()
+                _ => (),
             }
         });
 

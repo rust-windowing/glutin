@@ -4,12 +4,12 @@ pub use winit::os::android::{WindowBuilderExt, WindowExt};
 
 pub use api::egl::ffi::EGLContext;
 
+use os::ContextTraitExt;
 use Context;
-use os::GlContextExt;
 
 use std::os::raw;
 
-impl GlContextExt for Context {
+impl ContextTraitExt for Context {
     type Handle = EGLContext;
 
     #[inline]

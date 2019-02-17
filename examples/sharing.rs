@@ -4,18 +4,18 @@ extern crate glutin;
 
 mod support;
 
+use glutin::ContextTrait;
 use support::gl;
-use glutin::GlContext;
 
 fn main() {
     let mut el = glutin::EventsLoop::new();
     let mut size = glutin::dpi::PhysicalSize::new(768., 480.);
 
-    let headless_context = glutin::ContextBuilder::new()
-        .build_headless(&el)
-        .unwrap();
+    let headless_context =
+        glutin::ContextBuilder::new().build_headless(&el).unwrap();
 
-    let wb = glutin::WindowBuilder::new().with_title("A fantastic window!")
+    let wb = glutin::WindowBuilder::new()
+        .with_title("A fantastic window!")
         .with_dimensions(glutin::dpi::LogicalSize::from_physical(size, 1.0));
     let combined_context = glutin::ContextBuilder::new()
         .with_shared_lists(&headless_context)
@@ -23,7 +23,10 @@ fn main() {
         .unwrap();
 
     let _ = unsafe { combined_context.make_current() };
-    println!("Pixel format of the window's GL context: {:?}", combined_context.get_pixel_format());
+    println!(
+        "Pixel format of the window's GL context: {:?}",
+        combined_context.get_pixel_format()
+    );
     let glw = support::load(&combined_context.context());
 
     let mut render_tex = 0;
@@ -99,7 +102,10 @@ fn main() {
                             );
 
                             glw.gl.GenFramebuffers(1, &mut window_fb);
-                            glw.gl.BindFramebuffer(gl::READ_FRAMEBUFFER, window_fb);
+                            glw.gl.BindFramebuffer(
+                                gl::READ_FRAMEBUFFER,
+                                window_fb,
+                            );
                             glw.gl.BindFramebuffer(gl::DRAW_FRAMEBUFFER, 0);
                             glw.gl.FramebufferTexture2D(
                                 gl::READ_FRAMEBUFFER,
@@ -122,12 +128,17 @@ fn main() {
                                 0,
                             );
 
-                            glc.gl.Viewport(0, 0, size.width as _, size.height as _);
+                            glc.gl.Viewport(
+                                0,
+                                0,
+                                size.width as _,
+                                size.height as _,
+                            );
                         }
-                    },
+                    }
                     _ => (),
                 },
-                _ => ()
+                _ => (),
             }
         });
 
@@ -137,8 +148,14 @@ fn main() {
         let _ = unsafe { combined_context.make_current() };
         unsafe {
             glw.gl.BlitFramebuffer(
-                0, 0, size.width as _, size.height as _,
-                0, 0, size.width as _, size.height as _,
+                0,
+                0,
+                size.width as _,
+                size.height as _,
+                0,
+                0,
+                size.width as _,
+                size.height as _,
                 gl::COLOR_BUFFER_BIT,
                 gl::NEAREST,
             );

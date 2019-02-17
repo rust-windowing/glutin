@@ -1,12 +1,15 @@
-use std::sync::Arc;
-use std::ffi::CString;
-use std::os::raw;
-use winit;
-use winit::os::unix::WindowExt;
-use {ContextError, CreationError, GlAttributes, PixelFormat, PixelFormatRequirements};
 use api::dlopen;
 use api::egl::{self, ffi, Context as EglContext};
+use std::ffi::CString;
+use std::os::raw;
+use std::sync::Arc;
 use wayland_client::egl as wegl;
+use winit;
+use winit::os::unix::WindowExt;
+use {
+    ContextError, CreationError, GlAttributes, PixelFormat,
+    PixelFormatRequirements,
+};
 
 pub struct Context {
     egl_surface: Arc<wegl::WlEglSurface>,
@@ -20,8 +23,7 @@ impl Context {
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-    ) -> Result<(winit::Window, Self), CreationError>
-    {
+    ) -> Result<(winit::Window, Self), CreationError> {
         let window = wb.build(el)?;
         let context = Self::new_separated(&window, el, pf_reqs, gl_attr)?;
         Ok((window, context))
@@ -33,23 +35,42 @@ impl Context {
         _el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-    ) -> Result<Self, CreationError>
-    {
+    ) -> Result<Self, CreationError> {
         let logical_size = window.get_inner_size().unwrap();
         let (w, h) = (logical_size.width, logical_size.height);
         let surface = window.get_wayland_surface();
         let surface = match surface {
             Some(s) => s,
-            None => return Err(CreationError::NotSupported("Wayland not found")),
+            None => {
+                return Err(CreationError::NotSupported("Wayland not found"));
+            }
         };
-        let egl_surface = unsafe { wegl::WlEglSurface::new_from_raw(surface as *mut _, w as i32, h as i32) };
+        let egl_surface = unsafe {
+            wegl::WlEglSurface::new_from_raw(
+                surface as *mut _,
+                w as i32,
+                h as i32,
+            )
+        };
         let context = {
-            let mut libegl = unsafe { dlopen::dlopen(b"libEGL.so.1\0".as_ptr() as *const _, dlopen::RTLD_NOW) };
+            let mut libegl = unsafe {
+                dlopen::dlopen(
+                    b"libEGL.so.1\0".as_ptr() as *const _,
+                    dlopen::RTLD_NOW,
+                )
+            };
             if libegl.is_null() {
-                libegl = unsafe { dlopen::dlopen(b"libEGL.so\0".as_ptr() as *const _, dlopen::RTLD_NOW) };
+                libegl = unsafe {
+                    dlopen::dlopen(
+                        b"libEGL.so\0".as_ptr() as *const _,
+                        dlopen::RTLD_NOW,
+                    )
+                };
             }
             if libegl.is_null() {
-                return Err(CreationError::NotSupported("could not find libEGL"));
+                return Err(CreationError::NotSupported(
+                    "could not find libEGL",
+                ));
             }
             let egl = ::api::egl::ffi::egl::Egl::load_with(|sym| {
                 let sym = CString::new(sym).unwrap();
@@ -57,7 +78,7 @@ impl Context {
             });
             let gl_attr = gl_attr.clone().map_sharing(|c| &c.context);
             let native_display = egl::NativeDisplay::Wayland(Some(
-                window.get_wayland_display().unwrap() as *const _
+                window.get_wayland_display().unwrap() as *const _,
             ));
             EglContext::new(egl, pf_reqs, &gl_attr, native_display)
                 .and_then(|p| p.finish(egl_surface.ptr() as *const _))?

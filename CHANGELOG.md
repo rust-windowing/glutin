@@ -1,5 +1,6 @@
 # Unreleased
 
+- **Breaking:** Renamed `GlContext{,Ext}` to `ContextTrait{,Ext}`.
 - Implemented context sharing support for Windows and Linux.
 - Added `SeparatedContext`.
 - **Breaking:** Renamed `GlWindow` to `CombinedContext`.

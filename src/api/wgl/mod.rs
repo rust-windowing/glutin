@@ -1,33 +1,33 @@
 #![cfg(any(target_os = "windows"))]
 
+use Api;
 use ContextError;
 use CreationError;
 use GlAttributes;
-use GlRequest;
 use GlProfile;
+use GlRequest;
 use PixelFormat;
 use PixelFormatRequirements;
 use ReleaseBehavior;
 use Robustness;
-use Api;
 
 use self::make_current_guard::CurrentContextGuard;
 
 use std::ffi::{CStr, CString, OsStr};
-use std::os::raw::{c_void, c_int};
+use std::os::raw::{c_int, c_void};
 use std::os::windows::ffi::OsStrExt;
 use std::{io, mem, ptr};
 
-use winapi::shared::windef::{HDC, HGLRC, HWND};
 use winapi::shared::minwindef::HMODULE;
-use winapi::um::wingdi::*;
 use winapi::shared::minwindef::*;
-use winapi::um::winuser::*;
-use winapi::um::libloaderapi::*;
 use winapi::shared::ntdef::LPCWSTR;
+use winapi::shared::windef::{HDC, HGLRC, HWND};
+use winapi::um::libloaderapi::*;
+use winapi::um::wingdi::*;
+use winapi::um::winuser::*;
 
-mod make_current_guard;
 mod gl;
+mod make_current_guard;
 
 /// A WGL context.
 ///
@@ -78,15 +78,20 @@ impl Context {
     ///
     /// # Unsafety
     ///
-    /// The `window` must continue to exist as long as the resulting `Context` exists.
+    /// The `window` must continue to exist as long as the resulting `Context`
+    /// exists.
     #[inline]
-    pub unsafe fn new(pf_reqs: &PixelFormatRequirements, opengl: &GlAttributes<HGLRC>,
-                      window: HWND) -> Result<Context, CreationError>
-    {
+    pub unsafe fn new(
+        pf_reqs: &PixelFormatRequirements,
+        opengl: &GlAttributes<HGLRC>,
+        window: HWND,
+    ) -> Result<Context, CreationError> {
         let hdc = GetDC(window);
         if hdc.is_null() {
-            let err = Err(CreationError::OsError(format!("GetDC function failed: {}",
-                                                format!("{}", io::Error::last_os_error()))));
+            let err = Err(CreationError::OsError(format!(
+                "GetDC function failed: {}",
+                format!("{}", io::Error::last_os_error())
+            )));
             return err;
         }
 
@@ -98,26 +103,31 @@ impl Context {
             let data = extra_functions.GetExtensionsStringARB(hdc as *const _);
             let data = CStr::from_ptr(data).to_bytes().to_vec();
             String::from_utf8(data).unwrap()
-
         } else if extra_functions.GetExtensionsStringEXT.is_loaded() {
             let data = extra_functions.GetExtensionsStringEXT();
             let data = CStr::from_ptr(data).to_bytes().to_vec();
             String::from_utf8(data).unwrap()
-
         } else {
             format!("")
         };
 
         // calling SetPixelFormat
         let pixel_format = {
-            let (id, f) = if extensions.split(' ').find(|&i| i == "WGL_ARB_pixel_format")
-                                                  .is_some()
+            let (id, f) = if extensions
+                .split(' ')
+                .find(|&i| i == "WGL_ARB_pixel_format")
+                .is_some()
             {
-                choose_arb_pixel_format(&extra_functions, &extensions, hdc, pf_reqs)
-                                            .map_err(|_| CreationError::NoAvailablePixelFormat)?
+                choose_arb_pixel_format(
+                    &extra_functions,
+                    &extensions,
+                    hdc,
+                    pf_reqs,
+                )
+                .map_err(|_| CreationError::NoAvailablePixelFormat)?
             } else {
                 choose_native_pixel_format(hdc, pf_reqs)
-                                            .map_err(|_| CreationError::NoAvailablePixelFormat)?
+                    .map_err(|_| CreationError::NoAvailablePixelFormat)?
             };
 
             set_pixel_format(hdc, id)?;
@@ -125,18 +135,29 @@ impl Context {
         };
 
         // creating the OpenGL context
-        let context = try!(create_context(Some((&extra_functions, pf_reqs, opengl, &extensions)),
-                                          window, hdc));
+        let context = try!(create_context(
+            Some((&extra_functions, pf_reqs, opengl, &extensions)),
+            window,
+            hdc
+        ));
 
         // loading the opengl32 module
         let gl_library = load_opengl32_dll()?;
 
         // handling vsync
-        if extensions.split(' ').find(|&i| i == "WGL_EXT_swap_control").is_some() {
+        if extensions
+            .split(' ')
+            .find(|&i| i == "WGL_EXT_swap_control")
+            .is_some()
+        {
             let _guard = CurrentContextGuard::make_current(hdc, context.0)?;
 
-            if extra_functions.SwapIntervalEXT(if opengl.vsync { 1 } else { 0 }) == 0 {
-                return Err(CreationError::OsError(format!("wglSwapIntervalEXT failed")));
+            if extra_functions.SwapIntervalEXT(if opengl.vsync { 1 } else { 0 })
+                == 0
+            {
+                return Err(CreationError::OsError(format!(
+                    "wglSwapIntervalEXT failed"
+                )));
             }
         }
 
@@ -156,7 +177,11 @@ impl Context {
 
     #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        if gl::wgl::MakeCurrent(self.hdc as *const _, self.context.0 as *const _) != 0 {
+        if gl::wgl::MakeCurrent(
+            self.hdc as *const _,
+            self.context.0 as *const _,
+        ) != 0
+        {
             Ok(())
         } else {
             Err(ContextError::IoError(io::Error::last_os_error()))
@@ -165,7 +190,9 @@ impl Context {
 
     #[inline]
     pub fn is_current(&self) -> bool {
-        unsafe { gl::wgl::GetCurrentContext() == self.context.0 as *const c_void }
+        unsafe {
+            gl::wgl::GetCurrentContext() == self.context.0 as *const c_void
+        }
     }
 
     pub fn get_proc_address(&self, addr: &str) -> *const () {
@@ -174,7 +201,9 @@ impl Context {
 
         unsafe {
             let p = gl::wgl::GetProcAddress(addr) as *const ();
-            if !p.is_null() { return p; }
+            if !p.is_null() {
+                return p;
+            }
             GetProcAddress(self.gl_library, addr) as *const _
         }
     }
@@ -182,11 +211,11 @@ impl Context {
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
         // TODO: decide how to handle the error
-        /*if unsafe { SwapBuffers(self.hdc) } != 0 {
-            Ok(())
-        } else {
-            Err(ContextError::IoError(io::Error::last_os_error()))
-        }*/
+        // if unsafe { SwapBuffers(self.hdc) } != 0 {
+        // Ok(())
+        // } else {
+        // Err(ContextError::IoError(io::Error::last_os_error()))
+        // }
         unsafe { SwapBuffers(self.hdc) };
         Ok(())
     }
@@ -208,70 +237,109 @@ unsafe impl Sync for Context {}
 
 /// Creates an OpenGL context.
 ///
-/// If `extra` is `Some`, this function will attempt to use the latest WGL functions to create the
-/// context.
+/// If `extra` is `Some`, this function will attempt to use the latest WGL
+/// functions to create the context.
 ///
-/// Otherwise, only the basic API will be used and the chances of `CreationError::NotSupported`
-/// being returned increase.
-unsafe fn create_context(extra: Option<(&gl::wgl_extra::Wgl, &PixelFormatRequirements,
-                                        &GlAttributes<HGLRC>, &str)>,
-                         _: HWND, hdc: HDC)
-                         -> Result<ContextWrapper, CreationError>
-{
+/// Otherwise, only the basic API will be used and the chances of
+/// `CreationError::NotSupported` being returned increase.
+unsafe fn create_context(
+    extra: Option<(
+        &gl::wgl_extra::Wgl,
+        &PixelFormatRequirements,
+        &GlAttributes<HGLRC>,
+        &str,
+    )>,
+    _: HWND,
+    hdc: HDC,
+) -> Result<ContextWrapper, CreationError> {
     let share;
 
     if let Some((extra_functions, _pf_reqs, opengl, extensions)) = extra {
         share = opengl.sharing.unwrap_or(ptr::null_mut());
 
-        if extensions.split(' ').find(|&i| i == "WGL_ARB_create_context").is_some() {
+        if extensions
+            .split(' ')
+            .find(|&i| i == "WGL_ARB_create_context")
+            .is_some()
+        {
             let mut attributes = Vec::new();
 
             match opengl.version {
-                GlRequest::Latest => {},
+                GlRequest::Latest => {}
                 GlRequest::Specific(Api::OpenGl, (major, minor)) => {
-                    attributes.push(gl::wgl_extra::CONTEXT_MAJOR_VERSION_ARB as c_int);
+                    attributes.push(
+                        gl::wgl_extra::CONTEXT_MAJOR_VERSION_ARB as c_int,
+                    );
                     attributes.push(major as c_int);
-                    attributes.push(gl::wgl_extra::CONTEXT_MINOR_VERSION_ARB as c_int);
+                    attributes.push(
+                        gl::wgl_extra::CONTEXT_MINOR_VERSION_ARB as c_int,
+                    );
                     attributes.push(minor as c_int);
-                },
+                }
                 GlRequest::Specific(Api::OpenGlEs, (major, minor)) => {
-                    if extensions.split(' ').find(|&i| i == "WGL_EXT_create_context_es2_profile")
-                                            .is_some()
+                    if extensions
+                        .split(' ')
+                        .find(|&i| i == "WGL_EXT_create_context_es2_profile")
+                        .is_some()
                     {
-                        attributes.push(gl::wgl_extra::CONTEXT_PROFILE_MASK_ARB as c_int);
-                        attributes.push(gl::wgl_extra::CONTEXT_ES2_PROFILE_BIT_EXT as c_int);
+                        attributes.push(
+                            gl::wgl_extra::CONTEXT_PROFILE_MASK_ARB as c_int,
+                        );
+                        attributes.push(
+                            gl::wgl_extra::CONTEXT_ES2_PROFILE_BIT_EXT as c_int,
+                        );
                     } else {
                         return Err(CreationError::OpenGlVersionNotSupported);
                     }
 
-                    attributes.push(gl::wgl_extra::CONTEXT_MAJOR_VERSION_ARB as c_int);
+                    attributes.push(
+                        gl::wgl_extra::CONTEXT_MAJOR_VERSION_ARB as c_int,
+                    );
                     attributes.push(major as c_int);
-                    attributes.push(gl::wgl_extra::CONTEXT_MINOR_VERSION_ARB as c_int);
+                    attributes.push(
+                        gl::wgl_extra::CONTEXT_MINOR_VERSION_ARB as c_int,
+                    );
                     attributes.push(minor as c_int);
-                },
-                GlRequest::Specific(_, _) => return Err(CreationError::OpenGlVersionNotSupported),
-                GlRequest::GlThenGles { opengl_version: (major, minor), .. } => {
-                    attributes.push(gl::wgl_extra::CONTEXT_MAJOR_VERSION_ARB as c_int);
+                }
+                GlRequest::Specific(_, _) => {
+                    return Err(CreationError::OpenGlVersionNotSupported);
+                }
+                GlRequest::GlThenGles {
+                    opengl_version: (major, minor),
+                    ..
+                } => {
+                    attributes.push(
+                        gl::wgl_extra::CONTEXT_MAJOR_VERSION_ARB as c_int,
+                    );
                     attributes.push(major as c_int);
-                    attributes.push(gl::wgl_extra::CONTEXT_MINOR_VERSION_ARB as c_int);
+                    attributes.push(
+                        gl::wgl_extra::CONTEXT_MINOR_VERSION_ARB as c_int,
+                    );
                     attributes.push(minor as c_int);
-                },
+                }
             }
 
             if let Some(profile) = opengl.profile {
-                if extensions.split(' ').find(|&i| i == "WGL_ARB_create_context_profile").is_some()
+                if extensions
+                    .split(' ')
+                    .find(|&i| i == "WGL_ARB_create_context_profile")
+                    .is_some()
                 {
                     let flag = match profile {
-                        GlProfile::Compatibility =>
-                            gl::wgl_extra::CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
-                        GlProfile::Core =>
-                            gl::wgl_extra::CONTEXT_CORE_PROFILE_BIT_ARB,
+                        GlProfile::Compatibility => {
+                            gl::wgl_extra::CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB
+                        }
+                        GlProfile::Core => {
+                            gl::wgl_extra::CONTEXT_CORE_PROFILE_BIT_ARB
+                        }
                     };
-                    attributes.push(gl::wgl_extra::CONTEXT_PROFILE_MASK_ARB as c_int);
+                    attributes
+                        .push(gl::wgl_extra::CONTEXT_PROFILE_MASK_ARB as c_int);
                     attributes.push(flag as c_int);
                 } else {
                     return Err(CreationError::NotSupported(
-                            "required extension \"WGL_ARB_create_context_profile\" not found"));
+                        "required extension \"WGL_ARB_create_context_profile\" not found",
+                    ));
                 }
             }
 
@@ -279,32 +347,54 @@ unsafe fn create_context(extra: Option<(&gl::wgl_extra::Wgl, &PixelFormatRequire
                 let mut flags = 0;
 
                 // robustness
-                if extensions.split(' ').find(|&i| i == "WGL_ARB_create_context_robustness").is_some() {
+                if extensions
+                    .split(' ')
+                    .find(|&i| i == "WGL_ARB_create_context_robustness")
+                    .is_some()
+                {
                     match opengl.robustness {
-                        Robustness::RobustNoResetNotification | Robustness::TryRobustNoResetNotification => {
-                            attributes.push(gl::wgl_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB as c_int);
-                            attributes.push(gl::wgl_extra::NO_RESET_NOTIFICATION_ARB as c_int);
-                            flags = flags | gl::wgl_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as c_int;
-                        },
-                        Robustness::RobustLoseContextOnReset | Robustness::TryRobustLoseContextOnReset => {
-                            attributes.push(gl::wgl_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB as c_int);
-                            attributes.push(gl::wgl_extra::LOSE_CONTEXT_ON_RESET_ARB as c_int);
-                            flags = flags | gl::wgl_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as c_int;
-                        },
+                        Robustness::RobustNoResetNotification
+                        | Robustness::TryRobustNoResetNotification => {
+                            attributes.push(
+                                gl::wgl_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB as c_int,
+                            );
+                            attributes.push(
+                                gl::wgl_extra::NO_RESET_NOTIFICATION_ARB
+                                    as c_int,
+                            );
+                            flags = flags
+                                | gl::wgl_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB
+                                    as c_int;
+                        }
+                        Robustness::RobustLoseContextOnReset
+                        | Robustness::TryRobustLoseContextOnReset => {
+                            attributes.push(
+                                gl::wgl_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB as c_int,
+                            );
+                            attributes.push(
+                                gl::wgl_extra::LOSE_CONTEXT_ON_RESET_ARB
+                                    as c_int,
+                            );
+                            flags = flags
+                                | gl::wgl_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB
+                                    as c_int;
+                        }
                         Robustness::NotRobust => (),
                         Robustness::NoError => (),
                     }
                 } else {
                     match opengl.robustness {
-                        Robustness::RobustNoResetNotification | Robustness::RobustLoseContextOnReset => {
+                        Robustness::RobustNoResetNotification
+                        | Robustness::RobustLoseContextOnReset => {
                             return Err(CreationError::RobustnessNotSupported);
-                        },
-                        _ => ()
+                        }
+                        _ => (),
                     }
                 }
 
                 if opengl.debug {
-                    flags = flags | gl::wgl_extra::CONTEXT_DEBUG_BIT_ARB as c_int;
+                    flags =
+                        flags | gl::wgl_extra::CONTEXT_DEBUG_BIT_ARB as c_int;
                 }
 
                 flags
@@ -315,32 +405,39 @@ unsafe fn create_context(extra: Option<(&gl::wgl_extra::Wgl, &PixelFormatRequire
 
             attributes.push(0);
 
-            let ctx = extra_functions.CreateContextAttribsARB(hdc as *const c_void,
-                                                               share as *const c_void,
-                                                               attributes.as_ptr());
+            let ctx = extra_functions.CreateContextAttribsARB(
+                hdc as *const c_void,
+                share as *const c_void,
+                attributes.as_ptr(),
+            );
 
             if ctx.is_null() {
-                return Err(CreationError::OsError(format!("wglCreateContextAttribsARB failed: {}",
-                                                      format!("{}", io::Error::last_os_error()))));
+                return Err(CreationError::OsError(format!(
+                    "wglCreateContextAttribsARB failed: {}",
+                    format!("{}", io::Error::last_os_error())
+                )));
             } else {
                 return Ok(ContextWrapper(ctx as HGLRC));
             }
         }
-
     } else {
         share = ptr::null_mut();
     }
 
     let ctx = gl::wgl::CreateContext(hdc as *const c_void);
     if ctx.is_null() {
-        return Err(CreationError::OsError(format!("wglCreateContext failed: {}",
-                                                  format!("{}", io::Error::last_os_error()))));
+        return Err(CreationError::OsError(format!(
+            "wglCreateContext failed: {}",
+            format!("{}", io::Error::last_os_error())
+        )));
     }
 
     if !share.is_null() {
         if gl::wgl::ShareLists(share as *const c_void, ctx) == 0 {
-            return Err(CreationError::OsError(format!("wglShareLists failed: {}",
-                                                      format!("{}", io::Error::last_os_error()))));
+            return Err(CreationError::OsError(format!(
+                "wglShareLists failed: {}",
+                format!("{}", io::Error::last_os_error())
+            )));
         }
     };
 
@@ -350,9 +447,10 @@ unsafe fn create_context(extra: Option<(&gl::wgl_extra::Wgl, &PixelFormatRequire
 /// Chooses a pixel formats without using WGL.
 ///
 /// Gives less precise results than `enumerate_arb_pixel_formats`.
-unsafe fn choose_native_pixel_format(hdc: HDC, reqs: &PixelFormatRequirements)
-                                     -> Result<(c_int, PixelFormat), ()>
-{
+unsafe fn choose_native_pixel_format(
+    hdc: HDC,
+    reqs: &PixelFormatRequirements,
+) -> Result<(c_int, PixelFormat), ()> {
     // TODO: hardware acceleration is not handled
 
     // handling non-supported stuff
@@ -363,7 +461,7 @@ unsafe fn choose_native_pixel_format(hdc: HDC, reqs: &PixelFormatRequirements)
     match reqs.multisampling {
         Some(0) => (),
         None => (),
-        Some(_) => return Err(())
+        Some(_) => return Err(()),
     };
 
     if reqs.stereoscopy {
@@ -384,16 +482,12 @@ unsafe fn choose_native_pixel_format(hdc: HDC, reqs: &PixelFormatRequirements)
         nVersion: 1,
         dwFlags: {
             let f1 = match reqs.double_buffer {
-                None => PFD_DOUBLEBUFFER, // Should be PFD_DOUBLEBUFFER_DONTCARE after you can choose
+                None => PFD_DOUBLEBUFFER, /* Should be PFD_DOUBLEBUFFER_DONTCARE after you can choose */
                 Some(true) => PFD_DOUBLEBUFFER,
                 Some(false) => 0,
             };
 
-            let f2 = if reqs.stereoscopy {
-                PFD_STEREO
-            } else {
-                0
-            };
+            let f2 = if reqs.stereoscopy { PFD_STEREO } else { 0 };
 
             PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | f1 | f2
         },
@@ -430,14 +524,18 @@ unsafe fn choose_native_pixel_format(hdc: HDC, reqs: &PixelFormatRequirements)
 
     // querying back the capabilities of what windows told us
     let mut output: PIXELFORMATDESCRIPTOR = mem::zeroed();
-    if DescribePixelFormat(hdc, pf_id, mem::size_of::<PIXELFORMATDESCRIPTOR>() as u32,
-                                  &mut output) == 0
+    if DescribePixelFormat(
+        hdc,
+        pf_id,
+        mem::size_of::<PIXELFORMATDESCRIPTOR>() as u32,
+        &mut output,
+    ) == 0
     {
         return Err(());
     }
 
-    // windows may return us a non-conforming pixel format if none are supported, so we have to
-    // check this
+    // windows may return us a non-conforming pixel format if none are
+    // supported, so we have to check this
     if (output.dwFlags & PFD_DRAW_TO_WINDOW) == 0 {
         return Err(());
     }
@@ -489,10 +587,12 @@ unsafe fn choose_native_pixel_format(hdc: HDC, reqs: &PixelFormatRequirements)
 /// Enumerates the list of pixel formats by using extra WGL functions.
 ///
 /// Gives more precise results than `enumerate_native_pixel_formats`.
-unsafe fn choose_arb_pixel_format(extra: &gl::wgl_extra::Wgl, extensions: &str,
-                                  hdc: HDC, reqs: &PixelFormatRequirements)
-                                  -> Result<(c_int, PixelFormat), ()>
-{
+unsafe fn choose_arb_pixel_format(
+    extra: &gl::wgl_extra::Wgl,
+    extensions: &str,
+    hdc: HDC,
+    reqs: &PixelFormatRequirements,
+) -> Result<(c_int, PixelFormat), ()> {
     let descriptor = {
         let mut out: Vec<c_int> = Vec::with_capacity(37);
 
@@ -504,7 +604,11 @@ unsafe fn choose_arb_pixel_format(extra: &gl::wgl_extra::Wgl, extensions: &str,
 
         out.push(gl::wgl_extra::PIXEL_TYPE_ARB as c_int);
         if reqs.float_color_buffer {
-            if extensions.split(' ').find(|&i| i == "WGL_ARB_pixel_format_float").is_some() {
+            if extensions
+                .split(' ')
+                .find(|&i| i == "WGL_ARB_pixel_format_float")
+                .is_some()
+            {
                 out.push(gl::wgl_extra::TYPE_RGBA_FLOAT_ARB as c_int);
             } else {
                 return Err(());
@@ -542,13 +646,18 @@ unsafe fn choose_arb_pixel_format(extra: &gl::wgl_extra::Wgl, extensions: &str,
             out.push(stencil as c_int);
         }
 
-        // Prefer double buffering if unspecified (probably shouldn't once you can choose)
+        // Prefer double buffering if unspecified (probably shouldn't once you
+        // can choose)
         let double_buffer = reqs.double_buffer.unwrap_or(true);
         out.push(gl::wgl_extra::DOUBLE_BUFFER_ARB as c_int);
         out.push(if double_buffer { 1 } else { 0 });
 
         if let Some(multisampling) = reqs.multisampling {
-            if extensions.split(' ').find(|&i| i == "WGL_ARB_multisample").is_some() {
+            if extensions
+                .split(' ')
+                .find(|&i| i == "WGL_ARB_multisample")
+                .is_some()
+            {
                 out.push(gl::wgl_extra::SAMPLE_BUFFERS_ARB as c_int);
                 out.push(if multisampling == 0 { 0 } else { 1 });
                 out.push(gl::wgl_extra::SAMPLES_ARB as c_int);
@@ -562,10 +671,18 @@ unsafe fn choose_arb_pixel_format(extra: &gl::wgl_extra::Wgl, extensions: &str,
         out.push(if reqs.stereoscopy { 1 } else { 0 });
 
         if reqs.srgb {
-            if extensions.split(' ').find(|&i| i == "WGL_ARB_framebuffer_sRGB").is_some() {
+            if extensions
+                .split(' ')
+                .find(|&i| i == "WGL_ARB_framebuffer_sRGB")
+                .is_some()
+            {
                 out.push(gl::wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as c_int);
                 out.push(1);
-            } else if extensions.split(' ').find(|&i| i == "WGL_EXT_framebuffer_sRGB").is_some() {
+            } else if extensions
+                .split(' ')
+                .find(|&i| i == "WGL_EXT_framebuffer_sRGB")
+                .is_some()
+            {
                 out.push(gl::wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as c_int);
                 out.push(1);
             } else {
@@ -576,11 +693,20 @@ unsafe fn choose_arb_pixel_format(extra: &gl::wgl_extra::Wgl, extensions: &str,
         match reqs.release_behavior {
             ReleaseBehavior::Flush => (),
             ReleaseBehavior::None => {
-                if extensions.split(' ').find(|&i| i == "WGL_ARB_context_flush_control").is_some() {
-                    out.push(gl::wgl_extra::CONTEXT_RELEASE_BEHAVIOR_ARB as c_int);
-                    out.push(gl::wgl_extra::CONTEXT_RELEASE_BEHAVIOR_NONE_ARB as c_int);
+                if extensions
+                    .split(' ')
+                    .find(|&i| i == "WGL_ARB_context_flush_control")
+                    .is_some()
+                {
+                    out.push(
+                        gl::wgl_extra::CONTEXT_RELEASE_BEHAVIOR_ARB as c_int,
+                    );
+                    out.push(
+                        gl::wgl_extra::CONTEXT_RELEASE_BEHAVIOR_NONE_ARB
+                            as c_int,
+                    );
                 }
-            },
+            }
         }
 
         out.push(0);
@@ -589,8 +715,14 @@ unsafe fn choose_arb_pixel_format(extra: &gl::wgl_extra::Wgl, extensions: &str,
 
     let mut format_id = mem::uninitialized();
     let mut num_formats = mem::uninitialized();
-    if extra.ChoosePixelFormatARB(hdc as *const _, descriptor.as_ptr(), ptr::null(), 1,
-                                  &mut format_id, &mut num_formats) == 0
+    if extra.ChoosePixelFormatARB(
+        hdc as *const _,
+        descriptor.as_ptr(),
+        ptr::null(),
+        1,
+        &mut format_id,
+        &mut num_formats,
+    ) == 0
     {
         return Err(());
     }
@@ -601,25 +733,34 @@ unsafe fn choose_arb_pixel_format(extra: &gl::wgl_extra::Wgl, extensions: &str,
 
     let get_info = |attrib: u32| {
         let mut value = mem::uninitialized();
-        extra.GetPixelFormatAttribivARB(hdc as *const _, format_id as c_int,
-                                        0, 1, [attrib as c_int].as_ptr(),
-                                        &mut value);
+        extra.GetPixelFormatAttribivARB(
+            hdc as *const _,
+            format_id as c_int,
+            0,
+            1,
+            [attrib as c_int].as_ptr(),
+            &mut value,
+        );
         value as u32
     };
 
     let pf_desc = PixelFormat {
-        hardware_accelerated: get_info(gl::wgl_extra::ACCELERATION_ARB) !=
-                                                                gl::wgl_extra::NO_ACCELERATION_ARB,
-        color_bits: get_info(gl::wgl_extra::RED_BITS_ARB) as u8 +
-                    get_info(gl::wgl_extra::GREEN_BITS_ARB) as u8 +
-                    get_info(gl::wgl_extra::BLUE_BITS_ARB) as u8,
+        hardware_accelerated: get_info(gl::wgl_extra::ACCELERATION_ARB)
+            != gl::wgl_extra::NO_ACCELERATION_ARB,
+        color_bits: get_info(gl::wgl_extra::RED_BITS_ARB) as u8
+            + get_info(gl::wgl_extra::GREEN_BITS_ARB) as u8
+            + get_info(gl::wgl_extra::BLUE_BITS_ARB) as u8,
         alpha_bits: get_info(gl::wgl_extra::ALPHA_BITS_ARB) as u8,
         depth_bits: get_info(gl::wgl_extra::DEPTH_BITS_ARB) as u8,
         stencil_bits: get_info(gl::wgl_extra::STENCIL_BITS_ARB) as u8,
         stereoscopy: get_info(gl::wgl_extra::STEREO_ARB) != 0,
         double_buffer: get_info(gl::wgl_extra::DOUBLE_BUFFER_ARB) != 0,
         multisampling: {
-            if extensions.split(' ').find(|&i| i == "WGL_ARB_multisample").is_some() {
+            if extensions
+                .split(' ')
+                .find(|&i| i == "WGL_ARB_multisample")
+                .is_some()
+            {
                 match get_info(gl::wgl_extra::SAMPLES_ARB) {
                     0 => None,
                     a => Some(a as u16),
@@ -628,9 +769,17 @@ unsafe fn choose_arb_pixel_format(extra: &gl::wgl_extra::Wgl, extensions: &str,
                 None
             }
         },
-        srgb: if extensions.split(' ').find(|&i| i == "WGL_ARB_framebuffer_sRGB").is_some() {
+        srgb: if extensions
+            .split(' ')
+            .find(|&i| i == "WGL_ARB_framebuffer_sRGB")
+            .is_some()
+        {
             get_info(gl::wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB) != 0
-        } else if extensions.split(' ').find(|&i| i == "WGL_EXT_framebuffer_sRGB").is_some() {
+        } else if extensions
+            .split(' ')
+            .find(|&i| i == "WGL_EXT_framebuffer_sRGB")
+            .is_some()
+        {
             get_info(gl::wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT) != 0
         } else {
             false
@@ -644,16 +793,24 @@ unsafe fn choose_arb_pixel_format(extra: &gl::wgl_extra::Wgl, extensions: &str,
 unsafe fn set_pixel_format(hdc: HDC, id: c_int) -> Result<(), CreationError> {
     let mut output: PIXELFORMATDESCRIPTOR = mem::zeroed();
 
-    if DescribePixelFormat(hdc, id, mem::size_of::<PIXELFORMATDESCRIPTOR>()
-                                  as UINT, &mut output) == 0
+    if DescribePixelFormat(
+        hdc,
+        id,
+        mem::size_of::<PIXELFORMATDESCRIPTOR>() as UINT,
+        &mut output,
+    ) == 0
     {
-        return Err(CreationError::OsError(format!("DescribePixelFormat function failed: {}",
-                                                  format!("{}", io::Error::last_os_error()))));
+        return Err(CreationError::OsError(format!(
+            "DescribePixelFormat function failed: {}",
+            format!("{}", io::Error::last_os_error())
+        )));
     }
 
     if SetPixelFormat(hdc, id, &output) == 0 {
-        return Err(CreationError::OsError(format!("SetPixelFormat function failed: {}",
-                                                  format!("{}", io::Error::last_os_error()))));
+        return Err(CreationError::OsError(format!(
+            "SetPixelFormat function failed: {}",
+            format!("{}", io::Error::last_os_error())
+        )));
     }
 
     Ok(())
@@ -661,14 +818,18 @@ unsafe fn set_pixel_format(hdc: HDC, id: c_int) -> Result<(), CreationError> {
 
 /// Loads the `opengl32.dll` library.
 unsafe fn load_opengl32_dll() -> Result<HMODULE, CreationError> {
-    let name = OsStr::new("opengl32.dll").encode_wide().chain(Some(0).into_iter())
-                                         .collect::<Vec<_>>();
+    let name = OsStr::new("opengl32.dll")
+        .encode_wide()
+        .chain(Some(0).into_iter())
+        .collect::<Vec<_>>();
 
     let lib = LoadLibraryW(name.as_ptr());
 
     if lib.is_null() {
-        return Err(CreationError::OsError(format!("LoadLibrary function failed: {}",
-                                                  format!("{}", io::Error::last_os_error()))));
+        return Err(CreationError::OsError(format!(
+            "LoadLibrary function failed: {}",
+            format!("{}", io::Error::last_os_error())
+        )));
     }
 
     Ok(lib)
@@ -676,11 +837,15 @@ unsafe fn load_opengl32_dll() -> Result<HMODULE, CreationError> {
 
 /// Loads the WGL functions that are not guaranteed to be supported.
 ///
-/// The `window` must be passed because the driver can vary depending on the window's
-/// characteristics.
-unsafe fn load_extra_functions(window: HWND) -> Result<gl::wgl_extra::Wgl, CreationError> {
-    let (ex_style, style) = (WS_EX_APPWINDOW, WS_POPUP |
-                             WS_CLIPSIBLINGS | WS_CLIPCHILDREN);
+/// The `window` must be passed because the driver can vary depending on the
+/// window's characteristics.
+unsafe fn load_extra_functions(
+    window: HWND,
+) -> Result<gl::wgl_extra::Wgl, CreationError> {
+    let (ex_style, style) = (
+        WS_EX_APPWINDOW,
+        WS_POPUP | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
+    );
 
     // creating a dummy invisible window
     let dummy_window = {
@@ -697,8 +862,10 @@ unsafe fn load_extra_functions(window: HWND) -> Result<gl::wgl_extra::Wgl, Creat
         // getting the class name of the real window
         let mut class_name = [0u16; 128];
         if GetClassNameW(window, class_name.as_mut_ptr(), 128) == 0 {
-            return Err(CreationError::OsError(format!("GetClassNameW function failed: {}",
-                                              format!("{}", io::Error::last_os_error()))));
+            return Err(CreationError::OsError(format!(
+                "GetClassNameW function failed: {}",
+                format!("{}", io::Error::last_os_error())
+            )));
         }
 
         // access to class information of the real window
@@ -706,45 +873,63 @@ unsafe fn load_extra_functions(window: HWND) -> Result<gl::wgl_extra::Wgl, Creat
         let mut class: WNDCLASSEXW = mem::zeroed();
 
         if GetClassInfoExW(instance, class_name.as_ptr(), &mut class) == 0 {
-            return Err(CreationError::OsError(format!("GetClassInfoExW function failed: {}",
-                                              format!("{}", io::Error::last_os_error()))));
+            return Err(CreationError::OsError(format!(
+                "GetClassInfoExW function failed: {}",
+                format!("{}", io::Error::last_os_error())
+            )));
         }
 
         // register a new class for the dummy window,
         // similar to the class of the real window but with a different callback
-        let class_name = OsStr::new("WglDummy Class").encode_wide().chain(Some(0).into_iter())
-                                                   .collect::<Vec<_>>();
+        let class_name = OsStr::new("WglDummy Class")
+            .encode_wide()
+            .chain(Some(0).into_iter())
+            .collect::<Vec<_>>();
 
         class.cbSize = mem::size_of::<WNDCLASSEXW>() as UINT;
         class.lpszClassName = class_name.as_ptr();
         class.lpfnWndProc = Some(DefWindowProcW);
 
-        // this shouldn't fail if the registration of the real window class worked.
-        // multiple registrations of the window class trigger an error which we want
-        // to ignore silently (e.g for multi-window setups)
+        // this shouldn't fail if the registration of the real window class
+        // worked. multiple registrations of the window class trigger an
+        // error which we want to ignore silently (e.g for multi-window
+        // setups)
         RegisterClassExW(&class);
 
-        // this dummy window should match the real one enough to get the same OpenGL driver
-        let title = OsStr::new("dummy window").encode_wide().chain(Some(0).into_iter())
-                                              .collect::<Vec<_>>();
-        let win = CreateWindowExW(ex_style, class_name.as_ptr(),
-                                          title.as_ptr() as LPCWSTR, style,
-                                          CW_USEDEFAULT, CW_USEDEFAULT,
-                                          rect.right - rect.left,
-                                          rect.bottom - rect.top,
-                                          ptr::null_mut(), ptr::null_mut(),
-                                          GetModuleHandleW(ptr::null()),
-                                          ptr::null_mut());
+        // this dummy window should match the real one enough to get the same
+        // OpenGL driver
+        let title = OsStr::new("dummy window")
+            .encode_wide()
+            .chain(Some(0).into_iter())
+            .collect::<Vec<_>>();
+        let win = CreateWindowExW(
+            ex_style,
+            class_name.as_ptr(),
+            title.as_ptr() as LPCWSTR,
+            style,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            rect.right - rect.left,
+            rect.bottom - rect.top,
+            ptr::null_mut(),
+            ptr::null_mut(),
+            GetModuleHandleW(ptr::null()),
+            ptr::null_mut(),
+        );
 
         if win.is_null() {
-            return Err(CreationError::OsError(format!("CreateWindowEx function failed: {}",
-                                              format!("{}", io::Error::last_os_error()))));
+            return Err(CreationError::OsError(format!(
+                "CreateWindowEx function failed: {}",
+                format!("{}", io::Error::last_os_error())
+            )));
         }
 
         let hdc = GetDC(win);
         if hdc.is_null() {
-            let err = Err(CreationError::OsError(format!("GetDC function failed: {}",
-                                               format!("{}", io::Error::last_os_error()))));
+            let err = Err(CreationError::OsError(format!(
+                "GetDC function failed: {}",
+                format!("{}", io::Error::last_os_error())
+            )));
             return err;
         }
 
@@ -759,8 +944,8 @@ unsafe fn load_extra_functions(window: HWND) -> Result<gl::wgl_extra::Wgl, Creat
 
     // creating the dummy OpenGL context and making it current
     let dummy_context = create_context(None, dummy_window.0, dummy_window.1)?;
-    let _current_context = CurrentContextGuard::make_current(dummy_window.1,
-                                                                  dummy_context.0)?;
+    let _current_context =
+        CurrentContextGuard::make_current(dummy_window.1, dummy_context.0)?;
 
     // loading the extra WGL functions
     Ok(gl::wgl_extra::Wgl::load_with(|addr| {
@@ -806,7 +991,9 @@ fn choose_dummy_pixel_format(hdc: HDC) -> Result<c_int, CreationError> {
     // now querying
     let pf_id = unsafe { ChoosePixelFormat(hdc, &descriptor) };
     if pf_id == 0 {
-        return Err(CreationError::OsError("No available pixel format".to_owned()));
+        return Err(CreationError::OsError(
+            "No available pixel format".to_owned(),
+        ));
     }
 
     Ok(pf_id)

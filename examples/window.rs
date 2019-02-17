@@ -2,7 +2,7 @@ extern crate glutin;
 
 mod support;
 
-use glutin::GlContext;
+use glutin::ContextTrait;
 
 fn main() {
     let mut el = glutin::EventsLoop::new();
@@ -13,7 +13,10 @@ fn main() {
 
     let _ = unsafe { combined_context.make_current() };
 
-    println!("Pixel format of the window's GL context: {:?}", combined_context.get_pixel_format());
+    println!(
+        "Pixel format of the window's GL context: {:?}",
+        combined_context.get_pixel_format()
+    );
 
     let gl = support::load(&combined_context.context());
 
@@ -26,11 +29,12 @@ fn main() {
                     glutin::WindowEvent::CloseRequested => running = false,
                     glutin::WindowEvent::Resized(logical_size) => {
                         let dpi_factor = combined_context.get_hidpi_factor();
-                        combined_context.resize(logical_size.to_physical(dpi_factor));
-                    },
+                        combined_context
+                            .resize(logical_size.to_physical(dpi_factor));
+                    }
                     _ => (),
                 },
-                _ => ()
+                _ => (),
             }
         });
 

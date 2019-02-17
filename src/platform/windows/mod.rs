@@ -73,7 +73,8 @@ impl Context {
             pf_reqs,
             &opengl.clone().map_sharing(|w| &w.0),
             EGL.as_ref().map(|w| &w.0),
-        ).map(|(w, c)| (w, Context(c)))
+        )
+        .map(|(w, c)| (w, Context(c)))
     }
 
     /// See the docs in the crate root file.
@@ -89,7 +90,8 @@ impl Context {
             pf_reqs,
             &gl_attr.clone().map_sharing(|w| &w.0),
             EGL.as_ref().map(|w| &w.0),
-        ).map(|c| Context(c))
+        )
+        .map(|c| Context(c))
     }
 
     /// See the docs in the crate root file.
@@ -104,7 +106,8 @@ impl Context {
             pf_reqs,
             &gl_attr.clone().map_sharing(|w| &w.0),
             EGL.as_ref().map(|w| &w.0),
-        ).map(|c| Context(c))
+        )
+        .map(|c| Context(c))
     }
 }
 

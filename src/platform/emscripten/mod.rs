@@ -21,22 +21,25 @@ impl Context {
         el: &winit::EventsLoop,
         _pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-    ) -> Result<(winit::Window, Self), CreationError>
-    {
+    ) -> Result<(winit::Window, Self), CreationError> {
         let window = wb.build(el)?;
 
-        let gl_attr = gl_attr.clone().map_sharing(|_| unimplemented!("Shared contexts are unimplemented in WebGL."));
+        let gl_attr = gl_attr.clone().map_sharing(|_| {
+            unimplemented!("Shared contexts are unimplemented in WebGL.")
+        });
 
         // getting the default values of attributes
         let mut attributes = unsafe {
             use std::mem;
-            let mut attributes: ffi::EmscriptenWebGLContextAttributes = mem::uninitialized();
+            let mut attributes: ffi::EmscriptenWebGLContextAttributes =
+                mem::uninitialized();
             ffi::emscripten_webgl_init_context_attributes(&mut attributes);
             attributes
         };
 
         // setting the attributes
-        if let GlRequest::Specific(Api::WebGl, (major, minor)) = gl_attr.version {
+        if let GlRequest::Specific(Api::WebGl, (major, minor)) = gl_attr.version
+        {
             attributes.majorVersion = major as _;
             attributes.minorVersion = minor as _;
         }
@@ -45,10 +48,13 @@ impl Context {
         let context = unsafe {
             use std::{mem, ptr};
             // TODO: correct first parameter based on the window
-            let context = ffi::emscripten_webgl_create_context(ptr::null(), &attributes);
+            let context =
+                ffi::emscripten_webgl_create_context(ptr::null(), &attributes);
             if context <= 0 {
-                return Err(CreationError::OsError(format!("Error while calling emscripten_webgl_create_context: {}",
-                    error_to_str(mem::transmute(context)))));
+                return Err(CreationError::OsError(format!(
+                    "Error while calling emscripten_webgl_create_context: {}",
+                    error_to_str(mem::transmute(context))
+                )));
             }
             context
         };
@@ -109,8 +115,10 @@ impl Context {
         let addr = CString::new(addr).unwrap();
 
         unsafe {
-            // FIXME: if `as_ptr()` is used, then wrong data is passed to emscripten
-            ffi::emscripten_GetProcAddress(addr.into_raw() as *const _) as *const _
+            // FIXME: if `as_ptr()` is used, then wrong data is passed to
+            // emscripten
+            ffi::emscripten_GetProcAddress(addr.into_raw() as *const _)
+                as *const _
         }
     }
 
@@ -159,8 +167,9 @@ impl Drop for Context {
 
 fn error_to_str(code: ffi::EMSCRIPTEN_RESULT) -> &'static str {
     match code {
-        ffi::EMSCRIPTEN_RESULT_SUCCESS | ffi::EMSCRIPTEN_RESULT_DEFERRED
-            => "Internal error in the library (success detected as failure)",
+        ffi::EMSCRIPTEN_RESULT_SUCCESS | ffi::EMSCRIPTEN_RESULT_DEFERRED => {
+            "Internal error in the library (success detected as failure)"
+        }
 
         ffi::EMSCRIPTEN_RESULT_NOT_SUPPORTED => "Not supported",
         ffi::EMSCRIPTEN_RESULT_FAILED_NOT_DEFERRED => "Failed not deferred",
@@ -170,6 +179,6 @@ fn error_to_str(code: ffi::EMSCRIPTEN_RESULT) -> &'static str {
         ffi::EMSCRIPTEN_RESULT_FAILED => "Failed",
         ffi::EMSCRIPTEN_RESULT_NO_DATA => "No data",
 
-        _ => "Undocumented error"
+        _ => "Undocumented error",
     }
 }

@@ -2,27 +2,32 @@
 
 pub use winit::MonitorId;
 
-use CreationError;
 use ContextError;
+use CreationError;
 use GlAttributes;
 use PixelFormat;
 use PixelFormatRequirements;
 use Robustness;
 
-use cgl::{CGLEnable, kCGLCECrashOnRemovedFunctions, CGLSetParameter, kCGLCPSurfaceOpacity};
+use cgl::{
+    kCGLCECrashOnRemovedFunctions, kCGLCPSurfaceOpacity, CGLEnable,
+    CGLSetParameter,
+};
 use cocoa::appkit::{self, NSOpenGLContext, NSOpenGLPixelFormat};
 use cocoa::base::{id, nil};
 use cocoa::foundation::NSAutoreleasePool;
 use core_foundation::base::TCFType;
+use core_foundation::bundle::{
+    CFBundleGetBundleWithIdentifier, CFBundleGetFunctionPointerForName,
+};
 use core_foundation::string::CFString;
-use core_foundation::bundle::{CFBundleGetBundleWithIdentifier, CFBundleGetFunctionPointerForName};
 use objc::runtime::{BOOL, NO};
 use winit;
 use winit::os::macos::WindowExt;
 
-use std::str::FromStr;
 use std::ops::Deref;
 use std::os::raw::c_void;
+use std::str::FromStr;
 
 mod helpers;
 
@@ -48,8 +53,7 @@ impl Context {
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-    ) -> Result<(winit::Window, Self), CreationError>
-    {
+    ) -> Result<(winit::Window, Self), CreationError> {
         let transparent = wb.window.transparent;
         let window = wb.build(el)?;
 
@@ -58,8 +62,8 @@ impl Context {
         }
 
         match gl_attr.robustness {
-            Robustness::RobustNoResetNotification |
-            Robustness::RobustLoseContextOnReset => {
+            Robustness::RobustNoResetNotification
+            | Robustness::RobustLoseContextOnReset => {
                 return Err(CreationError::RobustnessNotSupported);
             }
             _ => (),
@@ -70,41 +74,59 @@ impl Context {
         let gl_profile = helpers::get_gl_profile(gl_attr, pf_reqs)?;
         let attributes = helpers::build_nsattributes(pf_reqs, gl_profile)?;
         unsafe {
-            let pixel_format = IdRef::new(NSOpenGLPixelFormat::alloc(nil)
-                .initWithAttributes_(&attributes));
+            let pixel_format = IdRef::new(
+                NSOpenGLPixelFormat::alloc(nil)
+                    .initWithAttributes_(&attributes),
+            );
             let pixel_format = match pixel_format.non_nil() {
                 None => return Err(CreationError::NoAvailablePixelFormat),
                 Some(pf) => pf,
             };
 
             // TODO: Add context sharing
-            let gl_context = IdRef::new(NSOpenGLContext::alloc(nil)
-                .initWithFormat_shareContext_(*pixel_format, nil));
+            let gl_context = IdRef::new(
+                NSOpenGLContext::alloc(nil)
+                    .initWithFormat_shareContext_(*pixel_format, nil),
+            );
             let gl_context = match gl_context.non_nil() {
                 Some(gl_context) => gl_context,
-                None => return Err(CreationError::NotSupported("could not open gl context")),
+                None => {
+                    return Err(CreationError::NotSupported(
+                        "could not open gl context",
+                    ));
+                }
             };
 
             let pixel_format = {
-                let get_attr = |attrib: appkit::NSOpenGLPixelFormatAttribute| -> i32 {
-                    let mut value = 0;
-                    NSOpenGLPixelFormat::getValues_forAttribute_forVirtualScreen_(
+                let get_attr =
+                    |attrib: appkit::NSOpenGLPixelFormatAttribute| -> i32 {
+                        let mut value = 0;
+                        NSOpenGLPixelFormat::getValues_forAttribute_forVirtualScreen_(
                         *pixel_format,
                         &mut value,
                         attrib,
-                        NSOpenGLContext::currentVirtualScreen(*gl_context));
-                    value
-                };
+                        NSOpenGLContext::currentVirtualScreen(*gl_context),
+                    );
+                        value
+                    };
 
                 PixelFormat {
-                    hardware_accelerated: get_attr(appkit::NSOpenGLPFAAccelerated) != 0,
-                    color_bits: (get_attr(appkit::NSOpenGLPFAColorSize) - get_attr(appkit::NSOpenGLPFAAlphaSize)) as u8,
+                    hardware_accelerated: get_attr(
+                        appkit::NSOpenGLPFAAccelerated,
+                    ) != 0,
+                    color_bits: (get_attr(appkit::NSOpenGLPFAColorSize)
+                        - get_attr(appkit::NSOpenGLPFAAlphaSize))
+                        as u8,
                     alpha_bits: get_attr(appkit::NSOpenGLPFAAlphaSize) as u8,
                     depth_bits: get_attr(appkit::NSOpenGLPFADepthSize) as u8,
-                    stencil_bits: get_attr(appkit::NSOpenGLPFAStencilSize) as u8,
+                    stencil_bits: get_attr(appkit::NSOpenGLPFAStencilSize)
+                        as u8,
                     stereoscopy: get_attr(appkit::NSOpenGLPFAStereo) != 0,
-                    double_buffer: get_attr(appkit::NSOpenGLPFADoubleBuffer) != 0,
-                    multisampling: if get_attr(appkit::NSOpenGLPFAMultisample) > 0 {
+                    double_buffer: get_attr(appkit::NSOpenGLPFADoubleBuffer)
+                        != 0,
+                    multisampling: if get_attr(appkit::NSOpenGLPFAMultisample)
+                        > 0
+                    {
                         Some(get_attr(appkit::NSOpenGLPFASamples) as u16)
                     } else {
                         None
@@ -115,16 +137,29 @@ impl Context {
 
             gl_context.setView_(view);
             let value = if gl_attr.vsync { 1 } else { 0 };
-            gl_context.setValues_forParameter_(&value, appkit::NSOpenGLContextParameter::NSOpenGLCPSwapInterval);
+            gl_context.setValues_forParameter_(
+                &value,
+                appkit::NSOpenGLContextParameter::NSOpenGLCPSwapInterval,
+            );
 
             if transparent {
                 let mut opacity = 0;
-                CGLSetParameter(gl_context.CGLContextObj() as *mut _, kCGLCPSurfaceOpacity, &mut opacity);
+                CGLSetParameter(
+                    gl_context.CGLContextObj() as *mut _,
+                    kCGLCPSurfaceOpacity,
+                    &mut opacity,
+                );
             }
 
-            CGLEnable(gl_context.CGLContextObj() as *mut _, kCGLCECrashOnRemovedFunctions);
+            CGLEnable(
+                gl_context.CGLContextObj() as *mut _,
+                kCGLCECrashOnRemovedFunctions,
+            );
 
-            let context = WindowedContext { context: gl_context, pixel_format: pixel_format };
+            let context = WindowedContext {
+                context: gl_context,
+                pixel_format: pixel_format,
+            };
             Ok((window, Context::WindowedContext(context)))
         }
     }
@@ -138,21 +173,25 @@ impl Context {
         let gl_profile = helpers::get_gl_profile(gl_attr, pf_reqs)?;
         let attributes = helpers::build_nsattributes(pf_reqs, gl_profile)?;
         let context = unsafe {
-            let pixelformat = NSOpenGLPixelFormat::alloc(nil).initWithAttributes_(&attributes);
+            let pixelformat = NSOpenGLPixelFormat::alloc(nil)
+                .initWithAttributes_(&attributes);
             if pixelformat == nil {
-                return Err(CreationError::OsError(format!("Could not create the pixel format")));
+                return Err(CreationError::OsError(format!(
+                    "Could not create the pixel format"
+                )));
             }
-            let context = NSOpenGLContext::alloc(nil).initWithFormat_shareContext_(pixelformat, nil);
+            let context = NSOpenGLContext::alloc(nil)
+                .initWithFormat_shareContext_(pixelformat, nil);
             if context == nil {
-                return Err(CreationError::OsError(format!("Could not create the rendering context")));
+                return Err(CreationError::OsError(format!(
+                    "Could not create the rendering context"
+                )));
             }
 
             IdRef::new(context)
         };
 
-        let headless = HeadlessContext {
-            context,
-        };
+        let headless = HeadlessContext { context };
 
         Ok(Context::HeadlessContext(headless))
     }
@@ -213,11 +252,18 @@ impl Context {
 
     pub fn get_proc_address(&self, addr: &str) -> *const () {
         let symbol_name: CFString = FromStr::from_str(addr).unwrap();
-        let framework_name: CFString = FromStr::from_str("com.apple.opengl").unwrap();
-        let framework =
-            unsafe { CFBundleGetBundleWithIdentifier(framework_name.as_concrete_TypeRef()) };
+        let framework_name: CFString =
+            FromStr::from_str("com.apple.opengl").unwrap();
+        let framework = unsafe {
+            CFBundleGetBundleWithIdentifier(
+                framework_name.as_concrete_TypeRef(),
+            )
+        };
         let symbol = unsafe {
-            CFBundleGetFunctionPointerForName(framework, symbol_name.as_concrete_TypeRef())
+            CFBundleGetFunctionPointerForName(
+                framework,
+                symbol_name.as_concrete_TypeRef(),
+            )
         };
         symbol as *const _
     }
@@ -275,7 +321,11 @@ impl IdRef {
     }
 
     fn non_nil(self) -> Option<IdRef> {
-        if self.0 == nil { None } else { Some(self) }
+        if self.0 == nil {
+            None
+        } else {
+            Some(self)
+        }
     }
 }
 

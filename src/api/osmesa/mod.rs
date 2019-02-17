@@ -1,7 +1,14 @@
-#![cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "netbsd", target_os = "openbsd"))]
+#![cfg(any(
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd"
+))]
 
 extern crate osmesa_sys;
 
+use libc;
 use Api;
 use ContextError;
 use CreationError;
@@ -11,13 +18,12 @@ use GlRequest;
 use PixelFormat;
 use PixelFormatRequirements;
 use Robustness;
-use libc;
 
 use std::error::Error;
 use std::ffi::CString;
 use std::fmt::{Debug, Display, Error as FormatError, Formatter};
-use std::{mem, ptr};
 use std::os::raw::c_void;
+use std::{mem, ptr};
 
 pub mod ffi {
     pub use super::osmesa_sys::OSMesaContext;
@@ -35,7 +41,10 @@ struct NoEsOrWebGlSupported;
 
 impl Display for NoEsOrWebGlSupported {
     fn fmt(&self, f: &mut Formatter) -> Result<(), FormatError> {
-        write!(f, "OsMesa only works with desktop OpenGL; OpenGL ES or WebGL are not supported")
+        write!(
+            f,
+            "OsMesa only works with desktop OpenGL; OpenGL ES or WebGL are not supported"
+        )
     }
 }
 
@@ -71,19 +80,21 @@ impl OsMesaContext {
         dimensions: (u32, u32),
         _pf_reqs: &PixelFormatRequirements,
         opengl: &GlAttributes<&OsMesaContext>,
-    ) -> Result<OsMesaContext, CreationError>
-    {
+    ) -> Result<OsMesaContext, CreationError> {
         osmesa_sys::OsMesa::try_loading()
             .map_err(LoadingError::new)
             .map_err(|e| CreationError::NoBackendAvailable(Box::new(e)))?;
 
-        if opengl.sharing.is_some() { panic!("Context sharing not possible with OsMesa") }
+        if opengl.sharing.is_some() {
+            panic!("Context sharing not possible with OsMesa")
+        }
 
         match opengl.robustness {
-            Robustness::RobustNoResetNotification | Robustness::RobustLoseContextOnReset => {
+            Robustness::RobustNoResetNotification
+            | Robustness::RobustLoseContextOnReset => {
                 return Err(CreationError::RobustnessNotSupported.into());
-            },
-            _ => ()
+            }
+            _ => (),
         }
 
         // TODO: use `pf_reqs` for the format
@@ -104,22 +115,28 @@ impl OsMesaContext {
         }
 
         match opengl.version {
-            GlRequest::Latest => {},
+            GlRequest::Latest => {}
             GlRequest::Specific(Api::OpenGl, (major, minor)) => {
                 attribs.push(osmesa_sys::OSMESA_CONTEXT_MAJOR_VERSION);
                 attribs.push(major as libc::c_int);
                 attribs.push(osmesa_sys::OSMESA_CONTEXT_MINOR_VERSION);
                 attribs.push(minor as libc::c_int);
-            },
-            GlRequest::Specific(Api::OpenGlEs, _) | GlRequest::Specific(Api::WebGl, _) => {
-                return Err(CreationError::NoBackendAvailable(Box::new(NoEsOrWebGlSupported)));
-            },
-            GlRequest::GlThenGles { opengl_version: (major, minor), .. } => {
+            }
+            GlRequest::Specific(Api::OpenGlEs, _)
+            | GlRequest::Specific(Api::WebGl, _) => {
+                return Err(CreationError::NoBackendAvailable(Box::new(
+                    NoEsOrWebGlSupported,
+                )));
+            }
+            GlRequest::GlThenGles {
+                opengl_version: (major, minor),
+                ..
+            } => {
                 attribs.push(osmesa_sys::OSMESA_CONTEXT_MAJOR_VERSION);
                 attribs.push(major as libc::c_int);
                 attribs.push(osmesa_sys::OSMESA_CONTEXT_MINOR_VERSION);
                 attribs.push(minor as libc::c_int);
-            },
+            }
         }
 
         // attribs array must be NULL terminated.
@@ -129,14 +146,20 @@ impl OsMesaContext {
             width: dimensions.0,
             height: dimensions.1,
             buffer: ::std::iter::repeat(unsafe { mem::uninitialized() })
-                .take((dimensions.0 * dimensions.1) as usize).collect(),
+                .take((dimensions.0 * dimensions.1) as usize)
+                .collect(),
             context: unsafe {
-                let ctx = osmesa_sys::OSMesaCreateContextAttribs(attribs.as_ptr(), ptr::null_mut());
+                let ctx = osmesa_sys::OSMesaCreateContextAttribs(
+                    attribs.as_ptr(),
+                    ptr::null_mut(),
+                );
                 if ctx.is_null() {
-                    return Err(CreationError::OsError("OSMesaCreateContextAttribs failed".to_string()));
+                    return Err(CreationError::OsError(
+                        "OSMesaCreateContextAttribs failed".to_string(),
+                    ));
                 }
                 ctx
-            }
+            },
         })
     }
 
@@ -152,12 +175,16 @@ impl OsMesaContext {
 
     #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        let ret = osmesa_sys::OSMesaMakeCurrent(self.context, self.buffer.as_ptr()
-                                                as *mut _, 0x1401, self.width
-                                                as libc::c_int, self.height as libc::c_int);
+        let ret = osmesa_sys::OSMesaMakeCurrent(
+            self.context,
+            self.buffer.as_ptr() as *mut _,
+            0x1401,
+            self.width as libc::c_int,
+            self.height as libc::c_int,
+        );
 
-        // an error can only happen in case of invalid parameter, which would indicate a bug
-        // in glutin
+        // an error can only happen in case of invalid parameter, which would
+        // indicate a bug in glutin
         if ret == 0 {
             panic!("OSMesaMakeCurrent failed");
         }
@@ -174,7 +201,9 @@ impl OsMesaContext {
     pub fn get_proc_address(&self, addr: &str) -> *const () {
         unsafe {
             let c_str = CString::new(addr.as_bytes().to_vec()).unwrap();
-            mem::transmute(osmesa_sys::OSMesaGetProcAddress(mem::transmute(c_str.as_ptr())))
+            mem::transmute(osmesa_sys::OSMesaGetProcAddress(mem::transmute(
+                c_str.as_ptr(),
+            )))
         }
     }
 

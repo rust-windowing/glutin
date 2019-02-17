@@ -2,7 +2,7 @@ extern crate glutin;
 
 mod support;
 
-use glutin::GlContext;
+use glutin::ContextTrait;
 use std::io::{self, Write};
 
 fn main() {
@@ -20,7 +20,10 @@ fn main() {
         let mut num = String::new();
         io::stdin().read_line(&mut num).unwrap();
         let num = num.trim().parse().ok().expect("Please enter a number");
-        let monitor = el.get_available_monitors().nth(num).expect("Please enter a valid ID");
+        let monitor = el
+            .get_available_monitors()
+            .nth(num)
+            .expect("Please enter a valid ID");
 
         println!("Using {:?}", monitor.get_name());
 
@@ -48,12 +51,18 @@ fn main() {
                     glutin::WindowEvent::CloseRequested => running = false,
                     glutin::WindowEvent::Resized(logical_size) => {
                         let dpi_factor = combined_context.get_hidpi_factor();
-                        combined_context.resize(logical_size.to_physical(dpi_factor));
-                    },
+                        combined_context
+                            .resize(logical_size.to_physical(dpi_factor));
+                    }
                     glutin::WindowEvent::KeyboardInput { input, .. } => {
                         match input.virtual_keycode {
-                            Some(glutin::VirtualKeyCode::Escape) => running = false,
-                            Some(glutin::VirtualKeyCode::F) if input.state == glutin::ElementState::Pressed => {
+                            Some(glutin::VirtualKeyCode::Escape) => {
+                                running = false
+                            }
+                            Some(glutin::VirtualKeyCode::F)
+                                if input.state
+                                    == glutin::ElementState::Pressed =>
+                            {
                                 let monitor = if fullscreen {
                                     None
                                 } else {
@@ -61,13 +70,13 @@ fn main() {
                                 };
                                 combined_context.set_fullscreen(monitor);
                                 fullscreen = !fullscreen;
-                            },
+                            }
                             _ => (),
                         }
-                    },
+                    }
                     _ => (),
                 },
-                _ => ()
+                _ => (),
             }
         });
 
