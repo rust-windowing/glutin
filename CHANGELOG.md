@@ -1,5 +1,6 @@
 # Unreleased
 
+- Fixes `Context::is_current` incorrectly returning `false`.
 - **Breaking:** Renamed `GlContext{,Ext}` to `ContextTrait{,Ext}`.
 - Implemented context sharing support for Windows and Linux.
 - Added `SeparatedContext`.
