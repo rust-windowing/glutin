@@ -21,18 +21,19 @@ use Robustness;
 
 use std::cell::Cell;
 use std::ffi::{CStr, CString};
+use std::ops::{Deref, DerefMut};
 use std::os::raw::{c_int, c_void};
 use std::{mem, ptr};
 
 pub mod ffi;
 
-#[cfg(not(target_os = "android",))]
+#[cfg(not(target_os = "android"))]
 mod egl {
     use super::ffi;
     use api::dlloader::{SymTrait, SymWrapper};
 
     #[derive(Clone)]
-    pub struct Egl(SymWrapper<ffi::egl::Egl>);
+    pub struct Egl(pub SymWrapper<ffi::egl::Egl>);
 
     /// Because `*const libc::c_void` doesn't implement `Sync`.
     unsafe impl Sync for Egl {}
@@ -51,7 +52,7 @@ mod egl {
             #[cfg(target_os = "windows")]
             let paths = vec!["libEGL.dll", "atioglxx.dll"];
 
-            #[cfg(not(target_os = "windows",))]
+            #[cfg(not(target_os = "windows"))]
             let paths = vec!["libEGL.so.1", "libEGL.so"];
 
             SymWrapper::new(paths).map(|i| Egl(i))
@@ -64,7 +65,7 @@ mod egl {
     use super::ffi;
 
     #[derive(Clone)]
-    pub struct Egl(ffi::egl::Egl);
+    pub struct Egl(pub ffi::egl::Egl);
 
     impl Egl {
         pub fn new() -> Result<Self, ()> {
@@ -72,24 +73,21 @@ mod egl {
         }
     }
 }
+pub use self::egl::Egl;
 
-mod egl {
-    use std::ops::{Deref, DerefMut};
-    impl Deref for Egl {
-        type Target = ffi::egl::Egl;
+impl Deref for Egl {
+    type Target = ffi::egl::Egl;
 
-        fn deref(&self) -> &ffi::egl::Egl {
-            &self.0
-        }
-    }
-
-    impl DerefMut for Egl {
-        fn deref_mut(&mut self) -> &mut ffi::egl::Egl {
-            &mut self.0
-        }
+    fn deref(&self) -> &ffi::egl::Egl {
+        &self.0
     }
 }
-pub use self::egl::Egl;
+
+impl DerefMut for Egl {
+    fn deref_mut(&mut self) -> &mut ffi::egl::Egl {
+        &mut self.0
+    }
+}
 
 lazy_static! {
     pub static ref EGL: Option<Egl> = Egl::new().ok();
