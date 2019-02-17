@@ -1,8 +1,8 @@
 use std::ffi::CString;
 use libloading::Library;
 
-use super::egl::ffi::egl::Egl;
-use super::glx::ffi::glx::Glx;
+use api::egl::ffi::egl::Egl;
+use api::glx::ffi::glx::Glx;
 
 // You have to make sure the symbols don't outlive the library,
 // easiest way is to just make the whole thing lazy_static.
