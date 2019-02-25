@@ -34,35 +34,39 @@ struct AndroidSyncEventHandler(Arc<AndroidContext>);
 impl android_glue::SyncEventHandler for AndroidSyncEventHandler {
     fn handle(&mut self, event: &android_glue::Event) {
         match *event {
-            // 'on_surface_destroyed' Android event can arrive with some delay because multithreading communication.
-            // Because of that, swap_buffers can be called before processing 'on_surface_destroyed' event, with the
-            // native window surface already destroyed. EGL generates a BAD_SURFACE error in this situation.
-            // Set stop to true to prevent swap_buffer call race conditions.
+            // 'on_surface_destroyed' Android event can arrive with some delay
+            // because multithreading communication. Because of
+            // that, swap_buffers can be called before processing
+            // 'on_surface_destroyed' event, with the native window
+            // surface already destroyed. EGL generates a BAD_SURFACE error in
+            // this situation. Set stop to true to prevent
+            // swap_buffer call race conditions.
             android_glue::Event::TermWindow => {
                 self.0.stopped.as_ref().unwrap().set(true);
-            },
-            _ => { return; }
+            }
+            _ => {
+                return;
+            }
         };
     }
 }
 
 impl Context {
+    #[inline]
     pub fn new(
-        window_builder: winit::WindowBuilder,
-        events_loop: &winit::EventsLoop,
+        wb: winit::WindowBuilder,
+        el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Self>,
-    ) -> Result<(winit::Window, Self), CreationError>
-    {
-        let window = window_builder.build(events_loop)?;
+    ) -> Result<(winit::Window, Self), CreationError> {
+        let window = wb.build(el)?;
         let gl_attr = gl_attr.clone().map_sharing(|c| &c.0.egl_context);
         let native_window = unsafe { android_glue::get_native_window() };
         if native_window.is_null() {
             return Err(OsError(format!("Android's native window is null")));
         }
-        let egl = egl::ffi::egl::Egl;
         let native_display = egl::NativeDisplay::Android;
-        let context = try!(EglContext::new(egl, pf_reqs, &gl_attr, native_display)
+        let context = try!(EglContext::new(pf_reqs, &gl_attr, native_display)
             .and_then(|p| p.finish(native_window as *const _)));
         let ctx = Arc::new(AndroidContext {
             egl_context: context,
@@ -73,7 +77,7 @@ impl Context {
         android_glue::add_sync_event_handler(handler);
         let context = Context(ctx.clone());
 
-        events_loop.set_suspend_callback(Some(Box::new(move |suspended| {
+        el.set_suspend_callback(Some(Box::new(move |suspended| {
             ctx.stopped.as_ref().unwrap().set(suspended);
             if suspended {
                 // Android has stopped the activity or sent it to background.
@@ -86,7 +90,8 @@ impl Context {
                 // Restore the EGL surface and animation loop.
                 unsafe {
                     let native_window = android_glue::get_native_window();
-                    ctx.egl_context.on_surface_created(native_window as *const _);
+                    ctx.egl_context
+                        .on_surface_created(native_window as *const _);
                 }
             }
         })));
@@ -99,21 +104,27 @@ impl Context {
         _el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-        _shareable_with_windowed_contexts: bool,
     ) -> Result<Self, CreationError> {
         let gl_attr = gl_attr.clone().map_sharing(|c| &c.0.egl_context);
-        let context = EglContext::new(
-            egl::ffi::egl::Egl,
-            pf_reqs,
-            &gl_attr,
-            egl::NativeDisplay::Android
-        )?;
-        let context = context.finish_pbuffer((1, 1))?;// TODO:
+        let context =
+            EglContext::new(pf_reqs, &gl_attr, egl::NativeDisplay::Android)?;
+        let context = context.finish_pbuffer((1, 1))?; // TODO:
         let ctx = Arc::new(AndroidContext {
             egl_context: context,
             stopped: None,
         });
         Ok(Context(ctx))
+    }
+
+    /// See the docs in the crate root file.
+    #[inline]
+    pub fn new_separated(
+        _window: &winit::Window,
+        _el: &winit::EventsLoop,
+        _pf_reqs: &PixelFormatRequirements,
+        _gl_attr: &GlAttributes<&Context>,
+    ) -> Result<Self, CreationError> {
+        unimplemented!()
     }
 
     #[inline]
@@ -128,8 +139,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn resize(&self, _: u32, _: u32) {
-    }
+    pub fn resize(&self, _: u32, _: u32) {}
 
     #[inline]
     pub fn is_current(&self) -> bool {

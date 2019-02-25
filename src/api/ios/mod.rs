@@ -26,10 +26,10 @@
 //! fn start_inner() {
 //!    ...
 //! }
-//!
 //! ```
 //!
-//! Compile project and then drag resulting .a into Xcode project. Add glutin.h to xcode.
+//! Compile project and then drag resulting .a into Xcode project. Add glutin.h
+//! to xcode.
 //!
 //! ```c
 //! void start_glutin_app();
@@ -52,38 +52,32 @@
 //!  - applicationWillEnterForeground is Suspended(false)
 //!  - applicationWillTerminate is Destroyed
 //!
-//! Keep in mind that after Destroyed event is received every attempt to draw with opengl will result in segfault.
+//! Keep in mind that after Destroyed event is received every attempt to draw
+//! with opengl will result in segfault.
 //!
-//! Also note that app will not receive Destroyed event if suspended, it will be SIGKILL'ed
+//! Also note that app will not receive Destroyed event if suspended, it will be
+//! SIGKILL'ed
 
 #![cfg(target_os = "ios")]
 
-use std::io;
 use std::ffi::CString;
+use std::io;
 use std::mem;
 use std::os::raw::*;
 
 use objc::declare::ClassDecl;
-use objc::runtime::{BOOL, Class, NO, Object, Sel, YES};
+use objc::runtime::{Class, Object, Sel, BOOL, NO, YES};
 
+use os::ios::{WindowBuilderExt, WindowExt};
+use os::ContextTraitExt;
 use {
-    Api,
-    ContextError,
-    CreationError,
-    EventsLoop,
-    GlAttributes,
-    GlRequest,
-    PixelFormat,
-    PixelFormatRequirements,
-    Window,
-    WindowBuilder,
+    Api, ContextError, CreationError, EventsLoop, GlAttributes, GlRequest,
+    PixelFormat, PixelFormatRequirements, Window, WindowBuilder,
 };
-use os::GlContextExt;
-use os::ios::{WindowExt, WindowBuilderExt};
 
 mod ffi;
-use self::ffi::*;
 pub use self::ffi::id;
+use self::ffi::*;
 
 #[derive(Debug, PartialEq)]
 enum ColorFormat {
@@ -95,8 +89,9 @@ enum ColorFormat {
 impl ColorFormat {
     #[allow(non_upper_case_globals)]
     pub fn for_view(view: id) -> Self {
-        let color_format: NSUInteger = unsafe { msg_send![view, drawableColorFormat] };
-        match color_format{
+        let color_format: NSUInteger =
+            unsafe { msg_send![view, drawableColorFormat] };
+        match color_format {
             GLKViewDrawableColorFormatRGBA8888 => ColorFormat::Rgba8888,
             GLKViewDrawableColorFormatRGB565 => ColorFormat::Rgb565,
             GLKViewDrawableColorFormatSRGBA8888 => ColorFormat::Srgba8888,
@@ -127,7 +122,8 @@ impl ColorFormat {
 
 #[allow(non_upper_case_globals)]
 fn depth_for_view(view: id) -> u8 {
-    let depth_format: NSUInteger = unsafe { msg_send![view, drawableDepthFormat] };
+    let depth_format: NSUInteger =
+        unsafe { msg_send![view, drawableDepthFormat] };
     match depth_format {
         GLKViewDrawableDepthFormatNone => 0,
         GLKViewDrawableDepthFormat16 => 16,
@@ -138,7 +134,8 @@ fn depth_for_view(view: id) -> u8 {
 
 #[allow(non_upper_case_globals)]
 fn stencil_for_view(view: id) -> u8 {
-    let stencil_format: NSUInteger = unsafe { msg_send![view, drawableStencilFormat] };
+    let stencil_format: NSUInteger =
+        unsafe { msg_send![view, drawableStencilFormat] };
     match stencil_format {
         GLKViewDrawableStencilFormatNone => 0,
         GLKViewDrawableStencilFormat8 => 8,
@@ -163,7 +160,9 @@ pub struct Context {
 
 fn validate_version(version: u8) -> Result<NSUInteger, CreationError> {
     let version = version as NSUInteger;
-    if version >= kEAGLRenderingAPIOpenGLES1 && version <= kEAGLRenderingAPIOpenGLES3 {
+    if version >= kEAGLRenderingAPIOpenGLES1
+        && version <= kEAGLRenderingAPIOpenGLES3
+    {
         Ok(version)
     } else {
         Err(CreationError::OsError(format!(
@@ -174,6 +173,7 @@ fn validate_version(version: u8) -> Result<NSUInteger, CreationError> {
 }
 
 impl Context {
+    #[inline]
     pub fn new(
         builder: WindowBuilder,
         event_loop: &EventsLoop,
@@ -181,22 +181,29 @@ impl Context {
         gl_attrs: &GlAttributes<&Context>,
     ) -> Result<(Window, Self), CreationError> {
         create_view_class();
-        let view_class = Class::get("MainGLView").expect("Failed to get class `MainGLView`");
-        let builder = builder.with_root_view_class(view_class as *const _ as *const _);
-        if gl_attrs.sharing.is_some() { unimplemented!("Shared contexts are unimplemented on iOS."); }
+        let view_class =
+            Class::get("MainGLView").expect("Failed to get class `MainGLView`");
+        let builder =
+            builder.with_root_view_class(view_class as *const _ as *const _);
+        if gl_attrs.sharing.is_some() {
+            unimplemented!("Shared contexts are unimplemented on iOS.");
+        }
         let version = match gl_attrs.version {
             GlRequest::Latest => kEAGLRenderingAPIOpenGLES3,
-            GlRequest::Specific(api, (major, _minor)) => if api == Api::OpenGlEs {
-                validate_version(major)?
-            } else {
-                return Err(CreationError::OsError(format!(
+            GlRequest::Specific(api, (major, _minor)) => {
+                if api == Api::OpenGlEs {
+                    validate_version(major)?
+                } else {
+                    return Err(CreationError::OsError(format!(
                     "Specified API ({:?}) is not availble on iOS. Only `Api::OpenGlEs` can be used",
                     api,
                 )));
-            },
-            GlRequest::GlThenGles { opengles_version: (major, _minor), .. } => {
-                validate_version(major)?
-            },
+                }
+            }
+            GlRequest::GlThenGles {
+                opengles_version: (major, _minor),
+                ..
+            } => validate_version(major)?,
         };
         let window = builder.build(event_loop)?;
         let context = unsafe {
@@ -209,35 +216,52 @@ impl Context {
         Ok((window, context))
     }
 
+    #[inline]
     pub fn new_context(
         el: &EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-        _shareable_with_windowed_contexts: bool,
     ) -> Result<Self, CreationError> {
         let wb = WindowBuilder::new().with_visibility(false);
-        Self::new(wb, el, pf_reqs, gl_attr)
-            .map(|(_window, context)| context)
+        Self::new(wb, el, pf_reqs, gl_attr).map(|(_window, context)| context)
     }
 
-    unsafe fn create_context(mut version: NSUInteger) -> Result<id, CreationError> {
-        let context_class = Class::get("EAGLContext").expect("Failed to get class `EAGLContext`");
+    /// See the docs in the crate root file.
+    #[inline]
+    pub fn new_separated(
+        _window: &Window,
+        _el: &EventsLoop,
+        _pf_reqs: &PixelFormatRequirements,
+        _gl_attr: &GlAttributes<&Context>,
+    ) -> Result<Self, CreationError> {
+        unimplemented!()
+    }
+
+    unsafe fn create_context(
+        mut version: NSUInteger,
+    ) -> Result<id, CreationError> {
+        let context_class = Class::get("EAGLContext")
+            .expect("Failed to get class `EAGLContext`");
         let eagl_context: id = msg_send![context_class, alloc];
         let mut valid_context = nil;
         while valid_context == nil && version > 0 {
-            valid_context = msg_send![eagl_context, initWithAPI:version];
+            valid_context = msg_send![eagl_context, initWithAPI: version];
             version -= 1;
         }
         if valid_context == nil {
-            Err(CreationError::OsError(format!("Failed to create an OpenGL ES context with any version")))
+            Err(CreationError::OsError(format!(
+                "Failed to create an OpenGL ES context with any version"
+            )))
         } else {
             Ok(eagl_context)
         }
     }
 
     unsafe fn init_context(&mut self, window: &Window) {
-        let dict_class = Class::get("NSDictionary").expect("Failed to get class `NSDictionary`");
-        let number_class = Class::get("NSNumber").expect("Failed to get class `NSNumber`");
+        let dict_class = Class::get("NSDictionary")
+            .expect("Failed to get class `NSDictionary`");
+        let number_class =
+            Class::get("NSNumber").expect("Failed to get class `NSNumber`");
         let draw_props: id = msg_send![dict_class, alloc];
         let draw_props: id = msg_send![draw_props,
             initWithObjects:
@@ -256,12 +280,14 @@ impl Context {
 
         let view = self.view;
         let scale_factor = window.get_hidpi_factor() as CGFloat;
-        let _: () = msg_send![view, setContentScaleFactor:scale_factor];
+        let _: () = msg_send![view, setContentScaleFactor: scale_factor];
         let layer: id = msg_send![view, layer];
-        let _: () = msg_send![layer, setContentsScale:scale_factor];
-        let _: () = msg_send![layer, setDrawableProperties:draw_props];
+        let _: () = msg_send![layer, setContentsScale: scale_factor];
+        let _: () = msg_send![layer, setDrawableProperties: draw_props];
 
-        let gl = gles::Gles2::load_with(|symbol| self.get_proc_address(symbol) as *const c_void);
+        let gl = gles::Gles2::load_with(|symbol| {
+            self.get_proc_address(symbol) as *const c_void
+        });
         let mut color_render_buf: gles::types::GLuint = 0;
         let mut frame_buf: gles::types::GLuint = 0;
         gl.GenRenderbuffers(1, &mut color_render_buf);
@@ -275,10 +301,17 @@ impl Context {
         gl.GenFramebuffers(1, &mut frame_buf);
         gl.BindFramebuffer(gles::FRAMEBUFFER, frame_buf);
 
-        gl.FramebufferRenderbuffer(gles::FRAMEBUFFER, gles::COLOR_ATTACHMENT0, gles::RENDERBUFFER, color_render_buf);
+        gl.FramebufferRenderbuffer(
+            gles::FRAMEBUFFER,
+            gles::COLOR_ATTACHMENT0,
+            gles::RENDERBUFFER,
+            color_render_buf,
+        );
 
         let status = gl.CheckFramebufferStatus(gles::FRAMEBUFFER);
-        if gl.CheckFramebufferStatus(gles::FRAMEBUFFER) != gles::FRAMEBUFFER_COMPLETE {
+        if gl.CheckFramebufferStatus(gles::FRAMEBUFFER)
+            != gles::FRAMEBUFFER_COMPLETE
+        {
             panic!("framebuffer status: {:?}", status);
         }
     }
@@ -286,13 +319,17 @@ impl Context {
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
         unsafe {
-            let res: BOOL = msg_send![self.eagl_context, presentRenderbuffer:gles::RENDERBUFFER];
+            let res: BOOL = msg_send![
+                self.eagl_context,
+                presentRenderbuffer: gles::RENDERBUFFER
+            ];
             if res == YES {
                 Ok(())
             } else {
-                Err(ContextError::IoError(
-                    io::Error::new(io::ErrorKind::Other, "`EAGLContext presentRenderbuffer` failed")
-                ))
+                Err(ContextError::IoError(io::Error::new(
+                    io::ErrorKind::Other,
+                    "`EAGLContext presentRenderbuffer` failed",
+                )))
             }
         }
     }
@@ -320,32 +357,38 @@ impl Context {
 
     #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        let context_class = Class::get("EAGLContext").expect("Failed to get class `EAGLContext`");
-        let res: BOOL = msg_send![context_class, setCurrentContext: self.eagl_context];
+        let context_class = Class::get("EAGLContext")
+            .expect("Failed to get class `EAGLContext`");
+        let res: BOOL =
+            msg_send![context_class, setCurrentContext: self.eagl_context];
         if res == YES {
             Ok(())
         } else {
-            Err(ContextError::IoError(
-                io::Error::new(io::ErrorKind::Other, "`EAGLContext setCurrentContext` failed")
-            ))
+            Err(ContextError::IoError(io::Error::new(
+                io::ErrorKind::Other,
+                "`EAGLContext setCurrentContext` failed",
+            )))
         }
     }
 
     #[inline]
     pub fn is_current(&self) -> bool {
-        // TODO: This can likely be implemented using `currentContext`/`getCurrentContext`
+        // TODO: This can likely be implemented using
+        // `currentContext`/`getCurrentContext`
         true
     }
 
     #[inline]
     pub fn get_proc_address(&self, proc_name: &str) -> *const () {
-        let proc_name_c = CString::new(proc_name).expect("proc name contained interior nul byte");
+        let proc_name_c = CString::new(proc_name)
+            .expect("proc name contained interior nul byte");
         let path = b"/System/Library/Frameworks/OpenGLES.framework/OpenGLES\0";
         let addr = unsafe {
-            let lib = dlopen(path.as_ptr() as *const c_char, RTLD_LAZY | RTLD_GLOBAL);
+            let lib =
+                dlopen(path.as_ptr() as *const c_char, RTLD_LAZY | RTLD_GLOBAL);
             dlsym(lib, proc_name_c.as_ptr()) as *const _
         };
-        //debug!("proc {} -> {:?}", proc_name, addr);
+        // debug!("proc {} -> {:?}", proc_name, addr);
         addr
     }
 
@@ -356,30 +399,45 @@ impl Context {
 }
 
 fn create_view_class() {
-    extern fn init_with_frame(this: &Object, _: Sel, frame: CGRect) -> id {
+    extern "C" fn init_with_frame(this: &Object, _: Sel, frame: CGRect) -> id {
         unsafe {
-            let view: id = msg_send![super(this, class!(GLKView)), initWithFrame:frame];
+            let view: id =
+                msg_send![super(this, class!(GLKView)), initWithFrame: frame];
 
-            let mask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-            let _: () = msg_send![view, setAutoresizingMask:mask];
-            let _: () = msg_send![view, setAutoresizesSubviews:YES];
+            let mask = UIViewAutoresizingFlexibleWidth
+                | UIViewAutoresizingFlexibleHeight;
+            let _: () = msg_send![view, setAutoresizingMask: mask];
+            let _: () = msg_send![view, setAutoresizesSubviews: YES];
 
             let layer: id = msg_send![view, layer];
-            let _ : () = msg_send![layer, setOpaque:YES];
+            let _: () = msg_send![layer, setOpaque: YES];
 
             view
         }
     }
 
-    extern fn layer_class(_: &Class, _: Sel) -> *const Class {
-        unsafe { mem::transmute(Class::get("CAEAGLLayer").expect("Failed to get class `CAEAGLLayer`")) }
+    extern "C" fn layer_class(_: &Class, _: Sel) -> *const Class {
+        unsafe {
+            mem::transmute(
+                Class::get("CAEAGLLayer")
+                    .expect("Failed to get class `CAEAGLLayer`"),
+            )
+        }
     }
 
-    let superclass = Class::get("GLKView").expect("Failed to get class `GLKView`");
-    let mut decl = ClassDecl::new("MainGLView", superclass).expect("Failed to declare class `MainGLView`");
+    let superclass =
+        Class::get("GLKView").expect("Failed to get class `GLKView`");
+    let mut decl = ClassDecl::new("MainGLView", superclass)
+        .expect("Failed to declare class `MainGLView`");
     unsafe {
-        decl.add_method(sel!(initWithFrame:), init_with_frame as extern fn(&Object, Sel, CGRect) -> id);
-        decl.add_class_method(sel!(layerClass), layer_class as extern fn(&Class, Sel) -> *const Class);
+        decl.add_method(
+            sel!(initWithFrame:),
+            init_with_frame as extern "C" fn(&Object, Sel, CGRect) -> id,
+        );
+        decl.add_class_method(
+            sel!(layerClass),
+            layer_class as extern "C" fn(&Class, Sel) -> *const Class,
+        );
         decl.register();
     }
 }
@@ -390,7 +448,7 @@ impl Drop for Context {
     }
 }
 
-impl GlContextExt for Context {
+impl ContextTraitExt for Context {
     type Handle = *mut c_void;
     #[inline]
     unsafe fn raw_handle(&self) -> Self::Handle {
