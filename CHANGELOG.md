@@ -5,6 +5,7 @@
 - Added `build` method to `ContextBuilder`.
 - Added `get_egl_display` method to `GlContextExt` trait and its implementation for platforms.
 - Removed minimum supported Rust version guarantee.
+- `NoBackendAvailable` is now `Sync`, as a result `CreationError` is also `Sync`.
 
 # Version 0.19.0 (2018-11-09)
 

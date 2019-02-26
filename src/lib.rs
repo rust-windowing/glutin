@@ -490,7 +490,7 @@ pub enum CreationError {
     OsError(String),
     /// TODO: remove this error
     NotSupported(&'static str),
-    NoBackendAvailable(Box<std::error::Error + Send>),
+    NoBackendAvailable(Box<std::error::Error + Send + Sync>),
     RobustnessNotSupported,
     OpenGlVersionNotSupported,
     NoAvailablePixelFormat,
