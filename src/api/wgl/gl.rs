@@ -9,4 +9,4 @@ pub mod wgl_extra {
 }
 
 #[link(name = "opengl32")]
-extern {}
+extern "C" {}

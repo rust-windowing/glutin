@@ -2,38 +2,43 @@ extern crate glutin;
 
 mod support;
 
-use glutin::GlContext;
+use glutin::ContextTrait;
 
 fn main() {
-    let mut events_loop = glutin::EventsLoop::new();
-    let window = glutin::WindowBuilder::new().with_title("A fantastic window!");
-    let context = glutin::ContextBuilder::new();
-    let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
+    let mut el = glutin::EventsLoop::new();
+    let wb = glutin::WindowBuilder::new().with_title("A fantastic window!");
+    let combined_context = glutin::ContextBuilder::new()
+        .build_combined(wb, &el)
+        .unwrap();
 
-    let _ = unsafe { gl_window.make_current() };
+    unsafe { combined_context.make_current().unwrap() }
 
-    println!("Pixel format of the window's GL context: {:?}", gl_window.get_pixel_format());
+    println!(
+        "Pixel format of the window's GL context: {:?}",
+        combined_context.get_pixel_format()
+    );
 
-    let gl = support::load(&gl_window.context());
+    let gl = support::load(&combined_context.context());
 
     let mut running = true;
     while running {
-        events_loop.poll_events(|event| {
+        el.poll_events(|event| {
             println!("{:?}", event);
             match event {
                 glutin::Event::WindowEvent { event, .. } => match event {
                     glutin::WindowEvent::CloseRequested => running = false,
                     glutin::WindowEvent::Resized(logical_size) => {
-                        let dpi_factor = gl_window.get_hidpi_factor();
-                        gl_window.resize(logical_size.to_physical(dpi_factor));
-                    },
+                        let dpi_factor = combined_context.get_hidpi_factor();
+                        combined_context
+                            .resize(logical_size.to_physical(dpi_factor));
+                    }
                     _ => (),
                 },
-                _ => ()
+                _ => (),
             }
         });
 
         gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
-        let _ = gl_window.swap_buffers();
+        let _ = combined_context.swap_buffers();
     }
 }

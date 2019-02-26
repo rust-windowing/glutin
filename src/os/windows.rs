@@ -1,17 +1,19 @@
 #![cfg(target_os = "windows")]
 
 pub use winapi::shared::windef::HGLRC;
-pub use winit::os::windows::{DeviceIdExt, MonitorIdExt, WindowBuilderExt, WindowExt};
+pub use winit::os::windows::{
+    DeviceIdExt, MonitorIdExt, WindowBuilderExt, WindowExt,
+};
 
 pub use api::egl::ffi::EGLContext;
 pub use platform::RawHandle;
 
 use std::os::raw;
 
-use os::GlContextExt;
+use os::ContextTraitExt;
 use Context;
 
-impl GlContextExt for Context {
+impl ContextTraitExt for Context {
     type Handle = RawHandle;
 
     #[inline]

@@ -1,43 +1,42 @@
-//! The purpose of this library is to provide an OpenGL context on as many platforms as possible.
+//! The purpose of this library is to provide an OpenGL context on as many
+//! platforms as possible.
 //!
-//! # Building a GlWindow
+//! # Building a CombinedContext
 //!
-//! A `GlWindow` is composed of a `Window` and an OpenGL `Context`. Due to some
-//! operating-system-specific quirks, glutin requires control over the order of creation of the
-//! `Context` and `Window`. Here is an example of building a GlWindow:
+//! A `CombinedContext` is composed of a `Window` and an OpenGL `Context`.
+//!
+//! Due to some operating-system-specific quirks, glutin prefers control over
+//! the order of creation of the `Context` and `Window`. Here is an example of
+//! building a CombinedContext the prefered way:
 //!
 //! ```no_run
 //! # extern crate glutin;
 //! # fn main() {
-//! let events_loop = glutin::EventsLoop::new();
-//! let window = glutin::WindowBuilder::new()
+//! let el = glutin::EventsLoop::new();
+//! let wb = glutin::WindowBuilder::new()
 //!     .with_title("Hello world!")
 //!     .with_dimensions(glutin::dpi::LogicalSize::new(1024.0, 768.0));
-//! let context = glutin::ContextBuilder::new();
-//! let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
+//! let combined_context = glutin::ContextBuilder::new()
+//!     .build_combined(wb, &el)
+//!     .unwrap();
 //! # }
 //! ```
 //!
-//! # Features
-//!
-//! This crate has one Cargo feature: `window`.
-//!
-//!  - `window` allows you to create regular windows and enables the `WindowBuilder` object.
-//!
-//! By default `window` is enabled.
+//! You can, of course, create an OpenGL `Context` separately from an existing
+//! window, however that may result in an suboptimal configuration of the window
+//! on some platforms. In that case use "SeparatedContext".
 
-#[cfg(target_os = "windows")]
 #[macro_use]
 extern crate lazy_static;
-
-#[cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "netbsd", target_os = "openbsd"))]
+#[cfg(any(
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd"
+))]
 #[macro_use]
 extern crate shared_library;
-
-extern crate libc;
-
-extern crate winit;
-
 #[cfg(target_os = "windows")]
 extern crate winapi;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
@@ -51,52 +50,58 @@ extern crate cocoa;
 extern crate core_foundation;
 #[cfg(target_os = "macos")]
 extern crate core_graphics;
-#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "dragonfly", target_os = "netbsd", target_os = "openbsd"))]
-extern crate x11_dl;
-#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "dragonfly", target_os = "netbsd", target_os = "openbsd"))]
+extern crate libc;
+#[cfg(any(
+    target_os = "windows",
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd"
+))]
+extern crate libloading;
+#[cfg(any(
+    target_os = "linux",
+    target_os = "freebsd",
+    target_os = "dragonfly",
+    target_os = "netbsd",
+    target_os = "openbsd"
+))]
 extern crate wayland_client;
-
-pub use winit::{
-    AvailableMonitorsIter,
-    AxisId,
-    ButtonId,
-    ControlFlow,
-    CreationError as WindowCreationError,
-    DeviceEvent,
-    DeviceId,
-    dpi,
-    ElementState,
-    Event,
-    EventsLoop,
-    EventsLoopClosed,
-    EventsLoopProxy,
-    Icon,
-    KeyboardInput,
-    ModifiersState,
-    MonitorId,
-    MouseButton,
-    MouseCursor,
-    MouseScrollDelta,
-    ScanCode,
-    Touch,
-    TouchPhase,
-    VirtualKeyCode,
-    Window,
-    WindowAttributes,
-    WindowBuilder,
-    WindowEvent,
-    WindowId,
-};
-
-use std::io;
+extern crate winit;
+#[cfg(any(
+    target_os = "linux",
+    target_os = "freebsd",
+    target_os = "dragonfly",
+    target_os = "netbsd",
+    target_os = "openbsd"
+))]
+extern crate x11_dl;
 
 mod api;
+mod combined;
+mod context;
 mod platform;
+mod separated;
 
 pub mod os;
 
+pub use combined::CombinedContext;
+pub use context::Context;
+pub use separated::SeparatedContext;
+
+use std::io;
+pub use winit::{
+    dpi, AvailableMonitorsIter, AxisId, ButtonId, ControlFlow,
+    CreationError as WindowCreationError, DeviceEvent, DeviceId, ElementState,
+    Event, EventsLoop, EventsLoopClosed, EventsLoopProxy, Icon, KeyboardInput,
+    ModifiersState, MonitorId, MouseButton, MouseCursor, MouseScrollDelta,
+    ScanCode, Touch, TouchPhase, VirtualKeyCode, Window, WindowAttributes,
+    WindowBuilder, WindowEvent, WindowId,
+};
+
 /// A trait for types associated with a GL context.
-pub trait GlContext
+pub trait ContextTrait
 where
     Self: Sized,
 {
@@ -113,72 +118,12 @@ where
     fn get_api(&self) -> Api;
 }
 
-/// Represents an OpenGL context.
-///
-/// A `Context` is normally associated with a single Window, however `Context`s can be *shared*
-/// between multiple windows.
-///
-/// # Example
-///
-/// ```no_run
-/// # extern crate glutin;
-/// # use glutin::GlContext;
-/// # fn main() {
-/// # let events_loop = glutin::EventsLoop::new();
-/// # let window = glutin::WindowBuilder::new();
-/// # let context = glutin::ContextBuilder::new();
-/// # let some_gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
-/// let context = glutin::ContextBuilder::new()
-///     .with_vsync(true)
-///     .with_multisampling(8)
-///     .with_shared_lists(some_gl_window.context());
-/// # }
-/// ```
-pub struct Context {
-    context: platform::Context,
-}
-
 /// Object that allows you to build `Context`s.
 pub struct ContextBuilder<'a> {
     /// The attributes to use to create the context.
     pub gl_attr: GlAttributes<&'a Context>,
     // Should be made public once it's stabilized.
     pf_reqs: PixelFormatRequirements,
-}
-
-/// Represents an OpenGL context and a Window with which it is associated.
-///
-/// # Example
-///
-/// ```no_run
-/// # extern crate glutin;
-/// # use glutin::GlContext;
-/// # fn main() {
-/// let mut events_loop = glutin::EventsLoop::new();
-/// let window = glutin::WindowBuilder::new();
-/// let context = glutin::ContextBuilder::new();
-/// let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
-///
-/// unsafe { gl_window.make_current().unwrap() };
-///
-/// loop {
-///     events_loop.poll_events(|event| {
-///         match event {
-///             // process events here
-///             _ => ()
-///         }
-///     });
-///
-///     // draw everything here
-///
-///     gl_window.swap_buffers();
-///     std::thread::sleep(std::time::Duration::from_millis(17));
-/// }
-/// # }
-/// ```
-pub struct GlWindow {
-    context: Context,
-    window: Window,
 }
 
 impl<'a> ContextBuilder<'a> {
@@ -206,8 +151,9 @@ impl<'a> ContextBuilder<'a> {
 
     /// Sets the *debug* flag for the OpenGL context.
     ///
-    /// The default value for this flag is `cfg!(debug_assertions)`, which means that it's enabled
-    /// when you run `cargo build` and disabled when you run `cargo build --release`.
+    /// The default value for this flag is `cfg!(debug_assertions)`, which means
+    /// that it's enabled when you run `cargo build` and disabled when you run
+    /// `cargo build --release`.
     #[inline]
     pub fn with_gl_debug_flag(mut self, flag: bool) -> Self {
         self.gl_attr.debug = flag;
@@ -237,8 +183,8 @@ impl<'a> ContextBuilder<'a> {
         self
     }
 
-    /// Sets the multisampling level to request. A value of `0` indicates that multisampling must
-    /// not be enabled.
+    /// Sets the multisampling level to request. A value of `0` indicates that
+    /// multisampling must not be enabled.
     ///
     /// # Panic
     ///
@@ -304,7 +250,6 @@ impl<'a> ContextBuilder<'a> {
     ///   * MacOS
     ///   * Linux using GLX with X
     ///   * Windows using WGL
-    ///
     #[inline]
     pub fn with_double_buffer(mut self, double_buffer: Option<bool>) -> Self {
         self.pf_reqs.double_buffer = double_buffer;
@@ -323,164 +268,39 @@ impl<'a> ContextBuilder<'a> {
     ///   * Linux using EGL with either X or Wayland
     ///   * Windows using EGL or WGL
     ///   * Android using EGL
-    ///
     #[inline]
-    pub fn with_hardware_acceleration(mut self, acceleration: Option<bool>) -> Self {
+    pub fn with_hardware_acceleration(
+        mut self,
+        acceleration: Option<bool>,
+    ) -> Self {
         self.pf_reqs.hardware_accelerated = acceleration;
         self
     }
 
-    /// Builds the context as a headless context.
-    pub fn build(self, el: &EventsLoop, shareable_with_windowed_contexts: bool) -> Result<Context, CreationError> {
-        Context::new(el, self, shareable_with_windowed_contexts)
-    }
-}
-
-impl GlWindow {
-    /// Builds the given window along with the associated GL context, returning the pair as a
-    /// `GlWindow`.
-    ///
-    /// Errors can occur in two scenarios:
-    ///  - If the window could not be created (via permission denied, incompatible system, out of
-    ///    memory, etc.). This should be very rare.
-    ///  - If the OpenGL context could not be created. This generally happens because the underlying
-    ///    platform doesn't support a requested feature.
-    pub fn new(
-        window_builder: WindowBuilder,
-        context_builder: ContextBuilder,
-        events_loop: &EventsLoop,
-    ) -> Result<Self, CreationError>
-    {
-        let ContextBuilder { pf_reqs, gl_attr } = context_builder;
-        let gl_attr = gl_attr.map_sharing(|ctxt| &ctxt.context);
-
-        // Not all platforms support context sharing yet, when they do, their
-        // `new.*` functions should be marked unsafe.
-        #[allow(unused_unsafe)]
-        unsafe {
-            platform::Context::new(window_builder, events_loop, &pf_reqs, &gl_attr)
-                .map(|(window, context)| GlWindow {
-                    window,
-                    context: Context { context },
-                })
-        }
+    /// Builds a headless context.
+    pub fn build_headless(
+        self,
+        el: &EventsLoop,
+    ) -> Result<Context, CreationError> {
+        Context::new(el, self)
     }
 
-    /// Borrow the inner `Window`.
-    pub fn window(&self) -> &Window {
-        &self.window
+    /// Builds a context and it's associated window.
+    pub fn build_combined(
+        self,
+        wb: WindowBuilder,
+        el: &EventsLoop,
+    ) -> Result<CombinedContext, CreationError> {
+        CombinedContext::new(wb, self, el)
     }
 
-    /// Borrow the inner GL `Context`.
-    pub fn context(&self) -> &Context {
-        &self.context
-    }
-
-    /// Swaps the buffers in case of double or triple buffering.
-    ///
-    /// You should call this function every time you have finished rendering, or the image may not
-    /// be displayed on the screen.
-    ///
-    /// **Warning**: if you enabled vsync, this function will block until the next time the screen
-    /// is refreshed. However drivers can choose to override your vsync settings, which means that
-    /// you can't know in advance whether `swap_buffers` will block or not.
-    pub fn swap_buffers(&self) -> Result<(), ContextError> {
-        self.context.context.swap_buffers()
-    }
-
-    /// Returns the pixel format of the main framebuffer of the context.
-    pub fn get_pixel_format(&self) -> PixelFormat {
-        self.context.context.get_pixel_format()
-    }
-
-    /// Resize the context.
-    ///
-    /// Some platforms (macOS, Wayland) require being manually updated when their window or
-    /// surface is resized.
-    ///
-    /// The easiest way of doing this is to take every `Resized` window event that
-    /// is received with a `LogicalSize` and convert it to a `PhysicalSize` and
-    /// pass it into this function.
-    pub fn resize(&self, size: dpi::PhysicalSize) {
-        let (width, height) = size.into();
-        self.context.context.resize(width, height);
-    }
-}
-
-impl GlContext for Context {
-    unsafe fn make_current(&self) -> Result<(), ContextError> {
-        self.context.make_current()
-    }
-
-    fn is_current(&self) -> bool {
-        self.context.is_current()
-    }
-
-    fn get_proc_address(&self, addr: &str) -> *const () {
-        self.context.get_proc_address(addr)
-    }
-
-    fn get_api(&self) -> Api {
-        self.context.get_api()
-    }
-}
-
-impl Context {
-    /// Builds the given GL context.
-    ///
-    /// Contexts made with the `shareable_with_windowed_contexts` flag set to
-    /// `true` can be shared with:
-    ///  - contexts made with that flag set to `true`; and
-    ///  - contexts made when creating a `GlWindow`.
-    ///
-    /// If the flag is set to `false` on the other hand, the context should only
-    /// be shared with other contexts made with the flag set to `false`.
-    ///
-    /// Some platforms only implement contexts that are shareable with windowed contexts. On those
-    /// platforms, the `shareable_with_windowed_contexts` flag will be ignored and always behave as
-    /// if it were set to `true`.
-    ///
-    /// Errors can occur if the OpenGL context could not be created. This generally happens because
-    /// the underlying platform doesn't support a requested feature, or if one of the sharing
-    /// restrictions above wasn't abided by.
-    pub fn new(
-        el: &winit::EventsLoop,
-        context_builder: ContextBuilder,
-        shareable_with_windowed_contexts: bool,
-    ) -> Result<Self, CreationError>
-    {
-        let ContextBuilder { pf_reqs, gl_attr } = context_builder;
-        let gl_attr = gl_attr.map_sharing(|ctxt| &ctxt.context);
-
-        unsafe {
-            platform::Context::new_context(el, &pf_reqs, &gl_attr, shareable_with_windowed_contexts)
-                .map(|context| Context { context })
-        }
-    }
-}
-
-impl GlContext for GlWindow {
-    unsafe fn make_current(&self) -> Result<(), ContextError> {
-        self.context.make_current()
-    }
-
-    fn is_current(&self) -> bool {
-        self.context.is_current()
-    }
-
-    fn get_proc_address(&self, addr: &str) -> *const () {
-        self.context.get_proc_address(addr)
-    }
-
-    fn get_api(&self) -> Api {
-        self.context.get_api()
-    }
-}
-
-impl std::ops::Deref for GlWindow {
-    type Target = Window;
-    fn deref(&self) -> &Self::Target {
-        &self.window
+    /// Builds a separated context.
+    pub fn build_separated(
+        self,
+        win: &Window,
+        el: &EventsLoop,
+    ) -> Result<SeparatedContext, CreationError> {
+        SeparatedContext::new(win, self, el)
     }
 }
 
@@ -506,21 +326,31 @@ impl CreationError {
             CreationError::OsError(ref text) => &text,
             CreationError::NotSupported(text) => &text,
             CreationError::NoBackendAvailable(_) => "No backend is available",
-            CreationError::RobustnessNotSupported => "You requested robustness, but it is \
-                                                      not supported.",
-            CreationError::OpenGlVersionNotSupported => "The requested OpenGL version is not \
-                                                         supported.",
-            CreationError::NoAvailablePixelFormat => "Couldn't find any pixel format that matches \
-                                                      the criteria.",
+            CreationError::RobustnessNotSupported => {
+                "You requested robustness, but it is not supported."
+            }
+            CreationError::OpenGlVersionNotSupported => {
+                "The requested OpenGL version is not supported."
+            }
+            CreationError::NoAvailablePixelFormat => {
+                "Couldn't find any pixel format that matches the criteria."
+            }
             CreationError::PlatformSpecific(ref text) => &text,
-            CreationError::Window(ref err) => std::error::Error::description(err),
-            CreationError::CreationErrorPair(ref _err1, ref _err2) => "Received two errors."
+            CreationError::Window(ref err) => {
+                std::error::Error::description(err)
+            }
+            CreationError::CreationErrorPair(ref _err1, ref _err2) => {
+                "Received two errors."
+            }
         }
     }
 }
 
 impl std::fmt::Display for CreationError {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+    fn fmt(
+        &self,
+        formatter: &mut std::fmt::Formatter,
+    ) -> Result<(), std::fmt::Error> {
         formatter.write_str(self.to_string())?;
 
         if let CreationError::CreationErrorPair(ref e1, ref e2) = *self {
@@ -535,7 +365,7 @@ impl std::fmt::Display for CreationError {
         if let &CreationError::NotSupported(msg) = self {
             write!(formatter, ": {}", msg)?;
         }
-        if let Some(err) = std::error::Error::cause(self) {
+        if let Some(err) = std::error::Error::source(self) {
             write!(formatter, ": {}", err)?;
         }
         Ok(())
@@ -551,7 +381,7 @@ impl std::error::Error for CreationError {
         match *self {
             CreationError::NoBackendAvailable(ref err) => Some(&**err),
             CreationError::Window(ref err) => Some(err),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -577,13 +407,16 @@ impl ContextError {
         match *self {
             ContextError::OsError(ref string) => string,
             ContextError::IoError(ref err) => err.description(),
-            ContextError::ContextLost => "Context lost"
+            ContextError::ContextLost => "Context lost",
         }
     }
 }
 
 impl std::fmt::Display for ContextError {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+    fn fmt(
+        &self,
+        formatter: &mut std::fmt::Formatter,
+    ) -> Result<(), std::fmt::Error> {
         formatter.write_str(self.to_string())
     }
 }
@@ -614,7 +447,8 @@ pub enum GlProfile {
     Core,
 }
 
-/// Describes the OpenGL API and version that are being requested when a context is created.
+/// Describes the OpenGL API and version that are being requested when a context
+/// is created.
 #[derive(Debug, Copy, Clone)]
 pub enum GlRequest {
     /// Request the latest version of the "best" API of this platform.
@@ -627,9 +461,9 @@ pub enum GlRequest {
     /// Example: `GlRequest::Specific(Api::OpenGl, (3, 3))`.
     Specific(Api, (u8, u8)),
 
-    /// If OpenGL is available, create an OpenGL context with the specified `opengl_version`.
-    /// Else if OpenGL ES or WebGL is available, create a context with the
-    /// specified `opengles_version`.
+    /// If OpenGL is available, create an OpenGL context with the specified
+    /// `opengl_version`. Else if OpenGL ES or WebGL is available, create a
+    /// context with the specified `opengles_version`.
     GlThenGles {
         /// The version to use for OpenGL.
         opengl_version: (u8, u8),
@@ -643,7 +477,10 @@ impl GlRequest {
     pub fn to_gl_version(&self) -> Option<(u8, u8)> {
         match self {
             &GlRequest::Specific(Api::OpenGl, version) => Some(version),
-            &GlRequest::GlThenGles { opengl_version: version, .. } => Some(version),
+            &GlRequest::GlThenGles {
+                opengl_version: version,
+                ..
+            } => Some(version),
             _ => None,
         }
     }
@@ -654,37 +491,41 @@ impl GlRequest {
 /// the compatibility profile features.
 pub static GL_CORE: GlRequest = GlRequest::Specific(Api::OpenGl, (3, 2));
 
-/// Specifies the tolerance of the OpenGL context to faults. If you accept raw OpenGL commands
-/// and/or raw shader code from an untrusted source, you should definitely care about this.
+/// Specifies the tolerance of the OpenGL context to faults. If you accept raw
+/// OpenGL commands and/or raw shader code from an untrusted source, you should
+/// definitely care about this.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Robustness {
-    /// Not everything is checked. Your application can crash if you do something wrong with your
-    /// shaders.
+    /// Not everything is checked. Your application can crash if you do
+    /// something wrong with your shaders.
     NotRobust,
 
-    /// The driver doesn't check anything. This option is very dangerous. Please know what you're
-    /// doing before using it. See the `GL_KHR_no_error` extension.
+    /// The driver doesn't check anything. This option is very dangerous.
+    /// Please know what you're doing before using it. See the
+    /// `GL_KHR_no_error` extension.
     ///
-    /// Since this option is purely an optimization, no error will be returned if the backend
-    /// doesn't support it. Instead it will automatically fall back to `NotRobust`.
+    /// Since this option is purely an optimization, no error will be returned
+    /// if the backend doesn't support it. Instead it will automatically
+    /// fall back to `NotRobust`.
     NoError,
 
-    /// Everything is checked to avoid any crash. The driver will attempt to avoid any problem,
-    /// but if a problem occurs the behavior is implementation-defined. You are just guaranteed not
-    /// to get a crash.
+    /// Everything is checked to avoid any crash. The driver will attempt to
+    /// avoid any problem, but if a problem occurs the behavior is
+    /// implementation-defined. You are just guaranteed not to get a crash.
     RobustNoResetNotification,
 
-    /// Same as `RobustNoResetNotification` but the context creation doesn't fail if it's not
-    /// supported.
+    /// Same as `RobustNoResetNotification` but the context creation doesn't
+    /// fail if it's not supported.
     TryRobustNoResetNotification,
 
-    /// Everything is checked to avoid any crash. If a problem occurs, the context will enter a
-    /// "context lost" state. It must then be recreated. For the moment, glutin doesn't provide a
-    /// way to recreate a context with the same window :-/
+    /// Everything is checked to avoid any crash. If a problem occurs, the
+    /// context will enter a "context lost" state. It must then be
+    /// recreated. For the moment, glutin doesn't provide a way to recreate
+    /// a context with the same window :-/
     RobustLoseContextOnReset,
 
-    /// Same as `RobustLoseContextOnReset` but the context creation doesn't fail if it's not
-    /// supported.
+    /// Same as `RobustLoseContextOnReset` but the context creation doesn't
+    /// fail if it's not supported.
     TryRobustLoseContextOnReset,
 }
 
@@ -694,7 +535,8 @@ pub enum ReleaseBehavior {
     /// Doesn't do anything. Most notably doesn't flush.
     None,
 
-    /// Flushes the context that was previously current as if `glFlush` was called.
+    /// Flushes the context that was previously current as if `glFlush` was
+    /// called.
     Flush,
 }
 
@@ -717,21 +559,24 @@ pub struct PixelFormat {
 // TODO: swap method? (swap, copy)
 #[derive(Clone, Debug)]
 pub struct PixelFormatRequirements {
-    /// If true, only hardware-accelerated formats will be considered. If false, only software
-    /// renderers. `None` means "don't care". Default is `Some(true)`.
+    /// If true, only hardware-accelerated formats will be considered. If
+    /// false, only software renderers. `None` means "don't care". Default
+    /// is `Some(true)`.
     pub hardware_accelerated: Option<bool>,
 
-    /// Minimum number of bits for the color buffer, excluding alpha. `None` means "don't care".
-    /// The default is `Some(24)`.
+    /// Minimum number of bits for the color buffer, excluding alpha. `None`
+    /// means "don't care". The default is `Some(24)`.
     pub color_bits: Option<u8>,
 
-    /// If true, the color buffer must be in a floating point format. Default is `false`.
+    /// If true, the color buffer must be in a floating point format. Default
+    /// is `false`.
     ///
-    /// Using floating points allows you to write values outside of the `[0.0, 1.0]` range.
+    /// Using floating points allows you to write values outside of the `[0.0,
+    /// 1.0]` range.
     pub float_color_buffer: bool,
 
-    /// Minimum number of bits for the alpha in the color buffer. `None` means "don't care".
-    /// The default is `Some(8)`.
+    /// Minimum number of bits for the alpha in the color buffer. `None` means
+    /// "don't care". The default is `Some(8)`.
     pub alpha_bits: Option<u8>,
 
     /// Minimum number of bits for the depth buffer. `None` means "don't care".
@@ -742,25 +587,30 @@ pub struct PixelFormatRequirements {
     /// The default value is `Some(8)`.
     pub stencil_bits: Option<u8>,
 
-    /// If true, only double-buffered formats will be considered. If false, only single-buffer
-    /// formats. `None` means "don't care". The default is `Some(true)`.
+    /// If true, only double-buffered formats will be considered. If false,
+    /// only single-buffer formats. `None` means "don't care". The default
+    /// is `Some(true)`.
     pub double_buffer: Option<bool>,
 
-    /// Contains the minimum number of samples per pixel in the color, depth and stencil buffers.
-    /// `None` means "don't care". Default is `None`.
+    /// Contains the minimum number of samples per pixel in the color, depth
+    /// and stencil buffers. `None` means "don't care". Default is `None`.
     /// A value of `Some(0)` indicates that multisampling must not be enabled.
     pub multisampling: Option<u16>,
 
-    /// If true, only stereoscopic formats will be considered. If false, only non-stereoscopic
-    /// formats. The default is `false`.
+    /// If true, only stereoscopic formats will be considered. If false, only
+    /// non-stereoscopic formats. The default is `false`.
     pub stereoscopy: bool,
 
-    /// If true, only sRGB-capable formats will be considered. If false, don't care.
-    /// The default is `false`.
+    /// If true, only sRGB-capable formats will be considered. If false, don't
+    /// care. The default is `false`.
     pub srgb: bool,
 
     /// The behavior when changing the current context. Default is `Flush`.
     pub release_behavior: ReleaseBehavior,
+
+    /// X11 only: set internally to insure a certain visual xid is used when
+    /// choosing the fbconfig.
+    pub(crate) x11_visual_xid: Option<std::os::raw::c_ulong>,
 }
 
 impl Default for PixelFormatRequirements {
@@ -778,6 +628,7 @@ impl Default for PixelFormatRequirements {
             stereoscopy: false,
             srgb: false,
             release_behavior: ReleaseBehavior::Flush,
+            x11_visual_xid: None,
         }
     }
 }
@@ -809,12 +660,14 @@ pub struct GlAttributes<S> {
 
     /// How the OpenGL context should detect errors.
     ///
-    /// The default is `NotRobust` because this is what is typically expected when you create an
-    /// OpenGL context. However for safety you should consider `TryRobustLoseContextOnReset`.
+    /// The default is `NotRobust` because this is what is typically expected
+    /// when you create an OpenGL context. However for safety you should
+    /// consider `TryRobustLoseContextOnReset`.
     pub robustness: Robustness,
 
-    /// Whether to use vsync. If vsync is enabled, calling `swap_buffers` will block until the
-    /// screen refreshes. This is typically used to prevent screen tearing.
+    /// Whether to use vsync. If vsync is enabled, calling `swap_buffers` will
+    /// block until the screen refreshes. This is typically used to prevent
+    /// screen tearing.
     ///
     /// The default is `false`.
     pub vsync: bool,
@@ -823,7 +676,10 @@ pub struct GlAttributes<S> {
 impl<S> GlAttributes<S> {
     /// Turns the `sharing` parameter into another type by calling a closure.
     #[inline]
-    pub fn map_sharing<F, T>(self, f: F) -> GlAttributes<T> where F: FnOnce(S) -> T {
+    pub fn map_sharing<F, T>(self, f: F) -> GlAttributes<T>
+    where
+        F: FnOnce(S) -> T,
+    {
         GlAttributes {
             sharing: self.sharing.map(f),
             version: self.version,

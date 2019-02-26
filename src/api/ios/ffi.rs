@@ -2,8 +2,8 @@
 
 use std::os::raw::*;
 
-use objc::{Encode, Encoding};
 use objc::runtime::Object;
+use objc::{Encode, Encoding};
 
 pub mod gles {
     include!(concat!(env!("OUT_DIR"), "/gles2_bindings.rs"));
@@ -81,7 +81,7 @@ pub const kEAGLRenderingAPIOpenGLES3: NSUInteger = 3;
 #[link(name = "UIKit", kind = "framework")]
 #[link(name = "CoreFoundation", kind = "framework")]
 #[link(name = "GlKit", kind = "framework")]
-extern {
+extern "C" {
     pub static kEAGLColorFormatRGB565: id;
     // pub static kEAGLColorFormatRGBA8: id;
     pub static kEAGLDrawablePropertyColorFormat: id;
@@ -91,7 +91,7 @@ extern {
 pub const RTLD_LAZY: c_int = 0x001;
 pub const RTLD_GLOBAL: c_int = 0x100;
 
-extern {
+extern "C" {
     pub fn dlopen(filename: *const c_char, flag: c_int) -> *mut c_void;
     pub fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
 }

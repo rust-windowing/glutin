@@ -1,5 +1,20 @@
 # Unreleased
 
+- We no longer load `libegl.so` and `libgl.so` multiple times.
+- Fixes `Context::is_current` incorrectly returning `false`.
+- **Breaking:** Renamed `GlContext{,Ext}` to `ContextTrait{,Ext}`.
+- Implemented context sharing support for Windows and Linux.
+- Added `SeparatedContext`.
+- **Breaking:** Renamed `GlWindow` to `CombinedContext`.
+- **Breaking:** Removed `shareable_with_windowed_contexts`. Now you must build
+OsMesa contexts via a separate extension.
+- Added `ContextBuilder::build` method.
+- On X11 and Wayland, you can now use shared contexts, however, one limitation 
+of the Wayland backend is that all shared contexts must use the same events
+pool as each other.
+- Added context sharing support to windows.
+- Improved docs.
+- Refactored code to be more consistent/cleaner. Ran rustfmt on everything.
 - Added NetBSD support.
 - **Breaking:** Removed `new_shared` function from `Context` and `GlWindow`, in favor of `new`.
 - Added `build` method to `ContextBuilder`.

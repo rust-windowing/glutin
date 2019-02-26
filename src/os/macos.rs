@@ -5,12 +5,12 @@ pub use winit::os::macos::MonitorIdExt;
 pub use winit::os::macos::WindowBuilderExt;
 pub use winit::os::macos::WindowExt;
 
+use os::ContextTraitExt;
 use Context;
-use os::GlContextExt;
 
 use std::os::raw::c_void;
 
-impl GlContextExt for Context {
+impl ContextTraitExt for Context {
     type Handle = *mut c_void;
 
     #[inline]
