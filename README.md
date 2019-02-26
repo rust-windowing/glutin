@@ -120,4 +120,15 @@ See also [this documentation](https://kripken.github.io/emscripten-site/docs/api
 
 ### X11
 
- - The plan is that glutin tries to dynamically link-to and use wayland if possible. If it doesn't work, it will try xlib instead. If it doesn't work, it will try libcaca. This is work-in-progress.
+The plan is that glutin tries to dynamically link-to and use wayland if possible. If it doesn't work, it will try xlib instead. If it doesn't work, it will try libcaca. This is work-in-progress.
+ 
+### Wayland
+
+Due to an issue with how mesa and Wayland play together, all shared contexts must use the same events pool as each other.
+
+## Common issues
+
+Help! I'm receiving `NoAvailablePixelFormat`!
+
+ - See: https://github.com/tomaka/glutin/issues/952#issuecomment-467228004
+
