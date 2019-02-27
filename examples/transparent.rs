@@ -1,5 +1,3 @@
-extern crate glutin;
-
 mod support;
 
 use glutin::ContextTrait;

@@ -8,7 +8,6 @@ use super::*;
 /// # Example
 ///
 /// ```no_run
-/// # extern crate glutin;
 /// # use glutin::ContextTrait;
 /// # fn main() {
 /// # let el = glutin::EventsLoop::new();

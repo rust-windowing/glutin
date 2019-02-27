@@ -1,9 +1,12 @@
-#![allow(dead_code)]
-#![allow(non_snake_case)]
-#![allow(non_camel_case_types)]
-#![allow(non_upper_case_globals)]
+#![allow(
+    dead_code,
+    non_snake_case,
+    non_camel_case_types,
+    non_upper_case_globals,
+)]
 
 use libc;
+
 use std::os::raw;
 
 #[link(name = "android")]

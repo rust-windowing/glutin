@@ -5,7 +5,6 @@ use super::*;
 /// # Example
 ///
 /// ```no_run
-/// # extern crate glutin;
 /// # use glutin::ContextTrait;
 /// # fn main() {
 /// let mut el = glutin::EventsLoop::new();
@@ -31,14 +30,19 @@ use super::*;
 /// }
 /// # }
 /// ```
-pub struct CombinedContext {
+pub struct GlContext {
     context: Context,
-    window: Window,
+    window: WindowRef,
 }
 
-impl CombinedContext {
+pub enum WindowRef {
+    Owned(Window),
+    Arced(Arc<Window>),
+}
+
+impl GlContext {
     /// Builds the given window along with the associated GL context, returning
-    /// the pair as a `CombinedContext`.
+    /// the pair as a `GlContext`.
     ///
     /// One notable limitation of the Wayland backend when it comes to shared
     /// contexts is that both contexts must use the same events loop.
@@ -56,15 +60,42 @@ impl CombinedContext {
         let ContextBuilder { pf_reqs, gl_attr } = cb;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
         platform::Context::new(wb, el, &pf_reqs, &gl_attr).map(
-            |(window, context)| CombinedContext {
-                window,
+            |(window, context)| GlContext {
+                window: WindowRef::Owned(window),
+                context: Context { context },
+            },
+        )
+    }
+
+    /// Builds the GL context using the passed `Window`, returning the context
+    /// as a `SeparatedContext`.
+    ///
+    /// One notable limitation of the Wayland backend when it comes to shared
+    /// contexts is that both contexts must use the same events loop.
+    ///
+    /// Errors can occur in two scenarios:
+    ///  - If the window could not be created (via permission denied,
+    ///  incompatible system, out of memory, etc.). This should be very rare.
+    ///  - If the OpenGL context could not be created. This generally happens
+    ///  because the underlying platform doesn't support a requested feature.
+    pub fn new_separated(
+        window: Arc<Window>,
+        cb: ContextBuilder,
+        el: &EventsLoop,
+    ) -> Result<Self, CreationError> {
+        let ContextBuilder { pf_reqs, gl_attr } = cb;
+        let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
+
+        platform::Context::new_separated(&*window, el, &pf_reqs, &gl_attr).map(
+            |context| GlContext {
+                window: WindowRef::Arced(window),
                 context: Context { context },
             },
         )
     }
 
     /// Borrow the inner `Window`.
-    pub fn window(&self) -> &Window {
+    pub fn window(&self) -> &WindowRef {
         &self.window
     }
 
@@ -105,7 +136,7 @@ impl CombinedContext {
     }
 }
 
-impl ContextTrait for CombinedContext {
+impl ContextTrait for GlContext {
     unsafe fn make_current(&self) -> Result<(), ContextError> {
         self.context.make_current()
     }
@@ -123,9 +154,19 @@ impl ContextTrait for CombinedContext {
     }
 }
 
-impl std::ops::Deref for CombinedContext {
-    type Target = Window;
+impl std::ops::Deref for GlContext {
+    type Target = WindowRef;
     fn deref(&self) -> &Self::Target {
         &self.window
+    }
+}
+
+impl std::ops::Deref for WindowRef {
+    type Target = Window;
+    fn deref(&self) -> &Self::Target {
+        match self {
+            WindowRef::Owned(ref w) => w,
+            WindowRef::Arced(w) => &*w,
+        }
     }
 }

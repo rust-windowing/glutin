@@ -9,28 +9,12 @@
 ))]
 #![allow(unused_variables)]
 
-use Api;
-use ContextError;
-use CreationError;
-use GlAttributes;
-use GlRequest;
-use PixelFormat;
-use PixelFormatRequirements;
-use ReleaseBehavior;
-use Robustness;
-
-use std::cell::Cell;
-use std::ffi::{CStr, CString};
-use std::ops::{Deref, DerefMut};
-use std::os::raw::{c_int, c_void};
-use std::{mem, ptr};
-
 pub mod ffi;
 
 #[cfg(not(target_os = "android"))]
 mod egl {
     use super::ffi;
-    use api::dlloader::{SymTrait, SymWrapper};
+    use crate::api::dlloader::{SymTrait, SymWrapper};
 
     #[derive(Clone)]
     pub struct Egl(pub SymWrapper<ffi::egl::Egl>);
@@ -73,7 +57,17 @@ mod egl {
         }
     }
 }
+
 pub use self::egl::Egl;
+use crate::{
+    Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
+    PixelFormatRequirements, ReleaseBehavior, Robustness,
+};
+
+use std::cell::Cell;
+use std::ffi::{CStr, CString};
+use std::ops::{Deref, DerefMut};
+use std::os::raw;
 
 impl Deref for Egl {
     type Target = ffi::egl::Egl;
@@ -126,7 +120,7 @@ pub struct Context {
 fn get_native_display(
     egl: &Egl,
     native_display: NativeDisplay,
-) -> *const c_void {
+) -> *const raw::c_void {
     unsafe { egl.GetDisplay(ffi::egl::DEFAULT_DISPLAY as *mut _) }
 }
 
@@ -134,7 +128,7 @@ fn get_native_display(
 fn get_native_display(
     egl: &Egl,
     native_display: NativeDisplay,
-) -> *const c_void {
+) -> *const raw::c_void {
     // the first step is to query the list of extensions without any display, if
     // supported
     let dp_extensions = unsafe {
@@ -173,7 +167,7 @@ fn get_native_display(
                 egl.GetPlatformDisplay(
                     ffi::egl::PLATFORM_X11_KHR,
                     d as *mut _,
-                    ptr::null(),
+                    std::ptr::null(),
                 )
             }
         }
@@ -188,7 +182,7 @@ fn get_native_display(
                 egl.GetPlatformDisplayEXT(
                     ffi::egl::PLATFORM_X11_EXT,
                     d as *mut _,
-                    ptr::null(),
+                    std::ptr::null(),
                 )
             }
         }
@@ -202,7 +196,7 @@ fn get_native_display(
                 egl.GetPlatformDisplay(
                     ffi::egl::PLATFORM_GBM_KHR,
                     d as *mut _,
-                    ptr::null(),
+                    std::ptr::null(),
                 )
             }
         }
@@ -216,7 +210,7 @@ fn get_native_display(
                 egl.GetPlatformDisplayEXT(
                     ffi::egl::PLATFORM_GBM_KHR,
                     d as *mut _,
-                    ptr::null(),
+                    std::ptr::null(),
                 )
             }
         }
@@ -230,7 +224,7 @@ fn get_native_display(
                 egl.GetPlatformDisplay(
                     ffi::egl::PLATFORM_WAYLAND_KHR,
                     d as *mut _,
-                    ptr::null(),
+                    std::ptr::null(),
                 )
             }
         }
@@ -244,7 +238,7 @@ fn get_native_display(
                 egl.GetPlatformDisplayEXT(
                     ffi::egl::PLATFORM_WAYLAND_EXT,
                     d as *mut _,
-                    ptr::null(),
+                    std::ptr::null(),
                 )
             }
         }
@@ -259,7 +253,7 @@ fn get_native_display(
             egl.GetPlatformDisplay(
                 ffi::egl::PLATFORM_ANDROID_KHR,
                 ffi::egl::DEFAULT_DISPLAY as *mut _,
-                ptr::null(),
+                std::ptr::null(),
             )
         }
 
@@ -270,7 +264,7 @@ fn get_native_display(
             egl.GetPlatformDisplay(
                 ffi::egl::PLATFORM_DEVICE_EXT,
                 display as *mut _,
-                ptr::null(),
+                std::ptr::null(),
             )
         }
 
@@ -315,8 +309,8 @@ impl Context {
         }
 
         let egl_version = unsafe {
-            let mut major: ffi::egl::types::EGLint = mem::uninitialized();
-            let mut minor: ffi::egl::types::EGLint = mem::uninitialized();
+            let mut major: ffi::egl::types::EGLint = std::mem::uninitialized();
+            let mut minor: ffi::egl::types::EGLint = std::mem::uninitialized();
 
             if egl.Initialize(display, &mut major, &mut minor) == 0 {
                 return Err(CreationError::OsError(format!(
@@ -430,7 +424,9 @@ impl Context {
 
         if ret == 0 {
             match egl.GetError() as u32 {
-                ffi::egl::CONTEXT_LOST => return Err(ContextError::ContextLost),
+                ffi::egl::CONTEXT_LOST => {
+                    return Err(ContextError::ContextLost)
+                }
                 err => panic!(
                     "eglMakeCurrent failed (eglGetError returned 0x{:x})",
                     err
@@ -465,7 +461,9 @@ impl Context {
 
         if ret == 0 {
             match unsafe { egl.GetError() } as u32 {
-                ffi::egl::CONTEXT_LOST => return Err(ContextError::ContextLost),
+                ffi::egl::CONTEXT_LOST => {
+                    return Err(ContextError::ContextLost)
+                }
                 err => panic!(
                     "eglSwapBuffers failed (eglGetError returned 0x{:x})",
                     err
@@ -513,7 +511,7 @@ impl Context {
             self.display,
             self.config_id,
             native_window,
-            ptr::null(),
+            std::ptr::null(),
         ));
         if self.surface.get().is_null() {
             panic!("on_surface_created: eglCreateWindowSurface failed")
@@ -584,7 +582,7 @@ pub struct ContextPrototype<'a> {
 impl<'a> ContextPrototype<'a> {
     pub fn get_native_visual_id(&self) -> ffi::egl::types::EGLint {
         let egl = EGL.as_ref().unwrap();
-        let mut value = unsafe { mem::uninitialized() };
+        let mut value = unsafe { std::mem::uninitialized() };
         let ret = unsafe {
             egl.GetConfigAttrib(
                 self.display,
@@ -609,7 +607,7 @@ impl<'a> ContextPrototype<'a> {
                 self.display,
                 self.config_id,
                 native_window,
-                ptr::null(),
+                std::ptr::null(),
             );
             if surface.is_null() {
                 return Err(CreationError::OsError(format!(
@@ -629,11 +627,11 @@ impl<'a> ContextPrototype<'a> {
     ) -> Result<Context, CreationError> {
         let egl = EGL.as_ref().unwrap();
         let attrs = &[
-            ffi::egl::WIDTH as c_int,
-            dimensions.0 as c_int,
-            ffi::egl::HEIGHT as c_int,
-            dimensions.1 as c_int,
-            ffi::egl::NONE as c_int,
+            ffi::egl::WIDTH as raw::c_int,
+            dimensions.0 as raw::c_int,
+            ffi::egl::HEIGHT as raw::c_int,
+            dimensions.1 as raw::c_int,
+            ffi::egl::NONE as raw::c_int,
         ];
 
         let surface = unsafe {
@@ -659,7 +657,7 @@ impl<'a> ContextPrototype<'a> {
     ) -> Result<Context, CreationError> {
         let share = match self.opengl.sharing {
             Some(ctx) => ctx.context,
-            None => ptr::null(),
+            None => std::ptr::null(),
         };
 
         let context = unsafe {
@@ -767,43 +765,43 @@ unsafe fn choose_fbconfig(
     reqs: &PixelFormatRequirements,
 ) -> Result<(ffi::egl::types::EGLConfig, PixelFormat), CreationError> {
     let descriptor = {
-        let mut out: Vec<c_int> = Vec::with_capacity(37);
+        let mut out: Vec<raw::c_int> = Vec::with_capacity(37);
 
         if egl_version >= &(1, 2) {
-            out.push(ffi::egl::COLOR_BUFFER_TYPE as c_int);
-            out.push(ffi::egl::RGB_BUFFER as c_int);
+            out.push(ffi::egl::COLOR_BUFFER_TYPE as raw::c_int);
+            out.push(ffi::egl::RGB_BUFFER as raw::c_int);
         }
 
-        out.push(ffi::egl::SURFACE_TYPE as c_int);
+        out.push(ffi::egl::SURFACE_TYPE as raw::c_int);
         // TODO: Some versions of Mesa report a BAD_ATTRIBUTE error
         // if we ask for PBUFFER_BIT as well as WINDOW_BIT
-        out.push((ffi::egl::WINDOW_BIT) as c_int);
+        out.push((ffi::egl::WINDOW_BIT) as raw::c_int);
 
         match (api, version) {
             (Api::OpenGlEs, Some((3, _))) => {
                 if egl_version < &(1, 3) {
                     return Err(CreationError::NoAvailablePixelFormat);
                 }
-                out.push(ffi::egl::RENDERABLE_TYPE as c_int);
-                out.push(ffi::egl::OPENGL_ES3_BIT as c_int);
-                out.push(ffi::egl::CONFORMANT as c_int);
-                out.push(ffi::egl::OPENGL_ES3_BIT as c_int);
+                out.push(ffi::egl::RENDERABLE_TYPE as raw::c_int);
+                out.push(ffi::egl::OPENGL_ES3_BIT as raw::c_int);
+                out.push(ffi::egl::CONFORMANT as raw::c_int);
+                out.push(ffi::egl::OPENGL_ES3_BIT as raw::c_int);
             }
             (Api::OpenGlEs, Some((2, _))) => {
                 if egl_version < &(1, 3) {
                     return Err(CreationError::NoAvailablePixelFormat);
                 }
-                out.push(ffi::egl::RENDERABLE_TYPE as c_int);
-                out.push(ffi::egl::OPENGL_ES2_BIT as c_int);
-                out.push(ffi::egl::CONFORMANT as c_int);
-                out.push(ffi::egl::OPENGL_ES2_BIT as c_int);
+                out.push(ffi::egl::RENDERABLE_TYPE as raw::c_int);
+                out.push(ffi::egl::OPENGL_ES2_BIT as raw::c_int);
+                out.push(ffi::egl::CONFORMANT as raw::c_int);
+                out.push(ffi::egl::OPENGL_ES2_BIT as raw::c_int);
             }
             (Api::OpenGlEs, Some((1, _))) => {
                 if egl_version >= &(1, 3) {
-                    out.push(ffi::egl::RENDERABLE_TYPE as c_int);
-                    out.push(ffi::egl::OPENGL_ES_BIT as c_int);
-                    out.push(ffi::egl::CONFORMANT as c_int);
-                    out.push(ffi::egl::OPENGL_ES_BIT as c_int);
+                    out.push(ffi::egl::RENDERABLE_TYPE as raw::c_int);
+                    out.push(ffi::egl::OPENGL_ES_BIT as raw::c_int);
+                    out.push(ffi::egl::CONFORMANT as raw::c_int);
+                    out.push(ffi::egl::OPENGL_ES_BIT as raw::c_int);
                 }
             }
             (Api::OpenGlEs, _) => unimplemented!(),
@@ -811,45 +809,49 @@ unsafe fn choose_fbconfig(
                 if egl_version < &(1, 3) {
                     return Err(CreationError::NoAvailablePixelFormat);
                 }
-                out.push(ffi::egl::RENDERABLE_TYPE as c_int);
-                out.push(ffi::egl::OPENGL_BIT as c_int);
-                out.push(ffi::egl::CONFORMANT as c_int);
-                out.push(ffi::egl::OPENGL_BIT as c_int);
+                out.push(ffi::egl::RENDERABLE_TYPE as raw::c_int);
+                out.push(ffi::egl::OPENGL_BIT as raw::c_int);
+                out.push(ffi::egl::CONFORMANT as raw::c_int);
+                out.push(ffi::egl::OPENGL_BIT as raw::c_int);
             }
             (_, _) => unimplemented!(),
         };
 
         if let Some(hardware_accelerated) = reqs.hardware_accelerated {
-            out.push(ffi::egl::CONFIG_CAVEAT as c_int);
+            out.push(ffi::egl::CONFIG_CAVEAT as raw::c_int);
             out.push(if hardware_accelerated {
-                ffi::egl::NONE as c_int
+                ffi::egl::NONE as raw::c_int
             } else {
-                ffi::egl::SLOW_CONFIG as c_int
+                ffi::egl::SLOW_CONFIG as raw::c_int
             });
         }
 
         if let Some(color) = reqs.color_bits {
-            out.push(ffi::egl::RED_SIZE as c_int);
-            out.push((color / 3) as c_int);
-            out.push(ffi::egl::GREEN_SIZE as c_int);
-            out.push((color / 3 + if color % 3 != 0 { 1 } else { 0 }) as c_int);
-            out.push(ffi::egl::BLUE_SIZE as c_int);
-            out.push((color / 3 + if color % 3 == 2 { 1 } else { 0 }) as c_int);
+            out.push(ffi::egl::RED_SIZE as raw::c_int);
+            out.push((color / 3) as raw::c_int);
+            out.push(ffi::egl::GREEN_SIZE as raw::c_int);
+            out.push(
+                (color / 3 + if color % 3 != 0 { 1 } else { 0 }) as raw::c_int,
+            );
+            out.push(ffi::egl::BLUE_SIZE as raw::c_int);
+            out.push(
+                (color / 3 + if color % 3 == 2 { 1 } else { 0 }) as raw::c_int,
+            );
         }
 
         if let Some(alpha) = reqs.alpha_bits {
-            out.push(ffi::egl::ALPHA_SIZE as c_int);
-            out.push(alpha as c_int);
+            out.push(ffi::egl::ALPHA_SIZE as raw::c_int);
+            out.push(alpha as raw::c_int);
         }
 
         if let Some(depth) = reqs.depth_bits {
-            out.push(ffi::egl::DEPTH_SIZE as c_int);
-            out.push(depth as c_int);
+            out.push(ffi::egl::DEPTH_SIZE as raw::c_int);
+            out.push(depth as raw::c_int);
         }
 
         if let Some(stencil) = reqs.stencil_bits {
-            out.push(ffi::egl::STENCIL_SIZE as c_int);
-            out.push(stencil as c_int);
+            out.push(ffi::egl::STENCIL_SIZE as raw::c_int);
+            out.push(stencil as raw::c_int);
         }
 
         if let Some(true) = reqs.double_buffer {
@@ -857,8 +859,8 @@ unsafe fn choose_fbconfig(
         }
 
         if let Some(multisampling) = reqs.multisampling {
-            out.push(ffi::egl::SAMPLES as c_int);
-            out.push(multisampling as c_int);
+            out.push(ffi::egl::SAMPLES as raw::c_int);
+            out.push(multisampling as raw::c_int);
         }
 
         if reqs.stereoscopy {
@@ -866,8 +868,8 @@ unsafe fn choose_fbconfig(
         }
 
         if let Some(xid) = reqs.x11_visual_xid {
-            out.push(ffi::egl::NATIVE_VISUAL_ID as c_int);
-            out.push(xid as c_int);
+            out.push(ffi::egl::NATIVE_VISUAL_ID as raw::c_int);
+            out.push(xid as raw::c_int);
         }
 
         // FIXME: srgb is not taken into account
@@ -880,13 +882,13 @@ unsafe fn choose_fbconfig(
             }
         }
 
-        out.push(ffi::egl::NONE as c_int);
+        out.push(ffi::egl::NONE as raw::c_int);
         out
     };
 
     // calling `eglChooseConfig`
-    let mut config_id = mem::uninitialized();
-    let mut num_configs = mem::uninitialized();
+    let mut config_id = std::mem::uninitialized();
+    let mut num_configs = std::mem::uninitialized();
     if egl.ChooseConfig(
         display,
         descriptor.as_ptr(),
@@ -904,7 +906,7 @@ unsafe fn choose_fbconfig(
     // analyzing each config
     macro_rules! attrib {
         ($egl:expr, $display:expr, $config:expr, $attr:expr) => {{
-            let mut value = mem::uninitialized();
+            let mut value = std::mem::uninitialized();
             let res = $egl.GetConfigAttrib(
                 $display,
                 $config,
@@ -992,8 +994,9 @@ unsafe fn create_context(
                     .find(|s| s == &"EGL_KHR_create_context_no_error")
                     .is_some()
                 {
-                    context_attributes
-                        .push(ffi::egl::CONTEXT_OPENGL_NO_ERROR_KHR as c_int);
+                    context_attributes.push(
+                        ffi::egl::CONTEXT_OPENGL_NO_ERROR_KHR as raw::c_int,
+                    );
                     context_attributes.push(1);
                 }
             }
@@ -1002,12 +1005,12 @@ unsafe fn create_context(
                 if supports_robustness {
                     context_attributes.push(
                         ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY
-                            as c_int,
+                            as raw::c_int,
                     );
                     context_attributes
-                        .push(ffi::egl::NO_RESET_NOTIFICATION as c_int);
-                    flags =
-                        flags | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as c_int;
+                        .push(ffi::egl::NO_RESET_NOTIFICATION as raw::c_int);
+                    flags = flags
+                        | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
                 } else {
                     return Err(CreationError::RobustnessNotSupported);
                 }
@@ -1017,12 +1020,12 @@ unsafe fn create_context(
                 if supports_robustness {
                     context_attributes.push(
                         ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY
-                            as c_int,
+                            as raw::c_int,
                     );
                     context_attributes
-                        .push(ffi::egl::NO_RESET_NOTIFICATION as c_int);
-                    flags =
-                        flags | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as c_int;
+                        .push(ffi::egl::NO_RESET_NOTIFICATION as raw::c_int);
+                    flags = flags
+                        | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
                 }
             }
 
@@ -1030,12 +1033,12 @@ unsafe fn create_context(
                 if supports_robustness {
                     context_attributes.push(
                         ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY
-                            as c_int,
+                            as raw::c_int,
                     );
                     context_attributes
-                        .push(ffi::egl::LOSE_CONTEXT_ON_RESET as c_int);
-                    flags =
-                        flags | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as c_int;
+                        .push(ffi::egl::LOSE_CONTEXT_ON_RESET as raw::c_int);
+                    flags = flags
+                        | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
                 } else {
                     return Err(CreationError::RobustnessNotSupported);
                 }
@@ -1045,12 +1048,12 @@ unsafe fn create_context(
                 if supports_robustness {
                     context_attributes.push(
                         ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY
-                            as c_int,
+                            as raw::c_int,
                     );
                     context_attributes
-                        .push(ffi::egl::LOSE_CONTEXT_ON_RESET as c_int);
-                    flags =
-                        flags | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as c_int;
+                        .push(ffi::egl::LOSE_CONTEXT_ON_RESET as raw::c_int);
+                    flags = flags
+                        | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
                 }
             }
         }

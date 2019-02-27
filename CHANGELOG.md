@@ -4,8 +4,7 @@
 - Fixes `Context::is_current` incorrectly returning `false`.
 - **Breaking:** Renamed `GlContext{,Ext}` to `ContextTrait{,Ext}`.
 - Implemented context sharing support for Windows and Linux.
-- Added `SeparatedContext`.
-- **Breaking:** Renamed `GlWindow` to `CombinedContext`.
+- Added support for separated contexts.
 - **Breaking:** Removed `shareable_with_windowed_contexts`. Now you must build
 OsMesa contexts via a separate extension.
 - Added `ContextBuilder::build` method.

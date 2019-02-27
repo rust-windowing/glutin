@@ -1,13 +1,5 @@
 #![allow(non_camel_case_types)]
 
-#[cfg(target_os = "windows")]
-extern crate winapi;
-
-pub use self::egl::types::EGLContext;
-pub use self::egl::types::EGLDisplay;
-
-use libc;
-
 pub mod egl {
     pub type khronos_utime_nanoseconds_t = super::khronos_utime_nanoseconds_t;
     pub type khronos_uint64_t = super::khronos_uint64_t;
@@ -22,6 +14,11 @@ pub mod egl {
 
     include!(concat!(env!("OUT_DIR"), "/egl_bindings.rs"));
 }
+
+pub use self::egl::types::EGLContext;
+pub use self::egl::types::EGLDisplay;
+
+use libc;
 
 pub type khronos_utime_nanoseconds_t = khronos_uint64_t;
 pub type khronos_uint64_t = libc::uint64_t;

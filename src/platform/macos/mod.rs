@@ -1,13 +1,9 @@
 #![cfg(target_os = "macos")]
 
-pub use winit::MonitorId;
-
-use ContextError;
-use CreationError;
-use GlAttributes;
-use PixelFormat;
-use PixelFormatRequirements;
-use Robustness;
+use crate::{
+    ContextError, CreationError, GlAttributes, PixelFormat,
+    PixelFormatRequirements, Robustness,
+};
 
 use cgl::{
     kCGLCECrashOnRemovedFunctions, kCGLCPSurfaceOpacity, CGLEnable,
@@ -22,11 +18,13 @@ use core_foundation::bundle::{
 };
 use core_foundation::string::CFString;
 use objc::runtime::{BOOL, NO};
+
 use winit;
 use winit::os::macos::WindowExt;
+pub use winit::MonitorId;
 
 use std::ops::Deref;
-use std::os::raw::c_void;
+use std::os::raw;
 use std::str::FromStr;
 
 mod helpers;
@@ -284,8 +282,8 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_api(&self) -> ::Api {
-        ::Api::OpenGl
+    pub fn get_api(&self) -> crate::Api {
+        crate::Api::OpenGl
     }
 
     #[inline]
@@ -297,7 +295,7 @@ impl Context {
     }
 
     #[inline]
-    pub unsafe fn raw_handle(&self) -> *mut c_void {
+    pub unsafe fn raw_handle(&self) -> *mut raw::c_void {
         match *self {
             Context::WindowedContext(ref c) => *c.context.deref() as *mut _,
             Context::HeadlessContext(ref c) => *c.context.deref() as *mut _,

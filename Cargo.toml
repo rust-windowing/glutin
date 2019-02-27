@@ -9,6 +9,7 @@ readme = "README.md"
 repository = "https://github.com/tomaka/glutin"
 documentation = "https://docs.rs/glutin"
 build = "build.rs"
+edition = "2018"
 
 [package.metadata.docs.rs]
 features = ["icon_loading", "serde"]

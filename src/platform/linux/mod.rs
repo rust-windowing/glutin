@@ -6,20 +6,18 @@
     target_os = "openbsd"
 ))]
 
+mod wayland;
+mod x11;
+
 use self::x11::X11Context;
-use api::egl;
-use api::glx;
-use {
+use crate::api::{egl, glx, osmesa};
+use crate::{
     ContextError, CreationError, GlAttributes, PixelFormat,
     PixelFormatRequirements,
 };
 
 use winit;
 use winit::os::unix::EventsLoopExt;
-
-mod wayland;
-mod x11;
-use api::osmesa;
 
 use std::os::raw;
 
@@ -55,7 +53,9 @@ impl Context {
                     Context::OsMesa(_) => Ok(()),
                     _ => {
                         let msg = "Cannot share an OSMesa context with a non-OSMesa context";
-                        return Err(CreationError::PlatformSpecific(msg.into()));
+                        return Err(CreationError::PlatformSpecific(
+                            msg.into(),
+                        ));
                     }
                 },
                 ContextType::X11 => match *c {
@@ -64,7 +64,9 @@ impl Context {
                     }
                     _ => {
                         let msg = "Cannot share an X11 context with a non-X11 context";
-                        return Err(CreationError::PlatformSpecific(msg.into()));
+                        return Err(CreationError::PlatformSpecific(
+                            msg.into(),
+                        ));
                     }
                 },
                 ContextType::Wayland => match *c {
@@ -72,7 +74,9 @@ impl Context {
                     | Context::HeadlessWayland(_, _) => Ok(()),
                     _ => {
                         let msg = "Cannot share a Wayland context with a non-Wayland context";
-                        return Err(CreationError::PlatformSpecific(msg.into()));
+                        return Err(CreationError::PlatformSpecific(
+                            msg.into(),
+                        ));
                     }
                 },
             }
@@ -225,7 +229,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_api(&self) -> ::Api {
+    pub fn get_api(&self) -> crate::Api {
         match *self {
             Context::WindowedX11(ref ctx)
             | Context::HeadlessX11(_, ref ctx) => ctx.get_api(),

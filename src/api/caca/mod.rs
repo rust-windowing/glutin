@@ -7,18 +7,17 @@
 ))]
 #![allow(unused_variables, dead_code)]
 
-use api::osmesa::OsMesaContext;
-use libc;
+mod ffi;
 
-use {
+use crate::api::osmesa::OsMesaContext;
+use crate::{
     Api, ContextError, CreationError, GlAttributes, PixelFormat,
     PixelFormatRequirements,
 };
 
-use std::path::Path;
-use std::ptr;
+use libc;
 
-mod ffi;
+use std::path::Path;
 
 pub struct Context {
     opengl: OsMesaContext,
@@ -47,7 +46,8 @@ impl Context {
             Ok(l) => l,
         };
 
-        let display = unsafe { (libcaca.caca_create_display)(ptr::null_mut()) };
+        let display =
+            unsafe { (libcaca.caca_create_display)(std::ptr::null_mut()) };
 
         if display.is_null() {
             return Err(CreationError::OsError(
