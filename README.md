@@ -38,51 +38,44 @@ gl = "*"
 extern crate gl;
 extern crate glutin;
 
-use glutin::dpi::*;
-use glutin::ContextTrait;
+use glutin::dpi;
+use glutin::GlContext;
 
 fn main() {
-    let mut el = glutin::EventsLoop::new();
-    let wb = glutin::WindowBuilder::new()
+    let mut events_loop = glutin::EventsLoop::new();
+    let window_builder = glutin::WindowBuilder::new()
         .with_title("Hello, world!")
-        .with_dimensions(LogicalSize::new(1024.0, 768.0));
-    let combined_context = glutin::ContextBuilder::new()
-        .with_vsync(true)
-        .build_combined(wb, &el)
-        .unwrap();
+        .with_dimensions(dpi::LogicalSize::new(1024.0, 720.0));
+    let context = glutin::ContextBuilder::new().with_vsync(true);
+    let window = glutin::GlWindow::new(window_builder, context, &events_loop).unwrap();
+
+    unsafe { window.make_current().unwrap() };
 
     unsafe {
-        combined_context.make_current().unwrap();
-    }
-
-    unsafe {
-        gl::load_with(|symbol| combined_context.get_proc_address(symbol) as *const _);
+        gl::load_with(|symbol| window.get_proc_address(symbol) as *const _);
         gl::ClearColor(0.0, 1.0, 0.0, 1.0);
     }
 
-    let mut running = true;
-    while running {
-        el.poll_events(|event| {
-            match event {
-                glutin::Event::WindowEvent{ event, .. } => match event {
-                    glutin::WindowEvent::CloseRequested => running = false,
-                    glutin::WindowEvent::Resized(logical_size) => {
-                        let dpi_factor = combined_context.get_hidpi_factor();
-                        combined_context.resize(logical_size.to_physical(dpi_factor));
-                    },
-                    _ => ()
-                },
-                _ => ()
-            }
+    let mut should_be_running = true;
+    while should_be_running {
+        events_loop.poll_events(|event| match event {
+            glutin::Event::WindowEvent { event, .. } => match event {
+                glutin::WindowEvent::CloseRequested => should_be_running = false,
+                glutin::WindowEvent::Resized(logical_size) => {
+                    let dpi_factor = window.get_hidpi_factor();
+                    window.resize(logical_size.to_physical(dpi_factor));
+                }
+                _ => (),
+            },
+            _ => (),
         });
 
-        unsafe {
-            gl::Clear(gl::COLOR_BUFFER_BIT);
-        }
+        unsafe { gl::Clear(gl::COLOR_BUFFER_BIT) }
 
-        combined_context.swap_buffers().unwrap();
+        window.swap_buffers().unwrap();
     }
 }
+
 ```
 
 Note that glutin aims at being a low-level brick in your rendering infrastructure. You are encouraged to write another layer of abstraction between glutin and your application.
