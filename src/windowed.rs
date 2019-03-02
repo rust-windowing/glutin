@@ -30,7 +30,7 @@ use super::*;
 /// }
 /// # }
 /// ```
-pub struct GlContext {
+pub struct WindowedContext {
     context: Context,
     window: WindowRef,
 }
@@ -40,9 +40,9 @@ pub enum WindowRef {
     Arced(Arc<Window>),
 }
 
-impl GlContext {
+impl WindowedContext {
     /// Builds the given window along with the associated GL context, returning
-    /// the pair as a `GlContext`.
+    /// the pair as a `WindowedContext`.
     ///
     /// One notable limitation of the Wayland backend when it comes to shared
     /// contexts is that both contexts must use the same events loop.
@@ -60,7 +60,7 @@ impl GlContext {
         let ContextBuilder { pf_reqs, gl_attr } = cb;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
         platform::Context::new(wb, el, &pf_reqs, &gl_attr).map(
-            |(window, context)| GlContext {
+            |(window, context)| WindowedContext {
                 window: WindowRef::Owned(window),
                 context: Context { context },
             },
@@ -68,7 +68,7 @@ impl GlContext {
     }
 
     /// Builds the GL context using the passed `Window`, returning the context
-    /// as a `SeparatedContext`.
+    /// as a `WindowedContext`.
     ///
     /// One notable limitation of the Wayland backend when it comes to shared
     /// contexts is that both contexts must use the same events loop.
@@ -87,7 +87,7 @@ impl GlContext {
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
 
         platform::Context::new_separated(&*window, el, &pf_reqs, &gl_attr).map(
-            |context| GlContext {
+            |context| WindowedContext {
                 window: WindowRef::Arced(window),
                 context: Context { context },
             },
@@ -136,7 +136,7 @@ impl GlContext {
     }
 }
 
-impl ContextTrait for GlContext {
+impl ContextTrait for WindowedContext {
     unsafe fn make_current(&self) -> Result<(), ContextError> {
         self.context.make_current()
     }
@@ -154,7 +154,7 @@ impl ContextTrait for GlContext {
     }
 }
 
-impl std::ops::Deref for GlContext {
+impl std::ops::Deref for WindowedContext {
     type Target = WindowRef;
     fn deref(&self) -> &Self::Target {
         &self.window

@@ -1,13 +1,13 @@
 //! The purpose of this library is to provide an OpenGL context on as many
 //! platforms as possible.
 //!
-//! # Building a GlContext
+//! # Building a WindowedContext
 //!
-//! A `GlContext` is composed of a `Window` and an OpenGL `Context`.
+//! A `WindowedContext` is composed of a `Window` and an OpenGL `Context`.
 //!
 //! Due to some operating-system-specific quirks, glutin prefers control over
 //! the order of creation of the `Context` and `Window`. Here is an example of
-//! building a GlContext the prefered way:
+//! building a WindowedContext the prefered way:
 //!
 //! ```no_run
 //! # fn main() {
@@ -52,12 +52,12 @@ extern crate objc;
 pub mod os;
 
 mod api;
-mod combined;
 mod context;
 mod platform;
+mod windowed;
 
-pub use crate::combined::GlContext;
 pub use crate::context::Context;
+pub use crate::windowed::{WindowRef, WindowedContext};
 
 pub use winit::{
     dpi, AvailableMonitorsIter, AxisId, ButtonId, ControlFlow,
@@ -261,8 +261,8 @@ impl<'a> ContextBuilder<'a> {
         self,
         wb: WindowBuilder,
         el: &EventsLoop,
-    ) -> Result<GlContext, CreationError> {
-        GlContext::new(wb, self, el)
+    ) -> Result<WindowedContext, CreationError> {
+        WindowedContext::new(wb, self, el)
     }
 
     /// Builds a separated context.
@@ -270,8 +270,8 @@ impl<'a> ContextBuilder<'a> {
         self,
         win: Arc<Window>,
         el: &EventsLoop,
-    ) -> Result<GlContext, CreationError> {
-        GlContext::new_separated(win, self, el)
+    ) -> Result<WindowedContext, CreationError> {
+        WindowedContext::new_separated(win, self, el)
     }
 }
 
@@ -447,11 +447,10 @@ impl GlRequest {
     /// Extract the desktop GL version, if any.
     pub fn to_gl_version(&self) -> Option<(u8, u8)> {
         match self {
-            &GlRequest::Specific(Api::OpenGl, version) => Some(version),
-            &GlRequest::GlThenGles {
-                opengl_version: version,
-                ..
-            } => Some(version),
+            &GlRequest::Specific(Api::OpenGl, opengl_version) => Some(opengl_version),
+            &GlRequest::GlThenGles { opengl_version, .. } => {
+                Some(opengl_version)
+            }
             _ => None,
         }
     }

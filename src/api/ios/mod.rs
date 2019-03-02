@@ -274,7 +274,7 @@ impl Context {
                 ].as_ptr()
             count: 2
         ];
-        let _ = self.make_current();
+        self.make_current().unwrap();
 
         let view = self.view;
         let scale_factor = window.get_hidpi_factor() as CGFloat;

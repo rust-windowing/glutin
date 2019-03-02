@@ -67,8 +67,6 @@ impl Drop for ContextWrapper {
 impl Context {
     /// Attempt to build a new WGL context on a window.
     ///
-    /// The window must **not** have had `SetPixelFormat` called on it.
-    ///
     /// # Unsafety
     ///
     /// The `window` must continue to exist as long as the resulting `Context`
@@ -104,14 +102,16 @@ impl Context {
             format!("")
         };
 
-        // calling SetPixelFormat
-        let pixel_format = {
-            let (id, f) = if extensions
-                .split(' ')
-                .find(|&i| i == "WGL_ARB_pixel_format")
-                .is_some()
-            {
-                choose_arb_pixel_format(
+        let use_arb_for_pixel_format = extensions
+            .split(' ')
+            .find(|&i| i == "WGL_ARB_pixel_format")
+            .is_some();
+
+        // calling SetPixelFormat, if not already done
+        let mut pixel_format_id = GetPixelFormat(hdc);
+        if pixel_format_id == 0 {
+            let id = if use_arb_for_pixel_format {
+                choose_arb_pixel_format_id(
                     &extra_functions,
                     &extensions,
                     hdc,
@@ -119,12 +119,25 @@ impl Context {
                 )
                 .map_err(|_| CreationError::NoAvailablePixelFormat)?
             } else {
-                choose_native_pixel_format(hdc, pf_reqs)
+                choose_native_pixel_format_id(hdc, pf_reqs)
                     .map_err(|_| CreationError::NoAvailablePixelFormat)?
             };
 
             set_pixel_format(hdc, id)?;
-            f
+            pixel_format_id = id;
+        }
+
+        let pixel_format = if use_arb_for_pixel_format {
+            choose_arb_pixel_format(
+                &extra_functions,
+                &extensions,
+                hdc,
+                pixel_format_id,
+            )
+            .map_err(|_| CreationError::NoAvailablePixelFormat)?
+        } else {
+            choose_native_pixel_format(hdc, pf_reqs, pixel_format_id)
+                .map_err(|_| CreationError::NoAvailablePixelFormat)?
         };
 
         // creating the OpenGL context
@@ -155,10 +168,10 @@ impl Context {
         }
 
         Ok(Context {
-            context: context,
-            hdc: hdc,
-            gl_library: gl_library,
-            pixel_format: pixel_format,
+            context,
+            hdc,
+            gl_library,
+            pixel_format,
         })
     }
 
@@ -443,10 +456,10 @@ unsafe fn create_context(
 /// Chooses a pixel formats without using WGL.
 ///
 /// Gives less precise results than `enumerate_arb_pixel_formats`.
-unsafe fn choose_native_pixel_format(
+unsafe fn choose_native_pixel_format_id(
     hdc: HDC,
     reqs: &PixelFormatRequirements,
-) -> Result<(raw::c_int, PixelFormat), ()> {
+) -> Result<raw::c_int, ()> {
     // TODO: hardware acceleration is not handled
 
     // handling non-supported stuff
@@ -518,6 +531,14 @@ unsafe fn choose_native_pixel_format(
         return Err(());
     }
 
+    Ok(pf_id)
+}
+
+unsafe fn choose_native_pixel_format(
+    hdc: HDC,
+    reqs: &PixelFormatRequirements,
+    pf_id: raw::c_int,
+) -> Result<PixelFormat, ()> {
     // querying back the capabilities of what windows told us
     let mut output: PIXELFORMATDESCRIPTOR = std::mem::zeroed();
     if DescribePixelFormat(
@@ -577,18 +598,18 @@ unsafe fn choose_native_pixel_format(
         }
     }
 
-    Ok((pf_id, pf_desc))
+    Ok(pf_desc)
 }
 
 /// Enumerates the list of pixel formats by using extra WGL functions.
 ///
 /// Gives more precise results than `enumerate_native_pixel_formats`.
-unsafe fn choose_arb_pixel_format(
+unsafe fn choose_arb_pixel_format_id(
     extra: &gl::wgl_extra::Wgl,
     extensions: &str,
     hdc: HDC,
     reqs: &PixelFormatRequirements,
-) -> Result<(raw::c_int, PixelFormat), ()> {
+) -> Result<raw::c_int, ()> {
     let descriptor = {
         let mut out: Vec<raw::c_int> = Vec::with_capacity(37);
 
@@ -732,6 +753,15 @@ unsafe fn choose_arb_pixel_format(
         return Err(());
     }
 
+    Ok(format_id)
+}
+
+unsafe fn choose_arb_pixel_format(
+    extra: &gl::wgl_extra::Wgl,
+    extensions: &str,
+    hdc: HDC,
+    format_id: raw::c_int,
+) -> Result<PixelFormat, ()> {
     let get_info = |attrib: u32| {
         let mut value = std::mem::uninitialized();
         extra.GetPixelFormatAttribivARB(
@@ -787,7 +817,7 @@ unsafe fn choose_arb_pixel_format(
         },
     };
 
-    Ok((format_id, pf_desc))
+    Ok(pf_desc)
 }
 
 /// Calls `SetPixelFormat` on a window.

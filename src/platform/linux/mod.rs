@@ -278,6 +278,7 @@ impl Context {
 
     #[inline]
     fn new_osmesa(
+        dims: (u32, u32),
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<Self, CreationError> {
@@ -286,13 +287,16 @@ impl Context {
             &Context::OsMesa(ref ctx) => ctx,
             _ => unreachable!(),
         });
-        osmesa::OsMesaContext::new((1, 1), pf_reqs, &gl_attr)
+        osmesa::OsMesaContext::new(dims, pf_reqs, &gl_attr)
             .map(|context| Context::OsMesa(context))
     }
 }
 
 pub trait OsMesaContextExt {
-    fn new_osmesa(cb: crate::ContextBuilder) -> Result<Self, CreationError>
+    fn new_osmesa(
+        dims: (u32, u32),
+        cb: crate::ContextBuilder,
+    ) -> Result<Self, CreationError>
     where
         Self: Sized;
 }
@@ -304,13 +308,16 @@ impl OsMesaContextExt for crate::Context {
     /// generally happens because the underlying platform doesn't support a
     /// requested feature.
     #[inline]
-    fn new_osmesa(cb: crate::ContextBuilder) -> Result<Self, CreationError>
+    fn new_osmesa(
+        dims: (u32, u32),
+        cb: crate::ContextBuilder,
+    ) -> Result<Self, CreationError>
     where
         Self: Sized,
     {
         let crate::ContextBuilder { pf_reqs, gl_attr } = cb;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
-        Context::new_osmesa(&pf_reqs, &gl_attr)
+        Context::new_osmesa(dims, &pf_reqs, &gl_attr)
             .map(|context| crate::Context { context })
     }
 }

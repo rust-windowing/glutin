@@ -45,8 +45,6 @@ unsafe impl Sync for Context {}
 impl Drop for Context {
     fn drop(&mut self) {
         unsafe {
-            // we don't call MakeCurrent(0, 0) because we are not sure that the
-            // context is still the current one
             self.context = X11Context::None;
 
             (self.xconn.xlib.XFreeColormap)(self.xconn.display, self.colormap);

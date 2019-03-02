@@ -5,7 +5,7 @@ use crate::{
     PixelFormatRequirements,
 };
 
-use crate::api::egl::{ffi, Context as EglContext, EGL, NativeDisplay};
+use crate::api::egl::{ffi, Context as EglContext, NativeDisplay, EGL};
 use crate::api::wgl::Context as WglContext;
 use crate::os::windows::WindowExt;
 

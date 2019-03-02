@@ -68,7 +68,7 @@ impl std::error::Error for LoadingError {
 
 impl OsMesaContext {
     pub fn new(
-        dimensions: (u32, u32),
+        dims: (u32, u32),
         _pf_reqs: &PixelFormatRequirements,
         opengl: &GlAttributes<&OsMesaContext>,
     ) -> Result<OsMesaContext, CreationError> {
@@ -134,10 +134,10 @@ impl OsMesaContext {
         attribs.push(0);
 
         Ok(OsMesaContext {
-            width: dimensions.0,
-            height: dimensions.1,
+            width: dims.0,
+            height: dims.1,
             buffer: std::iter::repeat(unsafe { std::mem::uninitialized() })
-                .take((dimensions.0 * dimensions.1) as usize)
+                .take((dims.0 * dims.1) as usize)
                 .collect(),
             context: unsafe {
                 let ctx = osmesa_sys::OSMesaCreateContextAttribs(

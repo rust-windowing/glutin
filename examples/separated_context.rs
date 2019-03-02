@@ -55,6 +55,6 @@ fn main() {
         });
 
         gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
-        let _ = separated_context.swap_buffers();
+        separated_context.swap_buffers().unwrap();
     }
 }

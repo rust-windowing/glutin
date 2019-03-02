@@ -231,13 +231,16 @@ impl Drop for Context {
     fn drop(&mut self) {
         let glx = GLX.as_ref().unwrap();
         unsafe {
-            if self.is_current() {
-                glx.MakeCurrent(
-                    self.xconn.display as *mut _,
-                    0,
-                    ptr::null_mut(),
-                );
-            }
+            // See `drop` for `crate::api::egl::Context` for rationale.
+            self.make_current().unwrap();
+
+            let gl_finish_fn = self.get_proc_address("glFinish");
+            assert!(gl_finish_fn != std::ptr::null());
+            let gl_finish_fn =
+                std::mem::transmute::<_, extern "system" fn()>(gl_finish_fn);
+            gl_finish_fn();
+
+            glx.MakeCurrent(self.xconn.display as *mut _, 0, ptr::null_mut());
 
             glx.DestroyContext(self.xconn.display as *mut _, self.context);
         }

@@ -35,7 +35,7 @@ impl Context {
         let gl_attr = gl_attr.clone().map_sharing(|w| &w.opengl);
         let opengl = OsMesaContext::new(window_outer_size, pf_reqs, &gl_attr)?;
 
-        let opengl_dimensions = opengl.get_dimensions();
+        let opengl_dims = opengl.get_dimensions();
 
         let libcaca = match ffi::LibCaca::open(&Path::new("libcaca.so.0")) {
             Err(_) => {
@@ -68,9 +68,9 @@ impl Context {
             let masks = get_masks();
             (libcaca.caca_create_dither)(
                 32,
-                opengl_dimensions.0 as libc::c_int,
-                opengl_dimensions.1 as libc::c_int,
-                opengl_dimensions.0 as libc::c_int * 4,
+                opengl_dims.0 as libc::c_int,
+                opengl_dims.1 as libc::c_int,
+                opengl_dims.0 as libc::c_int * 4,
                 masks.0,
                 masks.1,
                 masks.2,
@@ -86,10 +86,10 @@ impl Context {
         }
 
         Ok(Context {
-            libcaca: libcaca,
-            display: display,
-            opengl: opengl,
-            dither: dither,
+            libcaca,
+            display,
+            opengl,
+            dither,
         })
     }
 

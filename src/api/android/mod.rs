@@ -59,10 +59,10 @@ impl Context {
             return Err(OsError(format!("Android's native window is null")));
         }
         let native_display = NativeDisplay::Android;
-        let context = EglContext::new(pf_reqs, &gl_attr, native_display)
+        let egl_context = EglContext::new(pf_reqs, &gl_attr, native_display)
             .and_then(|p| p.finish(native_window as *const _))?;
         let ctx = Arc::new(AndroidContext {
-            egl_context: context,
+            egl_context,
             stopped: Some(Cell::new(false)),
         });
 
@@ -101,9 +101,9 @@ impl Context {
         let gl_attr = gl_attr.clone().map_sharing(|c| &c.0.egl_context);
         let context =
             EglContext::new(pf_reqs, &gl_attr, NativeDisplay::Android)?;
-        let context = context.finish_pbuffer((1, 1))?; // TODO:
+        let egl_context = context.finish_pbuffer((1, 1))?; // TODO:
         let ctx = Arc::new(AndroidContext {
-            egl_context: context,
+            egl_context,
             stopped: None,
         });
         Ok(Context(ctx))

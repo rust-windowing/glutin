@@ -62,7 +62,7 @@ impl Context {
         };
         let context = Context {
             egl_surface: Arc::new(egl_surface),
-            context: context,
+            context,
         };
         Ok(context)
     }

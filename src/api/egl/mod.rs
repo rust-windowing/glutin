@@ -402,14 +402,14 @@ impl Context {
         };
 
         Ok(ContextPrototype {
-            opengl: opengl,
-            display: display,
-            egl_version: egl_version,
-            extensions: extensions,
-            api: api,
-            version: version,
-            config_id: config_id,
-            pixel_format: pixel_format,
+            opengl,
+            display,
+            egl_version,
+            extensions,
+            api,
+            version,
+            config_id,
+            pixel_format,
         })
     }
 
@@ -428,7 +428,7 @@ impl Context {
                     return Err(ContextError::ContextLost)
                 }
                 err => panic!(
-                    "eglMakeCurrent failed (eglGetError returned 0x{:x})",
+                    "make_current: eglMakeCurrent failed (eglGetError returned 0x{:x})",
                     err
                 ),
             }
@@ -465,7 +465,7 @@ impl Context {
                     return Err(ContextError::ContextLost)
                 }
                 err => panic!(
-                    "eglSwapBuffers failed (eglGetError returned 0x{:x})",
+                    "swap_buffers: eglSwapBuffers failed (eglGetError returned 0x{:x})",
                     err
                 ),
             }
@@ -514,7 +514,10 @@ impl Context {
             std::ptr::null(),
         ));
         if self.surface.get().is_null() {
-            panic!("on_surface_created: eglCreateWindowSurface failed")
+            panic!(
+                "on_surface_created: eglCreateWindowSurface failed with 0x{:x}",
+                egl.GetError()
+            )
         }
         let ret = egl.MakeCurrent(
             self.display,
@@ -523,7 +526,10 @@ impl Context {
             self.context,
         );
         if ret == 0 {
-            panic!("on_surface_created: eglMakeCurrent failed");
+            panic!(
+                "on_surface_created: eglMakeCurrent failed with 0x{:x}",
+                egl.GetError()
+            )
         }
     }
 
@@ -544,7 +550,10 @@ impl Context {
             ffi::egl::NO_CONTEXT,
         );
         if ret == 0 {
-            panic!("on_surface_destroyed: eglMakeCurrent failed");
+            panic!(
+                "on_surface_destroyed: eglMakeCurrent failed with 0x{:x}",
+                egl.GetError()
+            )
         }
 
         egl.DestroySurface(self.display, self.surface.get());
@@ -557,10 +566,39 @@ unsafe impl Sync for Context {}
 
 impl Drop for Context {
     fn drop(&mut self) {
+        // https://stackoverflow.com/questions/54402688/recreate-eglcreatewindowsurface-with-same-native-window
         let egl = EGL.as_ref().unwrap();
         unsafe {
-            // we don't call MakeCurrent(0, 0) because we are not sure that the
-            // context is still the current one
+            // Ok, so we got to call `glFinish` before destroying the context to
+            // insure it actually gets destroyed. This requires making the this
+            // context current.
+            //
+            // Now, if the user has multiple contexts, and they drop this one
+            // unintentionally between calls to the other context, this could
+            // result in a !FUN! time debuging.
+            //
+            // Then again, if they're **unintentionally** dropping contexts, I
+            // think they got bigger problems.
+            self.make_current().unwrap();
+
+            let gl_finish_fn = self.get_proc_address("glFinish");
+            assert!(gl_finish_fn != std::ptr::null());
+            let gl_finish_fn =
+                std::mem::transmute::<_, extern "system" fn()>(gl_finish_fn);
+            gl_finish_fn();
+
+            let ret = egl.MakeCurrent(
+                self.display,
+                ffi::egl::NO_SURFACE,
+                ffi::egl::NO_SURFACE,
+                ffi::egl::NO_CONTEXT,
+            );
+            if ret == 0 {
+                panic!(
+                    "drop: eglMakeCurrent failed with 0x{:x}",
+                    egl.GetError()
+                )
+            }
             egl.DestroyContext(self.display, self.context);
             egl.DestroySurface(self.display, self.surface.get());
             egl.Terminate(self.display);
@@ -592,7 +630,10 @@ impl<'a> ContextPrototype<'a> {
             )
         };
         if ret == 0 {
-            panic!("eglGetConfigAttrib failed")
+            panic!(
+                "get_native_visual_id: eglGetConfigAttrib failed with 0x{:x}",
+                unsafe { egl.GetError() }
+            )
         };
         value
     }
@@ -623,14 +664,14 @@ impl<'a> ContextPrototype<'a> {
     #[cfg(any(target_os = "android", target_os = "windows"))]
     pub fn finish_pbuffer(
         self,
-        dimensions: (u32, u32),
+        dims: (u32, u32),
     ) -> Result<Context, CreationError> {
         let egl = EGL.as_ref().unwrap();
         let attrs = &[
             ffi::egl::WIDTH as raw::c_int,
-            dimensions.0 as raw::c_int,
+            dims.0 as raw::c_int,
             ffi::egl::HEIGHT as raw::c_int,
-            dimensions.1 as raw::c_int,
+            dims.1 as raw::c_int,
             ffi::egl::NONE as raw::c_int,
         ];
 
@@ -746,7 +787,7 @@ impl<'a> ContextPrototype<'a> {
 
         Ok(Context {
             display: self.display,
-            context: context,
+            context,
             surface: Cell::new(surface),
             api: self.api,
             pixel_format: self.pixel_format,
@@ -1108,7 +1149,7 @@ unsafe fn create_context(
             ffi::egl::BAD_MATCH | ffi::egl::BAD_ATTRIBUTE => {
                 return Err(CreationError::OpenGlVersionNotSupported);
             }
-            e => panic!("eglCreateContext failed: 0x{:x}", e),
+            e => panic!("create_context: eglCreateContext failed: 0x{:x}", e),
         }
     }
 
