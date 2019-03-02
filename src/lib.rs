@@ -26,6 +26,13 @@
 //! window, however that may result in an suboptimal configuration of the window
 //! on some platforms. In that case use "SeparatedContext".
 
+#[cfg(any(
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd"
+))]
 #[macro_use]
 extern crate lazy_static;
 #[cfg(any(
