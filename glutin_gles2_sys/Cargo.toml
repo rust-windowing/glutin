@@ -1,0 +1,17 @@
+[package]
+name = "glutin_gles2_sys"
+version = "0.1.0"
+authors = ["The glutin contributors", "Hal Gentz <zegentzy@protonmail.com>"]
+description = "The gles2 bindings for glutin"
+license = "Apache-2.0"
+build = "build.rs"
+edition = "2018"
+
+[build-dependencies]
+gl_generator = "0.10"
+
+[dependencies]
+libc = "0.2"
+
+[target.'cfg(target_os = "ios")'.dependencies]
+objc = "0.2"
