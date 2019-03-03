@@ -31,7 +31,8 @@
     target_os = "dragonfly",
     target_os = "freebsd",
     target_os = "netbsd",
-    target_os = "openbsd"
+    target_os = "openbsd",
+    target_os = "windows"
 ))]
 #[macro_use]
 extern crate lazy_static;
