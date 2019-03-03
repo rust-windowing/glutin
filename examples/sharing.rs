@@ -10,7 +10,7 @@ fn main() {
     let mut size = glutin::dpi::PhysicalSize::new(768., 480.);
 
     let headless_context =
-        glutin::ContextBuilder::new().build_headless(&el).unwrap();
+        glutin::ContextBuilder::new().build_headless(&el, size).unwrap();
 
     let wb = glutin::WindowBuilder::new()
         .with_title("A fantastic window!")

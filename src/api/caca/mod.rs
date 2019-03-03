@@ -16,6 +16,7 @@ use crate::{
 };
 
 use libc;
+use winit::dpi;
 
 use std::path::Path;
 
@@ -28,14 +29,14 @@ pub struct Context {
 
 impl Context {
     pub fn new(
-        window_outer_size: (u32, u32),
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
+        dims: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
         let gl_attr = gl_attr.clone().map_sharing(|w| &w.opengl);
-        let opengl = OsMesaContext::new(window_outer_size, pf_reqs, &gl_attr)?;
+        let opengl = OsMesaContext::new(pf_reqs, &gl_attr, dims)?;
 
-        let opengl_dims = opengl.get_dimensions();
+        let dims = opengl.get_dimensions();
 
         let libcaca = match ffi::LibCaca::open(&Path::new("libcaca.so.0")) {
             Err(_) => {
@@ -68,9 +69,9 @@ impl Context {
             let masks = get_masks();
             (libcaca.caca_create_dither)(
                 32,
-                opengl_dims.0 as libc::c_int,
-                opengl_dims.1 as libc::c_int,
-                opengl_dims.0 as libc::c_int * 4,
+                dims.0 as libc::c_int,
+                dims.1 as libc::c_int,
+                dims.0 as libc::c_int * 4,
                 masks.0,
                 masks.1,
                 masks.2,

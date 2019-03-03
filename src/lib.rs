@@ -252,8 +252,9 @@ impl<'a> ContextBuilder<'a> {
     pub fn build_headless(
         self,
         el: &EventsLoop,
+        dims: dpi::PhysicalSize,
     ) -> Result<Context, CreationError> {
-        Context::new(el, self)
+        Context::new_headless(el, self, dims)
     }
 
     /// Builds a context and it's associated window.
@@ -262,7 +263,7 @@ impl<'a> ContextBuilder<'a> {
         wb: WindowBuilder,
         el: &EventsLoop,
     ) -> Result<WindowedContext, CreationError> {
-        WindowedContext::new(wb, self, el)
+        WindowedContext::new_combined(wb, self, el)
     }
 
     /// Builds a separated context.

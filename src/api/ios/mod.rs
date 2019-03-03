@@ -73,6 +73,7 @@ use crate::{
 
 use objc::declare::ClassDecl;
 use objc::runtime::{Class, Object, Sel, BOOL, NO, YES};
+use winit::dpi;
 
 use std::ffi::CString;
 use std::os::raw;
@@ -172,7 +173,7 @@ fn validate_version(version: u8) -> Result<NSUInteger, CreationError> {
 
 impl Context {
     #[inline]
-    pub fn new(
+    pub fn new_combined(
         builder: WindowBuilder,
         event_loop: &EventsLoop,
         _: &PixelFormatRequirements,
@@ -215,12 +216,15 @@ impl Context {
     }
 
     #[inline]
-    pub fn new_context(
+    pub fn new_headless(
         el: &EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
+        dims: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
-        let wb = WindowBuilder::new().with_visibility(false);
+        let wb = WindowBuilder::new()
+            .with_visibility(false)
+            .with_dimensions(dims.to_logical(1.));
         Self::new(wb, el, pf_reqs, gl_attr).map(|(_window, context)| context)
     }
 

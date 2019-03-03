@@ -54,13 +54,14 @@ impl Context {
     ///  incompatible system, out of memory, etc.). This should be very rare.
     ///  - If the OpenGL context could not be created. This generally happens
     ///  because the underlying platform doesn't support a requested feature.
-    pub fn new(
+    pub fn new_headless(
         el: &winit::EventsLoop,
         cb: ContextBuilder,
+        dims: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
         let ContextBuilder { pf_reqs, gl_attr } = cb;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
-        platform::Context::new_context(el, &pf_reqs, &gl_attr)
+        platform::Context::new_headless(el, &pf_reqs, &gl_attr, dims)
             .map(|context| Context { context })
     }
 }

@@ -64,6 +64,9 @@ use crate::{
     PixelFormatRequirements, ReleaseBehavior, Robustness,
 };
 
+#[cfg(any(target_os = "android", target_os = "windows"))]
+use winit::dpi;
+
 use std::cell::Cell;
 use std::ffi::{CStr, CString};
 use std::ops::{Deref, DerefMut};
@@ -664,14 +667,16 @@ impl<'a> ContextPrototype<'a> {
     #[cfg(any(target_os = "android", target_os = "windows"))]
     pub fn finish_pbuffer(
         self,
-        dims: (u32, u32),
+        dims: dpi::PhysicalSize,
     ) -> Result<Context, CreationError> {
+        let dims: (u32, u32) = dims.into();
+
         let egl = EGL.as_ref().unwrap();
         let attrs = &[
             ffi::egl::WIDTH as raw::c_int,
-            dims.0 as raw::c_int,
+            dims.width as raw::c_int,
             ffi::egl::HEIGHT as raw::c_int,
-            dims.1 as raw::c_int,
+            dims.height as raw::c_int,
             ffi::egl::NONE as raw::c_int,
         ];
 

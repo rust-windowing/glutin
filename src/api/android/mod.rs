@@ -10,6 +10,7 @@ use crate::{
 
 use libc;
 use winit;
+use winit::dpi;
 use winit::os::android::EventsLoopExt;
 
 use std::cell::Cell;
@@ -46,7 +47,7 @@ impl android_glue::SyncEventHandler for AndroidSyncEventHandler {
 
 impl Context {
     #[inline]
-    pub fn new(
+    pub fn new_combined(
         wb: winit::WindowBuilder,
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
@@ -93,15 +94,16 @@ impl Context {
     }
 
     #[inline]
-    pub fn new_context(
+    pub fn new_headless(
         _el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
+        dims: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
         let gl_attr = gl_attr.clone().map_sharing(|c| &c.0.egl_context);
         let context =
             EglContext::new(pf_reqs, &gl_attr, NativeDisplay::Android)?;
-        let egl_context = context.finish_pbuffer((1, 1))?; // TODO:
+        let egl_context = context.finish_pbuffer(dims)?;
         let ctx = Arc::new(AndroidContext {
             egl_context,
             stopped: None,

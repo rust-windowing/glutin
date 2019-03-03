@@ -8,6 +8,7 @@ use crate::{
 };
 
 use winit;
+use winit::dpi;
 
 use std::ffi::CString;
 
@@ -18,7 +19,7 @@ pub enum Context {
 
 impl Context {
     #[inline]
-    pub fn new(
+    pub fn new_combined(
         wb: winit::WindowBuilder,
         el: &winit::EventsLoop,
         _pf_reqs: &PixelFormatRequirements,
@@ -67,12 +68,16 @@ impl Context {
     }
 
     #[inline]
-    pub fn new_context(
+    pub fn new_headless(
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
+        dims: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
-        let wb = winit::WindowBuilder::new().with_visibility(false);
+        let wb = winit::WindowBuilder::new()
+            .with_visibility(false)
+            .with_dimensions(dims.to_logical(1.));
+
         Self::new(wb, el, pf_reqs, gl_attr).map(|(w, c)| match c {
             Context::Window(c) => Context::WindowedContext(w, c),
             _ => panic!(),

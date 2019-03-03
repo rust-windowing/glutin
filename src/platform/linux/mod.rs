@@ -18,6 +18,7 @@ use crate::{
 
 use winit;
 use winit::os::unix::EventsLoopExt;
+use winit::dpi;
 
 use std::os::raw;
 
@@ -86,7 +87,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn new(
+    pub fn new_combined(
         wb: winit::WindowBuilder,
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
@@ -117,12 +118,15 @@ impl Context {
     }
 
     #[inline]
-    pub fn new_context(
+    pub fn new_headless(
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
+        dims: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
-        let wb = winit::WindowBuilder::new().with_visibility(false);
+        let wb = winit::WindowBuilder::new()
+            .with_visibility(false)
+            .with_dimensions(dims.to_logical(1.));
 
         if el.is_wayland() {
             Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
@@ -278,24 +282,24 @@ impl Context {
 
     #[inline]
     fn new_osmesa(
-        dims: (u32, u32),
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
+        dims: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
         Context::is_compatible(&gl_attr.sharing, ContextType::OsMesa)?;
         let gl_attr = gl_attr.clone().map_sharing(|ctx| match ctx {
             &Context::OsMesa(ref ctx) => ctx,
             _ => unreachable!(),
         });
-        osmesa::OsMesaContext::new(dims, pf_reqs, &gl_attr)
+        osmesa::OsMesaContext::new(pf_reqs, &gl_attr, dims)
             .map(|context| Context::OsMesa(context))
     }
 }
 
 pub trait OsMesaContextExt {
     fn new_osmesa(
-        dims: (u32, u32),
         cb: crate::ContextBuilder,
+        dims: dpi::PhysicalSize,
     ) -> Result<Self, CreationError>
     where
         Self: Sized;
@@ -309,15 +313,15 @@ impl OsMesaContextExt for crate::Context {
     /// requested feature.
     #[inline]
     fn new_osmesa(
-        dims: (u32, u32),
         cb: crate::ContextBuilder,
+        dims: dpi::PhysicalSize,
     ) -> Result<Self, CreationError>
     where
         Self: Sized,
     {
         let crate::ContextBuilder { pf_reqs, gl_attr } = cb;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
-        Context::new_osmesa(dims, &pf_reqs, &gl_attr)
+        Context::new_osmesa(&pf_reqs, &gl_attr, dims)
             .map(|context| crate::Context { context })
     }
 }

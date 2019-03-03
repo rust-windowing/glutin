@@ -52,14 +52,14 @@ impl WindowedContext {
     ///  incompatible system, out of memory, etc.). This should be very rare.
     ///  - If the OpenGL context could not be created. This generally happens
     ///  because the underlying platform doesn't support a requested feature.
-    pub fn new(
+    pub fn new_combined(
         wb: WindowBuilder,
         cb: ContextBuilder,
         el: &EventsLoop,
     ) -> Result<Self, CreationError> {
         let ContextBuilder { pf_reqs, gl_attr } = cb;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
-        platform::Context::new(wb, el, &pf_reqs, &gl_attr).map(
+        platform::Context::new_combined(wb, el, &pf_reqs, &gl_attr).map(
             |(window, context)| WindowedContext {
                 window: WindowRef::Owned(window),
                 context: Context { context },

@@ -16,6 +16,7 @@ use crate::{
 };
 
 use libc;
+use winit::dpi;
 
 use std::ffi::CString;
 use std::os::raw;
@@ -68,9 +69,9 @@ impl std::error::Error for LoadingError {
 
 impl OsMesaContext {
     pub fn new(
-        dims: (u32, u32),
         _pf_reqs: &PixelFormatRequirements,
         opengl: &GlAttributes<&OsMesaContext>,
+        dims: dpi::PhysicalSize,
     ) -> Result<OsMesaContext, CreationError> {
         osmesa_sys::OsMesa::try_loading()
             .map_err(LoadingError::new)
@@ -132,6 +133,8 @@ impl OsMesaContext {
 
         // attribs array must be NULL terminated.
         attribs.push(0);
+
+        let dims: (u32, u32) = dims.into();
 
         Ok(OsMesaContext {
             width: dims.0,

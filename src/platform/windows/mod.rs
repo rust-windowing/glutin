@@ -11,6 +11,7 @@ use crate::os::windows::WindowExt;
 
 use winapi::shared::windef::{HGLRC, HWND};
 use winit;
+use winit::dpi;
 
 use std::os::raw;
 
@@ -38,7 +39,7 @@ unsafe impl Sync for Context {}
 impl Context {
     /// See the docs in the crate root file.
     #[inline]
-    pub fn new(
+    pub fn new_combined(
         wb: winit::WindowBuilder,
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
@@ -134,10 +135,11 @@ impl Context {
     }
 
     #[inline]
-    pub fn new_context(
+    pub fn new_headless(
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
+        dims: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
         // if EGL is available, we try using EGL first
         // if EGL returns an error, we try the hidden window method
@@ -157,7 +159,7 @@ impl Context {
                 let native_display = NativeDisplay::Other(None);
                 let context =
                     EglContext::new(pf_reqs, &gl_attr_egl, native_display)
-                        .and_then(|prototype| prototype.finish_pbuffer((1, 1)))
+                        .and_then(|prototype| prototype.finish_pbuffer(dims))
                         .map(|ctx| Context::EglPbuffer(ctx));
 
                 if let Ok(context) = context {
@@ -167,7 +169,9 @@ impl Context {
             _ => (),
         }
 
-        let wb = winit::WindowBuilder::new().with_visibility(false);
+        let wb = winit::WindowBuilder::new()
+            .with_visibility(false)
+            .with_dimensions(dims.to_logical(1.));
         Self::new(wb, &el, pf_reqs, gl_attr).map(|(window, context)| {
             match context {
                 Context::Egl(context) => {
