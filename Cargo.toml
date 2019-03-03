@@ -21,7 +21,6 @@ serde = ["winit/serde"]
 [dependencies]
 lazy_static = "1.1"
 libc = "0.2"
-shared_library = "0.1"
 winit = "0.18"
 
 [build-dependencies]
@@ -57,3 +56,4 @@ osmesa-sys = "0.1.0"
 wayland-client = { version = "0.21", features = ["egl", "dlopen"] }
 x11-dl = "2.18.3"
 libloading = "0.5"
+shared_library = "0.1"
