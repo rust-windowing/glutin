@@ -32,7 +32,8 @@
     target_os = "freebsd",
     target_os = "netbsd",
     target_os = "openbsd",
-    target_os = "windows"
+    target_os = "windows",
+    target_os = "android",
 ))]
 #[macro_use]
 extern crate lazy_static;
