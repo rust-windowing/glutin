@@ -17,7 +17,11 @@ glutin = "*"
 
 ## [Documentation](https://docs.rs/glutin)
 
-## Try it!
+## Usage Examples
+
+Warning: these are examples for master. For the latest released version, 0.19, view [here](https://github.com/tomaka/glutin/tree/72e8c959c4ff538857d028167b9946b8938bdeaa).
+
+### Try it!
 
 ```bash
 git clone https://github.com/tomaka/glutin
@@ -25,19 +29,15 @@ cd glutin
 cargo run --example window
 ```
 
-## Usage
+### Usage
 
 Glutin is an OpenGL context creation library and doesn't directly provide OpenGL bindings for you.
-
 ```toml
 [dependencies]
 gl = "*"
 ```
 
 ```rust
-extern crate gl;
-extern crate glutin;
-
 use glutin::dpi::*;
 use glutin::ContextTrait;
 
@@ -87,7 +87,7 @@ fn main() {
 
 Note that glutin aims at being a low-level brick in your rendering infrastructure. You are encouraged to write another layer of abstraction between glutin and your application.
 
-glutin is only officially supported on the latest stable version of the Rust compiler.
+Glutin is only officially supported on the latest stable version of the Rust compiler.
 
 ## Platform-specific notes
 

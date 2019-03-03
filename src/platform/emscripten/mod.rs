@@ -1,13 +1,15 @@
 #![cfg(target_os = "emscripten")]
 
-use std::ffi::CString;
+mod ffi;
 
-use {Api, ContextError, CreationError, GlAttributes, GlRequest};
-use {PixelFormat, PixelFormatRequirements};
+use crate::{
+    Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
+    PixelFormatRequirements,
+};
 
 use winit;
 
-mod ffi;
+use std::ffi::CString;
 
 pub enum Context {
     Window(ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE),
@@ -30,9 +32,8 @@ impl Context {
 
         // getting the default values of attributes
         let mut attributes = unsafe {
-            use std::mem;
             let mut attributes: ffi::EmscriptenWebGLContextAttributes =
-                mem::uninitialized();
+                std::mem::uninitialized();
             ffi::emscripten_webgl_init_context_attributes(&mut attributes);
             attributes
         };
@@ -46,14 +47,15 @@ impl Context {
 
         // creating the context
         let context = unsafe {
-            use std::{mem, ptr};
             // TODO: correct first parameter based on the window
-            let context =
-                ffi::emscripten_webgl_create_context(ptr::null(), &attributes);
+            let context = ffi::emscripten_webgl_create_context(
+                std::ptr::null(),
+                &attributes,
+            );
             if context <= 0 {
                 return Err(CreationError::OsError(format!(
                     "Error while calling emscripten_webgl_create_context: {}",
-                    error_to_str(mem::transmute(context))
+                    error_to_str(std::mem::transmute(context))
                 )));
             }
             context

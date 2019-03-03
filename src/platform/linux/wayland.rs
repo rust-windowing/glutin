@@ -1,13 +1,15 @@
-use api::egl::{self, ffi, Context as EglContext};
-use std::os::raw;
-use std::sync::Arc;
-use wayland_client::egl as wegl;
-use winit;
-use winit::os::unix::WindowExt;
-use {
+use crate::api::egl::{ffi, Context as EglContext, NativeDisplay};
+use crate::{
     ContextError, CreationError, GlAttributes, PixelFormat,
     PixelFormatRequirements,
 };
+
+use wayland_client::egl as wegl;
+use winit;
+use winit::os::unix::WindowExt;
+
+use std::os::raw;
+use std::sync::Arc;
 
 pub struct Context {
     egl_surface: Arc<wegl::WlEglSurface>,
@@ -52,7 +54,7 @@ impl Context {
         };
         let context = {
             let gl_attr = gl_attr.clone().map_sharing(|c| &c.context);
-            let native_display = egl::NativeDisplay::Wayland(Some(
+            let native_display = NativeDisplay::Wayland(Some(
                 window.get_wayland_display().unwrap() as *const _,
             ));
             EglContext::new(pf_reqs, &gl_attr, native_display)
@@ -60,7 +62,7 @@ impl Context {
         };
         let context = Context {
             egl_surface: Arc::new(egl_surface),
-            context: context,
+            context,
         };
         Ok(context)
     }
@@ -91,7 +93,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_api(&self) -> ::Api {
+    pub fn get_api(&self) -> crate::Api {
         self.context.get_api()
     }
 

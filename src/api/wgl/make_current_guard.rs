@@ -1,11 +1,12 @@
-use std::io;
-use std::marker::PhantomData;
-use std::os::raw::c_void;
+use super::gl;
+use crate::CreationError;
 
 use winapi::shared::windef::{HDC, HGLRC};
-use CreationError;
 
-use super::gl;
+use std::io;
+use std::marker::PhantomData;
+use std::os::raw;
+
 /// A guard for when you want to make the context current. Destroying the guard
 /// restores the previously-current context.
 pub struct CurrentContextGuard<'a, 'b> {
@@ -44,8 +45,8 @@ impl<'a, 'b> Drop for CurrentContextGuard<'a, 'b> {
     fn drop(&mut self) {
         unsafe {
             gl::wgl::MakeCurrent(
-                self.previous_hdc as *const c_void,
-                self.previous_hglrc as *const c_void,
+                self.previous_hdc as *const raw::c_void,
+                self.previous_hglrc as *const raw::c_void,
             );
         }
     }

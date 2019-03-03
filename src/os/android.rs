@@ -1,11 +1,10 @@
 #![cfg(any(target_os = "android"))]
 
+pub use crate::api::egl::ffi::EGLContext;
+use crate::os::ContextTraitExt;
+use crate::Context;
+
 pub use winit::os::android::{WindowBuilderExt, WindowExt};
-
-pub use api::egl::ffi::EGLContext;
-
-use os::ContextTraitExt;
-use Context;
 
 use std::os::raw;
 

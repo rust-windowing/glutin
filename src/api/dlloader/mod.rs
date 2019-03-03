@@ -6,11 +6,12 @@
     target_os = "netbsd",
     target_os = "openbsd"
 ))]
+
+use libloading::Library;
+
 use std::ffi::CString;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-
-use libloading::Library;
 
 #[derive(Clone)]
 pub struct SymWrapper<T> {

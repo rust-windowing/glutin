@@ -1,16 +1,15 @@
 //! The purpose of this library is to provide an OpenGL context on as many
 //! platforms as possible.
 //!
-//! # Building a CombinedContext
+//! # Building a WindowedContext
 //!
-//! A `CombinedContext` is composed of a `Window` and an OpenGL `Context`.
+//! A `WindowedContext` is composed of a `Window` and an OpenGL `Context`.
 //!
 //! Due to some operating-system-specific quirks, glutin prefers control over
 //! the order of creation of the `Context` and `Window`. Here is an example of
-//! building a CombinedContext the prefered way:
+//! building a WindowedContext the prefered way:
 //!
 //! ```no_run
-//! # extern crate glutin;
 //! # fn main() {
 //! let el = glutin::EventsLoop::new();
 //! let wb = glutin::WindowBuilder::new()
@@ -27,13 +26,13 @@
 //! on some platforms. In that case use "SeparatedContext".
 
 #[cfg(any(
+    target_os = "windows",
     target_os = "linux",
+    target_os = "android",
     target_os = "dragonfly",
     target_os = "freebsd",
     target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "windows",
-    target_os = "android",
+    target_os = "openbsd"
 ))]
 #[macro_use]
 extern crate lazy_static;
@@ -46,60 +45,20 @@ extern crate lazy_static;
 ))]
 #[macro_use]
 extern crate shared_library;
-#[cfg(target_os = "windows")]
-extern crate winapi;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 #[macro_use]
 extern crate objc;
-#[cfg(target_os = "macos")]
-extern crate cgl;
-#[cfg(target_os = "macos")]
-extern crate cocoa;
-#[cfg(target_os = "macos")]
-extern crate core_foundation;
-#[cfg(target_os = "macos")]
-extern crate core_graphics;
-extern crate libc;
-#[cfg(any(
-    target_os = "windows",
-    target_os = "linux",
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd"
-))]
-extern crate libloading;
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "dragonfly",
-    target_os = "netbsd",
-    target_os = "openbsd"
-))]
-extern crate wayland_client;
-extern crate winit;
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "dragonfly",
-    target_os = "netbsd",
-    target_os = "openbsd"
-))]
-extern crate x11_dl;
-
-mod api;
-mod combined;
-mod context;
-mod platform;
-mod separated;
 
 pub mod os;
 
-pub use combined::CombinedContext;
-pub use context::Context;
-pub use separated::SeparatedContext;
+mod api;
+mod context;
+mod platform;
+mod windowed;
 
-use std::io;
+pub use crate::context::Context;
+pub use crate::windowed::{WindowRef, WindowedContext};
+
 pub use winit::{
     dpi, AvailableMonitorsIter, AxisId, ButtonId, ControlFlow,
     CreationError as WindowCreationError, DeviceEvent, DeviceId, ElementState,
@@ -108,6 +67,9 @@ pub use winit::{
     ScanCode, Touch, TouchPhase, VirtualKeyCode, Window, WindowAttributes,
     WindowBuilder, WindowEvent, WindowId,
 };
+
+use std::io;
+use std::sync::Arc;
 
 /// A trait for types associated with a GL context.
 pub trait ContextTrait
@@ -299,17 +261,17 @@ impl<'a> ContextBuilder<'a> {
         self,
         wb: WindowBuilder,
         el: &EventsLoop,
-    ) -> Result<CombinedContext, CreationError> {
-        CombinedContext::new(wb, self, el)
+    ) -> Result<WindowedContext, CreationError> {
+        WindowedContext::new(wb, self, el)
     }
 
     /// Builds a separated context.
     pub fn build_separated(
         self,
-        win: &Window,
+        win: Arc<Window>,
         el: &EventsLoop,
-    ) -> Result<SeparatedContext, CreationError> {
-        SeparatedContext::new(win, self, el)
+    ) -> Result<WindowedContext, CreationError> {
+        WindowedContext::new_separated(win, self, el)
     }
 }
 
@@ -485,11 +447,10 @@ impl GlRequest {
     /// Extract the desktop GL version, if any.
     pub fn to_gl_version(&self) -> Option<(u8, u8)> {
         match self {
-            &GlRequest::Specific(Api::OpenGl, version) => Some(version),
-            &GlRequest::GlThenGles {
-                opengl_version: version,
-                ..
-            } => Some(version),
+            &GlRequest::Specific(Api::OpenGl, opengl_version) => Some(opengl_version),
+            &GlRequest::GlThenGles { opengl_version, .. } => {
+                Some(opengl_version)
+            }
             _ => None,
         }
     }

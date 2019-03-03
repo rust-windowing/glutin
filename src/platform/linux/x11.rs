@@ -1,33 +1,29 @@
-pub use winit::os::unix::x11::{XConnection, XError, XNotSupported};
-
-use std::os::raw;
-use std::sync::Arc;
-use std::{error, fmt, mem, ptr};
-
-use winit;
-use winit::os::unix::{EventsLoopExt, WindowBuilderExt, WindowExt};
-
-use {
+use crate::api::egl::{Context as EglContext, NativeDisplay, EGL};
+use crate::api::glx::{ffi, Context as GlxContext, GLX};
+use crate::{
     Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
     PixelFormatRequirements,
 };
 
-use api::egl;
-use api::egl::{Context as EglContext, EGL};
-use api::glx::{ffi, Context as GlxContext, GLX};
+use winit;
+pub use winit::os::unix::x11::{XConnection, XError, XNotSupported};
+use winit::os::unix::{EventsLoopExt, WindowBuilderExt, WindowExt};
+
+use std::os::raw;
+use std::sync::Arc;
 
 #[derive(Debug)]
 struct NoX11Connection;
 
-impl error::Error for NoX11Connection {
+impl std::error::Error for NoX11Connection {
     fn description(&self) -> &str {
         "failed to get x11 connection"
     }
 }
 
-impl fmt::Display for NoX11Connection {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(error::Error::description(self))
+impl std::fmt::Display for NoX11Connection {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str(std::error::Error::description(self))
     }
 }
 
@@ -49,8 +45,6 @@ unsafe impl Sync for Context {}
 impl Drop for Context {
     fn drop(&mut self) {
         unsafe {
-            // we don't call MakeCurrent(0, 0) because we are not sure that the
-            // context is still the current one
             self.context = X11Context::None;
 
             (self.xconn.xlib.XFreeColormap)(self.xconn.display, self.colormap);
@@ -80,8 +74,8 @@ impl Context {
 
         // start the context building process
         enum Prototype<'a> {
-            Glx(::api::glx::ContextPrototype<'a>),
-            Egl(::api::egl::ContextPrototype<'a>),
+            Glx(crate::api::glx::ContextPrototype<'a>),
+            Egl(crate::api::egl::ContextPrototype<'a>),
         }
 
         let builder = gl_attr.clone();
@@ -112,9 +106,8 @@ impl Context {
                         X11Context::Egl(ref c) => c,
                         _ => panic!(),
                     });
-                    let native_display = egl::NativeDisplay::X11(Some(
-                        xconn.display as *const _,
-                    ));
+                    let native_display =
+                        NativeDisplay::X11(Some(xconn.display as *const _));
                     Prototype::Egl(EglContext::new(
                         pf_reqs,
                         &builder_egl_u,
@@ -135,9 +128,7 @@ impl Context {
                     Prototype::Egl(EglContext::new(
                         pf_reqs,
                         &builder_egl_u,
-                        egl::NativeDisplay::X11(Some(
-                            xconn.display as *const _,
-                        )),
+                        NativeDisplay::X11(Some(xconn.display as *const _)),
                     )?)
                 } else {
                     return Err(CreationError::NotSupported(
@@ -157,7 +148,8 @@ impl Context {
         let visual_infos = match context {
             Prototype::Glx(ref p) => p.get_visual_infos().clone(),
             Prototype::Egl(ref p) => {
-                let mut template: ffi::XVisualInfo = unsafe { mem::zeroed() };
+                let mut template: ffi::XVisualInfo =
+                    unsafe { std::mem::zeroed() };
                 template.visualid = p.get_native_visual_id() as ffi::VisualID;
 
                 let mut num_visuals = 0;
@@ -175,7 +167,7 @@ impl Context {
                 assert!(!vi.is_null());
                 assert!(num_visuals == 1);
 
-                let vi_copy = unsafe { ptr::read(vi as *const _) };
+                let vi_copy = unsafe { std::ptr::read(vi as *const _) };
                 unsafe {
                     (xconn.xlib.XFree)(vi as *mut _);
                 }
@@ -246,7 +238,7 @@ impl Context {
 
         let xlib_window = window.get_xlib_window().unwrap();
         let attrs = {
-            let mut attrs = unsafe { ::std::mem::uninitialized() };
+            let mut attrs = unsafe { std::mem::uninitialized() };
             unsafe {
                 (xconn.xlib.XGetWindowAttributes)(
                     xconn.display,
@@ -265,8 +257,8 @@ impl Context {
 
         // start the context building process
         enum Prototype<'a> {
-            Glx(::api::glx::ContextPrototype<'a>),
-            Egl(::api::egl::ContextPrototype<'a>),
+            Glx(crate::api::glx::ContextPrototype<'a>),
+            Egl(crate::api::egl::ContextPrototype<'a>),
         }
 
         let builder = gl_attr.clone();
@@ -299,9 +291,8 @@ impl Context {
                         X11Context::Egl(ref c) => c,
                         _ => panic!(),
                     });
-                    let native_display = egl::NativeDisplay::X11(Some(
-                        xconn.display as *const _,
-                    ));
+                    let native_display =
+                        NativeDisplay::X11(Some(xconn.display as *const _));
                     Prototype::Egl(EglContext::new(
                         &pf_reqs,
                         &builder_egl_u,
@@ -322,9 +313,7 @@ impl Context {
                     Prototype::Egl(EglContext::new(
                         &pf_reqs,
                         &builder_egl_u,
-                        egl::NativeDisplay::X11(Some(
-                            xconn.display as *const _,
-                        )),
+                        NativeDisplay::X11(Some(xconn.display as *const _)),
                     )?)
                 } else {
                     return Err(CreationError::NotSupported(
@@ -399,7 +388,7 @@ impl Context {
         match self.context {
             X11Context::Glx(ref ctx) => ctx.get_proc_address(addr),
             X11Context::Egl(ref ctx) => ctx.get_proc_address(addr),
-            X11Context::None => ptr::null(),
+            X11Context::None => std::ptr::null(),
         }
     }
 

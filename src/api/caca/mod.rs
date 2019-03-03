@@ -7,18 +7,17 @@
 ))]
 #![allow(unused_variables, dead_code)]
 
-use api::osmesa::OsMesaContext;
-use libc;
+mod ffi;
 
-use {
+use crate::api::osmesa::OsMesaContext;
+use crate::{
     Api, ContextError, CreationError, GlAttributes, PixelFormat,
     PixelFormatRequirements,
 };
 
-use std::path::Path;
-use std::ptr;
+use libc;
 
-mod ffi;
+use std::path::Path;
 
 pub struct Context {
     opengl: OsMesaContext,
@@ -36,7 +35,7 @@ impl Context {
         let gl_attr = gl_attr.clone().map_sharing(|w| &w.opengl);
         let opengl = OsMesaContext::new(window_outer_size, pf_reqs, &gl_attr)?;
 
-        let opengl_dimensions = opengl.get_dimensions();
+        let opengl_dims = opengl.get_dimensions();
 
         let libcaca = match ffi::LibCaca::open(&Path::new("libcaca.so.0")) {
             Err(_) => {
@@ -47,7 +46,8 @@ impl Context {
             Ok(l) => l,
         };
 
-        let display = unsafe { (libcaca.caca_create_display)(ptr::null_mut()) };
+        let display =
+            unsafe { (libcaca.caca_create_display)(std::ptr::null_mut()) };
 
         if display.is_null() {
             return Err(CreationError::OsError(
@@ -68,9 +68,9 @@ impl Context {
             let masks = get_masks();
             (libcaca.caca_create_dither)(
                 32,
-                opengl_dimensions.0 as libc::c_int,
-                opengl_dimensions.1 as libc::c_int,
-                opengl_dimensions.0 as libc::c_int * 4,
+                opengl_dims.0 as libc::c_int,
+                opengl_dims.1 as libc::c_int,
+                opengl_dims.0 as libc::c_int * 4,
                 masks.0,
                 masks.1,
                 masks.2,
@@ -86,10 +86,10 @@ impl Context {
         }
 
         Ok(Context {
-            libcaca: libcaca,
-            display: display,
-            opengl: opengl,
-            dither: dither,
+            libcaca,
+            display,
+            opengl,
+            dither,
         })
     }
 

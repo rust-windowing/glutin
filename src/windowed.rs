@@ -1,21 +1,19 @@
 use super::*;
 
-/// Represents an OpenGL context which has been associated with a preexisting
-/// window.
+/// Represents an OpenGL context and the `Window` with which it is associated.
 ///
 /// # Example
 ///
 /// ```no_run
-/// # extern crate glutin;
 /// # use glutin::ContextTrait;
 /// # fn main() {
 /// let mut el = glutin::EventsLoop::new();
-/// let win = glutin::WindowBuilder::new().build(&el).unwrap();
-/// let separated_context = glutin::ContextBuilder::new()
-///     .build_separated(&win, &el)
+/// let wb = glutin::WindowBuilder::new();
+/// let combined_context = glutin::ContextBuilder::new()
+///     .build_combined(wb, &el)
 ///     .unwrap();
 ///
-/// unsafe { separated_context.make_current().unwrap() };
+/// unsafe { combined_context.make_current().unwrap() };
 ///
 /// loop {
 ///     el.poll_events(|event| {
@@ -27,18 +25,24 @@ use super::*;
 ///
 ///     // draw everything here
 ///
-///     separated_context.swap_buffers();
+///     combined_context.swap_buffers();
 ///     std::thread::sleep(std::time::Duration::from_millis(17));
 /// }
 /// # }
 /// ```
-pub struct SeparatedContext {
+pub struct WindowedContext {
     context: Context,
+    window: WindowRef,
 }
 
-impl SeparatedContext {
-    /// Builds the GL context using the passed `Window`, returning the context
-    /// as a `SeparatedContext`.
+pub enum WindowRef {
+    Owned(Window),
+    Arced(Arc<Window>),
+}
+
+impl WindowedContext {
+    /// Builds the given window along with the associated GL context, returning
+    /// the pair as a `WindowedContext`.
     ///
     /// One notable limitation of the Wayland backend when it comes to shared
     /// contexts is that both contexts must use the same events loop.
@@ -49,18 +53,50 @@ impl SeparatedContext {
     ///  - If the OpenGL context could not be created. This generally happens
     ///  because the underlying platform doesn't support a requested feature.
     pub fn new(
-        window: &Window,
+        wb: WindowBuilder,
+        cb: ContextBuilder,
+        el: &EventsLoop,
+    ) -> Result<Self, CreationError> {
+        let ContextBuilder { pf_reqs, gl_attr } = cb;
+        let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
+        platform::Context::new(wb, el, &pf_reqs, &gl_attr).map(
+            |(window, context)| WindowedContext {
+                window: WindowRef::Owned(window),
+                context: Context { context },
+            },
+        )
+    }
+
+    /// Builds the GL context using the passed `Window`, returning the context
+    /// as a `WindowedContext`.
+    ///
+    /// One notable limitation of the Wayland backend when it comes to shared
+    /// contexts is that both contexts must use the same events loop.
+    ///
+    /// Errors can occur in two scenarios:
+    ///  - If the window could not be created (via permission denied,
+    ///  incompatible system, out of memory, etc.). This should be very rare.
+    ///  - If the OpenGL context could not be created. This generally happens
+    ///  because the underlying platform doesn't support a requested feature.
+    pub fn new_separated(
+        window: Arc<Window>,
         cb: ContextBuilder,
         el: &EventsLoop,
     ) -> Result<Self, CreationError> {
         let ContextBuilder { pf_reqs, gl_attr } = cb;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
 
-        platform::Context::new_separated(window, el, &pf_reqs, &gl_attr).map(
-            |context| SeparatedContext {
+        platform::Context::new_separated(&*window, el, &pf_reqs, &gl_attr).map(
+            |context| WindowedContext {
+                window: WindowRef::Arced(window),
                 context: Context { context },
             },
         )
+    }
+
+    /// Borrow the inner `Window`.
+    pub fn window(&self) -> &WindowRef {
+        &self.window
     }
 
     /// Borrow the inner GL `Context`.
@@ -100,7 +136,7 @@ impl SeparatedContext {
     }
 }
 
-impl ContextTrait for SeparatedContext {
+impl ContextTrait for WindowedContext {
     unsafe fn make_current(&self) -> Result<(), ContextError> {
         self.context.make_current()
     }
@@ -118,9 +154,19 @@ impl ContextTrait for SeparatedContext {
     }
 }
 
-impl std::ops::Deref for SeparatedContext {
-    type Target = Context;
+impl std::ops::Deref for WindowedContext {
+    type Target = WindowRef;
     fn deref(&self) -> &Self::Target {
-        &self.context
+        &self.window
+    }
+}
+
+impl std::ops::Deref for WindowRef {
+    type Target = Window;
+    fn deref(&self) -> &Self::Target {
+        match self {
+            WindowRef::Owned(ref w) => w,
+            WindowRef::Arced(w) => &*w,
+        }
     }
 }
