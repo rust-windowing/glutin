@@ -1,29 +1,23 @@
 #![cfg(target_os = "windows")]
 
-use std::os::raw;
-use std::ptr;
+use crate::{
+    Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
+    PixelFormatRequirements,
+};
+
+use crate::api::egl::{ffi, Context as EglContext, NativeDisplay, EGL};
+use crate::api::wgl::Context as WglContext;
+use crate::os::windows::WindowExt;
 
 use winapi::shared::windef::{HGLRC, HWND};
 use winit;
 
-use Api;
-use ContextError;
-use CreationError;
-use GlAttributes;
-use GlRequest;
-use PixelFormat;
-use PixelFormatRequirements;
-
-use api::egl;
-use api::egl::Context as EglContext;
-use api::egl::EGL;
-use api::wgl::Context as WglContext;
-use os::windows::WindowExt;
+use std::os::raw;
 
 /// Context handles available on Windows.
 #[derive(Clone, Debug)]
 pub enum RawHandle {
-    Egl(egl::ffi::EGLContext),
+    Egl(ffi::EGLContext),
     Wgl(HGLRC),
 }
 
@@ -95,7 +89,7 @@ impl Context {
                         EglContext::new(
                             &pf_reqs,
                             &gl_attr_egl,
-                            egl::NativeDisplay::Other(Some(ptr::null())),
+                            NativeDisplay::Other(Some(std::ptr::null())),
                         )
                         .and_then(|p| p.finish(w))
                         .map(|c| Context::Egl(c))
@@ -110,7 +104,7 @@ impl Context {
                         if let Ok(c) = EglContext::new(
                             &pf_reqs,
                             &gl_attr_egl,
-                            egl::NativeDisplay::Other(Some(ptr::null())),
+                            NativeDisplay::Other(Some(std::ptr::null())),
                         )
                         .and_then(|p| p.finish(w))
                         {
@@ -160,7 +154,7 @@ impl Context {
                         _ => unreachable!(),
                     });
 
-                let native_display = egl::NativeDisplay::Other(None);
+                let native_display = NativeDisplay::Other(None);
                 let context =
                     EglContext::new(pf_reqs, &gl_attr_egl, native_display)
                         .and_then(|prototype| prototype.finish_pbuffer((1, 1)))

@@ -1,26 +1,19 @@
 #![cfg(target_os = "android")]
 
-extern crate android_glue;
+mod ffi;
+
+use crate::api::egl::{ffi as egl_ffi, Context as EglContext, NativeDisplay};
+use crate::CreationError::{self, OsError};
+use crate::{
+    Api, ContextError, GlAttributes, PixelFormat, PixelFormatRequirements,
+};
 
 use libc;
-
-use CreationError::{self, OsError};
-
 use winit;
-
-use Api;
-use ContextError;
-use GlAttributes;
-use PixelFormat;
-use PixelFormatRequirements;
-
-use api::egl;
-use api::egl::Context as EglContext;
-use std::cell::Cell;
-use std::sync::Arc;
 use winit::os::android::EventsLoopExt;
 
-mod ffi;
+use std::cell::Cell;
+use std::sync::Arc;
 
 struct AndroidContext {
     egl_context: EglContext,
@@ -65,11 +58,11 @@ impl Context {
         if native_window.is_null() {
             return Err(OsError(format!("Android's native window is null")));
         }
-        let native_display = egl::NativeDisplay::Android;
-        let context = try!(EglContext::new(pf_reqs, &gl_attr, native_display)
-            .and_then(|p| p.finish(native_window as *const _)));
+        let native_display = NativeDisplay::Android;
+        let egl_context = EglContext::new(pf_reqs, &gl_attr, native_display)
+            .and_then(|p| p.finish(native_window as *const _))?;
         let ctx = Arc::new(AndroidContext {
-            egl_context: context,
+            egl_context,
             stopped: Some(Cell::new(false)),
         });
 
@@ -107,10 +100,10 @@ impl Context {
     ) -> Result<Self, CreationError> {
         let gl_attr = gl_attr.clone().map_sharing(|c| &c.0.egl_context);
         let context =
-            EglContext::new(pf_reqs, &gl_attr, egl::NativeDisplay::Android)?;
-        let context = context.finish_pbuffer((1, 1))?; // TODO:
+            EglContext::new(pf_reqs, &gl_attr, NativeDisplay::Android)?;
+        let egl_context = context.finish_pbuffer((1, 1))?; // TODO:
         let ctx = Arc::new(AndroidContext {
-            egl_context: context,
+            egl_context,
             stopped: None,
         });
         Ok(Context(ctx))
@@ -172,12 +165,12 @@ impl Context {
     }
 
     #[inline]
-    pub unsafe fn raw_handle(&self) -> egl::ffi::EGLContext {
+    pub unsafe fn raw_handle(&self) -> egl_ffi::EGLContext {
         self.0.egl_context.raw_handle()
     }
 
     #[inline]
-    pub unsafe fn get_egl_display(&self) -> egl::ffi::EGLDisplay {
+    pub unsafe fn get_egl_display(&self) -> egl_ffi::EGLDisplay {
         self.0.egl_context.get_egl_display()
     }
 }

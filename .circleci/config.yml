@@ -5,7 +5,7 @@ jobs:
   android-test:
     working_directory: ~/glutin
     docker:
-      - image: tomaka/cargo-apk
+      - image: gentz/android-rs-glue
     steps:
       - run: apt-get -qq update && apt-get install -y git
       - checkout

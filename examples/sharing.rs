@@ -1,7 +1,5 @@
 //! Requires OpenGL 4.2 minimium.
 
-extern crate glutin;
-
 mod support;
 
 use glutin::ContextTrait;
@@ -87,7 +85,7 @@ fn main() {
                         combined_context.resize(size);
 
                         unsafe {
-                            let _ = combined_context.make_current();
+                            combined_context.swap_buffers().unwrap();
                             glw.gl.DeleteTextures(1, &render_tex);
                             glw.gl.DeleteFramebuffers(1, &window_fb);
 

@@ -1,11 +1,10 @@
+use crate::{
+    CreationError, GlAttributes, GlProfile, GlRequest, PixelFormatRequirements,
+    ReleaseBehavior,
+};
+
 use cocoa::appkit::*;
 use cocoa::base::nil;
-use CreationError;
-use GlAttributes;
-use GlProfile;
-use GlRequest;
-use PixelFormatRequirements;
-use ReleaseBehavior;
 
 pub fn get_gl_profile<T>(
     opengl: &GlAttributes<&T>,

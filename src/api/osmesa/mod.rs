@@ -6,28 +6,19 @@
     target_os = "openbsd"
 ))]
 
-extern crate osmesa_sys;
+pub mod ffi {
+    pub use osmesa_sys::OSMesaContext;
+}
+
+use crate::{
+    Api, ContextError, CreationError, GlAttributes, GlProfile, GlRequest,
+    PixelFormat, PixelFormatRequirements, Robustness,
+};
 
 use libc;
-use Api;
-use ContextError;
-use CreationError;
-use GlAttributes;
-use GlProfile;
-use GlRequest;
-use PixelFormat;
-use PixelFormatRequirements;
-use Robustness;
 
-use std::error::Error;
 use std::ffi::CString;
-use std::fmt::{Debug, Display, Error as FormatError, Formatter};
-use std::os::raw::c_void;
-use std::{mem, ptr};
-
-pub mod ffi {
-    pub use super::osmesa_sys::OSMesaContext;
-}
+use std::os::raw;
 
 pub struct OsMesaContext {
     context: osmesa_sys::OSMesaContext,
@@ -39,8 +30,8 @@ pub struct OsMesaContext {
 #[derive(Debug)]
 struct NoEsOrWebGlSupported;
 
-impl Display for NoEsOrWebGlSupported {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), FormatError> {
+impl std::fmt::Display for NoEsOrWebGlSupported {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         write!(
             f,
             "OsMesa only works with desktop OpenGL; OpenGL ES or WebGL are not supported"
@@ -48,7 +39,7 @@ impl Display for NoEsOrWebGlSupported {
     }
 }
 
-impl Error for NoEsOrWebGlSupported {
+impl std::error::Error for NoEsOrWebGlSupported {
     fn description(&self) -> &str {
         "OsMesa only works with desktop OpenGL"
     }
@@ -58,18 +49,18 @@ impl Error for NoEsOrWebGlSupported {
 struct LoadingError(String);
 
 impl LoadingError {
-    fn new<D: Debug>(d: D) -> Self {
+    fn new<D: std::fmt::Debug>(d: D) -> Self {
         LoadingError(format!("{:?}", d))
     }
 }
 
-impl Display for LoadingError {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), FormatError> {
+impl std::fmt::Display for LoadingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         write!(f, "Failed to load OsMesa dynamic library: {}", self.0)
     }
 }
 
-impl Error for LoadingError {
+impl std::error::Error for LoadingError {
     fn description(&self) -> &str {
         "The library or a symbol of it could not be loaded"
     }
@@ -77,7 +68,7 @@ impl Error for LoadingError {
 
 impl OsMesaContext {
     pub fn new(
-        dimensions: (u32, u32),
+        dims: (u32, u32),
         _pf_reqs: &PixelFormatRequirements,
         opengl: &GlAttributes<&OsMesaContext>,
     ) -> Result<OsMesaContext, CreationError> {
@@ -143,15 +134,15 @@ impl OsMesaContext {
         attribs.push(0);
 
         Ok(OsMesaContext {
-            width: dimensions.0,
-            height: dimensions.1,
-            buffer: ::std::iter::repeat(unsafe { mem::uninitialized() })
-                .take((dimensions.0 * dimensions.1) as usize)
+            width: dims.0,
+            height: dims.1,
+            buffer: std::iter::repeat(unsafe { std::mem::uninitialized() })
+                .take((dims.0 * dims.1) as usize)
                 .collect(),
             context: unsafe {
                 let ctx = osmesa_sys::OSMesaCreateContextAttribs(
                     attribs.as_ptr(),
-                    ptr::null_mut(),
+                    std::ptr::null_mut(),
                 );
                 if ctx.is_null() {
                     return Err(CreationError::OsError(
@@ -201,9 +192,9 @@ impl OsMesaContext {
     pub fn get_proc_address(&self, addr: &str) -> *const () {
         unsafe {
             let c_str = CString::new(addr.as_bytes().to_vec()).unwrap();
-            mem::transmute(osmesa_sys::OSMesaGetProcAddress(mem::transmute(
-                c_str.as_ptr(),
-            )))
+            std::mem::transmute(osmesa_sys::OSMesaGetProcAddress(
+                std::mem::transmute(c_str.as_ptr()),
+            ))
         }
     }
 
@@ -218,7 +209,7 @@ impl OsMesaContext {
     }
 
     #[inline]
-    pub unsafe fn raw_handle(&self) -> *mut c_void {
+    pub unsafe fn raw_handle(&self) -> *mut raw::c_void {
         self.context as *mut _
     }
 }

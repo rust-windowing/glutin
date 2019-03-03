@@ -6,19 +6,6 @@
     target_os = "openbsd"
 ))]
 
-use {
-    Api, ContextError, CreationError, GlAttributes, GlProfile, GlRequest,
-    PixelFormat, PixelFormatRequirements, ReleaseBehavior, Robustness,
-};
-
-use std::ffi::{CStr, CString};
-use std::sync::Arc;
-use std::{mem, ptr, slice};
-
-use libc::{self, c_int};
-
-use winit::os::unix::x11::XConnection;
-
 pub mod ffi {
     pub use self::glx::types::GLXContext;
     pub use x11_dl::xlib::*;
@@ -36,7 +23,7 @@ pub mod ffi {
 
 mod glx {
     use super::ffi;
-    use api::dlloader::{SymTrait, SymWrapper};
+    use crate::api::dlloader::{SymTrait, SymWrapper};
     use std::ops::{Deref, DerefMut};
 
     #[derive(Clone)]
@@ -76,7 +63,19 @@ mod glx {
         }
     }
 }
+
 pub use self::glx::Glx;
+use crate::{
+    Api, ContextError, CreationError, GlAttributes, GlProfile, GlRequest,
+    PixelFormat, PixelFormatRequirements, ReleaseBehavior, Robustness,
+};
+
+use libc;
+use winit::os::unix::x11::XConnection;
+
+use std::ffi::{CStr, CString};
+use std::sync::Arc;
+use std::{mem, ptr, slice};
 
 lazy_static! {
     pub static ref GLX: Option<Glx> = Glx::new().ok();
@@ -210,8 +209,8 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_api(&self) -> ::Api {
-        ::Api::OpenGl
+    pub fn get_api(&self) -> crate::Api {
+        crate::Api::OpenGl
     }
 
     #[inline]
@@ -232,13 +231,16 @@ impl Drop for Context {
     fn drop(&mut self) {
         let glx = GLX.as_ref().unwrap();
         unsafe {
-            if self.is_current() {
-                glx.MakeCurrent(
-                    self.xconn.display as *mut _,
-                    0,
-                    ptr::null_mut(),
-                );
-            }
+            // See `drop` for `crate::api::egl::Context` for rationale.
+            self.make_current().unwrap();
+
+            let gl_finish_fn = self.get_proc_address("glFinish");
+            assert!(gl_finish_fn != std::ptr::null());
+            let gl_finish_fn =
+                std::mem::transmute::<_, extern "system" fn()>(gl_finish_fn);
+            gl_finish_fn();
+
+            glx.MakeCurrent(self.xconn.display as *mut _, 0, ptr::null_mut());
 
             glx.DestroyContext(self.xconn.display as *mut _, self.context);
         }
@@ -453,10 +455,12 @@ fn create_context(
         let context = if check_ext(extensions, "GLX_ARB_create_context") {
             let mut attributes = Vec::with_capacity(9);
 
-            attributes.push(ffi::glx_extra::CONTEXT_MAJOR_VERSION_ARB as c_int);
-            attributes.push(version.0 as c_int);
-            attributes.push(ffi::glx_extra::CONTEXT_MINOR_VERSION_ARB as c_int);
-            attributes.push(version.1 as c_int);
+            attributes
+                .push(ffi::glx_extra::CONTEXT_MAJOR_VERSION_ARB as libc::c_int);
+            attributes.push(version.0 as libc::c_int);
+            attributes
+                .push(ffi::glx_extra::CONTEXT_MINOR_VERSION_ARB as libc::c_int);
+            attributes.push(version.1 as libc::c_int);
 
             if let Some(profile) = profile {
                 let flag = match profile {
@@ -468,9 +472,10 @@ fn create_context(
                     }
                 };
 
-                attributes
-                    .push(ffi::glx_extra::CONTEXT_PROFILE_MASK_ARB as c_int);
-                attributes.push(flag as c_int);
+                attributes.push(
+                    ffi::glx_extra::CONTEXT_PROFILE_MASK_ARB as libc::c_int,
+                );
+                attributes.push(flag as libc::c_int);
             }
 
             let flags = {
@@ -482,28 +487,28 @@ fn create_context(
                         Robustness::RobustNoResetNotification
                         | Robustness::TryRobustNoResetNotification => {
                             attributes.push(
-                                ffi::glx_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB as c_int,
+                                ffi::glx_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB as libc::c_int,
                             );
                             attributes.push(
                                 ffi::glx_extra::NO_RESET_NOTIFICATION_ARB
-                                    as c_int,
+                                    as libc::c_int,
                             );
                             flags = flags
                                 | ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB
-                                    as c_int;
+                                    as libc::c_int;
                         }
                         Robustness::RobustLoseContextOnReset
                         | Robustness::TryRobustLoseContextOnReset => {
                             attributes.push(
-                                ffi::glx_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB as c_int,
+                                ffi::glx_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB as libc::c_int,
                             );
                             attributes.push(
                                 ffi::glx_extra::LOSE_CONTEXT_ON_RESET_ARB
-                                    as c_int,
+                                    as libc::c_int,
                             );
                             flags = flags
                                 | ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB
-                                    as c_int;
+                                    as libc::c_int;
                         }
                         Robustness::NotRobust => (),
                         Robustness::NoError => (),
@@ -519,14 +524,14 @@ fn create_context(
                 }
 
                 if debug {
-                    flags =
-                        flags | ffi::glx_extra::CONTEXT_DEBUG_BIT_ARB as c_int;
+                    flags = flags
+                        | ffi::glx_extra::CONTEXT_DEBUG_BIT_ARB as libc::c_int;
                 }
 
                 flags
             };
 
-            attributes.push(ffi::glx_extra::CONTEXT_FLAGS_ARB as c_int);
+            attributes.push(ffi::glx_extra::CONTEXT_FLAGS_ARB as libc::c_int);
             attributes.push(flags);
 
             attributes.push(0);
@@ -572,83 +577,91 @@ unsafe fn choose_fbconfig(
     transparent: bool,
 ) -> Result<(ffi::glx::types::GLXFBConfig, PixelFormat), ()> {
     let descriptor = {
-        let mut out: Vec<c_int> = Vec::with_capacity(37);
+        let mut out: Vec<libc::c_int> = Vec::with_capacity(37);
 
-        out.push(ffi::glx::X_RENDERABLE as c_int);
+        out.push(ffi::glx::X_RENDERABLE as libc::c_int);
         out.push(1);
 
         // TODO: If passed an visual xid, maybe we should stop assuming
         // TRUE_COLOR.
-        out.push(ffi::glx::X_VISUAL_TYPE as c_int);
-        out.push(ffi::glx::TRUE_COLOR as c_int);
+        out.push(ffi::glx::X_VISUAL_TYPE as libc::c_int);
+        out.push(ffi::glx::TRUE_COLOR as libc::c_int);
 
         if let Some(xid) = reqs.x11_visual_xid {
-            out.push(ffi::glx::VISUAL_ID as c_int);
-            out.push(xid as c_int);
+            out.push(ffi::glx::VISUAL_ID as libc::c_int);
+            out.push(xid as libc::c_int);
         }
 
-        out.push(ffi::glx::DRAWABLE_TYPE as c_int);
-        out.push(ffi::glx::WINDOW_BIT as c_int);
+        out.push(ffi::glx::DRAWABLE_TYPE as libc::c_int);
+        out.push(ffi::glx::WINDOW_BIT as libc::c_int);
 
-        out.push(ffi::glx::RENDER_TYPE as c_int);
+        out.push(ffi::glx::RENDER_TYPE as libc::c_int);
         if reqs.float_color_buffer {
             if check_ext(extensions, "GLX_ARB_fbconfig_float") {
-                out.push(ffi::glx_extra::RGBA_FLOAT_BIT_ARB as c_int);
+                out.push(ffi::glx_extra::RGBA_FLOAT_BIT_ARB as libc::c_int);
             } else {
                 return Err(());
             }
         } else {
-            out.push(ffi::glx::RGBA_BIT as c_int);
+            out.push(ffi::glx::RGBA_BIT as libc::c_int);
         }
 
         if let Some(color) = reqs.color_bits {
-            out.push(ffi::glx::RED_SIZE as c_int);
-            out.push((color / 3) as c_int);
-            out.push(ffi::glx::GREEN_SIZE as c_int);
-            out.push((color / 3 + if color % 3 != 0 { 1 } else { 0 }) as c_int);
-            out.push(ffi::glx::BLUE_SIZE as c_int);
-            out.push((color / 3 + if color % 3 == 2 { 1 } else { 0 }) as c_int);
+            out.push(ffi::glx::RED_SIZE as libc::c_int);
+            out.push((color / 3) as libc::c_int);
+            out.push(ffi::glx::GREEN_SIZE as libc::c_int);
+            out.push(
+                (color / 3 + if color % 3 != 0 { 1 } else { 0 }) as libc::c_int,
+            );
+            out.push(ffi::glx::BLUE_SIZE as libc::c_int);
+            out.push(
+                (color / 3 + if color % 3 == 2 { 1 } else { 0 }) as libc::c_int,
+            );
         }
 
         if let Some(alpha) = reqs.alpha_bits {
-            out.push(ffi::glx::ALPHA_SIZE as c_int);
-            out.push(alpha as c_int);
+            out.push(ffi::glx::ALPHA_SIZE as libc::c_int);
+            out.push(alpha as libc::c_int);
         }
 
         if let Some(depth) = reqs.depth_bits {
-            out.push(ffi::glx::DEPTH_SIZE as c_int);
-            out.push(depth as c_int);
+            out.push(ffi::glx::DEPTH_SIZE as libc::c_int);
+            out.push(depth as libc::c_int);
         }
 
         if let Some(stencil) = reqs.stencil_bits {
-            out.push(ffi::glx::STENCIL_SIZE as c_int);
-            out.push(stencil as c_int);
+            out.push(ffi::glx::STENCIL_SIZE as libc::c_int);
+            out.push(stencil as libc::c_int);
         }
 
         let double_buffer = reqs.double_buffer.unwrap_or(true);
-        out.push(ffi::glx::DOUBLEBUFFER as c_int);
+        out.push(ffi::glx::DOUBLEBUFFER as libc::c_int);
         out.push(if double_buffer { 1 } else { 0 });
 
         if let Some(multisampling) = reqs.multisampling {
             if check_ext(extensions, "GLX_ARB_multisample") {
-                out.push(ffi::glx_extra::SAMPLE_BUFFERS_ARB as c_int);
+                out.push(ffi::glx_extra::SAMPLE_BUFFERS_ARB as libc::c_int);
                 out.push(if multisampling == 0 { 0 } else { 1 });
-                out.push(ffi::glx_extra::SAMPLES_ARB as c_int);
-                out.push(multisampling as c_int);
+                out.push(ffi::glx_extra::SAMPLES_ARB as libc::c_int);
+                out.push(multisampling as libc::c_int);
             } else {
                 return Err(());
             }
         }
 
-        out.push(ffi::glx::STEREO as c_int);
+        out.push(ffi::glx::STEREO as libc::c_int);
         out.push(if reqs.stereoscopy { 1 } else { 0 });
 
         if reqs.srgb {
             if check_ext(extensions, "GLX_ARB_framebuffer_sRGB") {
-                out.push(ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as c_int);
+                out.push(
+                    ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as libc::c_int,
+                );
                 out.push(1);
             } else if check_ext(extensions, "GLX_EXT_framebuffer_sRGB") {
-                out.push(ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as c_int);
+                out.push(
+                    ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as libc::c_int,
+                );
                 out.push(1);
             } else {
                 return Err(());
@@ -660,18 +673,19 @@ unsafe fn choose_fbconfig(
             ReleaseBehavior::None => {
                 if check_ext(extensions, "GLX_ARB_context_flush_control") {
                     out.push(
-                        ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_ARB as c_int,
+                        ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_ARB
+                            as libc::c_int,
                     );
                     out.push(
                         ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_NONE_ARB
-                            as c_int,
+                            as libc::c_int,
                     );
                 }
             }
         }
 
-        out.push(ffi::glx::CONFIG_CAVEAT as c_int);
-        out.push(ffi::glx::DONT_CARE as c_int);
+        out.push(ffi::glx::CONFIG_CAVEAT as libc::c_int);
+        out.push(ffi::glx::DONT_CARE as libc::c_int);
 
         out.push(0);
         out
@@ -718,7 +732,7 @@ unsafe fn choose_fbconfig(
         res?
     };
 
-    let get_attrib = |attrib: c_int| -> i32 {
+    let get_attrib = |attrib: libc::c_int| -> i32 {
         let mut value = 0;
         glx.GetFBConfigAttrib(display as *mut _, fb_config, attrib, &mut value);
         // TODO: check return value
@@ -726,25 +740,29 @@ unsafe fn choose_fbconfig(
     };
 
     let pf_desc = PixelFormat {
-        hardware_accelerated: get_attrib(ffi::glx::CONFIG_CAVEAT as c_int)
-            != ffi::glx::SLOW_CONFIG as c_int,
-        color_bits: get_attrib(ffi::glx::RED_SIZE as c_int) as u8
-            + get_attrib(ffi::glx::GREEN_SIZE as c_int) as u8
-            + get_attrib(ffi::glx::BLUE_SIZE as c_int) as u8,
-        alpha_bits: get_attrib(ffi::glx::ALPHA_SIZE as c_int) as u8,
-        depth_bits: get_attrib(ffi::glx::DEPTH_SIZE as c_int) as u8,
-        stencil_bits: get_attrib(ffi::glx::STENCIL_SIZE as c_int) as u8,
-        stereoscopy: get_attrib(ffi::glx::STEREO as c_int) != 0,
-        double_buffer: get_attrib(ffi::glx::DOUBLEBUFFER as c_int) != 0,
-        multisampling: if get_attrib(ffi::glx::SAMPLE_BUFFERS as c_int) != 0 {
-            Some(get_attrib(ffi::glx::SAMPLES as c_int) as u16)
+        hardware_accelerated: get_attrib(
+            ffi::glx::CONFIG_CAVEAT as libc::c_int,
+        ) != ffi::glx::SLOW_CONFIG as libc::c_int,
+        color_bits: get_attrib(ffi::glx::RED_SIZE as libc::c_int) as u8
+            + get_attrib(ffi::glx::GREEN_SIZE as libc::c_int) as u8
+            + get_attrib(ffi::glx::BLUE_SIZE as libc::c_int) as u8,
+        alpha_bits: get_attrib(ffi::glx::ALPHA_SIZE as libc::c_int) as u8,
+        depth_bits: get_attrib(ffi::glx::DEPTH_SIZE as libc::c_int) as u8,
+        stencil_bits: get_attrib(ffi::glx::STENCIL_SIZE as libc::c_int) as u8,
+        stereoscopy: get_attrib(ffi::glx::STEREO as libc::c_int) != 0,
+        double_buffer: get_attrib(ffi::glx::DOUBLEBUFFER as libc::c_int) != 0,
+        multisampling: if get_attrib(ffi::glx::SAMPLE_BUFFERS as libc::c_int)
+            != 0
+        {
+            Some(get_attrib(ffi::glx::SAMPLES as libc::c_int) as u16)
         } else {
             None
         },
-        srgb: get_attrib(ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as c_int)
-            != 0
+        srgb: get_attrib(
+            ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as libc::c_int,
+        ) != 0
             || get_attrib(
-                ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as c_int,
+                ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as libc::c_int,
             ) != 0,
     };
 

@@ -1,19 +1,22 @@
-extern crate glutin;
-
 mod support;
 
 use glutin::ContextTrait;
+use std::sync::Arc;
 
 fn main() {
-    let mut el = glutin::EventsLoop::new();
-    let win = glutin::WindowBuilder::new()
-        .with_title("A fantastic window!")
-        .build(&el)
-        .unwrap();
+    let (separated_context, mut el, win) = {
+        let el = glutin::EventsLoop::new();
+        let win = glutin::WindowBuilder::new()
+            .with_title("A fantastic window!")
+            .build(&el)
+            .unwrap();
+        let win = Arc::new(win);
 
-    let separated_context = glutin::ContextBuilder::new()
-        .build_separated(&win, &el)
-        .unwrap();
+        let separated_context = glutin::ContextBuilder::new()
+            .build_separated(Arc::clone(&win), &el)
+            .unwrap();
+        (separated_context, el, win)
+    };
 
     unsafe { separated_context.make_current().unwrap() }
 
@@ -52,6 +55,6 @@ fn main() {
         });
 
         gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
-        let _ = separated_context.swap_buffers();
+        separated_context.swap_buffers().unwrap();
     }
 }

@@ -1,3 +1,5 @@
+#![cfg(target_os = "ios")]
+
 //! iOS support
 //!
 //! # Building app
@@ -58,26 +60,22 @@
 //! Also note that app will not receive Destroyed event if suspended, it will be
 //! SIGKILL'ed
 
-#![cfg(target_os = "ios")]
+mod ffi;
+pub use self::ffi::id;
+use self::ffi::*;
 
-use std::ffi::CString;
-use std::io;
-use std::mem;
-use std::os::raw::*;
-
-use objc::declare::ClassDecl;
-use objc::runtime::{Class, Object, Sel, BOOL, NO, YES};
-
-use os::ios::{WindowBuilderExt, WindowExt};
-use os::ContextTraitExt;
-use {
+use crate::os::ios::{WindowBuilderExt, WindowExt};
+use crate::os::ContextTraitExt;
+use crate::{
     Api, ContextError, CreationError, EventsLoop, GlAttributes, GlRequest,
     PixelFormat, PixelFormatRequirements, Window, WindowBuilder,
 };
 
-mod ffi;
-pub use self::ffi::id;
-use self::ffi::*;
+use objc::declare::ClassDecl;
+use objc::runtime::{Class, Object, Sel, BOOL, NO, YES};
+
+use std::ffi::CString;
+use std::os::raw;
 
 #[derive(Debug, PartialEq)]
 enum ColorFormat {
@@ -276,7 +274,7 @@ impl Context {
                 ].as_ptr()
             count: 2
         ];
-        let _ = self.make_current();
+        self.make_current().unwrap();
 
         let view = self.view;
         let scale_factor = window.get_hidpi_factor() as CGFloat;
@@ -286,7 +284,7 @@ impl Context {
         let _: () = msg_send![layer, setDrawableProperties: draw_props];
 
         let gl = gles::Gles2::load_with(|symbol| {
-            self.get_proc_address(symbol) as *const c_void
+            self.get_proc_address(symbol) as *const raw::c_void
         });
         let mut color_render_buf: gles::types::GLuint = 0;
         let mut frame_buf: gles::types::GLuint = 0;
@@ -326,8 +324,8 @@ impl Context {
             if res == YES {
                 Ok(())
             } else {
-                Err(ContextError::IoError(io::Error::new(
-                    io::ErrorKind::Other,
+                Err(ContextError::IoError(std::io::Error::new(
+                    std::io::ErrorKind::Other,
                     "`EAGLContext presentRenderbuffer` failed",
                 )))
             }
@@ -364,8 +362,8 @@ impl Context {
         if res == YES {
             Ok(())
         } else {
-            Err(ContextError::IoError(io::Error::new(
-                io::ErrorKind::Other,
+            Err(ContextError::IoError(std::io::Error::new(
+                std::io::ErrorKind::Other,
                 "`EAGLContext setCurrentContext` failed",
             )))
         }
@@ -384,8 +382,10 @@ impl Context {
             .expect("proc name contained interior nul byte");
         let path = b"/System/Library/Frameworks/OpenGLES.framework/OpenGLES\0";
         let addr = unsafe {
-            let lib =
-                dlopen(path.as_ptr() as *const c_char, RTLD_LAZY | RTLD_GLOBAL);
+            let lib = dlopen(
+                path.as_ptr() as *const raw::c_char,
+                RTLD_LAZY | RTLD_GLOBAL,
+            );
             dlsym(lib, proc_name_c.as_ptr()) as *const _
         };
         // debug!("proc {} -> {:?}", proc_name, addr);
@@ -418,7 +418,7 @@ fn create_view_class() {
 
     extern "C" fn layer_class(_: &Class, _: Sel) -> *const Class {
         unsafe {
-            mem::transmute(
+            std::mem::transmute(
                 Class::get("CAEAGLLayer")
                     .expect("Failed to get class `CAEAGLLayer`"),
             )
@@ -449,14 +449,14 @@ impl Drop for Context {
 }
 
 impl ContextTraitExt for Context {
-    type Handle = *mut c_void;
+    type Handle = *mut raw::c_void;
     #[inline]
     unsafe fn raw_handle(&self) -> Self::Handle {
-        self.eagl_context as *mut c_void
+        self.eagl_context as *mut raw::c_void
     }
 
     #[inline]
-    unsafe fn get_egl_display(&self) -> Option<*const c_void> {
+    unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
         None
     }
 }

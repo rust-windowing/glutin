@@ -1,5 +1,3 @@
-extern crate glutin;
-
 mod support;
 
 use glutin::ContextTrait;
@@ -51,6 +49,6 @@ fn main() {
         });
 
         gl.draw_frame([0.0; 4]);
-        let _ = combined_context.swap_buffers();
+        combined_context.swap_buffers().unwrap();
     }
 }

@@ -1,13 +1,13 @@
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
 
-use std::os::raw::*;
+pub mod gles {
+    include!(concat!(env!("OUT_DIR"), "/gles2_bindings.rs"));
+}
 
 use objc::runtime::Object;
 use objc::{Encode, Encoding};
 
-pub mod gles {
-    include!(concat!(env!("OUT_DIR"), "/gles2_bindings.rs"));
-}
+use std::os::raw;
 
 pub type id = *mut Object;
 pub const nil: id = 0 as id;
@@ -88,10 +88,16 @@ extern "C" {
     pub static kEAGLDrawablePropertyRetainedBacking: id;
 }
 
-pub const RTLD_LAZY: c_int = 0x001;
-pub const RTLD_GLOBAL: c_int = 0x100;
+pub const RTLD_LAZY: raw::c_int = 0x001;
+pub const RTLD_GLOBAL: raw::c_int = 0x100;
 
 extern "C" {
-    pub fn dlopen(filename: *const c_char, flag: c_int) -> *mut c_void;
-    pub fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
+    pub fn dlopen(
+        filename: *const raw::c_char,
+        flag: raw::c_int,
+    ) -> *mut raw::c_void;
+    pub fn dlsym(
+        handle: *mut raw::c_void,
+        symbol: *const raw::c_char,
+    ) -> *mut raw::c_void;
 }
