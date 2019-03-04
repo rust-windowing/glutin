@@ -93,8 +93,8 @@ where
 pub struct ContextBuilder<'a> {
     /// The attributes to use to create the context.
     pub gl_attr: GlAttributes<&'a Context>,
-    // Should be made public once it's stabilized.
-    pf_reqs: PixelFormatRequirements,
+    /// The pixel format requirements
+    pub pf_reqs: PixelFormatRequirements,
 }
 
 impl<'a> ContextBuilder<'a> {

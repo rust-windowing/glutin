@@ -2,6 +2,7 @@
 
 - We no longer load `libegl.so` and `libgl.so` multiple times.
 - Fixes `Context::is_current` incorrectly returning `false`.
+- Made `ContextBuilder`'s `pf_reqs` public.
 - **Breaking:** Renamed `GlContext{,Ext}` to `ContextTrait{,Ext}`.
 - **Breaking:** Renamed `GlWindow` to `WindowedContext`.
 - Implemented context sharing support for Windows and Linux.
