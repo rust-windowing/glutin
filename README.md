@@ -1,11 +1,8 @@
 # glutin -  OpenGL, UTilities and INput
-[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/tomaka/glutin?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+Alternative to GLFW in pure Rust.
 
 [![](https://meritbadge.herokuapp.com/glutin)](https://crates.io/crates/glutin)
-
 [![Docs.rs](https://docs.rs/glutin/badge.svg)](https://docs.rs/glutin)
-
-Alternative to GLFW in pure Rust.
 
 [![Build Status](https://travis-ci.org/tomaka/glutin.png?branch=master)](https://travis-ci.org/tomaka/glutin)
 [![Build status](https://ci.appveyor.com/api/projects/status/cv5xewg3uchb3854/branch/master?svg=true)](https://ci.appveyor.com/project/tomaka/glutin/branch/master)
@@ -16,6 +13,14 @@ glutin = "*"
 ```
 
 ## [Documentation](https://docs.rs/glutin)
+
+## Contact Us
+
+Join us in any of these:
+
+[![Freenode](https://img.shields.io/badge/freenode.net-%23glutin-red.svg)](http://webchat.freenode.net?channels=%23glutin&uio=MTY9dHJ1ZSYyPXRydWUmND10cnVlJjExPTE4NSYxMj10cnVlJjE1PXRydWU7a)
+[![Matrix](https://img.shields.io/badge/Matrix-%23Glutin%3Amatrix.org-blueviolet.svg)](https://matrix.to/#/#Glutin:matrix.org)
+[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/tomaka/glutin?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 ## Usage Examples
 
