@@ -21,7 +21,7 @@ serde = ["winit/serde"]
 [dependencies]
 lazy_static = "1.1"
 libc = "0.2"
-winit = "0.18"
+winit = "0.19"
 
 [build-dependencies]
 gl_generator = "0.10"
