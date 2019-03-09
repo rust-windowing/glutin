@@ -67,10 +67,10 @@ use crate::{
     PixelFormat, PixelFormatRequirements, Window, WindowBuilder,
 };
 
+use glutin_gles2_sys as ffi;
 use objc::declare::ClassDecl;
 use objc::runtime::{Class, Object, Sel, BOOL, NO, YES};
 use winit::dpi;
-use glutin_gles2_sys as ffi;
 
 use std::ffi::CString;
 use std::os::raw;
@@ -141,7 +141,8 @@ fn stencil_for_view(view: ffi::id) -> u8 {
 
 #[allow(non_upper_case_globals)]
 fn multisampling_for_view(view: ffi::id) -> Option<u16> {
-    let ms_format: ffi::NSUInteger = unsafe { msg_send![view, drawableMultisample] };
+    let ms_format: ffi::NSUInteger =
+        unsafe { msg_send![view, drawableMultisample] };
     match ms_format {
         GLKViewDrawableMultisampleNone => None,
         GLKViewDrawableMultisample4X => Some(4),
@@ -170,7 +171,7 @@ fn validate_version(version: u8) -> Result<ffi::NSUInteger, CreationError> {
 
 impl Context {
     #[inline]
-    pub fn new_combined(
+    pub fn new_windowed(
         builder: WindowBuilder,
         event_loop: &EventsLoop,
         _: &PixelFormatRequirements,
@@ -201,15 +202,15 @@ impl Context {
                 ..
             } => validate_version(major)?,
         };
-        let window = builder.build(event_loop)?;
+        let win = builder.build(event_loop)?;
         let context = unsafe {
             let eagl_context = Context::create_context(version)?;
-            let view = window.get_uiview() as ffi::id;
+            let view = win.get_uiview() as ffi::id;
             let mut context = Context { eagl_context, view };
-            context.init_context(&window);
+            context.init_context(&win);
             context
         };
-        Ok((window, context))
+        Ok((win, context))
     }
 
     #[inline]
@@ -222,18 +223,8 @@ impl Context {
         let wb = WindowBuilder::new()
             .with_visibility(false)
             .with_dimensions(dims.to_logical(1.));
-        Self::new_combined(wb, el, pf_reqs, gl_attr).map(|(_window, context)| context)
-    }
-
-    /// See the docs in the crate root file.
-    #[inline]
-    pub fn new_separated(
-        _window: &Window,
-        _el: &EventsLoop,
-        _pf_reqs: &PixelFormatRequirements,
-        _gl_attr: &GlAttributes<&Context>,
-    ) -> Result<Self, CreationError> {
-        unimplemented!()
+        Self::new_windowed(wb, el, pf_reqs, gl_attr)
+            .map(|(_window, context)| context)
     }
 
     unsafe fn create_context(
@@ -256,7 +247,7 @@ impl Context {
         }
     }
 
-    unsafe fn init_context(&mut self, window: &Window) {
+    unsafe fn init_context(&mut self, win: &Window) {
         let dict_class = Class::get("NSDictionary")
             .expect("Failed to get class `NSDictionary`");
         let number_class =
@@ -278,7 +269,7 @@ impl Context {
         self.make_current().unwrap();
 
         let view = self.view;
-        let scale_factor = window.get_hidpi_factor() as ffi::CGFloat;
+        let scale_factor = win.get_hidpi_factor() as ffi::CGFloat;
         let _: () = msg_send![view, setContentScaleFactor: scale_factor];
         let layer: ffi::id = msg_send![view, layer];
         let _: () = msg_send![layer, setContentsScale: scale_factor];
@@ -400,7 +391,11 @@ impl Context {
 }
 
 fn create_view_class() {
-    extern "C" fn init_with_frame(this: &Object, _: Sel, frame: ffi::CGRect) -> ffi::id {
+    extern "C" fn init_with_frame(
+        this: &Object,
+        _: Sel,
+        frame: ffi::CGRect,
+    ) -> ffi::id {
         unsafe {
             let view: ffi::id =
                 msg_send![super(this, class!(GLKView)), initWithFrame: frame];
@@ -433,7 +428,8 @@ fn create_view_class() {
     unsafe {
         decl.add_method(
             sel!(initWithFrame:),
-            init_with_frame as extern "C" fn(&Object, Sel, ffi::CGRect) -> ffi::id,
+            init_with_frame
+                as extern "C" fn(&Object, Sel, ffi::CGRect) -> ffi::id,
         );
         decl.add_class_method(
             sel!(layerClass),

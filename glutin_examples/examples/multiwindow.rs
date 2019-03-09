@@ -9,13 +9,13 @@ fn main() {
     for index in 0..3 {
         let title = format!("Charming Window #{}", index + 1);
         let wb = glutin::WindowBuilder::new().with_title(title);
-        let combined_context = glutin::ContextBuilder::new()
-            .build_combined(wb, &el)
+        let windowed_context = glutin::ContextBuilder::new()
+            .build_windowed(wb, &el)
             .unwrap();
-        unsafe { combined_context.make_current().unwrap() }
-        let gl = support::load(&combined_context.context());
-        let window_id = combined_context.id();
-        windows.insert(window_id, (combined_context, gl));
+        unsafe { windowed_context.make_current().unwrap() }
+        let gl = support::load(&windowed_context.context());
+        let window_id = windowed_context.id();
+        windows.insert(window_id, (windowed_context, gl));
     }
 
     while !windows.is_empty() {
@@ -25,10 +25,10 @@ fn main() {
                 glutin::Event::WindowEvent { event, window_id } => {
                     match event {
                         glutin::WindowEvent::Resized(logical_size) => {
-                            let combined_context = &windows[&window_id].0;
+                            let windowed_context = &windows[&window_id].0;
                             let dpi_factor =
-                                combined_context.get_hidpi_factor();
-                            combined_context
+                                windowed_context.get_hidpi_factor();
+                            windowed_context
                                 .resize(logical_size.to_physical(dpi_factor));
                         }
                         glutin::WindowEvent::CloseRequested => {

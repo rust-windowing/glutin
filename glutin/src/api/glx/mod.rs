@@ -7,8 +7,8 @@
 ))]
 
 mod glx {
-    use glutin_glx_sys as ffi;
     use crate::api::dlloader::{SymTrait, SymWrapper};
+    use glutin_glx_sys as ffi;
     use std::ops::{Deref, DerefMut};
 
     #[derive(Clone)]
@@ -55,9 +55,9 @@ use crate::{
     PixelFormat, PixelFormatRequirements, ReleaseBehavior, Robustness,
 };
 
+use glutin_glx_sys as ffi;
 use libc;
 use winit::os::unix::x11::XConnection;
-use glutin_glx_sys as ffi;
 
 use std::ffi::{CStr, CString};
 use std::sync::Arc;
@@ -248,7 +248,7 @@ impl<'a> ContextPrototype<'a> {
         &self.visual_infos
     }
 
-    pub fn finish(self, window: ffi::Window) -> Result<Context, CreationError> {
+    pub fn finish(self, win: ffi::Window) -> Result<Context, CreationError> {
         let glx = GLX.as_ref().unwrap();
         let share = match self.opengl.sharing {
             Some(ctx) => ctx.context,
@@ -357,7 +357,7 @@ impl<'a> ContextPrototype<'a> {
         if self.opengl.vsync {
             unsafe {
                 glx
-                    .MakeCurrent(self.xconn.display as *mut _, window, context)
+                    .MakeCurrent(self.xconn.display as *mut _, win, context)
             };
 
             if check_ext(&self.extensions, "GLX_EXT_swap_control")
@@ -365,7 +365,7 @@ impl<'a> ContextPrototype<'a> {
             {
                 // this should be the most common extension
                 unsafe {
-                    extra_functions.SwapIntervalEXT(self.xconn.display as *mut _, window, 1);
+                    extra_functions.SwapIntervalEXT(self.xconn.display as *mut _, win, 1);
                 }
 
             // checking that it worked
@@ -408,7 +408,7 @@ impl<'a> ContextPrototype<'a> {
 
         Ok(Context {
             xconn: self.xconn,
-            window,
+            window: win,
             context,
             pixel_format: self.pixel_format,
         })

@@ -9,11 +9,11 @@ use super::*;
 /// # fn main() {
 /// let mut el = glutin::EventsLoop::new();
 /// let wb = glutin::WindowBuilder::new();
-/// let combined_context = glutin::ContextBuilder::new()
-///     .build_combined(wb, &el)
+/// let windowed_context = glutin::ContextBuilder::new()
+///     .build_windowed(wb, &el)
 ///     .unwrap();
 ///
-/// unsafe { combined_context.make_current().unwrap() };
+/// unsafe { windowed_context.make_current().unwrap() };
 ///
 /// loop {
 ///     el.poll_events(|event| {
@@ -25,19 +25,14 @@ use super::*;
 ///
 ///     // draw everything here
 ///
-///     combined_context.swap_buffers();
+///     windowed_context.swap_buffers();
 ///     std::thread::sleep(std::time::Duration::from_millis(17));
 /// }
 /// # }
 /// ```
 pub struct WindowedContext {
     context: Context,
-    window: WindowRef,
-}
-
-pub enum WindowRef {
-    Owned(Window),
-    Arced(Arc<Window>),
+    window: Window,
 }
 
 impl WindowedContext {
@@ -52,50 +47,23 @@ impl WindowedContext {
     ///  incompatible system, out of memory, etc.). This should be very rare.
     ///  - If the OpenGL context could not be created. This generally happens
     ///  because the underlying platform doesn't support a requested feature.
-    pub fn new_combined(
+    pub fn new_windowed(
         wb: WindowBuilder,
         cb: ContextBuilder,
         el: &EventsLoop,
     ) -> Result<Self, CreationError> {
         let ContextBuilder { pf_reqs, gl_attr } = cb;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
-        platform::Context::new_combined(wb, el, &pf_reqs, &gl_attr).map(
+        platform::Context::new_windowed(wb, el, &pf_reqs, &gl_attr).map(
             |(window, context)| WindowedContext {
-                window: WindowRef::Owned(window),
-                context: Context { context },
-            },
-        )
-    }
-
-    /// Builds the GL context using the passed `Window`, returning the context
-    /// as a `WindowedContext`.
-    ///
-    /// One notable limitation of the Wayland backend when it comes to shared
-    /// contexts is that both contexts must use the same events loop.
-    ///
-    /// Errors can occur in two scenarios:
-    ///  - If the window could not be created (via permission denied,
-    ///  incompatible system, out of memory, etc.). This should be very rare.
-    ///  - If the OpenGL context could not be created. This generally happens
-    ///  because the underlying platform doesn't support a requested feature.
-    pub fn new_separated(
-        window: Arc<Window>,
-        cb: ContextBuilder,
-        el: &EventsLoop,
-    ) -> Result<Self, CreationError> {
-        let ContextBuilder { pf_reqs, gl_attr } = cb;
-        let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
-
-        platform::Context::new_separated(&*window, el, &pf_reqs, &gl_attr).map(
-            |context| WindowedContext {
-                window: WindowRef::Arced(window),
+                window,
                 context: Context { context },
             },
         )
     }
 
     /// Borrow the inner `Window`.
-    pub fn window(&self) -> &WindowRef {
+    pub fn window(&self) -> &Window {
         &self.window
     }
 
@@ -155,18 +123,8 @@ impl ContextTrait for WindowedContext {
 }
 
 impl std::ops::Deref for WindowedContext {
-    type Target = WindowRef;
-    fn deref(&self) -> &Self::Target {
-        &self.window
-    }
-}
-
-impl std::ops::Deref for WindowRef {
     type Target = Window;
     fn deref(&self) -> &Self::Target {
-        match self {
-            WindowRef::Owned(ref w) => w,
-            WindowRef::Arced(w) => &*w,
-        }
+        &self.window
     }
 }

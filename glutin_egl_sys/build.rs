@@ -44,6 +44,7 @@ fn main() {
             reg.write_bindings(gl_generator::StaticStructGenerator, &mut file)
         } else {
             reg.write_bindings(gl_generator::StructGenerator, &mut file)
-        }.unwrap()
+        }
+        .unwrap()
     }
 }

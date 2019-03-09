@@ -9,23 +9,24 @@ fn main() {
     let mut el = glutin::EventsLoop::new();
     let mut size = glutin::dpi::PhysicalSize::new(768., 480.);
 
-    let headless_context =
-        glutin::ContextBuilder::new().build_headless(&el, size).unwrap();
+    let headless_context = glutin::ContextBuilder::new()
+        .build_headless(&el, size)
+        .unwrap();
 
     let wb = glutin::WindowBuilder::new()
         .with_title("A fantastic window!")
         .with_dimensions(glutin::dpi::LogicalSize::from_physical(size, 1.0));
-    let combined_context = glutin::ContextBuilder::new()
+    let windowed_context = glutin::ContextBuilder::new()
         .with_shared_lists(&headless_context)
-        .build_combined(wb, &el)
+        .build_windowed(wb, &el)
         .unwrap();
 
-    unsafe { combined_context.make_current().unwrap() }
+    unsafe { windowed_context.make_current().unwrap() }
     println!(
         "Pixel format of the window's GL context: {:?}",
-        combined_context.get_pixel_format()
+        windowed_context.get_pixel_format()
     );
-    let glw = support::load(&combined_context.context());
+    let glw = support::load(&windowed_context.context());
 
     let mut render_tex = 0;
     unsafe {
@@ -79,13 +80,13 @@ fn main() {
                 glutin::Event::WindowEvent { event, .. } => match event {
                     glutin::WindowEvent::CloseRequested => running = false,
                     glutin::WindowEvent::Resized(logical_size) => {
-                        unsafe { combined_context.make_current().unwrap() }
-                        let dpi_factor = combined_context.get_hidpi_factor();
+                        unsafe { windowed_context.make_current().unwrap() }
+                        let dpi_factor = windowed_context.get_hidpi_factor();
                         size = logical_size.to_physical(dpi_factor);
-                        combined_context.resize(size);
+                        windowed_context.resize(size);
 
                         unsafe {
-                            combined_context.swap_buffers().unwrap();
+                            windowed_context.swap_buffers().unwrap();
                             glw.gl.DeleteTextures(1, &render_tex);
                             glw.gl.DeleteFramebuffers(1, &window_fb);
 
@@ -143,7 +144,7 @@ fn main() {
         unsafe { headless_context.make_current().unwrap() }
         glc.draw_frame([1.0, 0.5, 0.7, 1.0]);
 
-        unsafe { combined_context.make_current().unwrap() }
+        unsafe { windowed_context.make_current().unwrap() }
         unsafe {
             glw.gl.BlitFramebuffer(
                 0,
@@ -158,11 +159,11 @@ fn main() {
                 gl::NEAREST,
             );
         }
-        let _ = combined_context.swap_buffers();
+        let _ = windowed_context.swap_buffers();
     }
 
     unsafe {
-        let _ = combined_context.make_current();
+        let _ = windowed_context.make_current();
         glw.gl.DeleteTextures(1, &render_tex);
         glw.gl.DeleteFramebuffers(1, &window_fb);
         let _ = headless_context.make_current();

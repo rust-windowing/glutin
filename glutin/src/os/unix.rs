@@ -6,11 +6,11 @@
     target_os = "openbsd"
 ))]
 
+use crate::os::ContextTraitExt;
+pub use crate::platform::{OsMesaContextExt, RawContextExt, RawHandle};
+use crate::Context;
 pub use glutin_egl_sys::EGLContext;
 pub use glutin_glx_sys::GLXContext;
-use crate::os::ContextTraitExt;
-pub use crate::platform::RawHandle;
-use crate::Context;
 
 pub use winit::os::unix::EventsLoopExt;
 pub use winit::os::unix::MonitorIdExt;

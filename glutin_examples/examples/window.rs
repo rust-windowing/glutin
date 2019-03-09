@@ -5,18 +5,18 @@ use glutin::ContextTrait;
 fn main() {
     let mut el = glutin::EventsLoop::new();
     let wb = glutin::WindowBuilder::new().with_title("A fantastic window!");
-    let combined_context = glutin::ContextBuilder::new()
-        .build_combined(wb, &el)
+    let windowed_context = glutin::ContextBuilder::new()
+        .build_windowed(wb, &el)
         .unwrap();
 
-    unsafe { combined_context.make_current().unwrap() }
+    unsafe { windowed_context.make_current().unwrap() }
 
     println!(
         "Pixel format of the window's GL context: {:?}",
-        combined_context.get_pixel_format()
+        windowed_context.get_pixel_format()
     );
 
-    let gl = support::load(&combined_context.context());
+    let gl = support::load(&windowed_context.context());
 
     let mut running = true;
     while running {
@@ -26,8 +26,8 @@ fn main() {
                 glutin::Event::WindowEvent { event, .. } => match event {
                     glutin::WindowEvent::CloseRequested => running = false,
                     glutin::WindowEvent::Resized(logical_size) => {
-                        let dpi_factor = combined_context.get_hidpi_factor();
-                        combined_context
+                        let dpi_factor = windowed_context.get_hidpi_factor();
+                        windowed_context
                             .resize(logical_size.to_physical(dpi_factor));
                     }
                     _ => (),
@@ -37,6 +37,6 @@ fn main() {
         });
 
         gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
-        combined_context.swap_buffers().unwrap();
+        windowed_context.swap_buffers().unwrap();
     }
 }

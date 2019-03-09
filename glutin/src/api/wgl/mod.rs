@@ -9,6 +9,7 @@ use crate::{
 
 use self::make_current_guard::CurrentContextGuard;
 
+use glutin_wgl_sys as gl;
 use winapi::shared::minwindef::HMODULE;
 use winapi::shared::minwindef::*;
 use winapi::shared::ntdef::LPCWSTR;
@@ -16,7 +17,6 @@ use winapi::shared::windef::{HDC, HGLRC, HWND};
 use winapi::um::libloaderapi::*;
 use winapi::um::wingdi::*;
 use winapi::um::winuser::*;
-use glutin_wgl_sys as gl;
 
 use std::ffi::{CStr, CString, OsStr};
 use std::os::raw;
@@ -75,9 +75,9 @@ impl Context {
     pub unsafe fn new(
         pf_reqs: &PixelFormatRequirements,
         opengl: &GlAttributes<HGLRC>,
-        window: HWND,
+        win: HWND,
     ) -> Result<Context, CreationError> {
-        let hdc = GetDC(window);
+        let hdc = GetDC(win);
         if hdc.is_null() {
             let err = Err(CreationError::OsError(format!(
                 "GetDC function failed: {}",
@@ -87,7 +87,7 @@ impl Context {
         }
 
         // loading the functions that are not guaranteed to be supported
-        let extra_functions = load_extra_functions(window)?;
+        let extra_functions = load_extra_functions(win)?;
 
         // getting the list of the supported extensions
         let extensions = if extra_functions.GetExtensionsStringARB.is_loaded() {
@@ -143,7 +143,7 @@ impl Context {
         // creating the OpenGL context
         let context = create_context(
             Some((&extra_functions, pf_reqs, opengl, &extensions)),
-            window,
+            win,
             hdc,
         )?;
 
@@ -874,7 +874,7 @@ unsafe fn load_opengl32_dll() -> Result<HMODULE, CreationError> {
 /// The `window` must be passed because the driver can vary depending on the
 /// window's characteristics.
 unsafe fn load_extra_functions(
-    window: HWND,
+    win: HWND,
 ) -> Result<gl::wgl_extra::Wgl, CreationError> {
     let (ex_style, style) = (
         WS_EX_APPWINDOW,
@@ -882,12 +882,12 @@ unsafe fn load_extra_functions(
     );
 
     // creating a dummy invisible window
-    let dummy_window = {
+    let dummy_win = {
         // getting the rect of the real window
         let rect = {
             let mut placement: WINDOWPLACEMENT = std::mem::zeroed();
             placement.length = std::mem::size_of::<WINDOWPLACEMENT>() as UINT;
-            if GetWindowPlacement(window, &mut placement) == 0 {
+            if GetWindowPlacement(win, &mut placement) == 0 {
                 panic!();
             }
             placement.rcNormalPosition
@@ -895,7 +895,7 @@ unsafe fn load_extra_functions(
 
         // getting the class name of the real window
         let mut class_name = [0u16; 128];
-        if GetClassNameW(window, class_name.as_mut_ptr(), 128) == 0 {
+        if GetClassNameW(win, class_name.as_mut_ptr(), 128) == 0 {
             return Err(CreationError::OsError(format!(
                 "GetClassNameW function failed: {}",
                 format!("{}", std::io::Error::last_os_error())
@@ -972,14 +972,14 @@ unsafe fn load_extra_functions(
 
     // getting the pixel format that we will use and setting it
     {
-        let id = choose_dummy_pixel_format(dummy_window.1)?;
-        set_pixel_format(dummy_window.1, id)?;
+        let id = choose_dummy_pixel_format(dummy_win.1)?;
+        set_pixel_format(dummy_win.1, id)?;
     }
 
     // creating the dummy OpenGL context and making it current
-    let dummy_context = create_context(None, dummy_window.0, dummy_window.1)?;
+    let dummy_ctx = create_context(None, dummy_win.0, dummy_win.1)?;
     let _current_context =
-        CurrentContextGuard::make_current(dummy_window.1, dummy_context.0)?;
+        CurrentContextGuard::make_current(dummy_win.1, dummy_ctx.0)?;
 
     // loading the extra WGL functions
     Ok(gl::wgl_extra::Wgl::load_with(|addr| {

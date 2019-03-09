@@ -5,10 +5,10 @@ use crate::{
     PixelFormatRequirements,
 };
 
+use glutin_glx_sys as ffi;
 use winit;
 pub use winit::os::unix::x11::{XConnection, XError, XNotSupported};
 use winit::os::unix::{EventsLoopExt, WindowBuilderExt, WindowExt};
-use glutin_glx_sys as ffi;
 
 use std::os::raw;
 use std::sync::Arc;
@@ -176,18 +176,16 @@ impl Context {
             }
         };
 
-        let window = wb
+        let win = wb
             .with_x11_visual(&visual_infos as *const _)
             .with_x11_screen(screen_id)
             .build(el)?;
 
-        let xlib_window = window.get_xlib_window().unwrap();
+        let xwin = win.get_xlib_window().unwrap();
         // finish creating the OpenGL context
         let context = match context {
-            Prototype::Glx(ctx) => X11Context::Glx(ctx.finish(xlib_window)?),
-            Prototype::Egl(ctx) => {
-                X11Context::Egl(ctx.finish(xlib_window as _)?)
-            }
+            Prototype::Glx(ctx) => X11Context::Glx(ctx.finish(xwin)?),
+            Prototype::Egl(ctx) => X11Context::Egl(ctx.finish(xwin as _)?),
         };
 
         // getting the root window
@@ -216,34 +214,38 @@ impl Context {
             colormap,
         };
 
-        Ok((window, context))
+        Ok((win, context))
     }
 
     #[inline]
-    pub fn new_separated(
-        window: &winit::Window,
-        el: &winit::EventsLoop,
+    pub fn new_raw_context(
+        xconn: Arc<XConnection>,
+        xwin: raw::c_ulong,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<Self, CreationError> {
-        let xconn = match el.get_xlib_xconnection() {
-            Some(xconn) => xconn,
-            None => {
-                return Err(CreationError::NoBackendAvailable(Box::new(
-                    NoX11Connection,
-                )));
-            }
+        let attrs = unsafe {
+            let mut attrs = ::std::mem::uninitialized();
+            (xconn.xlib.XGetWindowAttributes)(xconn.display, xwin, &mut attrs);
+            attrs
         };
 
-        let screen_id = window.get_xlib_screen_id().unwrap();
+        // Not particularly efficient, but it's the only method I can find.
+        let mut screen_id = 0;
+        unsafe {
+            while attrs.screen
+                != (xconn.xlib.XScreenOfDisplay)(xconn.display, screen_id)
+            {
+                screen_id += 1;
+            }
+        }
 
-        let xlib_window = window.get_xlib_window().unwrap();
         let attrs = {
             let mut attrs = unsafe { std::mem::uninitialized() };
             unsafe {
                 (xconn.xlib.XGetWindowAttributes)(
                     xconn.display,
-                    xlib_window,
+                    xwin,
                     &mut attrs,
                 );
             }
@@ -331,10 +333,8 @@ impl Context {
 
         // finish creating the OpenGL context
         let context = match context {
-            Prototype::Glx(ctx) => X11Context::Glx(ctx.finish(xlib_window)?),
-            Prototype::Egl(ctx) => {
-                X11Context::Egl(ctx.finish(xlib_window as _)?)
-            }
+            Prototype::Glx(ctx) => X11Context::Glx(ctx.finish(xwin)?),
+            Prototype::Egl(ctx) => X11Context::Egl(ctx.finish(xwin as _)?),
         };
 
         // getting the root window

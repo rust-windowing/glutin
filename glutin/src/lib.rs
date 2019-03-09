@@ -15,8 +15,8 @@
 //! let wb = glutin::WindowBuilder::new()
 //!     .with_title("Hello world!")
 //!     .with_dimensions(glutin::dpi::LogicalSize::new(1024.0, 768.0));
-//! let combined_context = glutin::ContextBuilder::new()
-//!     .build_combined(wb, &el)
+//! let windowed_context = glutin::ContextBuilder::new()
+//!     .build_windowed(wb, &el)
 //!     .unwrap();
 //! # }
 //! ```
@@ -54,10 +54,12 @@ pub mod os;
 mod api;
 mod context;
 mod platform;
+mod raw_context;
 mod windowed;
 
 pub use crate::context::Context;
-pub use crate::windowed::{WindowRef, WindowedContext};
+pub use crate::raw_context::RawContext;
+pub use crate::windowed::WindowedContext;
 
 pub use winit::{
     dpi, AvailableMonitorsIter, AxisId, ButtonId, ControlFlow,
@@ -69,7 +71,6 @@ pub use winit::{
 };
 
 use std::io;
-use std::sync::Arc;
 
 /// A trait for types associated with a GL context.
 pub trait ContextTrait
@@ -258,21 +259,12 @@ impl<'a> ContextBuilder<'a> {
     }
 
     /// Builds a context and it's associated window.
-    pub fn build_combined(
+    pub fn build_windowed(
         self,
         wb: WindowBuilder,
         el: &EventsLoop,
     ) -> Result<WindowedContext, CreationError> {
-        WindowedContext::new_combined(wb, self, el)
-    }
-
-    /// Builds a separated context.
-    pub fn build_separated(
-        self,
-        win: Arc<Window>,
-        el: &EventsLoop,
-    ) -> Result<WindowedContext, CreationError> {
-        WindowedContext::new_separated(win, self, el)
+        WindowedContext::new_windowed(wb, self, el)
     }
 }
 
@@ -448,7 +440,9 @@ impl GlRequest {
     /// Extract the desktop GL version, if any.
     pub fn to_gl_version(&self) -> Option<(u8, u8)> {
         match self {
-            &GlRequest::Specific(Api::OpenGl, opengl_version) => Some(opengl_version),
+            &GlRequest::Specific(Api::OpenGl, opengl_version) => {
+                Some(opengl_version)
+            }
             &GlRequest::GlThenGles { opengl_version, .. } => {
                 Some(opengl_version)
             }

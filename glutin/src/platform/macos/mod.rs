@@ -47,14 +47,14 @@ pub struct HeadlessContext {
 
 impl Context {
     #[inline]
-    pub fn new_combined(
+    pub fn new_windowed(
         wb: winit::WindowBuilder,
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<(winit::Window, Self), CreationError> {
         let transparent = wb.window.transparent;
-        let window = wb.build(el)?;
+        let win = wb.build(el)?;
 
         if gl_attr.sharing.is_some() {
             unimplemented!()
@@ -68,7 +68,7 @@ impl Context {
             _ => (),
         }
 
-        let view = window.get_nsview() as id;
+        let view = win.get_nsview() as id;
 
         let gl_profile = helpers::get_gl_profile(gl_attr, pf_reqs)?;
         let attributes = helpers::build_nsattributes(pf_reqs, gl_profile)?;
@@ -159,7 +159,7 @@ impl Context {
                 context: gl_context,
                 pixel_format: pixel_format,
             };
-            Ok((window, Context::WindowedContext(context)))
+            Ok((win, Context::WindowedContext(context)))
         }
     }
 
@@ -194,17 +194,6 @@ impl Context {
         let headless = HeadlessContext { context };
 
         Ok(Context::HeadlessContext(headless))
-    }
-
-    /// See the docs in the crate root file.
-    #[inline]
-    pub fn new_separated(
-        _window: &winit::Window,
-        _el: &winit::EventsLoop,
-        _pf_reqs: &PixelFormatRequirements,
-        _gl_attr: &GlAttributes<&Context>,
-    ) -> Result<Self, CreationError> {
-        unimplemented!()
     }
 
     pub fn resize(&self, _width: u32, _height: u32) {

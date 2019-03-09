@@ -1,8 +1,8 @@
 #![cfg(any(target_os = "android"))]
 
-pub use glutin_egl_sys::EGLContext;
 use crate::os::ContextTraitExt;
 use crate::Context;
+pub use glutin_egl_sys::EGLContext;
 
 pub use winit::os::android::{WindowBuilderExt, WindowExt};
 

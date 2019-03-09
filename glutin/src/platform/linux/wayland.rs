@@ -4,10 +4,11 @@ use crate::{
     PixelFormatRequirements,
 };
 
+use glutin_egl_sys as ffi;
 use wayland_client::egl as wegl;
+pub use wayland_client::sys::client::wl_display;
 use winit;
 use winit::os::unix::WindowExt;
-use glutin_egl_sys as ffi;
 
 use std::os::raw;
 use std::sync::Arc;
@@ -25,39 +26,52 @@ impl Context {
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<(winit::Window, Self), CreationError> {
-        let window = wb.build(el)?;
-        let context = Self::new_separated(&window, el, pf_reqs, gl_attr)?;
-        Ok((window, context))
-    }
+        let win = wb.build(el)?;
 
-    #[inline]
-    pub fn new_separated(
-        window: &winit::Window,
-        _el: &winit::EventsLoop,
-        pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context>,
-    ) -> Result<Self, CreationError> {
-        let logical_size = window.get_inner_size().unwrap();
-        let (w, h) = (logical_size.width, logical_size.height);
-        let surface = window.get_wayland_surface();
+        let dpi_factor = win.get_hidpi_factor();
+        let size = win.get_inner_size().unwrap().to_physical(dpi_factor);
+        let (width, height): (u32, u32) = size.into();
+
+        let display_ptr = win.get_wayland_display().unwrap() as *const _;
+        let surface = win.get_wayland_surface();
         let surface = match surface {
             Some(s) => s,
             None => {
                 return Err(CreationError::NotSupported("Wayland not found"));
             }
         };
+
+        let context = Self::new_raw_context(
+            display_ptr,
+            surface,
+            width,
+            height,
+            pf_reqs,
+            gl_attr,
+        )?;
+        Ok((win, context))
+    }
+
+    #[inline]
+    pub fn new_raw_context(
+        display_ptr: *const wl_display,
+        surface: *mut raw::c_void,
+        width: u32,
+        height: u32,
+        pf_reqs: &PixelFormatRequirements,
+        gl_attr: &GlAttributes<&Context>,
+    ) -> Result<Self, CreationError> {
         let egl_surface = unsafe {
             wegl::WlEglSurface::new_from_raw(
                 surface as *mut _,
-                w as i32,
-                h as i32,
+                width as i32,
+                height as i32,
             )
         };
         let context = {
             let gl_attr = gl_attr.clone().map_sharing(|c| &c.context);
-            let native_display = NativeDisplay::Wayland(Some(
-                window.get_wayland_display().unwrap() as *const _,
-            ));
+            let native_display =
+                NativeDisplay::Wayland(Some(display_ptr as *const _));
             EglContext::new(pf_reqs, &gl_attr, native_display)
                 .and_then(|p| p.finish(egl_surface.ptr() as *const _))?
         };

@@ -62,9 +62,9 @@ use crate::{
     PixelFormatRequirements, ReleaseBehavior, Robustness,
 };
 
+use glutin_egl_sys as ffi;
 #[cfg(any(target_os = "android", target_os = "windows"))]
 use winit::dpi;
-use glutin_egl_sys as ffi;
 
 use std::cell::Cell;
 use std::ffi::{CStr, CString};
@@ -119,18 +119,12 @@ pub struct Context {
 
 #[cfg(target_os = "android")]
 #[inline]
-fn get_native_display(
-    egl: &Egl,
-    native_display: NativeDisplay,
-) -> *const raw::c_void {
+fn get_native_display(egl: &Egl, ndisp: NativeDisplay) -> *const raw::c_void {
     unsafe { egl.GetDisplay(ffi::egl::DEFAULT_DISPLAY as *mut _) }
 }
 
 #[cfg(not(target_os = "android"))]
-fn get_native_display(
-    egl: &Egl,
-    native_display: NativeDisplay,
-) -> *const raw::c_void {
+fn get_native_display(egl: &Egl, ndisp: NativeDisplay) -> *const raw::c_void {
     // the first step is to query the list of extensions without any display, if
     // supported
     let dp_extensions = unsafe {
@@ -153,7 +147,7 @@ fn get_native_display(
     let has_dp_extension =
         |e: &str| dp_extensions.iter().find(|s| s == &e).is_some();
 
-    match native_display {
+    match ndisp {
         // Note: Some EGL implementations are missing the
         // `eglGetPlatformDisplay(EXT)` symbol       despite reporting
         // `EGL_EXT_platform_base`. I'm pretty sure this is a bug.
@@ -298,11 +292,11 @@ impl Context {
     pub fn new<'a>(
         pf_reqs: &PixelFormatRequirements,
         opengl: &'a GlAttributes<&'a Context>,
-        native_display: NativeDisplay,
+        ndisp: NativeDisplay,
     ) -> Result<ContextPrototype<'a>, CreationError> {
         let egl = EGL.as_ref().unwrap();
         // calling `eglGetDisplay` or equivalent
-        let display = get_native_display(egl, native_display);
+        let display = get_native_display(egl, ndisp);
 
         if display.is_null() {
             return Err(CreationError::OsError(
@@ -501,10 +495,7 @@ impl Context {
     // Create a new surface and attach it to the recreated ANativeWindow.
     // Restore the EGLContext.
     #[cfg(target_os = "android")]
-    pub unsafe fn on_surface_created(
-        &self,
-        native_window: ffi::EGLNativeWindowType,
-    ) {
+    pub unsafe fn on_surface_created(&self, nwin: ffi::EGLNativeWindowType) {
         let egl = EGL.as_ref().unwrap();
         if self.surface.get() != ffi::egl::NO_SURFACE {
             return;
@@ -512,7 +503,7 @@ impl Context {
         self.surface.set(egl.CreateWindowSurface(
             self.display,
             self.config_id,
-            native_window,
+            nwin,
             std::ptr::null(),
         ));
         if self.surface.get().is_null() {
@@ -642,14 +633,14 @@ impl<'a> ContextPrototype<'a> {
 
     pub fn finish(
         self,
-        native_window: ffi::EGLNativeWindowType,
+        nwin: ffi::EGLNativeWindowType,
     ) -> Result<Context, CreationError> {
         let egl = EGL.as_ref().unwrap();
         let surface = unsafe {
             let surface = egl.CreateWindowSurface(
                 self.display,
                 self.config_id,
-                native_window,
+                nwin,
                 std::ptr::null(),
             );
             if surface.is_null() {

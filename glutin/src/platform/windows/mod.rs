@@ -9,10 +9,10 @@ use crate::api::egl::{Context as EglContext, NativeDisplay, EGL};
 use crate::api::wgl::Context as WglContext;
 use crate::os::windows::WindowExt;
 
+use glutin_egl_sys as ffi;
 use winapi::shared::windef::{HGLRC, HWND};
 use winit;
 use winit::dpi;
-use glutin_egl_sys as ffi;
 
 use std::os::raw;
 
@@ -40,26 +40,25 @@ unsafe impl Sync for Context {}
 impl Context {
     /// See the docs in the crate root file.
     #[inline]
-    pub fn new_combined(
+    pub fn new_windowed(
         wb: winit::WindowBuilder,
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Self>,
     ) -> Result<(winit::Window, Self), CreationError> {
-        let window = wb.build(el)?;
-        let ctx = Self::new_separated(&window, el, pf_reqs, gl_attr)?;
+        let win = wb.build(el)?;
+        let hwnd = win.get_hwnd() as HWND;
+        let ctx = Self::new_raw_context(hwnd, pf_reqs, gl_attr)?;
 
-        Ok((window, ctx))
+        Ok((win, ctx))
     }
 
     #[inline]
-    pub fn new_separated(
-        window: &winit::Window,
-        _el: &winit::EventsLoop,
+    pub fn new_raw_context(
+        hwnd: HWND,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Self>,
     ) -> Result<Self, CreationError> {
-        let w = window.get_hwnd() as HWND;
         match gl_attr.version {
             GlRequest::Specific(Api::OpenGlEs, (_major, _minor)) => {
                 match (gl_attr.sharing, &*EGL) {
@@ -74,7 +73,7 @@ impl Context {
                                 _ => unreachable!(),
                             });
                         unsafe {
-                            WglContext::new(&pf_reqs, &gl_attr_wgl, w)
+                            WglContext::new(&pf_reqs, &gl_attr_wgl, hwnd)
                                 .map(Context::Wgl)
                         }
                     }
@@ -93,7 +92,7 @@ impl Context {
                             &gl_attr_egl,
                             NativeDisplay::Other(Some(std::ptr::null())),
                         )
-                        .and_then(|p| p.finish(w))
+                        .and_then(|p| p.finish(hwnd))
                         .map(|c| Context::Egl(c))
                     }
                     // Try EGL, fallback to WGL.
@@ -108,12 +107,12 @@ impl Context {
                             &gl_attr_egl,
                             NativeDisplay::Other(Some(std::ptr::null())),
                         )
-                        .and_then(|p| p.finish(w))
+                        .and_then(|p| p.finish(hwnd))
                         {
                             Ok(Context::Egl(c))
                         } else {
                             unsafe {
-                                WglContext::new(&pf_reqs, &gl_attr_wgl, w)
+                                WglContext::new(&pf_reqs, &gl_attr_wgl, hwnd)
                                     .map(Context::Wgl)
                             }
                         }
@@ -129,7 +128,7 @@ impl Context {
                         _ => panic!(),
                     });
                 unsafe {
-                    WglContext::new(&pf_reqs, &gl_attr_wgl, w).map(Context::Wgl)
+                    WglContext::new(&pf_reqs, &gl_attr_wgl, hwnd).map(Context::Wgl)
                 }
             }
         }
@@ -173,14 +172,10 @@ impl Context {
         let wb = winit::WindowBuilder::new()
             .with_visibility(false)
             .with_dimensions(dims.to_logical(1.));
-        Self::new_combined(wb, &el, pf_reqs, gl_attr).map(|(window, context)| {
+        Self::new_windowed(wb, &el, pf_reqs, gl_attr).map(|(win, context)| {
             match context {
-                Context::Egl(context) => {
-                    Context::HiddenWindowEgl(window, context)
-                }
-                Context::Wgl(context) => {
-                    Context::HiddenWindowWgl(window, context)
-                }
+                Context::Egl(context) => Context::HiddenWindowEgl(win, context),
+                Context::Wgl(context) => Context::HiddenWindowWgl(win, context),
                 _ => unreachable!(),
             }
         })
@@ -277,5 +272,36 @@ impl Context {
             | Context::EglPbuffer(ref c) => Some(c.get_egl_display()),
             _ => None,
         }
+    }
+}
+
+pub trait RawContextExt {
+    /// Creates a raw context on the provided window.
+    ///
+    /// Unsafe behaviour might happen if you:
+    ///   - Provide us with invalid parameters.
+    ///   - The window is destroyed before the context
+    unsafe fn new_raw_context(
+        hwnd: *mut raw::c_void,
+        cb: crate::ContextBuilder,
+    ) -> Result<crate::RawContext, CreationError>
+    where
+        Self: Sized;
+}
+
+impl RawContextExt for crate::Context {
+    #[inline]
+    unsafe fn new_raw_context(
+        hwnd: *mut raw::c_void,
+        cb: crate::ContextBuilder,
+    ) -> Result<crate::RawContext, CreationError>
+    where
+        Self: Sized,
+    {
+        let crate::ContextBuilder { pf_reqs, gl_attr } = cb;
+        let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
+        Context::new_raw_context(hwnd as *mut _, &pf_reqs, &gl_attr)
+            .map(|context| crate::Context { context })
+            .map(|context| crate::RawContext { context })
     }
 }

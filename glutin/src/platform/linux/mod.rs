@@ -17,10 +17,11 @@ use crate::{
 };
 
 use winit;
-use winit::os::unix::EventsLoopExt;
 use winit::dpi;
+use winit::os::unix::EventsLoopExt;
 
 use std::os::raw;
+use std::sync::Arc;
 
 /// Context handles available on Unix-like platforms.
 #[derive(Clone, Debug)]
@@ -87,7 +88,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn new_combined(
+    pub fn new_windowed(
         wb: winit::WindowBuilder,
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
@@ -101,9 +102,8 @@ impl Context {
                 | &Context::HeadlessWayland(_, ref ctx) => ctx,
                 _ => unreachable!(),
             });
-            wayland::Context::new(wb, el, pf_reqs, &gl_attr).map(
-                |(window, context)| (window, Context::WindowedWayland(context)),
-            )
+            wayland::Context::new(wb, el, pf_reqs, &gl_attr)
+                .map(|(win, context)| (win, Context::WindowedWayland(context)))
         } else {
             Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
             let gl_attr = gl_attr.clone().map_sharing(|ctx| match ctx {
@@ -111,9 +111,8 @@ impl Context {
                 | &Context::HeadlessX11(_, ref ctx) => ctx,
                 _ => unreachable!(),
             });
-            x11::Context::new(wb, el, pf_reqs, &gl_attr).map(
-                |(window, context)| (window, Context::WindowedX11(context)),
-            )
+            x11::Context::new(wb, el, pf_reqs, &gl_attr)
+                .map(|(win, context)| (win, Context::WindowedX11(context)))
         }
     }
 
@@ -135,9 +134,8 @@ impl Context {
                 | &Context::HeadlessWayland(_, ref ctx) => ctx,
                 _ => unreachable!(),
             });
-            wayland::Context::new(wb, &el, pf_reqs, &gl_attr).map(
-                |(window, context)| Context::HeadlessWayland(window, context),
-            )
+            wayland::Context::new(wb, &el, pf_reqs, &gl_attr)
+                .map(|(win, context)| Context::HeadlessWayland(win, context))
         } else {
             Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
             let gl_attr = gl_attr.clone().map_sharing(|ctx| match ctx {
@@ -146,36 +144,7 @@ impl Context {
                 _ => unreachable!(),
             });
             x11::Context::new(wb, &el, pf_reqs, &gl_attr)
-                .map(|(window, context)| Context::HeadlessX11(window, context))
-        }
-    }
-
-    #[inline]
-    pub fn new_separated(
-        window: &winit::Window,
-        el: &winit::EventsLoop,
-        pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context>,
-    ) -> Result<Self, CreationError> {
-        if el.is_wayland() {
-            Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
-
-            let gl_attr = gl_attr.clone().map_sharing(|ctx| match ctx {
-                &Context::WindowedWayland(ref ctx)
-                | &Context::HeadlessWayland(_, ref ctx) => ctx,
-                _ => unreachable!(),
-            });
-            wayland::Context::new_separated(window, el, pf_reqs, &gl_attr)
-                .map(|context| Context::WindowedWayland(context))
-        } else {
-            Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
-            let gl_attr = gl_attr.clone().map_sharing(|ctx| match ctx {
-                &Context::WindowedX11(ref ctx)
-                | &Context::HeadlessX11(_, ref ctx) => ctx,
-                _ => unreachable!(),
-            });
-            x11::Context::new_separated(window, el, pf_reqs, &gl_attr)
-                .map(|context| Context::WindowedX11(context))
+                .map(|(win, context)| Context::HeadlessX11(win, context))
         }
     }
 
@@ -323,5 +292,92 @@ impl OsMesaContextExt for crate::Context {
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
         Context::new_osmesa(&pf_reqs, &gl_attr, dims)
             .map(|context| crate::Context { context })
+    }
+}
+
+pub trait RawContextExt {
+    /// Creates a raw context on the provided surface.
+    ///
+    /// Unsafe behaviour might happen if you:
+    ///   - Provide us with invalid parameters.
+    ///   - The surface/display_ptr is destroyed before the context
+    unsafe fn new_raw_wayland_context(
+        display_ptr: *const wayland::wl_display,
+        surface: *mut raw::c_void,
+        width: u32,
+        height: u32,
+        cb: crate::ContextBuilder,
+    ) -> Result<crate::RawContext, CreationError>
+    where
+        Self: Sized;
+
+    /// Creates a raw context on the provided window.
+    ///
+    /// Unsafe behaviour might happen if you:
+    ///   - Provide us with invalid parameters.
+    ///   - The xconn/xwin is destroyed before the context
+    unsafe fn new_raw_x11_context(
+        xconn: Arc<x11::XConnection>,
+        xwin: raw::c_ulong,
+        cb: crate::ContextBuilder,
+    ) -> Result<crate::RawContext, CreationError>
+    where
+        Self: Sized;
+}
+
+impl RawContextExt for crate::Context {
+    #[inline]
+    unsafe fn new_raw_wayland_context(
+        display_ptr: *const wayland::wl_display,
+        surface: *mut raw::c_void,
+        width: u32,
+        height: u32,
+        cb: crate::ContextBuilder,
+    ) -> Result<crate::RawContext, CreationError>
+    where
+        Self: Sized,
+    {
+        let crate::ContextBuilder { pf_reqs, gl_attr } = cb;
+        let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
+        Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
+        let gl_attr = gl_attr.clone().map_sharing(|ctx| match ctx {
+            &Context::WindowedWayland(ref ctx)
+            | &Context::HeadlessWayland(_, ref ctx) => ctx,
+            _ => unreachable!(),
+        });
+        wayland::Context::new_raw_context(
+            display_ptr,
+            surface,
+            width,
+            height,
+            &pf_reqs,
+            &gl_attr,
+        )
+        .map(|context| Context::WindowedWayland(context))
+        .map(|context| crate::Context { context })
+        .map(|context| crate::RawContext { context })
+    }
+
+    #[inline]
+    unsafe fn new_raw_x11_context(
+        xconn: Arc<x11::XConnection>,
+        xwin: raw::c_ulong,
+        cb: crate::ContextBuilder,
+    ) -> Result<crate::RawContext, CreationError>
+    where
+        Self: Sized,
+    {
+        let crate::ContextBuilder { pf_reqs, gl_attr } = cb;
+        let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
+        Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
+        let gl_attr = gl_attr.clone().map_sharing(|ctx| match ctx {
+            &Context::WindowedX11(ref ctx)
+            | &Context::HeadlessX11(_, ref ctx) => ctx,
+            _ => unreachable!(),
+        });
+        x11::Context::new_raw_context(xconn, xwin, &pf_reqs, &gl_attr)
+            .map(|context| Context::WindowedX11(context))
+            .map(|context| crate::Context { context })
+            .map(|context| crate::RawContext { context })
     }
 }

@@ -6,11 +6,11 @@ use crate::{
     Api, ContextError, GlAttributes, PixelFormat, PixelFormatRequirements,
 };
 
+use glutin_egl_sys as ffi;
 use libc;
 use winit;
 use winit::dpi;
 use winit::os::android::EventsLoopExt;
-use glutin_egl_sys as ffi;
 
 use std::cell::Cell;
 use std::sync::Arc;
@@ -46,21 +46,21 @@ impl android_glue::SyncEventHandler for AndroidSyncEventHandler {
 
 impl Context {
     #[inline]
-    pub fn new_combined(
+    pub fn new_windowed(
         wb: winit::WindowBuilder,
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Self>,
     ) -> Result<(winit::Window, Self), CreationError> {
-        let window = wb.build(el)?;
+        let win = wb.build(el)?;
         let gl_attr = gl_attr.clone().map_sharing(|c| &c.0.egl_context);
-        let native_window = unsafe { android_glue::get_native_window() };
-        if native_window.is_null() {
+        let nwin = unsafe { android_glue::get_native_window() };
+        if nwin.is_null() {
             return Err(OsError(format!("Android's native window is null")));
         }
         let native_display = NativeDisplay::Android;
         let egl_context = EglContext::new(pf_reqs, &gl_attr, native_display)
-            .and_then(|p| p.finish(native_window as *const _))?;
+            .and_then(|p| p.finish(nwin as *const _))?;
         let ctx = Arc::new(AndroidContext {
             egl_context,
             stopped: Some(Cell::new(false)),
@@ -82,14 +82,13 @@ impl Context {
                 // Android has started the activity or sent it to foreground.
                 // Restore the EGL surface and animation loop.
                 unsafe {
-                    let native_window = android_glue::get_native_window();
-                    ctx.egl_context
-                        .on_surface_created(native_window as *const _);
+                    let nwin = android_glue::get_native_window();
+                    ctx.egl_context.on_surface_created(nwin as *const _);
                 }
             }
         })));
 
-        Ok((window, context))
+        Ok((win, context))
     }
 
     #[inline]
@@ -108,17 +107,6 @@ impl Context {
             stopped: None,
         });
         Ok(Context(ctx))
-    }
-
-    /// See the docs in the crate root file.
-    #[inline]
-    pub fn new_separated(
-        _window: &winit::Window,
-        _el: &winit::EventsLoop,
-        _pf_reqs: &PixelFormatRequirements,
-        _gl_attr: &GlAttributes<&Context>,
-    ) -> Result<Self, CreationError> {
-        unimplemented!()
     }
 
     #[inline]

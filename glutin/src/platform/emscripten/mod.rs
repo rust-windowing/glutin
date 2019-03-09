@@ -19,13 +19,13 @@ pub enum Context {
 
 impl Context {
     #[inline]
-    pub fn new_combined(
+    pub fn new_windowed(
         wb: winit::WindowBuilder,
         el: &winit::EventsLoop,
         _pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<(winit::Window, Self), CreationError> {
-        let window = wb.build(el)?;
+        let win = wb.build(el)?;
 
         let gl_attr = gl_attr.clone().map_sharing(|_| {
             unimplemented!("Shared contexts are unimplemented in WebGL.")
@@ -64,7 +64,7 @@ impl Context {
 
         // TODO: emscripten_set_webglcontextrestored_callback
 
-        Ok((window, Context::Window(context)))
+        Ok((win, Context::Window(context)))
     }
 
     #[inline]
@@ -78,21 +78,10 @@ impl Context {
             .with_visibility(false)
             .with_dimensions(dims.to_logical(1.));
 
-        Self::new_combined(wb, el, pf_reqs, gl_attr).map(|(w, c)| match c {
+        Self::new_windowed(wb, el, pf_reqs, gl_attr).map(|(w, c)| match c {
             Context::Window(c) => Context::WindowedContext(w, c),
             _ => panic!(),
         })
-    }
-
-    /// See the docs in the crate root file.
-    #[inline]
-    pub fn new_separated(
-        _window: &winit::Window,
-        _el: &winit::EventsLoop,
-        _pf_reqs: &PixelFormatRequirements,
-        _gl_attr: &GlAttributes<&Context>,
-    ) -> Result<Self, CreationError> {
-        unimplemented!()
     }
 
     #[inline]

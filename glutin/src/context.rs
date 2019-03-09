@@ -13,7 +13,7 @@ use super::*;
 /// # let el = glutin::EventsLoop::new();
 /// # let wb = glutin::WindowBuilder::new();
 /// # let some_context = glutin::ContextBuilder::new()
-/// #    .build_combined(wb, &el)
+/// #    .build_windowed(wb, &el)
 /// #    .unwrap();
 /// let cb = glutin::ContextBuilder::new()
 ///     .with_vsync(true)
