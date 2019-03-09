@@ -22,6 +22,7 @@ pool as each other.
 - Added `get_egl_display` method to `GlContextExt` trait and its implementation for platforms.
 - Removed minimum supported Rust version guarantee.
 - `NoBackendAvailable` is now `Sync`, as a result `CreationError` is also `Sync`.
+- Update winit dependency to 0.19.0. See [winit's CHANGELOG](https://github.com/tomaka/winit/blob/master/CHANGELOG.md#version-0190-2019-03-06) for more info.
 
 # Version 0.19.0 (2018-11-09)
 
