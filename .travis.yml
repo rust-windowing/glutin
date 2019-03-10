@@ -67,11 +67,15 @@ after_success:
   - |
         [ $TRAVIS_BRANCH = master ] &&
         [ $TRAVIS_PULL_REQUEST = false ] && {
-            CRATES=$(for crate in glutin*; do echo "$crate"; done | sort -r | grep -v "_examples")
-            for crate in $CRATES; do 
-                echo "Doing $crate"
-                cd "$crate"
-                cargo publish --token ${CRATESIO_TOKEN}
-                cd ..
+            cd glutin
+            for crate in ../glutin_*; do 
+                # We can't do the glutin crate first because it depends on the others.
+                if [ "$crate" != "glutin" ]; then 
+                    cd "$crate"
+                    cargo publish --token ${CRATESIO_TOKEN}
+                fi
             done
+
+            cd ../glutin
+            cargo publish --token ${CRATESIO_TOKEN}
         }
