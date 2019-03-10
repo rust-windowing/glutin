@@ -1,5 +1,4 @@
 [workspace]
-
 members = [
     "glutin",
     "glutin_examples",
@@ -8,3 +7,10 @@ members = [
     "glutin_wgl_sys",
     "glutin_gles2_sys",
 ]
+
+[replace]
+"glutin_egl_sys:0.1.1" = { path = "glutin_egl_sys" }
+"glutin_glx_sys:0.1.1" = { path = "glutin_glx_sys" }
+"glutin_wgl_sys:0.1.1" = { path = "glutin_wgl_sys" }
+"glutin_gles2_sys:0.1.1" = { path = "glutin_gles2_sys" }
+

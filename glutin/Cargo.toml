@@ -24,11 +24,11 @@ winit = "0.19"
 
 [target.'cfg(target_os = "android")'.dependencies]
 android_glue = "0.2"
-glutin_egl_sys = { path = "../glutin_egl_sys" }
+glutin_egl_sys = "0.1.1"
 
 [target.'cfg(any(target_os = "ios", target_os = "macos"))'.dependencies]
 objc = "0.2"
-glutin_gles2_sys = { path = "../glutin_gles2_sys" }
+glutin_gles2_sys = "0.1.1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 cgl = "0.2"
@@ -47,13 +47,13 @@ features = [
 
 [target.'cfg(target_os = "windows")'.dependencies]
 libloading = "0.5"
-glutin_wgl_sys = { path = "../glutin_wgl_sys" }
-glutin_egl_sys = { path = "../glutin_egl_sys" }
+glutin_wgl_sys = "0.1.1"
+glutin_egl_sys = "0.1.1"
 
 [target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "dragonfly", target_os = "netbsd", target_os = "openbsd"))'.dependencies]
 osmesa-sys = "0.1"
 wayland-client = { version = "0.21", features = ["egl", "dlopen"] }
 libloading = "0.5"
 shared_library = "0.1"
-glutin_egl_sys = { path = "../glutin_egl_sys" }
-glutin_glx_sys = { path = "../glutin_glx_sys" }
+glutin_egl_sys = "0.1.1"
+glutin_glx_sys = "0.1.1"
