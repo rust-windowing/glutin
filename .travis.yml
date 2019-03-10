@@ -65,6 +65,13 @@ script:
 
 after_success:
   - |
-      [ $TRAVIS_BRANCH = master ] &&
-      [ $TRAVIS_PULL_REQUEST = false ] &&
-      cargo publish --token ${CRATESIO_TOKEN}
+        [ $TRAVIS_BRANCH = master ] &&
+        [ $TRAVIS_PULL_REQUEST = false ] && {
+            CRATES=$(for crate in glutin*; do echo "$crate"; done | sort -r | grep -v "_examples")
+            for crate in $CRATES; do 
+                echo "Doing $crate"
+                cd "$crate"
+                cargo publish --token ${CRATESIO_TOKEN}
+                cd ..
+            done
+        }
