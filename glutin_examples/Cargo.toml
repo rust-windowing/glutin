@@ -1,0 +1,15 @@
+[package]
+name = "glutin_examples"
+version = "0.1.0"
+authors = ["The glutin contributors", "Hal Gentz <zegentzy@protonmail.com>"]
+description = "Examples for glutin"
+license = "Apache-2.0"
+build = "build.rs"
+edition = "2018"
+
+[dependencies]
+glutin = { path = "../glutin" }
+winit = "0.19"
+
+[build-dependencies]
+gl_generator = "0.10"

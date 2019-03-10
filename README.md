@@ -51,17 +51,17 @@ fn main() {
     let wb = glutin::WindowBuilder::new()
         .with_title("Hello, world!")
         .with_dimensions(LogicalSize::new(1024.0, 768.0));
-    let combined_context = glutin::ContextBuilder::new()
+    let windowed_context = glutin::ContextBuilder::new()
         .with_vsync(true)
-        .build_combined(wb, &el)
+        .build_windowed(wb, &el)
         .unwrap();
 
     unsafe {
-        combined_context.make_current().unwrap();
+        windowed_context.make_current().unwrap();
     }
 
     unsafe {
-        gl::load_with(|symbol| combined_context.get_proc_address(symbol) as *const _);
+        gl::load_with(|symbol| windowed_context.get_proc_address(symbol) as *const _);
         gl::ClearColor(0.0, 1.0, 0.0, 1.0);
     }
 
@@ -72,8 +72,8 @@ fn main() {
                 glutin::Event::WindowEvent{ event, .. } => match event {
                     glutin::WindowEvent::CloseRequested => running = false,
                     glutin::WindowEvent::Resized(logical_size) => {
-                        let dpi_factor = combined_context.get_hidpi_factor();
-                        combined_context.resize(logical_size.to_physical(dpi_factor));
+                        let dpi_factor = windowed_context.get_hidpi_factor();
+                        windowed_context.resize(logical_size.to_physical(dpi_factor));
                     },
                     _ => ()
                 },
@@ -85,7 +85,7 @@ fn main() {
             gl::Clear(gl::COLOR_BUFFER_BIT);
         }
 
-        combined_context.swap_buffers().unwrap();
+        windowed_context.swap_buffers().unwrap();
     }
 }
 ```

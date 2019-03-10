@@ -11,7 +11,7 @@ jobs:
       - checkout
       - restore_cache:
           key: android-test-cache-{{ checksum "Cargo.toml" }}
-      - run: cargo apk build --example window
+      - run: cd glutin_examples && cargo apk build --example window
       - save_cache:
           key: android-test-cache-{{ checksum "Cargo.toml" }}
           paths:

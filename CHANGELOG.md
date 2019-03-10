@@ -1,15 +1,19 @@
 # Unreleased
 
+# Version 0.20.0 (2019-03-09)
+
 - We no longer load `libegl.so` and `libgl.so` multiple times.
 - Fixes `Context::is_current` incorrectly returning `false`.
 - Made `ContextBuilder`'s `pf_reqs` public.
 - **Breaking:** Renamed `GlContext{,Ext}` to `ContextTrait{,Ext}`.
 - **Breaking:** Renamed `GlWindow` to `WindowedContext`.
 - Implemented context sharing support for Windows and Linux.
-- Added support for separated contexts.
+- Added support for contexts made from raw parts for Windows and Linux.
 - **Breaking:** Removed `shareable_with_windowed_contexts`. Now you must build
 OsMesa contexts via a separate extension.
-- Added `ContextBuilder::build` method.
+- Added `ContextBuilder::build_{windowed,headless}` methods.
+- **Breaking:** Renamed `Context::new` to `Context::new_headless`. `new_headless` now accepts dimensions for the off-screen surface backing it.
+- **Breaking:** Renamed `GlWindow::new` to `WindowedContext::new_windowed`.
 - On X11 and Wayland, you can now use shared contexts, however, one limitation 
 of the Wayland backend is that all shared contexts must use the same events
 pool as each other.
