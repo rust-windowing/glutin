@@ -24,7 +24,7 @@ Join us in any of these:
 
 ## Usage Examples
 
-Warning: these are examples for master. For the latest released version, 0.19, view [here](https://github.com/tomaka/glutin/tree/72e8c959c4ff538857d028167b9946b8938bdeaa).
+Warning: these are examples for master. For the latest released version, 0.20, view [here](https://github.com/tomaka/glutin/tree/521a3522e348f5c52a5490b1a659f417698ea953).
 
 ### Try it!
 
