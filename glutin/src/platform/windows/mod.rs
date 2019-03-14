@@ -128,7 +128,8 @@ impl Context {
                         _ => panic!(),
                     });
                 unsafe {
-                    WglContext::new(&pf_reqs, &gl_attr_wgl, hwnd).map(Context::Wgl)
+                    WglContext::new(&pf_reqs, &gl_attr_wgl, hwnd)
+                        .map(Context::Wgl)
                 }
             }
         }

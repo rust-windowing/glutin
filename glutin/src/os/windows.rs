@@ -1,7 +1,7 @@
 #![cfg(target_os = "windows")]
 
 use crate::os::ContextTraitExt;
-pub use crate::platform::{RawHandle, RawContextExt};
+pub use crate::platform::{RawContextExt, RawHandle};
 use crate::Context;
 pub use glutin_egl_sys::EGLContext;
 

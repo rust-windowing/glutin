@@ -3,7 +3,7 @@
     target_os = "dragonfly",
     target_os = "freebsd",
     target_os = "netbsd",
-    target_os = "openbsd"
+    target_os = "openbsd",
 ))]
 
 mod wayland;
@@ -12,11 +12,10 @@ mod x11;
 use self::x11::X11Context;
 use crate::api::osmesa;
 use crate::{
-    ContextError, CreationError, GlAttributes, PixelFormat,
+    Api, ContextError, CreationError, GlAttributes, PixelFormat,
     PixelFormatRequirements,
 };
 
-use winit;
 use winit::dpi;
 use winit::os::unix::EventsLoopExt;
 
@@ -202,7 +201,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_api(&self) -> crate::Api {
+    pub fn get_api(&self) -> Api {
         match *self {
             Context::WindowedX11(ref ctx)
             | Context::HeadlessX11(_, ref ctx) => ctx.get_api(),
