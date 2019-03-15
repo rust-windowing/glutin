@@ -10,8 +10,8 @@ fn main() {
 
 #[cfg(any(target_os = "linux", target_os = "windows"))]
 mod this_example {
-    use glutin::ContextTrait;
     use super::support;
+    use glutin::ContextTrait;
 
     pub fn main() {
         let (raw_context, mut el, win) = {
@@ -49,8 +49,9 @@ mod this_example {
                 } else {
                     let xconn = el.get_xlib_xconnection().unwrap();
                     let xwindow = win.get_xlib_window().unwrap();
-                    raw_context =
-                        glutin::Context::new_raw_x11_context(xconn, xwindow, cb);
+                    raw_context = glutin::Context::new_raw_x11_context(
+                        xconn, xwindow, cb,
+                    );
                 }
 
                 (raw_context.unwrap(), el, win)
@@ -93,7 +94,9 @@ mod this_example {
                                 },
                             ..
                         }
-                        | glutin::WindowEvent::CloseRequested => running = false,
+                        | glutin::WindowEvent::CloseRequested => {
+                            running = false
+                        }
                         glutin::WindowEvent::Resized(logical_size) => {
                             let dpi_factor = win.get_hidpi_factor();
                             raw_context
