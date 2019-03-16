@@ -54,6 +54,6 @@ glutin_egl_sys = "0.1.1"
 osmesa-sys = "0.1"
 wayland-client = { version = "0.21", features = ["egl", "dlopen"] }
 libloading = "0.5"
-shared_library = "0.1"
+shared_library = "0.1.1"
 glutin_egl_sys = "0.1.1"
 glutin_glx_sys = "0.1.1"
