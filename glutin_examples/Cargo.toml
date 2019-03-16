@@ -1,10 +1,11 @@
 [package]
 name = "glutin_examples"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["The glutin contributors", "Hal Gentz <zegentzy@protonmail.com>"]
 description = "Examples for glutin"
 repository = "https://github.com/tomaka/glutin"
 license = "Apache-2.0"
+readme = "../README.md"
 build = "build.rs"
 edition = "2018"
 publish = false
