@@ -23,6 +23,7 @@ pub enum RawHandle {
     Wgl(HGLRC),
 }
 
+#[derive(Debug)]
 pub enum Context {
     /// A regular window
     Egl(EglContext),

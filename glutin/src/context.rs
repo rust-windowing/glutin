@@ -21,6 +21,7 @@ use super::*;
 ///     .with_shared_lists(some_context.context());
 /// # }
 /// ```
+#[derive(Debug)]
 pub struct Context {
     pub(crate) context: platform::Context,
 }

@@ -1,4 +1,5 @@
 #![cfg(target_os = "ios")]
+#![allow(deprecated)] // From upstream library, caused by uses of `msg_send!`
 
 //! iOS support
 //!
@@ -88,9 +89,9 @@ impl ColorFormat {
         let color_format: ffi::NSUInteger =
             unsafe { msg_send![view, drawableColorFormat] };
         match color_format {
-            GLKViewDrawableColorFormatRGBA8888 => ColorFormat::Rgba8888,
-            GLKViewDrawableColorFormatRGB565 => ColorFormat::Rgb565,
-            GLKViewDrawableColorFormatSRGBA8888 => ColorFormat::Srgba8888,
+            ffi::GLKViewDrawableColorFormatRGBA8888 => ColorFormat::Rgba8888,
+            ffi::GLKViewDrawableColorFormatRGB565 => ColorFormat::Rgb565,
+            ffi::GLKViewDrawableColorFormatSRGBA8888 => ColorFormat::Srgba8888,
             _ => unreachable!(),
         }
     }
@@ -121,9 +122,9 @@ fn depth_for_view(view: ffi::id) -> u8 {
     let depth_format: ffi::NSUInteger =
         unsafe { msg_send![view, drawableDepthFormat] };
     match depth_format {
-        GLKViewDrawableDepthFormatNone => 0,
-        GLKViewDrawableDepthFormat16 => 16,
-        GLKViewDrawableDepthFormat24 => 24,
+        ffi::GLKViewDrawableDepthFormatNone => 0,
+        ffi::GLKViewDrawableDepthFormat16 => 16,
+        ffi::GLKViewDrawableDepthFormat24 => 24,
         _ => unreachable!(),
     }
 }
@@ -133,8 +134,8 @@ fn stencil_for_view(view: ffi::id) -> u8 {
     let stencil_format: ffi::NSUInteger =
         unsafe { msg_send![view, drawableStencilFormat] };
     match stencil_format {
-        GLKViewDrawableStencilFormatNone => 0,
-        GLKViewDrawableStencilFormat8 => 8,
+        ffi::GLKViewDrawableStencilFormatNone => 0,
+        ffi::GLKViewDrawableStencilFormat8 => 8,
         _ => unreachable!(),
     }
 }
@@ -144,12 +145,13 @@ fn multisampling_for_view(view: ffi::id) -> Option<u16> {
     let ms_format: ffi::NSUInteger =
         unsafe { msg_send![view, drawableMultisample] };
     match ms_format {
-        GLKViewDrawableMultisampleNone => None,
-        GLKViewDrawableMultisample4X => Some(4),
+        ffi::GLKViewDrawableMultisampleNone => None,
+        ffi::GLKViewDrawableMultisample4X => Some(4),
         _ => unreachable!(),
     }
 }
 
+#[derive(Debug)]
 pub struct Context {
     eagl_context: ffi::id,
     view: ffi::id, // this will be invalid after the `EventsLoop` is dropped

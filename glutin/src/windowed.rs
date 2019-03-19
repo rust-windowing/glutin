@@ -30,6 +30,7 @@ use super::*;
 /// }
 /// # }
 /// ```
+#[derive(Debug)]
 pub struct WindowedContext {
     context: Context,
     window: Window,

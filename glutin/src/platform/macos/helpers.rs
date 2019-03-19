@@ -1,3 +1,5 @@
+#![allow(deprecated)] // From upstream library, caused by uses of `msg_send!`
+
 use crate::{
     CreationError, GlAttributes, GlProfile, GlRequest, PixelFormatRequirements,
     ReleaseBehavior,

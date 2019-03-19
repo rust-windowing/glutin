@@ -28,12 +28,14 @@ impl std::fmt::Display for NoX11Connection {
     }
 }
 
+#[derive(Debug)]
 pub enum X11Context {
     Glx(GlxContext),
     Egl(EglContext),
     None,
 }
 
+#[derive(Debug)]
 pub struct Context {
     xconn: Arc<XConnection>,
     colormap: ffi::Colormap,

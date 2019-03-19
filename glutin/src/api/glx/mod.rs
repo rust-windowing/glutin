@@ -3,7 +3,7 @@
     target_os = "dragonfly",
     target_os = "freebsd",
     target_os = "netbsd",
-    target_os = "openbsd"
+    target_os = "openbsd",
 ))]
 
 mod glx {
@@ -67,6 +67,7 @@ lazy_static! {
     pub static ref GLX: Option<Glx> = Glx::new().ok();
 }
 
+#[derive(Debug)]
 pub struct Context {
     xconn: Arc<XConnection>,
     window: ffi::Window,
@@ -233,6 +234,7 @@ impl Drop for Context {
     }
 }
 
+#[derive(Debug)]
 pub struct ContextPrototype<'a> {
     extensions: String,
     xconn: Arc<XConnection>,

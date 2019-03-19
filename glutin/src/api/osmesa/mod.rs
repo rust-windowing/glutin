@@ -3,7 +3,7 @@
     target_os = "dragonfly",
     target_os = "freebsd",
     target_os = "netbsd",
-    target_os = "openbsd"
+    target_os = "openbsd",
 ))]
 
 pub mod ffi {
@@ -21,6 +21,7 @@ use winit::dpi;
 use std::ffi::CString;
 use std::os::raw;
 
+#[derive(Debug)]
 pub struct OsMesaContext {
     context: osmesa_sys::OSMesaContext,
     buffer: Vec<u32>,

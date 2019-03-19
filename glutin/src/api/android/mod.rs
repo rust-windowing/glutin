@@ -15,13 +15,16 @@ use winit::os::android::EventsLoopExt;
 use std::cell::Cell;
 use std::sync::Arc;
 
+#[derive(Debug)]
 struct AndroidContext {
     egl_context: EglContext,
     stopped: Option<Cell<bool>>,
 }
 
+#[derive(Debug)]
 pub struct Context(Arc<AndroidContext>);
 
+#[derive(Debug)]
 struct AndroidSyncEventHandler(Arc<AndroidContext>);
 
 impl android_glue::SyncEventHandler for AndroidSyncEventHandler {
