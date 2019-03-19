@@ -1,6 +1,7 @@
 use super::*;
 
 /// Represents a raw OpenGL context.
+#[derive(Debug)]
 pub struct RawContext {
     pub(crate) context: Context,
 }

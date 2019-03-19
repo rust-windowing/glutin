@@ -25,6 +25,7 @@ use std::os::windows::ffi::OsStrExt;
 /// A WGL context.
 ///
 /// Note: should be destroyed before its window.
+#[derive(Debug)]
 pub struct Context {
     context: ContextWrapper,
 
@@ -41,6 +42,7 @@ pub struct Context {
 }
 
 /// A simple wrapper that destroys the window when it is destroyed.
+#[derive(Debug)]
 struct WindowWrapper(HWND, HDC);
 
 impl Drop for WindowWrapper {
@@ -53,6 +55,7 @@ impl Drop for WindowWrapper {
 }
 
 /// Wraps around a context so that it is destroyed when necessary.
+#[derive(Debug)]
 struct ContextWrapper(HGLRC);
 
 impl Drop for ContextWrapper {

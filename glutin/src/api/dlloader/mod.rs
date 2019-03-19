@@ -4,7 +4,7 @@
     target_os = "dragonfly",
     target_os = "freebsd",
     target_os = "netbsd",
-    target_os = "openbsd"
+    target_os = "openbsd",
 ))]
 
 use libloading::Library;
@@ -13,7 +13,7 @@ use std::ffi::CString;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct SymWrapper<T> {
     inner: T,
     _lib: Arc<Library>,

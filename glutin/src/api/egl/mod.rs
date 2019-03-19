@@ -5,7 +5,7 @@
     target_os = "dragonfly",
     target_os = "freebsd",
     target_os = "netbsd",
-    target_os = "openbsd"
+    target_os = "openbsd",
 ))]
 #![allow(unused_variables)]
 
@@ -90,6 +90,7 @@ lazy_static! {
 }
 
 /// Specifies the type of display passed as `native_display`.
+#[derive(Debug)]
 #[allow(dead_code)]
 pub enum NativeDisplay {
     /// `None` means `EGL_DEFAULT_DISPLAY`.
@@ -107,6 +108,7 @@ pub enum NativeDisplay {
     Other(Option<ffi::EGLNativeDisplayType>),
 }
 
+#[derive(Debug)]
 pub struct Context {
     display: ffi::egl::types::EGLDisplay,
     context: ffi::egl::types::EGLContext,
@@ -592,13 +594,16 @@ impl Drop for Context {
                     egl.GetError()
                 )
             }
+
             egl.DestroyContext(self.display, self.context);
             egl.DestroySurface(self.display, self.surface.get());
+            self.surface.set(ffi::egl::NO_SURFACE);
             egl.Terminate(self.display);
         }
     }
 }
 
+#[derive(Debug)]
 pub struct ContextPrototype<'a> {
     opengl: &'a GlAttributes<&'a Context>,
     display: ffi::egl::types::EGLDisplay,
@@ -611,6 +616,13 @@ pub struct ContextPrototype<'a> {
 }
 
 impl<'a> ContextPrototype<'a> {
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd",
+    ))]
     pub fn get_native_visual_id(&self) -> ffi::egl::types::EGLint {
         let egl = EGL.as_ref().unwrap();
         let mut value = unsafe { std::mem::uninitialized() };

@@ -10,11 +10,11 @@
 //!
 
 pub mod android;
+pub mod blank;
 pub mod ios;
 pub mod macos;
 pub mod unix;
 pub mod windows;
-pub mod blank;
 
 use std::os::raw;
 

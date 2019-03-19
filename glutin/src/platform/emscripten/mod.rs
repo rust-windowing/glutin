@@ -12,6 +12,7 @@ use winit::dpi;
 
 use std::ffi::CString;
 
+#[derive(Debug)]
 pub enum Context {
     Window(ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE),
     WindowedContext(winit::Window, ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE),

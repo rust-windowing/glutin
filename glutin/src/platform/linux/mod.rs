@@ -16,6 +16,7 @@ use crate::{
     PixelFormatRequirements,
 };
 
+use takeable_option::Takeable;
 use winit::dpi;
 use winit::os::unix::EventsLoopExt;
 
@@ -29,17 +30,19 @@ pub enum RawHandle {
     Egl(glutin_egl_sys::EGLContext),
 }
 
+#[derive(Debug)]
 pub enum ContextType {
     X11,
     Wayland,
     OsMesa,
 }
 
+#[derive(Debug)]
 pub enum Context {
     WindowedX11(x11::Context),
-    HeadlessX11(winit::Window, x11::Context),
+    HeadlessX11(winit::Window, Takeable<x11::Context>),
     WindowedWayland(wayland::Context),
-    HeadlessWayland(winit::Window, wayland::Context),
+    HeadlessWayland(winit::Window, Takeable<wayland::Context>),
     OsMesa(osmesa::OsMesaContext),
 }
 
@@ -96,18 +99,18 @@ impl Context {
         if el.is_wayland() {
             Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
 
-            let gl_attr = gl_attr.clone().map_sharing(|ctx| match ctx {
-                &Context::WindowedWayland(ref ctx)
-                | &Context::HeadlessWayland(_, ref ctx) => ctx,
+            let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
+                Context::WindowedWayland(ref ctx) => ctx,
+                Context::HeadlessWayland(_, ref ctx) => &**ctx,
                 _ => unreachable!(),
             });
             wayland::Context::new(wb, el, pf_reqs, &gl_attr)
                 .map(|(win, context)| (win, Context::WindowedWayland(context)))
         } else {
             Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
-            let gl_attr = gl_attr.clone().map_sharing(|ctx| match ctx {
-                &Context::WindowedX11(ref ctx)
-                | &Context::HeadlessX11(_, ref ctx) => ctx,
+            let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
+                Context::WindowedX11(ref ctx) => ctx,
+                Context::HeadlessX11(_, ref ctx) => &**ctx,
                 _ => unreachable!(),
             });
             x11::Context::new(wb, el, pf_reqs, &gl_attr)
@@ -128,22 +131,23 @@ impl Context {
 
         if el.is_wayland() {
             Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
-            let gl_attr = gl_attr.clone().map_sharing(|ctx| match ctx {
-                &Context::WindowedWayland(ref ctx)
-                | &Context::HeadlessWayland(_, ref ctx) => ctx,
+            let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
+                Context::WindowedWayland(ref ctx) => ctx,
+                Context::HeadlessWayland(_, ref ctx) => &**ctx,
                 _ => unreachable!(),
             });
-            wayland::Context::new(wb, &el, pf_reqs, &gl_attr)
-                .map(|(win, context)| Context::HeadlessWayland(win, context))
+            wayland::Context::new(wb, &el, pf_reqs, &gl_attr).map(
+                |(win, ctx)| Context::HeadlessWayland(win, Takeable::new(ctx)),
+            )
         } else {
             Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
-            let gl_attr = gl_attr.clone().map_sharing(|ctx| match ctx {
-                &Context::WindowedX11(ref ctx)
-                | &Context::HeadlessX11(_, ref ctx) => ctx,
+            let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
+                Context::WindowedX11(ref ctx) => ctx,
+                Context::HeadlessX11(_, ref ctx) => &**ctx,
                 _ => unreachable!(),
             });
             x11::Context::new(wb, &el, pf_reqs, &gl_attr)
-                .map(|(win, context)| Context::HeadlessX11(win, context))
+                .map(|(win, ctx)| Context::HeadlessX11(win, Takeable::new(ctx)))
         }
     }
 
@@ -159,10 +163,10 @@ impl Context {
     #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
         match *self {
-            Context::WindowedX11(ref ctx)
-            | Context::HeadlessX11(_, ref ctx) => ctx.make_current(),
-            Context::WindowedWayland(ref ctx)
-            | Context::HeadlessWayland(_, ref ctx) => ctx.make_current(),
+            Context::WindowedX11(ref ctx) => ctx.make_current(),
+            Context::HeadlessX11(_, ref ctx) => ctx.make_current(),
+            Context::WindowedWayland(ref ctx) => ctx.make_current(),
+            Context::HeadlessWayland(_, ref ctx) => ctx.make_current(),
             Context::OsMesa(ref ctx) => ctx.make_current(),
         }
     }
@@ -170,10 +174,10 @@ impl Context {
     #[inline]
     pub fn is_current(&self) -> bool {
         match *self {
-            Context::WindowedX11(ref ctx)
-            | Context::HeadlessX11(_, ref ctx) => ctx.is_current(),
-            Context::WindowedWayland(ref ctx)
-            | Context::HeadlessWayland(_, ref ctx) => ctx.is_current(),
+            Context::WindowedX11(ref ctx) => ctx.is_current(),
+            Context::HeadlessX11(_, ref ctx) => ctx.is_current(),
+            Context::WindowedWayland(ref ctx) => ctx.is_current(),
+            Context::HeadlessWayland(_, ref ctx) => ctx.is_current(),
             Context::OsMesa(ref ctx) => ctx.is_current(),
         }
     }
@@ -181,12 +185,10 @@ impl Context {
     #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const () {
         match *self {
-            Context::WindowedX11(ref ctx)
-            | Context::HeadlessX11(_, ref ctx) => ctx.get_proc_address(addr),
-            Context::WindowedWayland(ref ctx)
-            | Context::HeadlessWayland(_, ref ctx) => {
-                ctx.get_proc_address(addr)
-            }
+            Context::WindowedX11(ref ctx) => ctx.get_proc_address(addr),
+            Context::HeadlessX11(_, ref ctx) => ctx.get_proc_address(addr),
+            Context::WindowedWayland(ref ctx) => ctx.get_proc_address(addr),
+            Context::HeadlessWayland(_, ref ctx) => ctx.get_proc_address(addr),
             Context::OsMesa(ref ctx) => ctx.get_proc_address(addr),
         }
     }
@@ -203,10 +205,10 @@ impl Context {
     #[inline]
     pub fn get_api(&self) -> Api {
         match *self {
-            Context::WindowedX11(ref ctx)
-            | Context::HeadlessX11(_, ref ctx) => ctx.get_api(),
-            Context::WindowedWayland(ref ctx)
-            | Context::HeadlessWayland(_, ref ctx) => ctx.get_api(),
+            Context::WindowedX11(ref ctx) => ctx.get_api(),
+            Context::HeadlessX11(_, ref ctx) => ctx.get_api(),
+            Context::WindowedWayland(ref ctx) => ctx.get_api(),
+            Context::HeadlessWayland(_, ref ctx) => ctx.get_api(),
             Context::OsMesa(ref ctx) => ctx.get_api(),
         }
     }
@@ -222,15 +224,19 @@ impl Context {
 
     #[inline]
     pub unsafe fn raw_handle(&self) -> RawHandle {
+        let rh = |ctx: &x11::Context| match *ctx.raw_handle() {
+            X11Context::Glx(ref ctx) => RawHandle::Glx(ctx.raw_handle()),
+            X11Context::Egl(ref ctx) => RawHandle::Egl(ctx.raw_handle()),
+            X11Context::None => panic!(),
+        };
+
         match *self {
-            Context::WindowedX11(ref ctx)
-            | Context::HeadlessX11(_, ref ctx) => match *ctx.raw_handle() {
-                X11Context::Glx(ref ctx) => RawHandle::Glx(ctx.raw_handle()),
-                X11Context::Egl(ref ctx) => RawHandle::Egl(ctx.raw_handle()),
-                X11Context::None => panic!(),
-            },
-            Context::WindowedWayland(ref ctx)
-            | Context::HeadlessWayland(_, ref ctx) => {
+            Context::WindowedX11(ref ctx) => rh(ctx),
+            Context::HeadlessX11(_, ref ctx) => rh(&**ctx),
+            Context::WindowedWayland(ref ctx) => {
+                RawHandle::Egl(ctx.raw_handle())
+            }
+            Context::HeadlessWayland(_, ref ctx) => {
                 RawHandle::Egl(ctx.raw_handle())
             }
             Context::OsMesa(ref ctx) => RawHandle::Egl(ctx.raw_handle()),
@@ -240,10 +246,10 @@ impl Context {
     #[inline]
     pub unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
         match *self {
-            Context::WindowedX11(ref ctx)
-            | Context::HeadlessX11(_, ref ctx) => ctx.get_egl_display(),
-            Context::WindowedWayland(ref ctx)
-            | Context::HeadlessWayland(_, ref ctx) => ctx.get_egl_display(),
+            Context::WindowedX11(ref ctx) => ctx.get_egl_display(),
+            Context::HeadlessX11(_, ref ctx) => ctx.get_egl_display(),
+            Context::WindowedWayland(ref ctx) => ctx.get_egl_display(),
+            Context::HeadlessWayland(_, ref ctx) => ctx.get_egl_display(),
             _ => None,
         }
     }
@@ -255,12 +261,28 @@ impl Context {
         dims: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
         Context::is_compatible(&gl_attr.sharing, ContextType::OsMesa)?;
-        let gl_attr = gl_attr.clone().map_sharing(|ctx| match ctx {
-            &Context::OsMesa(ref ctx) => ctx,
+        let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
+            Context::OsMesa(ref ctx) => ctx,
             _ => unreachable!(),
         });
         osmesa::OsMesaContext::new(pf_reqs, &gl_attr, dims)
             .map(|context| Context::OsMesa(context))
+    }
+}
+
+impl Drop for Context {
+    fn drop(&mut self) {
+        // Want to know something obvious? One needs to drop the context before
+        // the window. Yeah, this was a fun bug to track down.
+        match self {
+            Context::HeadlessWayland(_, ctx) => {
+                Takeable::take(ctx);
+            }
+            Context::HeadlessX11(_, ctx) => {
+                Takeable::take(ctx);
+            }
+            _ => (),
+        }
     }
 }
 
@@ -339,9 +361,9 @@ impl RawContextExt for crate::Context {
         let crate::ContextBuilder { pf_reqs, gl_attr } = cb;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
         Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
-        let gl_attr = gl_attr.clone().map_sharing(|ctx| match ctx {
-            &Context::WindowedWayland(ref ctx)
-            | &Context::HeadlessWayland(_, ref ctx) => ctx,
+        let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
+            Context::WindowedWayland(ref ctx) => ctx,
+            Context::HeadlessWayland(_, ref ctx) => &**ctx,
             _ => unreachable!(),
         });
         wayland::Context::new_raw_context(
@@ -369,9 +391,9 @@ impl RawContextExt for crate::Context {
         let crate::ContextBuilder { pf_reqs, gl_attr } = cb;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
         Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
-        let gl_attr = gl_attr.clone().map_sharing(|ctx| match ctx {
-            &Context::WindowedX11(ref ctx)
-            | &Context::HeadlessX11(_, ref ctx) => ctx,
+        let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
+            Context::WindowedX11(ref ctx) => ctx,
+            Context::HeadlessX11(_, ref ctx) => &**ctx,
             _ => unreachable!(),
         });
         x11::Context::new_raw_context(xconn, xwin, &pf_reqs, &gl_attr)

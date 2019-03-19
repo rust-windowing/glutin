@@ -1,4 +1,5 @@
 #![cfg(target_os = "macos")]
+#![allow(deprecated)] // From upstream library, caused by uses of `msg_send!`
 
 use crate::{
     ContextError, CreationError, GlAttributes, PixelFormat,
@@ -30,17 +31,20 @@ use std::str::FromStr;
 
 mod helpers;
 
+#[derive(Debug)]
 pub enum Context {
     WindowedContext(WindowedContext),
     HeadlessContext(HeadlessContext),
 }
 
+#[derive(Debug)]
 pub struct WindowedContext {
     // NSOpenGLContext
     context: IdRef,
     pixel_format: PixelFormat,
 }
 
+#[derive(Debug)]
 pub struct HeadlessContext {
     context: IdRef,
 }
@@ -294,6 +298,7 @@ impl Context {
     }
 }
 
+#[derive(Debug)]
 struct IdRef(id);
 
 impl IdRef {

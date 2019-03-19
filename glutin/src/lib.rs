@@ -25,6 +25,12 @@
 //! window, however that may result in an suboptimal configuration of the window
 //! on some platforms. In that case use "SeparatedContext".
 
+#![deny(
+    warnings,
+    missing_debug_implementations,
+    //missing_docs,
+)]
+
 #[cfg(any(
     target_os = "windows",
     target_os = "linux",
@@ -32,7 +38,7 @@
     target_os = "dragonfly",
     target_os = "freebsd",
     target_os = "netbsd",
-    target_os = "openbsd"
+    target_os = "openbsd",
 ))]
 #[macro_use]
 extern crate lazy_static;
@@ -41,13 +47,22 @@ extern crate lazy_static;
     target_os = "dragonfly",
     target_os = "freebsd",
     target_os = "netbsd",
-    target_os = "openbsd"
+    target_os = "openbsd",
 ))]
 #[macro_use]
 extern crate shared_library;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 #[macro_use]
 extern crate objc;
+#[cfg(any(
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+))]
+#[macro_use]
+extern crate debug_stub_derive;
 
 pub mod os;
 
@@ -91,6 +106,7 @@ where
 }
 
 /// Object that allows you to build `Context`s.
+#[derive(Debug)]
 pub struct ContextBuilder<'a> {
     /// The attributes to use to create the context.
     pub gl_attr: GlAttributes<&'a Context>,
@@ -599,7 +615,7 @@ impl Default for PixelFormatRequirements {
 }
 
 /// Attributes to use when creating an OpenGL context.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct GlAttributes<S> {
     /// An existing context with which some OpenGL objects get shared.
     ///

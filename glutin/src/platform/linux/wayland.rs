@@ -13,7 +13,9 @@ use winit::os::unix::WindowExt;
 use std::os::raw;
 use std::sync::Arc;
 
+#[derive(DebugStub)]
 pub struct Context {
+    #[debug_stub = "Arc<wegl::WlEglSurface>"]
     egl_surface: Arc<wegl::WlEglSurface>,
     context: EglContext,
 }

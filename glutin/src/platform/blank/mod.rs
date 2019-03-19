@@ -18,6 +18,7 @@ use crate::{
 
 use winit::dpi;
 
+#[derive(Debug)]
 pub enum Context {}
 
 impl Context {

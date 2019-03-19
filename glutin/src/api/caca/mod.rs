@@ -3,7 +3,7 @@
     target_os = "dragonfly",
     target_os = "freebsd",
     target_os = "netbsd",
-    target_os = "openbsd"
+    target_os = "openbsd",
 ))]
 #![allow(unused_variables, dead_code)]
 
@@ -20,8 +20,10 @@ use winit::dpi;
 
 use std::path::Path;
 
+#[derive(DebugStub)]
 pub struct Context {
     opengl: OsMesaContext,
+    #[debug_stub = "ffi::LibCaca"]
     libcaca: ffi::LibCaca,
     display: *mut ffi::caca_display_t,
     dither: *mut ffi::caca_dither_t,

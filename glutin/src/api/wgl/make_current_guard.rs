@@ -9,6 +9,7 @@ use std::os::raw;
 
 /// A guard for when you want to make the context current. Destroying the guard
 /// restores the previously-current context.
+#[derive(Debug)]
 pub struct CurrentContextGuard<'a, 'b> {
     previous_hdc: HDC,
     previous_hglrc: HGLRC,
