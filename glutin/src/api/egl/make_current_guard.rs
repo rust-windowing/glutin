@@ -4,6 +4,7 @@ use glutin_egl_sys as ffi;
 /// restores the previously-current context.
 #[derive(Debug)]
 pub struct MakeCurrentGuard {
+    display: ffi::egl::types::EGLDisplay,
     old_display: ffi::egl::types::EGLDisplay,
     possibly_invalid: Option<MakeCurrentGuardInner>,
 }
@@ -25,7 +26,8 @@ impl MakeCurrentGuard {
         unsafe {
             let egl = super::EGL.as_ref().unwrap();
 
-            let ret = MakeCurrentGuard {
+            let mut ret = MakeCurrentGuard {
+                display,
                 old_display: egl.GetCurrentDisplay(),
                 possibly_invalid: Some(MakeCurrentGuardInner {
                     old_draw_surface: egl
@@ -36,12 +38,16 @@ impl MakeCurrentGuard {
                 }),
             };
 
+            if ret.old_display == ffi::egl::NO_DISPLAY {
+                ret.invalidate();
+            }
+
             let res =
                 egl.MakeCurrent(display, draw_surface, read_surface, context);
 
             if res == 0 {
                 let err = egl.GetError();
-                Err(format!("`eglMakeCurrent` failed: {:?}", err))
+                Err(format!("`eglMakeCurrent` failed: 0x{:x}", err))
             } else {
                 Ok(ret)
             }
@@ -56,13 +62,11 @@ impl MakeCurrentGuard {
         context: ffi::egl::types::EGLContext,
     ) {
         if self.possibly_invalid.is_some() {
-            let mgi = MakeCurrentGuardInner {
-                old_draw_surface: draw_surface,
-                old_read_surface: read_surface,
-                old_context: context,
-            };
-
-            if self.old_display == display || self.possibly_invalid == Some(mgi)
+            let pi = self.possibly_invalid.as_ref().unwrap();
+            if self.old_display == display
+                || pi.old_draw_surface == draw_surface
+                || pi.old_read_surface == read_surface
+                || pi.old_context == context
             {
                 self.invalidate();
             }
@@ -91,17 +95,18 @@ impl Drop for MakeCurrentGuard {
                 ),
             };
 
+        let display = match self.old_display {
+            ffi::egl::NO_DISPLAY => self.display,
+            old_display => old_display,
+        };
+
         unsafe {
-            let res = egl.MakeCurrent(
-                self.old_display,
-                draw_surface,
-                read_surface,
-                context,
-            );
+            let res =
+                egl.MakeCurrent(display, draw_surface, read_surface, context);
 
             if res == 0 {
                 let err = egl.GetError();
-                panic!("`eglMakeCurrent` failed: {:?}", err)
+                panic!("`eglMakeCurrent` failed: 0x{:x}", err)
             }
         }
     }

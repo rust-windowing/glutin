@@ -428,6 +428,9 @@ impl Context {
                 ffi::egl::CONTEXT_LOST => {
                     return Err(ContextError::ContextLost)
                 }
+                // Can be returned (among other reasons) if the window has been
+                // closed by the user.
+                ffi::egl::BAD_DISPLAY => return Err(ContextError::DisplayLost),
                 err => panic!(
                     "make_current: eglMakeCurrent failed (eglGetError returned 0x{:x})",
                     err
@@ -593,9 +596,64 @@ impl Drop for Context {
             gl_finish_fn();
 
             egl.DestroyContext(self.display, self.context);
+            self.context = ffi::egl::NO_CONTEXT;
             egl.DestroySurface(self.display, self.surface.get());
             self.surface.set(ffi::egl::NO_SURFACE);
-            egl.Terminate(self.display);
+
+            // In a reasonable world, we could uncomment the line bellow.
+            //
+            // This is no such world. Lets talk about something.
+            //
+            // You see, every call to `get_native_display` returns the exact
+            // same display, just look at the docs:
+            //
+            //  "Multiple calls made to eglGetDisplay with the same display_id
+            //  will return the same EGLDisplay handle."
+            //
+            // My EGL implementation does not do any ref counting, nor do the
+            // EGL docs mention ref counting anywhere.  In fact, the docs state
+            // that there will be *no effect*, which, in a way, implies no ref
+            // counting:
+            //
+            //      "Initializing an already initialized EGL display connection
+            //      has no effect besides returning the version numbers."
+            //
+            // So, if we terminate the display, other people who are using it
+            // won't be so happy.
+            //
+            // Well, how did I stumble on this issue you might ask...
+            //
+            // In this case, the "other people" was us, for it appears my EGL
+            // implementation does not follow the docs, or maybe I'm misreading
+            // them. You see, according to the egl docs:
+            //
+            //      "To release the current context without assigning a new one,
+            //      set context to EGL_NO_CONTEXT and set draw and read to
+            //      EGL_NO_SURFACE. [...] ******This is the only case where an
+            //      uninitialized display may be passed to
+            //      eglMakeCurrent.******"
+            // (Emphasis mine).
+            //
+            // Well, my computer returns EGL_BAD_DISPLAY if the display passed
+            // to eglMakeCurrent is uninitialized, which allowed to me to spot
+            // this issue.
+            //
+            // I would have assumed that if EGL was going to provide us with the
+            // same EGLDisplay that they'd at least do some ref counting, but
+            // they don't.
+            //
+            // FIXME: Technically we are leaking resources, not much we can do.
+            // Yeah, we could have a global static that does ref counting
+            // ourselves, but what if some other library is using the display.
+            //
+            // On Linux, we could preload a little lib that does ref counting on
+            // that level, but:
+            //      A) What about other platforms?
+            //      B) Do you *really* want all glutin programs to preload a
+            //      library?
+            //      C) Who the hell is going to maintain that?
+            //
+            // egl.Terminate(self.display);
         }
     }
 }
