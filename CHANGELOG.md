@@ -1,8 +1,10 @@
 # Unreleased
 
+- We now load `libGL.so` instead of `libGLX.so`.
+
 # Version 0.20.0 (2019-03-09)
 
-- We no longer load `libegl.so` and `libgl.so` multiple times.
+- We no longer load `libEGL.so` and `libGL.so` multiple times.
 - Fixes `Context::is_current` incorrectly returning `false`.
 - Made `ContextBuilder`'s `pf_reqs` public.
 - **Breaking:** Renamed `GlContext{,Ext}` to `ContextTrait{,Ext}`.
