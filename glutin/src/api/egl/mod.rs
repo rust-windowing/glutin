@@ -17,7 +17,7 @@ mod egl {
     #[derive(Clone)]
     pub struct Egl(pub SymWrapper<ffi::egl::Egl>);
 
-    /// Because `*const libc::c_void` doesn't implement `Sync`.
+    /// Because `*const raw::c_void` doesn't implement `Sync`.
     unsafe impl Sync for Egl {}
 
     impl SymTrait for ffi::egl::Egl {
@@ -56,7 +56,10 @@ mod egl {
     }
 }
 
+mod make_current_guard;
+
 pub use self::egl::Egl;
+use self::make_current_guard::MakeCurrentGuard;
 use crate::{
     Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
     PixelFormatRequirements, ReleaseBehavior, Robustness,
@@ -565,35 +568,29 @@ impl Drop for Context {
         let egl = EGL.as_ref().unwrap();
         unsafe {
             // Ok, so we got to call `glFinish` before destroying the context to
-            // insure it actually gets destroyed. This requires making the this
+            // ensure it actually gets destroyed. This requires making the this
             // context current.
-            //
-            // Now, if the user has multiple contexts, and they drop this one
-            // unintentionally between calls to the other context, this could
-            // result in a !FUN! time debuging.
-            //
-            // Then again, if they're **unintentionally** dropping contexts, I
-            // think they got bigger problems.
-            self.make_current().unwrap();
+            let mut guard = MakeCurrentGuard::new(
+                self.display,
+                self.surface.get(),
+                self.surface.get(),
+                self.context,
+            )
+            .map_err(|err| ContextError::OsError(err))
+            .unwrap();
+
+            guard.if_any_same_then_invalidate(
+                self.display,
+                self.surface.get(),
+                self.surface.get(),
+                self.context,
+            );
 
             let gl_finish_fn = self.get_proc_address("glFinish");
             assert!(gl_finish_fn != std::ptr::null());
             let gl_finish_fn =
                 std::mem::transmute::<_, extern "system" fn()>(gl_finish_fn);
             gl_finish_fn();
-
-            let ret = egl.MakeCurrent(
-                self.display,
-                ffi::egl::NO_SURFACE,
-                ffi::egl::NO_SURFACE,
-                ffi::egl::NO_CONTEXT,
-            );
-            if ret == 0 {
-                panic!(
-                    "drop: eglMakeCurrent failed with 0x{:x}",
-                    egl.GetError()
-                )
-            }
 
             egl.DestroyContext(self.display, self.context);
             egl.DestroySurface(self.display, self.surface.get());

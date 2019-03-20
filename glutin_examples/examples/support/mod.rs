@@ -1,8 +1,6 @@
 use glutin::{self, ContextTrait};
 
 use std::ffi::CStr;
-use std::mem;
-use std::ptr;
 
 pub mod gl {
     pub use self::Gles2 as Gl;
@@ -32,7 +30,7 @@ pub fn load(gl_context: &glutin::Context) -> Gl {
             vs,
             1,
             [VS_SRC.as_ptr() as *const _].as_ptr(),
-            ptr::null(),
+            std::ptr::null(),
         );
         gl.CompileShader(vs);
 
@@ -41,7 +39,7 @@ pub fn load(gl_context: &glutin::Context) -> Gl {
             fs,
             1,
             [FS_SRC.as_ptr() as *const _].as_ptr(),
-            ptr::null(),
+            std::ptr::null(),
         );
         gl.CompileShader(fs);
 
@@ -51,19 +49,19 @@ pub fn load(gl_context: &glutin::Context) -> Gl {
         gl.LinkProgram(program);
         gl.UseProgram(program);
 
-        let mut vb = mem::uninitialized();
+        let mut vb = std::mem::uninitialized();
         gl.GenBuffers(1, &mut vb);
         gl.BindBuffer(gl::ARRAY_BUFFER, vb);
         gl.BufferData(
             gl::ARRAY_BUFFER,
-            (VERTEX_DATA.len() * mem::size_of::<f32>())
+            (VERTEX_DATA.len() * std::mem::size_of::<f32>())
                 as gl::types::GLsizeiptr,
             VERTEX_DATA.as_ptr() as *const _,
             gl::STATIC_DRAW,
         );
 
         if gl.BindVertexArray.is_loaded() {
-            let mut vao = mem::uninitialized();
+            let mut vao = std::mem::uninitialized();
             gl.GenVertexArrays(1, &mut vao);
             gl.BindVertexArray(vao);
         }
@@ -77,16 +75,16 @@ pub fn load(gl_context: &glutin::Context) -> Gl {
             2,
             gl::FLOAT,
             0,
-            5 * mem::size_of::<f32>() as gl::types::GLsizei,
-            ptr::null(),
+            5 * std::mem::size_of::<f32>() as gl::types::GLsizei,
+            std::ptr::null(),
         );
         gl.VertexAttribPointer(
             color_attrib as gl::types::GLuint,
             3,
             gl::FLOAT,
             0,
-            5 * mem::size_of::<f32>() as gl::types::GLsizei,
-            (2 * mem::size_of::<f32>()) as *const () as *const _,
+            5 * std::mem::size_of::<f32>() as gl::types::GLsizei,
+            (2 * std::mem::size_of::<f32>()) as *const () as *const _,
         );
         gl.EnableVertexAttribArray(pos_attrib as gl::types::GLuint);
         gl.EnableVertexAttribArray(color_attrib as gl::types::GLuint);

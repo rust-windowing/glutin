@@ -11,6 +11,3 @@ edition = "2018"
 
 [build-dependencies]
 gl_generator = "0.10"
-
-[dependencies]
-libc = "0.2"

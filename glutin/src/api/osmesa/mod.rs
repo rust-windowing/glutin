@@ -15,7 +15,6 @@ use crate::{
     PixelFormat, PixelFormatRequirements, Robustness,
 };
 
-use libc;
 use winit::dpi;
 
 use std::ffi::CString;
@@ -111,9 +110,9 @@ impl OsMesaContext {
             GlRequest::Latest => {}
             GlRequest::Specific(Api::OpenGl, (major, minor)) => {
                 attribs.push(osmesa_sys::OSMESA_CONTEXT_MAJOR_VERSION);
-                attribs.push(major as libc::c_int);
+                attribs.push(major as raw::c_int);
                 attribs.push(osmesa_sys::OSMESA_CONTEXT_MINOR_VERSION);
-                attribs.push(minor as libc::c_int);
+                attribs.push(minor as raw::c_int);
             }
             GlRequest::Specific(Api::OpenGlEs, _)
             | GlRequest::Specific(Api::WebGl, _) => {
@@ -126,9 +125,9 @@ impl OsMesaContext {
                 ..
             } => {
                 attribs.push(osmesa_sys::OSMESA_CONTEXT_MAJOR_VERSION);
-                attribs.push(major as libc::c_int);
+                attribs.push(major as raw::c_int);
                 attribs.push(osmesa_sys::OSMESA_CONTEXT_MINOR_VERSION);
-                attribs.push(minor as libc::c_int);
+                attribs.push(minor as raw::c_int);
             }
         }
 
@@ -174,8 +173,8 @@ impl OsMesaContext {
             self.context,
             self.buffer.as_ptr() as *mut _,
             0x1401,
-            self.width as libc::c_int,
-            self.height as libc::c_int,
+            self.width as raw::c_int,
+            self.height as raw::c_int,
         );
 
         // an error can only happen in case of invalid parameter, which would
