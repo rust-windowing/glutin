@@ -12,8 +12,5 @@ edition = "2018"
 [build-dependencies]
 gl_generator = "0.10"
 
-[dependencies]
-libc = "0.2"
-
 [target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os="dragonfly", target_os="netbsd", target_os="openbsd"))'.dependencies]
 x11-dl = "2.18"

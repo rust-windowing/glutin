@@ -7,7 +7,6 @@ use crate::{
 };
 
 use glutin_egl_sys as ffi;
-use libc;
 use winit;
 use winit::dpi;
 use winit::os::android::EventsLoopExt;

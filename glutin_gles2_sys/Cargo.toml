@@ -12,8 +12,5 @@ edition = "2018"
 [build-dependencies]
 gl_generator = "0.10"
 
-[dependencies]
-libc = "0.2"
-
 [target.'cfg(target_os = "ios")'.dependencies]
 objc = "0.2"

@@ -7,7 +7,7 @@
 //!
 //! Due to some operating-system-specific quirks, glutin prefers control over
 //! the order of creation of the `Context` and `Window`. Here is an example of
-//! building a WindowedContext the prefered way:
+//! building a WindowedContext:
 //!
 //! ```no_run
 //! # fn main() {
@@ -23,7 +23,8 @@
 //!
 //! You can, of course, create an OpenGL `Context` separately from an existing
 //! window, however that may result in an suboptimal configuration of the window
-//! on some platforms. In that case use "SeparatedContext".
+//! on some platforms. In that case use the unsafe platform-specific
+//! `RawWindowExt` available on some platforms.
 
 #![deny(
     warnings,
@@ -379,6 +380,7 @@ pub enum ContextError {
     OsError(String),
     IoError(io::Error),
     ContextLost,
+    DisplayLost,
 }
 
 impl ContextError {
@@ -388,6 +390,7 @@ impl ContextError {
             ContextError::OsError(ref string) => string,
             ContextError::IoError(ref err) => err.description(),
             ContextError::ContextLost => "Context lost",
+            ContextError::DisplayLost => "Display lost",
         }
     }
 }

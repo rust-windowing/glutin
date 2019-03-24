@@ -49,9 +49,11 @@ fn main() {
         for (index, window) in windows.values().enumerate() {
             let mut color = [1.0, 0.5, 0.7, 1.0];
             color.swap(0, index % 3);
-            unsafe { window.0.make_current().unwrap() };
-            window.1.draw_frame(color);
-            window.0.swap_buffers().unwrap();
+            // window might have been closed, so can't make current
+            if unsafe { window.0.make_current().is_ok() } {
+                window.1.draw_frame(color);
+                window.0.swap_buffers().unwrap();
+            }
         }
     }
 }

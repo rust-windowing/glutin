@@ -17,7 +17,7 @@ mod egl {
     #[derive(Clone)]
     pub struct Egl(pub SymWrapper<ffi::egl::Egl>);
 
-    /// Because `*const libc::c_void` doesn't implement `Sync`.
+    /// Because `*const raw::c_void` doesn't implement `Sync`.
     unsafe impl Sync for Egl {}
 
     impl SymTrait for ffi::egl::Egl {
@@ -56,7 +56,10 @@ mod egl {
     }
 }
 
+mod make_current_guard;
+
 pub use self::egl::Egl;
+use self::make_current_guard::MakeCurrentGuard;
 use crate::{
     Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
     PixelFormatRequirements, ReleaseBehavior, Robustness,
@@ -425,6 +428,9 @@ impl Context {
                 ffi::egl::CONTEXT_LOST => {
                     return Err(ContextError::ContextLost)
                 }
+                // Can be returned (among other reasons) if the window has been
+                // closed by the user.
+                ffi::egl::BAD_DISPLAY => return Err(ContextError::DisplayLost),
                 err => panic!(
                     "make_current: eglMakeCurrent failed (eglGetError returned 0x{:x})",
                     err
@@ -565,16 +571,23 @@ impl Drop for Context {
         let egl = EGL.as_ref().unwrap();
         unsafe {
             // Ok, so we got to call `glFinish` before destroying the context to
-            // insure it actually gets destroyed. This requires making the this
+            // ensure it actually gets destroyed. This requires making the this
             // context current.
-            //
-            // Now, if the user has multiple contexts, and they drop this one
-            // unintentionally between calls to the other context, this could
-            // result in a !FUN! time debuging.
-            //
-            // Then again, if they're **unintentionally** dropping contexts, I
-            // think they got bigger problems.
-            self.make_current().unwrap();
+            let mut guard = MakeCurrentGuard::new(
+                self.display,
+                self.surface.get(),
+                self.surface.get(),
+                self.context,
+            )
+            .map_err(|err| ContextError::OsError(err))
+            .unwrap();
+
+            guard.if_any_same_then_invalidate(
+                self.display,
+                self.surface.get(),
+                self.surface.get(),
+                self.context,
+            );
 
             let gl_finish_fn = self.get_proc_address("glFinish");
             assert!(gl_finish_fn != std::ptr::null());
@@ -582,23 +595,65 @@ impl Drop for Context {
                 std::mem::transmute::<_, extern "system" fn()>(gl_finish_fn);
             gl_finish_fn();
 
-            let ret = egl.MakeCurrent(
-                self.display,
-                ffi::egl::NO_SURFACE,
-                ffi::egl::NO_SURFACE,
-                ffi::egl::NO_CONTEXT,
-            );
-            if ret == 0 {
-                panic!(
-                    "drop: eglMakeCurrent failed with 0x{:x}",
-                    egl.GetError()
-                )
-            }
-
             egl.DestroyContext(self.display, self.context);
+            self.context = ffi::egl::NO_CONTEXT;
             egl.DestroySurface(self.display, self.surface.get());
             self.surface.set(ffi::egl::NO_SURFACE);
-            egl.Terminate(self.display);
+
+            // In a reasonable world, we could uncomment the line bellow.
+            //
+            // This is no such world. Lets talk about something.
+            //
+            // You see, every call to `get_native_display` returns the exact
+            // same display, just look at the docs:
+            //
+            //  "Multiple calls made to eglGetDisplay with the same display_id
+            //  will return the same EGLDisplay handle."
+            //
+            // My EGL implementation does not do any ref counting, nor do the
+            // EGL docs mention ref counting anywhere.  In fact, the docs state
+            // that there will be *no effect*, which, in a way, implies no ref
+            // counting:
+            //
+            //      "Initializing an already initialized EGL display connection
+            //      has no effect besides returning the version numbers."
+            //
+            // So, if we terminate the display, other people who are using it
+            // won't be so happy.
+            //
+            // Well, how did I stumble on this issue you might ask...
+            //
+            // In this case, the "other people" was us, for it appears my EGL
+            // implementation does not follow the docs, or maybe I'm misreading
+            // them. You see, according to the egl docs:
+            //
+            //      "To release the current context without assigning a new one,
+            //      set context to EGL_NO_CONTEXT and set draw and read to
+            //      EGL_NO_SURFACE. [...] ******This is the only case where an
+            //      uninitialized display may be passed to
+            //      eglMakeCurrent.******"
+            // (Emphasis mine).
+            //
+            // Well, my computer returns EGL_BAD_DISPLAY if the display passed
+            // to eglMakeCurrent is uninitialized, which allowed to me to spot
+            // this issue.
+            //
+            // I would have assumed that if EGL was going to provide us with the
+            // same EGLDisplay that they'd at least do some ref counting, but
+            // they don't.
+            //
+            // FIXME: Technically we are leaking resources, not much we can do.
+            // Yeah, we could have a global static that does ref counting
+            // ourselves, but what if some other library is using the display.
+            //
+            // On Linux, we could preload a little lib that does ref counting on
+            // that level, but:
+            //      A) What about other platforms?
+            //      B) Do you *really* want all glutin programs to preload a
+            //      library?
+            //      C) Who the hell is going to maintain that?
+            //
+            // egl.Terminate(self.display);
         }
     }
 }

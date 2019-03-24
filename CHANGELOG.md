@@ -1,6 +1,12 @@
 # Unreleased
 
 - We now load `libGL.so` instead of `libGLX.so`.
+ - **Breaking**: Added `DisplayLost` variant to `ContextError`.
+ - Fixed bug where we drop the hidden window belonging to a headless context on
+ on X11 and/or Wayland before the actual context.
+ - "Fixed" bug where we will close `EGLDisplay`s while they are still in use by 
+ others. Angry and/or salty rant can be found in `glutin/src/api/egl/mod.rs`, 
+ you can't miss it.
 
 # Version 0.20.0 (2019-03-09)
 

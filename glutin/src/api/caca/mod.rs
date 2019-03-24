@@ -15,9 +15,9 @@ use crate::{
     PixelFormatRequirements,
 };
 
-use libc;
 use winit::dpi;
 
+use std::os::raw;
 use std::path::Path;
 
 #[derive(DebugStub)]
@@ -71,9 +71,9 @@ impl Context {
             let masks = get_masks();
             (libcaca.caca_create_dither)(
                 32,
-                dims.0 as libc::c_int,
-                dims.1 as libc::c_int,
-                dims.0 as libc::c_int * 4,
+                dims.0 as raw::c_int,
+                dims.1 as raw::c_int,
+                dims.0 as raw::c_int * 4,
                 masks.0,
                 masks.1,
                 masks.2,
@@ -130,8 +130,8 @@ impl Context {
                 canvas,
                 0,
                 0,
-                width as libc::c_int,
-                height as libc::c_int,
+                width as raw::c_int,
+                height as raw::c_int,
                 self.dither,
                 buffer.as_ptr() as *const _,
             );

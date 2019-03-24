@@ -27,25 +27,25 @@ pub mod egl {
 pub use self::egl::types::EGLContext;
 pub use self::egl::types::EGLDisplay;
 
-use libc;
+use std::os::raw;
 
 pub type khronos_utime_nanoseconds_t = khronos_uint64_t;
-pub type khronos_uint64_t = libc::uint64_t;
-pub type khronos_ssize_t = libc::c_long;
-pub type EGLint = libc::int32_t;
-pub type EGLNativeDisplayType = *const libc::c_void;
-pub type EGLNativePixmapType = *const libc::c_void; // FIXME: egl_native_pixmap_t instead
+pub type khronos_uint64_t = u64;
+pub type khronos_ssize_t = raw::c_long;
+pub type EGLint = i32;
+pub type EGLNativeDisplayType = *const raw::c_void;
+pub type EGLNativePixmapType = *const raw::c_void; // FIXME: egl_native_pixmap_t instead
 
 #[cfg(target_os = "windows")]
 pub type EGLNativeWindowType = winapi::shared::windef::HWND;
 #[cfg(target_os = "linux")]
-pub type EGLNativeWindowType = *const libc::c_void;
+pub type EGLNativeWindowType = *const raw::c_void;
 #[cfg(target_os = "android")]
-pub type EGLNativeWindowType = *const libc::c_void;
+pub type EGLNativeWindowType = *const raw::c_void;
 #[cfg(any(
     target_os = "dragonfly",
     target_os = "freebsd",
     target_os = "netbsd",
     target_os = "openbsd"
 ))]
-pub type EGLNativeWindowType = *const libc::c_void;
+pub type EGLNativeWindowType = *const raw::c_void;
