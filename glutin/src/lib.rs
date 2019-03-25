@@ -70,12 +70,10 @@ pub mod os;
 mod api;
 mod context;
 mod platform;
-mod raw_context;
 mod windowed;
 
-pub use crate::context::Context;
-pub use crate::raw_context::RawContext;
-pub use crate::windowed::WindowedContext;
+pub use crate::context::{Context, CurrentContext, NotCurrentContext};
+pub use crate::windowed::{ContextWrapper, WindowedContext, RawContext};
 
 pub use winit::{
     dpi, AvailableMonitorsIter, AxisId, ButtonId, ControlFlow,
@@ -90,15 +88,26 @@ use std::io;
 
 /// A trait for types associated with a GL context.
 pub trait ContextTrait
-where
-    Self: Sized,
 {
+    type CurrentContext: CurrentContextTrait + ContextTrait;
+    type NotCurrentContext: ContextTrait;
+
     /// Sets the context as the current context.
-    unsafe fn make_current(&self) -> Result<(), ContextError>;
+    unsafe fn make_current(self) -> Result<Self::CurrentContext, (Self, ContextError)>;
+
+    /// If this context is current, makes the context not current.
+    unsafe fn make_not_current(self) -> Result<Self::NotCurrentContext, (Self, ContextError)>;
+
+    /// Treats the context as not current, even if it is current.
+    ///
+    /// It is preferable to use `make_not_current`.
+    unsafe fn treat_as_not_current(self) -> Self::NotCurrentContext;
 
     /// Returns true if this context is the current one in this thread.
     fn is_current(&self) -> bool;
+}
 
+pub trait CurrentContextTrait {
     /// Returns the address of an OpenGL function.
     fn get_proc_address(&self, addr: &str) -> *const ();
 
@@ -108,14 +117,14 @@ where
 
 /// Object that allows you to build `Context`s.
 #[derive(Debug)]
-pub struct ContextBuilder<'a> {
+pub struct ContextBuilder<'a, T> {
     /// The attributes to use to create the context.
-    pub gl_attr: GlAttributes<&'a Context>,
+    pub gl_attr: GlAttributes<&'a Context<T>>,
     /// The pixel format requirements
     pub pf_reqs: PixelFormatRequirements,
 }
 
-impl<'a> ContextBuilder<'a> {
+impl<'a, T> ContextBuilder<'a, T> {
     /// Initializes a new `ContextBuilder` with default values.
     pub fn new() -> Self {
         ContextBuilder {
@@ -167,7 +176,7 @@ impl<'a> ContextBuilder<'a> {
 
     /// Share the display lists with the given `Context`.
     #[inline]
-    pub fn with_shared_lists(mut self, other: &'a Context) -> Self {
+    pub fn with_shared_lists(mut self, other: &'a Context<T>) -> Self {
         self.gl_attr.sharing = Some(other);
         self
     }
@@ -264,24 +273,6 @@ impl<'a> ContextBuilder<'a> {
     ) -> Self {
         self.pf_reqs.hardware_accelerated = acceleration;
         self
-    }
-
-    /// Builds a headless context.
-    pub fn build_headless(
-        self,
-        el: &EventsLoop,
-        dims: dpi::PhysicalSize,
-    ) -> Result<Context, CreationError> {
-        Context::new_headless(el, self, dims)
-    }
-
-    /// Builds a context and it's associated window.
-    pub fn build_windowed(
-        self,
-        wb: WindowBuilder,
-        el: &EventsLoop,
-    ) -> Result<WindowedContext, CreationError> {
-        WindowedContext::new_windowed(wb, self, el)
     }
 }
 
