@@ -49,11 +49,16 @@ mod this_example {
             );
         }
 
-        // TODO: vertically flip image.
+        let mut pixels_flipped: Vec<gl::types::GLubyte> = vec![];
+        for v in (0..ss[3]).rev()  {
+            let s = 3 * v as usize * ss[2] as usize;
+            let o = 3 * ss[2] as usize;
+            pixels_flipped.extend_from_slice(&pixels[s..(s + o)]);
+        }
 
         image::save_buffer(
             &Path::new("os_mesa.png"),
-            &pixels,
+            &pixels_flipped,
             ss[2] as u32,
             ss[3] as u32,
             image::RGB(8),
