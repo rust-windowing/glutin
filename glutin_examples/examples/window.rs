@@ -1,15 +1,16 @@
 mod support;
 
-use glutin::ContextTrait;
+use glutin::{ContextTrait, PossiblyCurrentContext};
 
 fn main() {
     let mut el = glutin::EventsLoop::new();
     let wb = glutin::WindowBuilder::new().with_title("A fantastic window!");
-    let windowed_context = glutin::ContextBuilder::new()
-        .build_windowed(wb, &el)
-        .unwrap();
 
-    unsafe { windowed_context.make_current().unwrap() }
+    let cb: glutin::ContextBuilder<PossiblyCurrentContext> =
+        glutin::ContextBuilder::new();
+    let windowed_context = cb.build_windowed(wb, &el).unwrap();
+
+    let windowed_context = unsafe { windowed_context.make_current().unwrap() };
 
     println!(
         "Pixel format of the window's GL context: {:?}",
@@ -26,7 +27,8 @@ fn main() {
                 glutin::Event::WindowEvent { event, .. } => match event {
                     glutin::WindowEvent::CloseRequested => running = false,
                     glutin::WindowEvent::Resized(logical_size) => {
-                        let dpi_factor = windowed_context.get_hidpi_factor();
+                        let dpi_factor =
+                            windowed_context.window().get_hidpi_factor();
                         windowed_context
                             .resize(logical_size.to_physical(dpi_factor));
                     }

@@ -1,6 +1,6 @@
 mod support;
 
-use glutin::ContextTrait;
+use glutin::{ContextTrait, PossiblyCurrentContext};
 use std::io::{self, Write};
 
 fn main() {
@@ -31,11 +31,11 @@ fn main() {
     let wb = glutin::WindowBuilder::new()
         .with_title("Hello world!")
         .with_fullscreen(Some(monitor));
-    let windowed_context = glutin::ContextBuilder::new()
-        .build_windowed(wb, &el)
-        .unwrap();
+    let cb: glutin::ContextBuilder<PossiblyCurrentContext> =
+        glutin::ContextBuilder::new();
+    let windowed_context = cb.build_windowed(wb, &el).unwrap();
 
-    unsafe { windowed_context.make_current().unwrap() }
+    let windowed_context = unsafe { windowed_context.make_current().unwrap() };
 
     let gl = support::load(&windowed_context.context());
 
@@ -48,7 +48,8 @@ fn main() {
                 glutin::Event::WindowEvent { event, .. } => match event {
                     glutin::WindowEvent::CloseRequested => running = false,
                     glutin::WindowEvent::Resized(logical_size) => {
-                        let dpi_factor = windowed_context.get_hidpi_factor();
+                        let dpi_factor =
+                            windowed_context.window().get_hidpi_factor();
                         windowed_context
                             .resize(logical_size.to_physical(dpi_factor));
                     }
@@ -64,9 +65,15 @@ fn main() {
                                 let monitor = if fullscreen {
                                     None
                                 } else {
-                                    Some(windowed_context.get_current_monitor())
+                                    Some(
+                                        windowed_context
+                                            .window()
+                                            .get_current_monitor(),
+                                    )
                                 };
-                                windowed_context.set_fullscreen(monitor);
+                                windowed_context
+                                    .window()
+                                    .set_fullscreen(monitor);
                                 fullscreen = !fullscreen;
                             }
                             _ => (),

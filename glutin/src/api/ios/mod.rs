@@ -1,5 +1,4 @@
 #![cfg(target_os = "ios")]
-#![allow(deprecated)] // From upstream library, caused by uses of `msg_send!`
 
 //! iOS support
 //!

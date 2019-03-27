@@ -50,8 +50,6 @@ extern crate lazy_static;
     target_os = "netbsd",
     target_os = "openbsd",
 ))]
-#[macro_use]
-extern crate shared_library;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 #[macro_use]
 extern crate objc;
@@ -72,8 +70,11 @@ mod context;
 mod platform;
 mod windowed;
 
-pub use crate::context::{Context, CurrentContext, NotCurrentContext};
-pub use crate::windowed::{ContextWrapper, WindowedContext, RawContext};
+pub use crate::context::{
+    Context, ContextCurrentState, ContextTrait, NotCurrentContext,
+    PossiblyCurrentContext, PossiblyCurrentContextTrait,
+};
+pub use crate::windowed::{ContextWrapper, RawContext, WindowedContext};
 
 pub use winit::{
     dpi, AvailableMonitorsIter, AxisId, ButtonId, ControlFlow,
@@ -86,45 +87,16 @@ pub use winit::{
 
 use std::io;
 
-/// A trait for types associated with a GL context.
-pub trait ContextTrait
-{
-    type CurrentContext: CurrentContextTrait + ContextTrait;
-    type NotCurrentContext: ContextTrait;
-
-    /// Sets the context as the current context.
-    unsafe fn make_current(self) -> Result<Self::CurrentContext, (Self, ContextError)>;
-
-    /// If this context is current, makes the context not current.
-    unsafe fn make_not_current(self) -> Result<Self::NotCurrentContext, (Self, ContextError)>;
-
-    /// Treats the context as not current, even if it is current.
-    ///
-    /// It is preferable to use `make_not_current`.
-    unsafe fn treat_as_not_current(self) -> Self::NotCurrentContext;
-
-    /// Returns true if this context is the current one in this thread.
-    fn is_current(&self) -> bool;
-}
-
-pub trait CurrentContextTrait {
-    /// Returns the address of an OpenGL function.
-    fn get_proc_address(&self, addr: &str) -> *const ();
-
-    /// Returns the OpenGL API being used.
-    fn get_api(&self) -> Api;
-}
-
 /// Object that allows you to build `Context`s.
 #[derive(Debug)]
-pub struct ContextBuilder<'a, T> {
+pub struct ContextBuilder<'a, T: ContextCurrentState> {
     /// The attributes to use to create the context.
     pub gl_attr: GlAttributes<&'a Context<T>>,
     /// The pixel format requirements
     pub pf_reqs: PixelFormatRequirements,
 }
 
-impl<'a, T> ContextBuilder<'a, T> {
+impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     /// Initializes a new `ContextBuilder` with default values.
     pub fn new() -> Self {
         ContextBuilder {
@@ -176,9 +148,14 @@ impl<'a, T> ContextBuilder<'a, T> {
 
     /// Share the display lists with the given `Context`.
     #[inline]
-    pub fn with_shared_lists(mut self, other: &'a Context<T>) -> Self {
-        self.gl_attr.sharing = Some(other);
-        self
+    pub fn with_shared_lists<T2: ContextCurrentState>(
+        self,
+        other: &'a Context<T2>,
+    ) -> ContextBuilder<'a, T2> {
+        ContextBuilder {
+            gl_attr: self.gl_attr.set_sharing(Some(other)),
+            pf_reqs: self.pf_reqs,
+        }
     }
 
     /// Sets the multisampling level to request. A value of `0` indicates that
@@ -657,6 +634,19 @@ impl<S> GlAttributes<S> {
     {
         GlAttributes {
             sharing: self.sharing.map(f),
+            version: self.version,
+            profile: self.profile,
+            debug: self.debug,
+            robustness: self.robustness,
+            vsync: self.vsync,
+        }
+    }
+
+    /// Turns the `sharing` parameter into another type.
+    #[inline]
+    fn set_sharing<T>(self, sharing: Option<T>) -> GlAttributes<T> {
+        GlAttributes {
+            sharing,
             version: self.version,
             profile: self.profile,
             debug: self.debug,

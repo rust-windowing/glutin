@@ -1,11 +1,13 @@
 use crate::api::egl::{Context as EglContext, NativeDisplay, EGL};
 use crate::api::glx::{Context as GlxContext, GLX};
 use crate::{
-    Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
-    PixelFormatRequirements,
+    Api, ContextCurrentState, ContextError, CreationError, GlAttributes,
+    GlRequest, NotCurrentContext, PixelFormat, PixelFormatRequirements,
+    PossiblyCurrentContext,
 };
 
 use glutin_glx_sys as ffi;
+use takeable_option::Takeable;
 use winit;
 pub use winit::os::unix::x11::{XConnection, XError, XNotSupported};
 use winit::os::unix::{EventsLoopExt, WindowBuilderExt, WindowExt};
@@ -29,40 +31,50 @@ impl std::fmt::Display for NoX11Connection {
 }
 
 #[derive(Debug)]
-pub enum X11Context {
-    Glx(GlxContext),
-    Egl(EglContext),
-    None,
+pub enum X11Context<T: ContextCurrentState> {
+    Glx(GlxContext<T>),
+    Egl(EglContext<T>),
 }
 
 #[derive(Debug)]
-pub struct Context {
+struct ContextInner {
     xconn: Arc<XConnection>,
     colormap: ffi::Colormap,
-    context: X11Context,
 }
 
-unsafe impl Send for Context {}
-unsafe impl Sync for Context {}
+#[derive(Debug)]
+pub struct Context<T: ContextCurrentState> {
+    inner: Takeable<ContextInner>,
+    context: Takeable<X11Context<T>>,
+}
 
-impl Drop for Context {
+unsafe impl<T: ContextCurrentState> Send for Context<T> {}
+unsafe impl<T: ContextCurrentState> Sync for Context<T> {}
+
+impl<T: ContextCurrentState> Drop for Context<T> {
     fn drop(&mut self) {
         unsafe {
-            self.context = X11Context::None;
+            Takeable::try_take(&mut self.context);
 
-            (self.xconn.xlib.XFreeColormap)(self.xconn.display, self.colormap);
+            if let Some(inner) = Takeable::try_take(&mut self.inner) {
+                (inner.xconn.xlib.XFreeColormap)(
+                    inner.xconn.display,
+                    inner.colormap,
+                );
+            }
         }
     }
 }
 
-impl Context {
+impl<T: ContextCurrentState> Context<T> {
     #[inline]
     pub fn new(
         wb: winit::WindowBuilder,
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context>,
-    ) -> Result<(winit::Window, Self), CreationError> {
+        gl_attr: &GlAttributes<&Context<T>>,
+    ) -> Result<(winit::Window, Context<NotCurrentContext>), CreationError>
+    {
         let xconn = match el.get_xlib_xconnection() {
             Some(xconn) => xconn,
             None => {
@@ -76,9 +88,9 @@ impl Context {
         let screen_id = unsafe { (xconn.xlib.XDefaultScreen)(xconn.display) };
 
         // start the context building process
-        enum Prototype<'a> {
-            Glx(crate::api::glx::ContextPrototype<'a>),
-            Egl(crate::api::egl::ContextPrototype<'a>),
+        enum Prototype<'a, T: ContextCurrentState> {
+            Glx(crate::api::glx::ContextPrototype<'a, T>),
+            Egl(crate::api::egl::ContextPrototype<'a, T>),
         }
 
         let builder = gl_attr.clone();
@@ -93,7 +105,7 @@ impl Context {
                 // GLX should be preferred over EGL, otherwise crashes may occur
                 // on X11 – issue #314
                 if let Some(_) = *GLX {
-                    builder_glx_u = builder.map_sharing(|c| match c.context {
+                    builder_glx_u = builder.map_sharing(|c| match *c.context {
                         X11Context::Glx(ref c) => c,
                         _ => panic!(),
                     });
@@ -105,7 +117,7 @@ impl Context {
                         wb.window.transparent,
                     )?)
                 } else if let Some(_) = *EGL {
-                    builder_egl_u = builder.map_sharing(|c| match c.context {
+                    builder_egl_u = builder.map_sharing(|c| match *c.context {
                         X11Context::Egl(ref c) => c,
                         _ => panic!(),
                     });
@@ -124,7 +136,7 @@ impl Context {
             }
             GlRequest::Specific(Api::OpenGlEs, _) => {
                 if let Some(_) = *EGL {
-                    builder_egl_u = builder.map_sharing(|c| match c.context {
+                    builder_egl_u = builder.map_sharing(|c| match *c.context {
                         X11Context::Egl(ref c) => c,
                         _ => panic!(),
                     });
@@ -211,9 +223,11 @@ impl Context {
         };
 
         let context = Context {
-            xconn: Arc::clone(&xconn),
-            context,
-            colormap,
+            inner: Takeable::new(ContextInner {
+                xconn: Arc::clone(&xconn),
+                colormap,
+            }),
+            context: Takeable::new(context),
         };
 
         Ok((win, context))
@@ -224,8 +238,8 @@ impl Context {
         xconn: Arc<XConnection>,
         xwin: raw::c_ulong,
         pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context>,
-    ) -> Result<Self, CreationError> {
+        gl_attr: &GlAttributes<&Context<T>>,
+    ) -> Result<Context<NotCurrentContext>, CreationError> {
         let attrs = unsafe {
             let mut attrs = ::std::mem::uninitialized();
             (xconn.xlib.XGetWindowAttributes)(xconn.display, xwin, &mut attrs);
@@ -261,9 +275,9 @@ impl Context {
         pf_reqs.depth_bits = Some(attrs.depth as _);
 
         // start the context building process
-        enum Prototype<'a> {
-            Glx(crate::api::glx::ContextPrototype<'a>),
-            Egl(crate::api::egl::ContextPrototype<'a>),
+        enum Prototype<'a, T: ContextCurrentState> {
+            Glx(crate::api::glx::ContextPrototype<'a, T>),
+            Egl(crate::api::egl::ContextPrototype<'a, T>),
         }
 
         let builder = gl_attr.clone();
@@ -278,7 +292,7 @@ impl Context {
                 // GLX should be preferred over EGL, otherwise crashes may occur
                 // on X11 – issue #314
                 if let Some(_) = *GLX {
-                    builder_glx_u = builder.map_sharing(|c| match c.context {
+                    builder_glx_u = builder.map_sharing(|c| match *c.context {
                         X11Context::Glx(ref c) => c,
                         _ => panic!(),
                     });
@@ -292,7 +306,7 @@ impl Context {
                         false,
                     )?)
                 } else if let Some(_) = *EGL {
-                    builder_egl_u = builder.map_sharing(|c| match c.context {
+                    builder_egl_u = builder.map_sharing(|c| match *c.context {
                         X11Context::Egl(ref c) => c,
                         _ => panic!(),
                     });
@@ -311,7 +325,7 @@ impl Context {
             }
             GlRequest::Specific(Api::OpenGlEs, _) => {
                 if let Some(_) = *EGL {
-                    builder_egl_u = builder.map_sharing(|c| match c.context {
+                    builder_egl_u = builder.map_sharing(|c| match *c.context {
                         X11Context::Egl(ref c) => c,
                         _ => panic!(),
                     });
@@ -360,78 +374,131 @@ impl Context {
         };
 
         let context = Context {
-            xconn: Arc::clone(&xconn),
-            context,
-            colormap,
+            inner: Takeable::new(ContextInner {
+                xconn: Arc::clone(&xconn),
+                colormap,
+            }),
+            context: Takeable::new(context),
         };
 
         Ok(context)
     }
 
-    #[inline]
-    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        match self.context {
-            X11Context::Glx(ref ctx) => ctx.make_current(),
-            X11Context::Egl(ref ctx) => ctx.make_current(),
-            X11Context::None => Ok(()),
+    fn state_sub<T2, E, FG, FE>(
+        mut self,
+        fg: FG,
+        fe: FE,
+    ) -> Result<Context<T2>, (Self, E)>
+    where
+        T2: ContextCurrentState,
+        FG: FnOnce(GlxContext<T>) -> Result<GlxContext<T2>, (GlxContext<T>, E)>,
+        FE: FnOnce(EglContext<T>) -> Result<EglContext<T2>, (EglContext<T>, E)>,
+    {
+        let inner = Takeable::take(&mut self.inner);
+        let context = match Takeable::take(&mut self.context) {
+            X11Context::Glx(ctx) => match fg(ctx) {
+                Ok(ctx) => Ok(X11Context::Glx(ctx)),
+                Err((ctx, err)) => Err((X11Context::Glx(ctx), err)),
+            },
+            X11Context::Egl(ctx) => match fe(ctx) {
+                Ok(ctx) => Ok(X11Context::Egl(ctx)),
+                Err((ctx, err)) => Err((X11Context::Egl(ctx), err)),
+            },
+        };
+
+        match context {
+            Ok(context) => Ok(Context {
+                context: Takeable::new(context),
+                inner: Takeable::new(inner),
+            }),
+            Err((context, err)) => Err((
+                Context {
+                    context: Takeable::new(context),
+                    inner: Takeable::new(inner),
+                },
+                err,
+            )),
         }
+    }
+
+    #[inline]
+    pub unsafe fn make_current(
+        self,
+    ) -> Result<Context<PossiblyCurrentContext>, (Self, ContextError)> {
+        self.state_sub(|ctx| ctx.make_current(), |ctx| ctx.make_current())
+    }
+
+    #[inline]
+    pub unsafe fn make_not_current(
+        self,
+    ) -> Result<Context<NotCurrentContext>, (Self, ContextError)> {
+        self.state_sub(
+            |ctx| ctx.make_not_current(),
+            |ctx| ctx.make_not_current(),
+        )
+    }
+
+    #[inline]
+    pub unsafe fn treat_as_not_current(self) -> Context<NotCurrentContext> {
+        self.state_sub::<_, (), _, _>(
+            |ctx| Ok(ctx.treat_as_not_current()),
+            |ctx| Ok(ctx.treat_as_not_current()),
+        )
+        .unwrap()
     }
 
     #[inline]
     pub fn is_current(&self) -> bool {
-        match self.context {
+        match *self.context {
             X11Context::Glx(ref ctx) => ctx.is_current(),
             X11Context::Egl(ref ctx) => ctx.is_current(),
-            X11Context::None => panic!(),
-        }
-    }
-
-    #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const () {
-        match self.context {
-            X11Context::Glx(ref ctx) => ctx.get_proc_address(addr),
-            X11Context::Egl(ref ctx) => ctx.get_proc_address(addr),
-            X11Context::None => std::ptr::null(),
-        }
-    }
-
-    #[inline]
-    pub fn swap_buffers(&self) -> Result<(), ContextError> {
-        match self.context {
-            X11Context::Glx(ref ctx) => ctx.swap_buffers(),
-            X11Context::Egl(ref ctx) => ctx.swap_buffers(),
-            X11Context::None => Ok(()),
         }
     }
 
     #[inline]
     pub fn get_api(&self) -> Api {
-        match self.context {
+        match *self.context {
             X11Context::Glx(ref ctx) => ctx.get_api(),
             X11Context::Egl(ref ctx) => ctx.get_api(),
-            X11Context::None => panic!(),
         }
     }
 
     #[inline]
-    pub fn get_pixel_format(&self) -> PixelFormat {
-        match self.context {
-            X11Context::Glx(ref ctx) => ctx.get_pixel_format(),
-            X11Context::Egl(ref ctx) => ctx.get_pixel_format(),
-            X11Context::None => panic!(),
-        }
-    }
-
-    #[inline]
-    pub unsafe fn raw_handle(&self) -> &X11Context {
+    pub unsafe fn raw_handle(&self) -> &X11Context<T> {
         &self.context
     }
 
     #[inline]
     pub unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
-        match self.context {
+        match *self.context {
             X11Context::Egl(ref ctx) => Some(ctx.get_egl_display()),
             _ => None,
+        }
+    }
+}
+
+impl Context<PossiblyCurrentContext> {
+    #[inline]
+    pub fn get_proc_address(&self, addr: &str) -> *const () {
+        match *self.context {
+            X11Context::Glx(ref ctx) => ctx.get_proc_address(addr),
+            X11Context::Egl(ref ctx) => ctx.get_proc_address(addr),
+        }
+    }
+
+    #[inline]
+    pub fn swap_buffers(&self) -> Result<(), ContextError> {
+        match *self.context {
+            X11Context::Glx(ref ctx) => ctx.swap_buffers(),
+            X11Context::Egl(ref ctx) => ctx.swap_buffers(),
+        }
+    }
+
+    #[inline]
+    pub fn get_pixel_format(&self) -> PixelFormat {
+        match *self.context {
+            X11Context::Glx(ref ctx) => ctx.get_pixel_format(),
+            X11Context::Egl(ref ctx) => ctx.get_pixel_format(),
         }
     }
 }

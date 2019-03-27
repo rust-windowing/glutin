@@ -8,7 +8,7 @@
 
 use crate::os::ContextTraitExt;
 pub use crate::platform::{OsMesaContextExt, RawContextExt, RawHandle};
-use crate::Context;
+use crate::{Context, ContextCurrentState};
 pub use glutin_egl_sys::EGLContext;
 pub use glutin_glx_sys::GLXContext;
 
@@ -21,7 +21,7 @@ pub use winit::os::unix::XWindowType;
 
 use std::os::raw;
 
-impl ContextTraitExt for Context {
+impl<T: ContextCurrentState> ContextTraitExt for Context<T> {
     type Handle = RawHandle;
 
     #[inline]

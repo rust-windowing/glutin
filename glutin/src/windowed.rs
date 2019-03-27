@@ -1,5 +1,7 @@
 use super::*;
 
+use std::marker::PhantomData;
+
 /// Represents an OpenGL context and the `Window` with which it is associated.
 ///
 /// # Example
@@ -36,12 +38,12 @@ pub type WindowedContext<T> = ContextWrapper<T, Window>;
 pub type RawContext<T> = ContextWrapper<T, ()>;
 
 #[derive(Debug)]
-pub struct ContextWrapper<T, W> {
-    context: Context<T>,
-    window: W,
+pub struct ContextWrapper<T: ContextCurrentState, W> {
+    pub(crate) context: Context<T>,
+    pub(crate) window: W,
 }
 
-impl<T, W> ContextWrapper<T, W> {
+impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
     /// Borrow the inner `W`.
     pub fn window(&self) -> &W {
         &self.window
@@ -53,7 +55,7 @@ impl<T, W> ContextWrapper<T, W> {
     }
 }
 
-impl<W> ContextWrapper<CurrentContext, W> {
+impl<W> ContextWrapper<PossiblyCurrentContext, W> {
     /// Swaps the buffers in case of double or triple buffering.
     ///
     /// You should call this function every time you have finished rendering, or
@@ -86,20 +88,32 @@ impl<W> ContextWrapper<CurrentContext, W> {
     }
 }
 
-impl<T, W> ContextTrait for ContextWrapper<T, W> {
-    type CurrentContext = ContextWrapper<CurrentContext, W>;
+impl<T: ContextCurrentState, W> ContextTrait for ContextWrapper<T, W> {
+    type PossiblyCurrentContext = ContextWrapper<PossiblyCurrentContext, W>;
     type NotCurrentContext = ContextWrapper<NotCurrentContext, W>;
 
-    unsafe fn make_current(self) -> Result<Self::CurrentContext, (Self, ContextError)> {
-        self.context.make_current()
-            .map(|context| ContextWrapper { window: self.window, context })
-            .map_err(|(context, err)| (ContextWrapper { window: self.window, context }, err))
+    unsafe fn make_current(
+        self,
+    ) -> Result<Self::PossiblyCurrentContext, (Self, ContextError)> {
+        let window = self.window;
+        match self.context.make_current() {
+            Ok(context) => Ok(ContextWrapper { window, context }),
+            Err((context, err)) => {
+                Err((ContextWrapper { window, context }, err))
+            }
+        }
     }
 
-    unsafe fn make_not_current(self) -> Result<Self::NotCurrentContext, (Self, ContextError)> {
-        self.context.make_not_current()
-            .map(|context| ContextWrapper { window: self.window, context })
-            .map_err(|(context, err)| (ContextWrapper { window: self.window, context }, err))
+    unsafe fn make_not_current(
+        self,
+    ) -> Result<Self::NotCurrentContext, (Self, ContextError)> {
+        let window = self.window;
+        match self.context.make_not_current() {
+            Ok(context) => Ok(ContextWrapper { window, context }),
+            Err((context, err)) => {
+                Err((ContextWrapper { window, context }, err))
+            }
+        }
     }
 
     unsafe fn treat_as_not_current(self) -> Self::NotCurrentContext {
@@ -112,26 +126,28 @@ impl<T, W> ContextTrait for ContextWrapper<T, W> {
     fn is_current(&self) -> bool {
         self.context.is_current()
     }
-}
-
-impl<W> CurrentContextTrait for ContextWrapper<CurrentContext, W> {
-    fn get_proc_address(&self, addr: &str) -> *const () {
-        self.context.get_proc_address(addr)
-    }
 
     fn get_api(&self) -> Api {
         self.context.get_api()
     }
 }
 
-impl<T, W> std::ops::Deref for ContextWrapper<T, W> {
-    type Target = W;
-    fn deref(&self) -> &Self::Target {
-        &self.window
+impl<W> PossiblyCurrentContextTrait
+    for ContextWrapper<PossiblyCurrentContext, W>
+{
+    fn get_proc_address(&self, addr: &str) -> *const () {
+        self.context.get_proc_address(addr)
     }
 }
 
-impl<'a, T> ContextBuilder<'a, T> {
+impl<T: ContextCurrentState, W> std::ops::Deref for ContextWrapper<T, W> {
+    type Target = Context<T>;
+    fn deref(&self) -> &Self::Target {
+        &self.context
+    }
+}
+
+impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     /// Builds the given window along with the associated GL context, returning
     /// the pair as a `WindowedContext`.
     ///
@@ -153,7 +169,10 @@ impl<'a, T> ContextBuilder<'a, T> {
         platform::Context::new_windowed(wb, el, &pf_reqs, &gl_attr).map(
             |(window, context)| WindowedContext {
                 window,
-                context: Context { context },
+                context: Context {
+                    context,
+                    phantom: PhantomData,
+                },
             },
         )
     }

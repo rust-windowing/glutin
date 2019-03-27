@@ -2,31 +2,42 @@
 
 mod support;
 
-use glutin::ContextTrait;
-use support::gl;
+use glutin::PossiblyCurrentContext;
+use support::{gl, ContextCurrentWrapper, ContextTracker, ContextWrapper};
 
 fn main() {
     let mut el = glutin::EventsLoop::new();
     let mut size = glutin::dpi::PhysicalSize::new(768., 480.);
 
-    let headless_context = glutin::ContextBuilder::new()
-        .build_headless(&el, size)
-        .unwrap();
+    let mut ct = ContextTracker::default();
+
+    let cb: glutin::ContextBuilder<PossiblyCurrentContext> =
+        glutin::ContextBuilder::new();
+    let headless_context = cb.build_headless(&el, size).unwrap();
 
     let wb = glutin::WindowBuilder::new()
         .with_title("A fantastic window!")
         .with_dimensions(glutin::dpi::LogicalSize::from_physical(size, 1.0));
-    let windowed_context = glutin::ContextBuilder::new()
+    let cb: glutin::ContextBuilder<PossiblyCurrentContext> =
+        glutin::ContextBuilder::new();
+    let windowed_context = cb
         .with_shared_lists(&headless_context)
         .build_windowed(wb, &el)
         .unwrap();
 
-    unsafe { windowed_context.make_current().unwrap() }
+    let headless_id = ct.insert(ContextCurrentWrapper::NotCurrent(
+        ContextWrapper::Headless(headless_context),
+    ));
+    let windowed_id = ct.insert(ContextCurrentWrapper::NotCurrent(
+        ContextWrapper::Windowed(windowed_context),
+    ));
+
+    let windowed_context = ct.get_current(windowed_id).unwrap();
     println!(
         "Pixel format of the window's GL context: {:?}",
-        windowed_context.get_pixel_format()
+        windowed_context.windowed().get_pixel_format()
     );
-    let glw = support::load(&windowed_context.context());
+    let glw = support::load(&windowed_context.windowed().context());
 
     let mut render_tex = 0;
     unsafe {
@@ -54,9 +65,10 @@ fn main() {
             0,
         );
     }
+    std::mem::drop(windowed_context);
 
-    unsafe { headless_context.make_current().unwrap() }
-    let glc = support::load(&headless_context);
+    let headless_context = ct.get_current(headless_id).unwrap();
+    let glc = support::load(&headless_context.headless());
 
     let mut context_fb = 0;
     unsafe {
@@ -71,6 +83,7 @@ fn main() {
         );
         glc.gl.Viewport(0, 0, size.width as _, size.height as _);
     }
+    std::mem::drop(headless_context);
 
     let mut running = true;
     while running {
@@ -80,13 +93,17 @@ fn main() {
                 glutin::Event::WindowEvent { event, .. } => match event {
                     glutin::WindowEvent::CloseRequested => running = false,
                     glutin::WindowEvent::Resized(logical_size) => {
-                        unsafe { windowed_context.make_current().unwrap() }
-                        let dpi_factor = windowed_context.get_hidpi_factor();
+                        let windowed_context =
+                            ct.get_current(windowed_id).unwrap();
+                        let dpi_factor = windowed_context
+                            .windowed()
+                            .window()
+                            .get_hidpi_factor();
                         size = logical_size.to_physical(dpi_factor);
-                        windowed_context.resize(size);
+                        windowed_context.windowed().resize(size);
 
                         unsafe {
-                            windowed_context.swap_buffers().unwrap();
+                            windowed_context.windowed().swap_buffers().unwrap();
                             glw.gl.DeleteTextures(1, &render_tex);
                             glw.gl.DeleteFramebuffers(1, &window_fb);
 
@@ -113,8 +130,9 @@ fn main() {
                                 render_tex,
                                 0,
                             );
+                            std::mem::drop(windowed_context);
 
-                            let _ = headless_context.make_current();
+                            let _ = ct.get_current(headless_id).unwrap();
                             glc.gl.DeleteFramebuffers(1, &context_fb);
 
                             glc.gl.GenFramebuffers(1, &mut context_fb);
@@ -141,10 +159,11 @@ fn main() {
             }
         });
 
-        unsafe { headless_context.make_current().unwrap() }
+        let headless_context = ct.get_current(headless_id).unwrap();
         glc.draw_frame([1.0, 0.5, 0.7, 1.0]);
+        std::mem::drop(headless_context);
 
-        unsafe { windowed_context.make_current().unwrap() }
+        let windowed_context = ct.get_current(windowed_id).unwrap();
         unsafe {
             glw.gl.BlitFramebuffer(
                 0,
@@ -159,14 +178,15 @@ fn main() {
                 gl::NEAREST,
             );
         }
-        let _ = windowed_context.swap_buffers();
+        windowed_context.windowed().swap_buffers().unwrap();
     }
 
     unsafe {
-        let _ = windowed_context.make_current();
+        let windowed_context = ct.get_current(windowed_id).unwrap();
         glw.gl.DeleteTextures(1, &render_tex);
         glw.gl.DeleteFramebuffers(1, &window_fb);
-        let _ = headless_context.make_current();
+        std::mem::drop(windowed_context);
+        let _ = ct.get_current(headless_id).unwrap();
         glc.gl.DeleteFramebuffers(1, &context_fb);
     }
 }

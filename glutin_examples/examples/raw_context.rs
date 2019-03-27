@@ -11,7 +11,7 @@ fn main() {
 #[cfg(any(target_os = "linux", target_os = "windows"))]
 mod this_example {
     use super::support;
-    use glutin::ContextTrait;
+    use glutin::{ContextTrait, PossiblyCurrentContext};
 
     pub fn main() {
         let (raw_context, mut el, win) = {
@@ -26,7 +26,8 @@ mod this_example {
                 use glutin::os::unix::RawContextExt;
                 use winit::os::unix::{EventsLoopExt, WindowExt};
 
-                let cb = glutin::ContextBuilder::new();
+                let cb: glutin::ContextBuilder<PossiblyCurrentContext> =
+                    glutin::ContextBuilder::new();
                 let raw_context;
 
                 if el.is_wayland() {
@@ -39,19 +40,16 @@ mod this_example {
                         win.get_wayland_display().unwrap() as *const _;
                     let surface = win.get_wayland_surface().unwrap();
 
-                    raw_context = glutin::Context::new_raw_wayland_context(
+                    raw_context = cb.build_raw_wayland_context(
                         display_ptr,
                         surface,
                         width,
                         height,
-                        cb,
                     );
                 } else {
                     let xconn = el.get_xlib_xconnection().unwrap();
                     let xwindow = win.get_xlib_window().unwrap();
-                    raw_context = glutin::Context::new_raw_x11_context(
-                        xconn, xwindow, cb,
-                    );
+                    raw_context = cb.build_raw_x11_context(xconn, xwindow);
                 }
 
                 (raw_context.unwrap(), el, win)
@@ -70,7 +68,7 @@ mod this_example {
             }
         };
 
-        unsafe { raw_context.make_current().unwrap() }
+        let raw_context = unsafe { raw_context.make_current().unwrap() };
 
         println!(
             "Pixel format of the window's GL context: {:?}",

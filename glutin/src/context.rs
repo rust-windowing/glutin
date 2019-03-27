@@ -24,31 +24,106 @@ use std::marker::PhantomData;
 /// # }
 /// ```
 #[derive(Debug)]
-pub struct Context<T> {
+pub struct Context<T: ContextCurrentState> {
     pub(crate) context: platform::Context<T>,
-    phantom: PhantomData<T>,
+    pub(crate) phantom: PhantomData<T>,
+}
+
+/// A trait for types associated with a GL context.
+pub trait ContextTrait
+where
+    Self: Sized,
+{
+    type PossiblyCurrentContext: PossiblyCurrentContextTrait
+        + ContextTrait<
+            PossiblyCurrentContext = Self::PossiblyCurrentContext,
+            NotCurrentContext = Self::NotCurrentContext,
+        >;
+    type NotCurrentContext: ContextTrait<
+        PossiblyCurrentContext = Self::PossiblyCurrentContext,
+        NotCurrentContext = Self::NotCurrentContext,
+    >;
+
+    /// Sets the context as the current context.
+    unsafe fn make_current(
+        self,
+    ) -> Result<Self::PossiblyCurrentContext, (Self, ContextError)>;
+
+    /// If this context is current, makes the context not current.
+    unsafe fn make_not_current(
+        self,
+    ) -> Result<Self::NotCurrentContext, (Self, ContextError)>;
+
+    /// Treats the context as not current, even if it is current.
+    ///
+    /// It is preferable to use `make_not_current`.
+    unsafe fn treat_as_not_current(self) -> Self::NotCurrentContext;
+
+    /// Returns true if this context is the current one in this thread.
+    fn is_current(&self) -> bool;
+
+    /// Returns the OpenGL API being used.
+    fn get_api(&self) -> Api;
+}
+
+pub trait PossiblyCurrentContextTrait {
+    /// Returns the address of an OpenGL function.
+    fn get_proc_address(&self, addr: &str) -> *const ();
 }
 
 #[derive(Debug)]
-pub enum CurrentContext {}
+pub enum PossiblyCurrentContext {}
 
 #[derive(Debug)]
 pub enum NotCurrentContext {}
 
-impl<T> ContextTrait for Context<T> {
-    type CurrentContext = Context<CurrentContext>;
+pub trait ContextCurrentState: std::fmt::Debug {}
+
+impl ContextCurrentState for PossiblyCurrentContext {}
+impl ContextCurrentState for NotCurrentContext {}
+
+impl<T: ContextCurrentState> ContextTrait for Context<T> {
+    type PossiblyCurrentContext = Context<PossiblyCurrentContext>;
     type NotCurrentContext = Context<NotCurrentContext>;
 
-    unsafe fn make_current(self) -> Result<Self::CurrentContext, (Self, ContextError)> {
-        self.context.make_current()
-            .map(|context| Context { context, phantom: PhantomData })
-            .map_err(|(context, err)| (Context { context, phantom: PhantomData }, err))
+    unsafe fn make_current(
+        self,
+    ) -> Result<Self::PossiblyCurrentContext, (Self, ContextError)> {
+        self.context
+            .make_current()
+            .map(|context| Context {
+                context,
+                phantom: PhantomData,
+            })
+            .map_err(|(context, err)| {
+                (
+                    Context {
+                        context,
+                        phantom: PhantomData,
+                    },
+                    err,
+                )
+            })
     }
 
-    unsafe fn make_not_current(self) -> Result<Self::NotCurrentContext, (Self, ContextError)> {
-        self.context.make_not_current()
-            .map(|context| Context { context, phantom: PhantomData })
-            .map_err(|(context, err)| (Context { context, phantom: PhantomData }, err))
+    unsafe fn make_not_current(
+        self,
+    ) -> Result<Self::NotCurrentContext, (Self, ContextError)> {
+        self.context
+            .make_not_current()
+            .map(|context| Context {
+                context,
+                phantom: PhantomData,
+            })
+            .map_err(|(context, err)| {
+                (
+                    Context {
+                        context,
+                        phantom: PhantomData,
+                    },
+                    err,
+                )
+            })
     }
 
     unsafe fn treat_as_not_current(self) -> Self::NotCurrentContext {
@@ -61,19 +136,19 @@ impl<T> ContextTrait for Context<T> {
     fn is_current(&self) -> bool {
         self.context.is_current()
     }
-}
-
-impl CurrentContextTrait for Context<CurrentContext> {
-    fn get_proc_address(&self, addr: &str) -> *const () {
-        self.context.get_proc_address(addr)
-    }
 
     fn get_api(&self) -> Api {
         self.context.get_api()
     }
 }
 
-impl<'a, T> ContextBuilder<'a, T> {
+impl PossiblyCurrentContextTrait for Context<PossiblyCurrentContext> {
+    fn get_proc_address(&self, addr: &str) -> *const () {
+        self.context.get_proc_address(addr)
+    }
+}
+
+impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     /// Builds the given GL context.
     ///
     /// One notable limitation of the Wayland backend when it comes to shared
@@ -91,7 +166,11 @@ impl<'a, T> ContextBuilder<'a, T> {
     ) -> Result<Context<NotCurrentContext>, CreationError> {
         let ContextBuilder { pf_reqs, gl_attr } = self;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
-        platform::Context::new_headless(el, &pf_reqs, &gl_attr, dims)
-            .map(|context| Context { context, phantom: PhantomData })
+        platform::Context::new_headless(el, &pf_reqs, &gl_attr, dims).map(
+            |context| Context {
+                context,
+                phantom: PhantomData,
+            },
+        )
     }
 }

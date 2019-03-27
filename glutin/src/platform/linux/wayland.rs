@@ -1,7 +1,8 @@
 use crate::api::egl::{Context as EglContext, NativeDisplay};
 use crate::{
-    ContextError, CreationError, GlAttributes, PixelFormat,
-    PixelFormatRequirements,
+    ContextCurrentState, ContextError, CreationError, GlAttributes,
+    NotCurrentContext, PixelFormat, PixelFormatRequirements,
+    PossiblyCurrentContext,
 };
 
 use glutin_egl_sys as ffi;
@@ -14,20 +15,21 @@ use std::os::raw;
 use std::sync::Arc;
 
 #[derive(DebugStub)]
-pub struct Context {
+pub struct Context<T: ContextCurrentState> {
     #[debug_stub = "Arc<wegl::WlEglSurface>"]
     egl_surface: Arc<wegl::WlEglSurface>,
-    context: EglContext,
+    context: EglContext<T>,
 }
 
-impl Context {
+impl<T: ContextCurrentState> Context<T> {
     #[inline]
     pub fn new(
         wb: winit::WindowBuilder,
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context>,
-    ) -> Result<(winit::Window, Self), CreationError> {
+        gl_attr: &GlAttributes<&Context<T>>,
+    ) -> Result<(winit::Window, Context<NotCurrentContext>), CreationError>
+    {
         let win = wb.build(el)?;
 
         let dpi_factor = win.get_hidpi_factor();
@@ -61,8 +63,8 @@ impl Context {
         width: u32,
         height: u32,
         pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context>,
-    ) -> Result<Self, CreationError> {
+        gl_attr: &GlAttributes<&Context<T>>,
+    ) -> Result<Context<NotCurrentContext>, CreationError> {
         let egl_surface = unsafe {
             wegl::WlEglSurface::new_from_raw(
                 surface as *mut _,
@@ -85,18 +87,78 @@ impl Context {
     }
 
     #[inline]
-    pub fn resize(&self, width: u32, height: u32) {
-        self.egl_surface.resize(width as i32, height as i32, 0, 0);
+    pub unsafe fn make_current(
+        self,
+    ) -> Result<Context<PossiblyCurrentContext>, (Self, ContextError)> {
+        let egl_surface = self.egl_surface;
+        match self.context.make_current() {
+            Ok(context) => Ok(Context {
+                context,
+                egl_surface,
+            }),
+            Err((context, err)) => Err((
+                Context {
+                    context,
+                    egl_surface,
+                },
+                err,
+            )),
+        }
     }
 
     #[inline]
-    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        self.context.make_current()
+    pub unsafe fn make_not_current(
+        self,
+    ) -> Result<Context<NotCurrentContext>, (Self, ContextError)> {
+        let egl_surface = self.egl_surface;
+        match self.context.make_not_current() {
+            Ok(context) => Ok(Context {
+                context,
+                egl_surface,
+            }),
+            Err((context, err)) => Err((
+                Context {
+                    context,
+                    egl_surface,
+                },
+                err,
+            )),
+        }
+    }
+
+    #[inline]
+    pub unsafe fn treat_as_not_current(self) -> Context<NotCurrentContext> {
+        Context {
+            egl_surface: self.egl_surface,
+            context: self.context.treat_as_not_current(),
+        }
     }
 
     #[inline]
     pub fn is_current(&self) -> bool {
         self.context.is_current()
+    }
+
+    #[inline]
+    pub fn get_api(&self) -> crate::Api {
+        self.context.get_api()
+    }
+
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> ffi::EGLContext {
+        self.context.raw_handle()
+    }
+
+    #[inline]
+    pub unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
+        Some(self.context.get_egl_display())
+    }
+}
+
+impl Context<PossiblyCurrentContext> {
+    #[inline]
+    pub fn resize(&self, width: u32, height: u32) {
+        self.egl_surface.resize(width as i32, height as i32, 0, 0);
     }
 
     #[inline]
@@ -110,22 +172,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_api(&self) -> crate::Api {
-        self.context.get_api()
-    }
-
-    #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         self.context.get_pixel_format().clone()
-    }
-
-    #[inline]
-    pub unsafe fn raw_handle(&self) -> ffi::EGLContext {
-        self.context.raw_handle()
-    }
-
-    #[inline]
-    pub unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
-        Some(self.context.get_egl_display())
     }
 }

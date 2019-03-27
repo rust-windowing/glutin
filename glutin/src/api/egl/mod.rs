@@ -61,23 +61,26 @@ mod make_current_guard;
 pub use self::egl::Egl;
 use self::make_current_guard::MakeCurrentGuard;
 use crate::{
-    Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
-    PixelFormatRequirements, ReleaseBehavior, Robustness,
+    Api, ContextCurrentState, ContextError, CreationError, GlAttributes,
+    GlRequest, NotCurrentContext, PixelFormat, PixelFormatRequirements,
+    PossiblyCurrentContext, ReleaseBehavior, Robustness,
 };
 
 use glutin_egl_sys as ffi;
+use takeable_option::Takeable;
 #[cfg(any(target_os = "android", target_os = "windows"))]
 use winit::dpi;
 
 use std::cell::Cell;
 use std::ffi::{CStr, CString};
+use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::os::raw;
 
 impl Deref for Egl {
     type Target = ffi::egl::Egl;
 
-    fn deref(&self) -> &ffi::egl::Egl {
+    fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
@@ -112,7 +115,7 @@ pub enum NativeDisplay {
 }
 
 #[derive(Debug)]
-pub struct Context {
+struct ContextInner {
     display: ffi::egl::types::EGLDisplay,
     context: ffi::egl::types::EGLContext,
     surface: Cell<ffi::egl::types::EGLSurface>,
@@ -120,6 +123,12 @@ pub struct Context {
     pixel_format: PixelFormat,
     #[cfg(target_os = "android")]
     config_id: ffi::egl::types::EGLConfig,
+}
+
+#[derive(Debug)]
+pub struct Context<T: ContextCurrentState> {
+    inner: Takeable<ContextInner>,
+    phantom: PhantomData<T>,
 }
 
 #[cfg(target_os = "android")]
@@ -287,7 +296,7 @@ fn get_native_display(egl: &Egl, ndisp: NativeDisplay) -> *const raw::c_void {
     }
 }
 
-impl Context {
+impl<T: ContextCurrentState> Context<T> {
     /// Start building an EGL context.
     ///
     /// This function initializes some things and chooses the pixel format.
@@ -296,9 +305,9 @@ impl Context {
     /// `ContextPrototype`.
     pub fn new<'a>(
         pf_reqs: &PixelFormatRequirements,
-        opengl: &'a GlAttributes<&'a Context>,
+        opengl: &'a GlAttributes<&'a Context<T>>,
         ndisp: NativeDisplay,
-    ) -> Result<ContextPrototype<'a>, CreationError> {
+    ) -> Result<ContextPrototype<'a, T>, CreationError> {
         let egl = EGL.as_ref().unwrap();
         // calling `eglGetDisplay` or equivalent
         let display = get_native_display(egl, ndisp);
@@ -414,54 +423,201 @@ impl Context {
         })
     }
 
-    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        let egl = EGL.as_ref().unwrap();
-        let ret = egl.MakeCurrent(
-            self.display,
-            self.surface.get(),
-            self.surface.get(),
-            self.context,
-        );
+    fn state_sub<T2: ContextCurrentState>(
+        mut self,
+        err: Result<(), ContextError>,
+    ) -> Result<Context<T2>, (Self, ContextError)> {
+        match err {
+            Ok(()) => Ok(Context {
+                inner: Takeable::new(Takeable::take(&mut self.inner)),
+                phantom: PhantomData,
+            }),
+            Err(err) => Err((
+                Context {
+                    inner: Takeable::new(Takeable::take(&mut self.inner)),
+                    phantom: PhantomData,
+                },
+                err,
+            )),
+        }
+    }
 
-        if ret == 0 {
+    unsafe fn check_make_current<T2: ContextCurrentState>(
+        self,
+        ret: Option<u32>,
+    ) -> Result<Context<T2>, (Self, ContextError)> {
+        let egl = EGL.as_ref().unwrap();
+        if ret == Some(0) {
             match egl.GetError() as u32 {
                 ffi::egl::CONTEXT_LOST => {
-                    return Err(ContextError::ContextLost)
+                    return self.state_sub(Err(ContextError::ContextLost));
                 }
                 // Can be returned (among other reasons) if the window has been
                 // closed by the user.
-                ffi::egl::BAD_DISPLAY => return Err(ContextError::DisplayLost),
+                ffi::egl::BAD_DISPLAY => return self.state_sub(Err(ContextError::DisplayLost)),
                 err => panic!(
                     "make_current: eglMakeCurrent failed (eglGetError returned 0x{:x})",
                     err
                 ),
             }
         } else {
-            Ok(())
+            self.state_sub(Ok(()))
         }
+    }
+
+    pub unsafe fn make_current(
+        self,
+    ) -> Result<Context<PossiblyCurrentContext>, (Self, ContextError)> {
+        let egl = EGL.as_ref().unwrap();
+        let ret = egl.MakeCurrent(
+            self.inner.display,
+            self.inner.surface.get(),
+            self.inner.surface.get(),
+            self.inner.context,
+        );
+
+        self.check_make_current(Some(ret))
+    }
+
+    pub unsafe fn make_not_current(
+        self,
+    ) -> Result<Context<NotCurrentContext>, (Self, ContextError)> {
+        let egl = EGL.as_ref().unwrap();
+        if egl.GetCurrentSurface(ffi::egl::DRAW as i32)
+            == self.inner.surface.get()
+            || egl.GetCurrentSurface(ffi::egl::READ as i32)
+                == self.inner.surface.get()
+            || egl.GetCurrentContext() == self.inner.context
+        {
+            let ret = egl.MakeCurrent(
+                self.inner.display,
+                ffi::egl::NO_SURFACE,
+                ffi::egl::NO_SURFACE,
+                ffi::egl::NO_CONTEXT,
+            );
+
+            self.check_make_current(Some(ret))
+        } else {
+            self.check_make_current(None)
+        }
+    }
+
+    pub unsafe fn treat_as_not_current(self) -> Context<NotCurrentContext> {
+        let egl = EGL.as_ref().unwrap();
+        self.state_sub(Ok(())).unwrap()
     }
 
     #[inline]
     pub fn is_current(&self) -> bool {
         let egl = EGL.as_ref().unwrap();
-        unsafe { egl.GetCurrentContext() == self.context }
+        unsafe { egl.GetCurrentContext() == self.inner.context }
     }
 
-    pub fn get_proc_address(&self, addr: &str) -> *const () {
+    #[inline]
+    pub fn get_api(&self) -> Api {
+        self.inner.api
+    }
+
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> ffi::egl::types::EGLContext {
+        self.inner.context
+    }
+
+    #[inline]
+    pub unsafe fn get_egl_display(&self) -> ffi::egl::types::EGLDisplay {
+        self.inner.display
+    }
+
+    // Handle Android Life Cycle.
+    // Android has started the activity or sent it to foreground.
+    // Create a new surface and attach it to the recreated ANativeWindow.
+    // Restore the EGLContext.
+    #[cfg(target_os = "android")]
+    pub unsafe fn on_surface_created(&self, nwin: ffi::EGLNativeWindowType) {
+        let egl = EGL.as_ref().unwrap();
+        if self.inner.surface.get() != ffi::egl::NO_SURFACE {
+            return;
+        }
+        self.inner.surface.set(egl.CreateWindowSurface(
+            self.inner.display,
+            self.inner.config_id,
+            nwin,
+            std::ptr::null(),
+        ));
+        if self.inner.surface.get().is_null() {
+            panic!(
+                "on_surface_created: eglCreateWindowSurface failed with 0x{:x}",
+                egl.GetError()
+            )
+        }
+        let ret = egl.MakeCurrent(
+            self.inner.display,
+            self.inner.surface.get(),
+            self.inner.surface.get(),
+            self.inner.context,
+        );
+        if ret == 0 {
+            panic!(
+                "on_surface_created: eglMakeCurrent failed with 0x{:x}",
+                egl.GetError()
+            )
+        }
+    }
+
+    // Handle Android Life Cycle.
+    // Android has stopped the activity or sent it to background.
+    // Release the surface attached to the destroyed ANativeWindow.
+    // The EGLContext is not destroyed so it can be restored later.
+    #[cfg(target_os = "android")]
+    pub unsafe fn on_surface_destroyed(&self) {
+        let egl = EGL.as_ref().unwrap();
+        if self.inner.surface.get() == ffi::egl::NO_SURFACE {
+            return;
+        }
+        let ret = egl.MakeCurrent(
+            self.inner.display,
+            ffi::egl::NO_SURFACE,
+            ffi::egl::NO_SURFACE,
+            ffi::egl::NO_CONTEXT,
+        );
+        if ret == 0 {
+            panic!(
+                "on_surface_destroyed: eglMakeCurrent failed with 0x{:x}",
+                egl.GetError()
+            )
+        }
+
+        egl.DestroySurface(self.inner.display, self.inner.surface.get());
+        self.inner.surface.set(ffi::egl::NO_SURFACE);
+    }
+
+    /// Unsaftey:
+    ///     Context must be current.
+    #[inline]
+    unsafe fn get_proc_address_impl(&self, addr: &str) -> *const () {
         let egl = EGL.as_ref().unwrap();
         let addr = CString::new(addr.as_bytes()).unwrap();
         let addr = addr.as_ptr();
-        unsafe { egl.GetProcAddress(addr) as *const _ }
+        egl.GetProcAddress(addr) as *const _
+    }
+}
+
+impl Context<PossiblyCurrentContext> {
+    #[inline]
+    pub fn get_proc_address(&self, addr: &str) -> *const () {
+        unsafe { self.get_proc_address_impl(addr) }
     }
 
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
         let egl = EGL.as_ref().unwrap();
-        if self.surface.get() == ffi::egl::NO_SURFACE {
+        if self.inner.surface.get() == ffi::egl::NO_SURFACE {
             return Err(ContextError::ContextLost);
         }
 
-        let ret = unsafe { egl.SwapBuffers(self.display, self.surface.get()) };
+        let ret = unsafe {
+            egl.SwapBuffers(self.inner.display, self.inner.surface.get())
+        };
 
         if ret == 0 {
             match unsafe { egl.GetError() } as u32 {
@@ -479,188 +635,119 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_api(&self) -> Api {
-        self.api
-    }
-
-    #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
-        self.pixel_format.clone()
-    }
-
-    #[inline]
-    pub unsafe fn raw_handle(&self) -> ffi::egl::types::EGLContext {
-        self.context
-    }
-
-    #[inline]
-    pub unsafe fn get_egl_display(&self) -> ffi::egl::types::EGLDisplay {
-        self.display
-    }
-
-    // Handle Android Life Cycle.
-    // Android has started the activity or sent it to foreground.
-    // Create a new surface and attach it to the recreated ANativeWindow.
-    // Restore the EGLContext.
-    #[cfg(target_os = "android")]
-    pub unsafe fn on_surface_created(&self, nwin: ffi::EGLNativeWindowType) {
-        let egl = EGL.as_ref().unwrap();
-        if self.surface.get() != ffi::egl::NO_SURFACE {
-            return;
-        }
-        self.surface.set(egl.CreateWindowSurface(
-            self.display,
-            self.config_id,
-            nwin,
-            std::ptr::null(),
-        ));
-        if self.surface.get().is_null() {
-            panic!(
-                "on_surface_created: eglCreateWindowSurface failed with 0x{:x}",
-                egl.GetError()
-            )
-        }
-        let ret = egl.MakeCurrent(
-            self.display,
-            self.surface.get(),
-            self.surface.get(),
-            self.context,
-        );
-        if ret == 0 {
-            panic!(
-                "on_surface_created: eglMakeCurrent failed with 0x{:x}",
-                egl.GetError()
-            )
-        }
-    }
-
-    // Handle Android Life Cycle.
-    // Android has stopped the activity or sent it to background.
-    // Release the surface attached to the destroyed ANativeWindow.
-    // The EGLContext is not destroyed so it can be restored later.
-    #[cfg(target_os = "android")]
-    pub unsafe fn on_surface_destroyed(&self) {
-        let egl = EGL.as_ref().unwrap();
-        if self.surface.get() == ffi::egl::NO_SURFACE {
-            return;
-        }
-        let ret = egl.MakeCurrent(
-            self.display,
-            ffi::egl::NO_SURFACE,
-            ffi::egl::NO_SURFACE,
-            ffi::egl::NO_CONTEXT,
-        );
-        if ret == 0 {
-            panic!(
-                "on_surface_destroyed: eglMakeCurrent failed with 0x{:x}",
-                egl.GetError()
-            )
-        }
-
-        egl.DestroySurface(self.display, self.surface.get());
-        self.surface.set(ffi::egl::NO_SURFACE);
+        self.inner.pixel_format.clone()
     }
 }
 
-unsafe impl Send for Context {}
-unsafe impl Sync for Context {}
+unsafe impl<T: ContextCurrentState> Send for Context<T> {}
+unsafe impl<T: ContextCurrentState> Sync for Context<T> {}
 
-impl Drop for Context {
+impl<T: ContextCurrentState> Drop for Context<T> {
     fn drop(&mut self) {
-        // https://stackoverflow.com/questions/54402688/recreate-eglcreatewindowsurface-with-same-native-window
-        let egl = EGL.as_ref().unwrap();
-        unsafe {
-            // Ok, so we got to call `glFinish` before destroying the context to
-            // ensure it actually gets destroyed. This requires making the this
-            // context current.
-            let mut guard = MakeCurrentGuard::new(
-                self.display,
-                self.surface.get(),
-                self.surface.get(),
-                self.context,
-            )
-            .map_err(|err| ContextError::OsError(err))
-            .unwrap();
+        if let Some(mut inner) = Takeable::try_take(&mut self.inner) {
+            unsafe {
+                // https://stackoverflow.com/questions/54402688/recreate-eglcreatewindowsurface-with-same-native-window
+                let egl = EGL.as_ref().unwrap();
+                // Ok, so we got to call `glFinish` before destroying the
+                // context to ensure it actually gets destroyed.
+                // This requires making the this
+                // context current.
+                let mut guard = MakeCurrentGuard::new(
+                    inner.display,
+                    inner.surface.get(),
+                    inner.surface.get(),
+                    inner.context,
+                )
+                .map_err(|err| ContextError::OsError(err))
+                .unwrap();
 
-            guard.if_any_same_then_invalidate(
-                self.display,
-                self.surface.get(),
-                self.surface.get(),
-                self.context,
-            );
+                guard.if_any_same_then_invalidate(
+                    inner.surface.get(),
+                    inner.surface.get(),
+                    inner.context,
+                );
 
-            let gl_finish_fn = self.get_proc_address("glFinish");
-            assert!(gl_finish_fn != std::ptr::null());
-            let gl_finish_fn =
-                std::mem::transmute::<_, extern "system" fn()>(gl_finish_fn);
-            gl_finish_fn();
+                let gl_finish_fn = self.get_proc_address_impl("glFinish");
+                assert!(gl_finish_fn != std::ptr::null());
+                let gl_finish_fn = std::mem::transmute::<_, extern "system" fn()>(
+                    gl_finish_fn,
+                );
+                gl_finish_fn();
 
-            egl.DestroyContext(self.display, self.context);
-            self.context = ffi::egl::NO_CONTEXT;
-            egl.DestroySurface(self.display, self.surface.get());
-            self.surface.set(ffi::egl::NO_SURFACE);
+                egl.DestroyContext(inner.display, inner.context);
+                inner.context = ffi::egl::NO_CONTEXT;
+                egl.DestroySurface(inner.display, inner.surface.get());
+                inner.surface.set(ffi::egl::NO_SURFACE);
 
-            // In a reasonable world, we could uncomment the line bellow.
-            //
-            // This is no such world. Lets talk about something.
-            //
-            // You see, every call to `get_native_display` returns the exact
-            // same display, just look at the docs:
-            //
-            //  "Multiple calls made to eglGetDisplay with the same display_id
-            //  will return the same EGLDisplay handle."
-            //
-            // My EGL implementation does not do any ref counting, nor do the
-            // EGL docs mention ref counting anywhere.  In fact, the docs state
-            // that there will be *no effect*, which, in a way, implies no ref
-            // counting:
-            //
-            //      "Initializing an already initialized EGL display connection
-            //      has no effect besides returning the version numbers."
-            //
-            // So, if we terminate the display, other people who are using it
-            // won't be so happy.
-            //
-            // Well, how did I stumble on this issue you might ask...
-            //
-            // In this case, the "other people" was us, for it appears my EGL
-            // implementation does not follow the docs, or maybe I'm misreading
-            // them. You see, according to the egl docs:
-            //
-            //      "To release the current context without assigning a new one,
-            //      set context to EGL_NO_CONTEXT and set draw and read to
-            //      EGL_NO_SURFACE. [...] ******This is the only case where an
-            //      uninitialized display may be passed to
-            //      eglMakeCurrent.******"
-            // (Emphasis mine).
-            //
-            // Well, my computer returns EGL_BAD_DISPLAY if the display passed
-            // to eglMakeCurrent is uninitialized, which allowed to me to spot
-            // this issue.
-            //
-            // I would have assumed that if EGL was going to provide us with the
-            // same EGLDisplay that they'd at least do some ref counting, but
-            // they don't.
-            //
-            // FIXME: Technically we are leaking resources, not much we can do.
-            // Yeah, we could have a global static that does ref counting
-            // ourselves, but what if some other library is using the display.
-            //
-            // On Linux, we could preload a little lib that does ref counting on
-            // that level, but:
-            //      A) What about other platforms?
-            //      B) Do you *really* want all glutin programs to preload a
-            //      library?
-            //      C) Who the hell is going to maintain that?
-            //
-            // egl.Terminate(self.display);
+                // In a reasonable world, we could uncomment the line bellow.
+                //
+                // This is no such world. Lets talk about something.
+                //
+                // You see, every call to `get_native_display` returns the exact
+                // same display, just look at the docs:
+                //
+                //  "Multiple calls made to eglGetDisplay with the same
+                // display_id  will return the same EGLDisplay
+                // handle."
+                //
+                // My EGL implementation does not do any ref counting, nor do
+                // the EGL docs mention ref counting anywhere.
+                // In fact, the docs state that there will be
+                // *no effect*, which, in a way, implies no ref
+                // counting:
+                //
+                //      "Initializing an already initialized EGL display
+                // connection      has no effect besides
+                // returning the version numbers."
+                //
+                // So, if we terminate the display, other people who are using
+                // it won't be so happy.
+                //
+                // Well, how did I stumble on this issue you might ask...
+                //
+                // In this case, the "other people" was us, for it appears my
+                // EGL implementation does not follow the docs,
+                // or maybe I'm misreading them. You see,
+                // according to the egl docs:
+                //
+                //      "To release the current context without assigning a new
+                // one,      set context to EGL_NO_CONTEXT and
+                // set draw and read to      EGL_NO_SURFACE.
+                // [...] ******This is the only case where an
+                //      uninitialized display may be passed to
+                //      eglMakeCurrent.******"
+                // (Emphasis mine).
+                //
+                // Well, my computer returns EGL_BAD_DISPLAY if the display
+                // passed to eglMakeCurrent is uninitialized,
+                // which allowed to me to spot this issue.
+                //
+                // I would have assumed that if EGL was going to provide us with
+                // the same EGLDisplay that they'd at least do
+                // some ref counting, but they don't.
+                //
+                // FIXME: Technically we are leaking resources, not much we can
+                // do. Yeah, we could have a global static that
+                // does ref counting ourselves, but what if some
+                // other library is using the display.
+                //
+                // On Linux, we could preload a little lib that does ref
+                // counting on that level, but:
+                //      A) What about other platforms?
+                //      B) Do you *really* want all glutin programs to preload a
+                //      library?
+                //      C) Who the hell is going to maintain that?
+                //
+                // egl.Terminate(inner.display);
+            }
         }
     }
 }
 
 #[derive(Debug)]
-pub struct ContextPrototype<'a> {
-    opengl: &'a GlAttributes<&'a Context>,
+pub struct ContextPrototype<'a, T: ContextCurrentState> {
+    opengl: &'a GlAttributes<&'a Context<T>>,
     display: ffi::egl::types::EGLDisplay,
     egl_version: (ffi::egl::types::EGLint, ffi::egl::types::EGLint),
     extensions: Vec<String>,
@@ -670,7 +757,7 @@ pub struct ContextPrototype<'a> {
     pixel_format: PixelFormat,
 }
 
-impl<'a> ContextPrototype<'a> {
+impl<'a, T: ContextCurrentState> ContextPrototype<'a, T> {
     #[cfg(any(
         target_os = "linux",
         target_os = "dragonfly",
@@ -701,7 +788,7 @@ impl<'a> ContextPrototype<'a> {
     pub fn finish(
         self,
         nwin: ffi::EGLNativeWindowType,
-    ) -> Result<Context, CreationError> {
+    ) -> Result<Context<NotCurrentContext>, CreationError> {
         let egl = EGL.as_ref().unwrap();
         let surface = unsafe {
             let surface = egl.CreateWindowSurface(
@@ -725,7 +812,7 @@ impl<'a> ContextPrototype<'a> {
     pub fn finish_pbuffer(
         self,
         dims: dpi::PhysicalSize,
-    ) -> Result<Context, CreationError> {
+    ) -> Result<Context<NotCurrentContext>, CreationError> {
         let dims: (u32, u32) = dims.into();
 
         let egl = EGL.as_ref().unwrap();
@@ -757,9 +844,9 @@ impl<'a> ContextPrototype<'a> {
     fn finish_impl(
         self,
         surface: ffi::egl::types::EGLSurface,
-    ) -> Result<Context, CreationError> {
+    ) -> Result<Context<NotCurrentContext>, CreationError> {
         let share = match self.opengl.sharing {
-            Some(ctx) => ctx.context,
+            Some(ctx) => ctx.inner.context,
             None => std::ptr::null(),
         };
 
@@ -848,13 +935,16 @@ impl<'a> ContextPrototype<'a> {
         };
 
         Ok(Context {
-            display: self.display,
-            context,
-            surface: Cell::new(surface),
-            api: self.api,
-            pixel_format: self.pixel_format,
-            #[cfg(target_os = "android")]
-            config_id: self.config_id,
+            inner: Takeable::new(ContextInner {
+                display: self.display,
+                context,
+                surface: Cell::new(surface),
+                api: self.api,
+                pixel_format: self.pixel_format,
+                #[cfg(target_os = "android")]
+                config_id: self.config_id,
+            }),
+            phantom: PhantomData,
         })
     }
 }

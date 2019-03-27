@@ -1,12 +1,13 @@
 # Unreleased
 
- - **Breaking**: Split `ContextTrait` into `ContextTrait` and `CurrentContextTrait`.
+ - **Breaking**: Split `ContextTrait` into `ContextTrait` and `PossiblyCurrentContextTrait`.
  - **Breaking**: Changed `WindowedContext` and `RawContext` into typedefs of
  `ContextWrapper`.
  - **Breaking**: Removed `new_windowed` and `new_headless` from `WindowedContext`
  and `Context`, respectiveness.
- - **Breaking**: Added two new types, `NotCurrentContext` and `CurrentContext`,
- which `RawContext`, `WindowedContext` and `Context` are now generic over.
+ - **Breaking**: Added two new types, `NotCurrentContext` and `PossiblyCurrentContext`,
+ which `RawContext`, `WindowedContext`, `ContextBuilder` and `Context` are now 
+ generic over.
  - Added `make_not_current` into `ContextTrait`.
  - Added `treat_as_not_current` into `ContextTrait`.
 - We now load `libGL.so` instead of `libGLX.so`.

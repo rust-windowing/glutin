@@ -53,14 +53,18 @@ mod glx {
 pub use self::glx::Glx;
 use self::make_current_guard::MakeCurrentGuard;
 use crate::{
-    Api, ContextError, CreationError, GlAttributes, GlProfile, GlRequest,
-    PixelFormat, PixelFormatRequirements, ReleaseBehavior, Robustness,
+    Api, ContextCurrentState, ContextError, CreationError, GlAttributes,
+    GlProfile, GlRequest, NotCurrentContext, PixelFormat,
+    PixelFormatRequirements, PossiblyCurrentContext, ReleaseBehavior,
+    Robustness,
 };
 
 use glutin_glx_sys as ffi;
+use takeable_option::Takeable;
 use winit::os::unix::x11::XConnection;
 
 use std::ffi::{CStr, CString};
+use std::marker::PhantomData;
 use std::os::raw;
 use std::sync::Arc;
 
@@ -69,21 +73,27 @@ lazy_static! {
 }
 
 #[derive(Debug)]
-pub struct Context {
+struct ContextInner {
     xconn: Arc<XConnection>,
     window: ffi::Window,
     context: ffi::GLXContext,
     pixel_format: PixelFormat,
 }
 
-impl Context {
+#[derive(Debug)]
+pub struct Context<T: ContextCurrentState> {
+    inner: Takeable<ContextInner>,
+    phantom: PhantomData<T>,
+}
+
+impl<T: ContextCurrentState> Context<T> {
     pub fn new<'a>(
         xconn: Arc<XConnection>,
         pf_reqs: &PixelFormatRequirements,
-        opengl: &'a GlAttributes<&'a Context>,
+        opengl: &'a GlAttributes<&'a Context<T>>,
         screen_id: raw::c_int,
         transparent: bool,
-    ) -> Result<ContextPrototype<'a>, CreationError> {
+    ) -> Result<ContextPrototype<'a, T>, CreationError> {
         let glx = GLX.as_ref().unwrap();
         // This is completely ridiculous, but VirtualBox's OpenGL driver needs
         // some call handled by *it* (i.e. not Mesa) to occur before
@@ -149,44 +159,114 @@ impl Context {
         })
     }
 
-    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        let glx = GLX.as_ref().unwrap();
-        let res = glx.MakeCurrent(
-            self.xconn.display as *mut _,
-            self.window,
-            self.context,
-        );
-        if res == 0 {
-            let err = self.xconn.check_errors();
-            Err(ContextError::OsError(format!(
+    fn state_sub<T2: ContextCurrentState>(
+        mut self,
+        err: Result<(), ContextError>,
+    ) -> Result<Context<T2>, (Self, ContextError)> {
+        match err {
+            Ok(()) => Ok(Context {
+                inner: Takeable::new(Takeable::take(&mut self.inner)),
+                phantom: PhantomData,
+            }),
+            Err(err) => Err((
+                Context {
+                    inner: Takeable::new(Takeable::take(&mut self.inner)),
+                    phantom: PhantomData,
+                },
+                err,
+            )),
+        }
+    }
+
+    unsafe fn check_make_current<T2: ContextCurrentState>(
+        self,
+        ret: Option<i32>,
+    ) -> Result<Context<T2>, (Self, ContextError)> {
+        if ret == Some(0) {
+            let err = self.inner.xconn.check_errors();
+            self.state_sub(Err(ContextError::OsError(format!(
                 "`glXMakeCurrent` failed: {:?}",
                 err
-            )))
+            ))))
         } else {
-            Ok(())
+            self.state_sub(Ok(()))
         }
+    }
+
+    #[inline]
+    pub unsafe fn make_current(
+        self,
+    ) -> Result<Context<PossiblyCurrentContext>, (Self, ContextError)> {
+        let glx = GLX.as_ref().unwrap();
+        let res = glx.MakeCurrent(
+            self.inner.xconn.display as *mut _,
+            self.inner.window,
+            self.inner.context,
+        );
+        self.check_make_current(Some(res))
+    }
+
+    #[inline]
+    pub unsafe fn make_not_current(
+        self,
+    ) -> Result<Context<NotCurrentContext>, (Self, ContextError)> {
+        let glx = GLX.as_ref().unwrap();
+        let res = glx.MakeCurrent(
+            self.inner.xconn.display as *mut _,
+            0,
+            std::ptr::null(),
+        );
+        self.check_make_current(Some(res))
+    }
+
+    #[inline]
+    pub unsafe fn treat_as_not_current(self) -> Context<NotCurrentContext> {
+        self.check_make_current(None).unwrap()
     }
 
     #[inline]
     pub fn is_current(&self) -> bool {
         let glx = GLX.as_ref().unwrap();
-        unsafe { glx.GetCurrentContext() == self.context }
+        unsafe { glx.GetCurrentContext() == self.inner.context }
     }
 
-    pub fn get_proc_address(&self, addr: &str) -> *const () {
+    #[inline]
+    pub fn get_api(&self) -> crate::Api {
+        crate::Api::OpenGl
+    }
+
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> ffi::GLXContext {
+        self.inner.context
+    }
+
+    /// Unsaftey:
+    ///     Context must be current.
+    #[inline]
+    unsafe fn get_proc_address_impl(&self, addr: &str) -> *const () {
         let glx = GLX.as_ref().unwrap();
         let addr = CString::new(addr.as_bytes()).unwrap();
         let addr = addr.as_ptr();
-        unsafe { glx.GetProcAddress(addr as *const _) as *const _ }
+        glx.GetProcAddress(addr as *const _) as *const _
+    }
+}
+
+impl Context<PossiblyCurrentContext> {
+    #[inline]
+    pub fn get_proc_address(&self, addr: &str) -> *const () {
+        unsafe { self.get_proc_address_impl(addr) }
     }
 
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
         let glx = GLX.as_ref().unwrap();
         unsafe {
-            glx.SwapBuffers(self.xconn.display as *mut _, self.window);
+            glx.SwapBuffers(
+                self.inner.xconn.display as *mut _,
+                self.inner.window,
+            );
         }
-        if let Err(err) = self.xconn.check_errors() {
+        if let Err(err) = self.inner.xconn.check_errors() {
             Err(ContextError::OsError(format!(
                 "`glXSwapBuffers` failed: {:?}",
                 err
@@ -197,70 +277,72 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_api(&self) -> crate::Api {
-        crate::Api::OpenGl
-    }
-
-    #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
-        self.pixel_format.clone()
-    }
-
-    #[inline]
-    pub unsafe fn raw_handle(&self) -> ffi::GLXContext {
-        self.context
+        self.inner.pixel_format.clone()
     }
 }
 
-unsafe impl Send for Context {}
-unsafe impl Sync for Context {}
+unsafe impl<T: ContextCurrentState> Send for Context<T> {}
+unsafe impl<T: ContextCurrentState> Sync for Context<T> {}
 
-impl Drop for Context {
+impl<T: ContextCurrentState> Drop for Context<T> {
     fn drop(&mut self) {
-        let glx = GLX.as_ref().unwrap();
-        unsafe {
-            // See `drop` for `crate::api::egl::Context` for rationale.
-            let mut guard =
-                MakeCurrentGuard::new(&self.xconn, self.window, self.context)
-                    .map_err(|err| ContextError::OsError(err))
-                    .unwrap();
+        if let Some(inner) = Takeable::try_take(&mut self.inner) {
+            let glx = GLX.as_ref().unwrap();
+            unsafe {
+                // See `drop` for `crate::api::egl::Context` for rationale.
+                let mut guard = MakeCurrentGuard::new(
+                    &inner.xconn,
+                    inner.window,
+                    inner.context,
+                )
+                .map_err(|err| ContextError::OsError(err))
+                .unwrap();
 
-            let gl_finish_fn = self.get_proc_address("glFinish");
-            assert!(gl_finish_fn != std::ptr::null());
-            let gl_finish_fn =
-                std::mem::transmute::<_, extern "system" fn()>(gl_finish_fn);
-            gl_finish_fn();
+                let gl_finish_fn = self.get_proc_address_impl("glFinish");
+                assert!(gl_finish_fn != std::ptr::null());
+                let gl_finish_fn = std::mem::transmute::<_, extern "system" fn()>(
+                    gl_finish_fn,
+                );
+                gl_finish_fn();
 
-            if guard.old_context() == Some(self.context) {
-                guard.invalidate()
+                if guard.old_context() == Some(inner.context) {
+                    guard.invalidate()
+                }
+                std::mem::drop(guard);
+
+                glx.DestroyContext(
+                    inner.xconn.display as *mut _,
+                    inner.context,
+                );
             }
-            std::mem::drop(guard);
-
-            glx.DestroyContext(self.xconn.display as *mut _, self.context);
         }
     }
 }
 
 #[derive(Debug)]
-pub struct ContextPrototype<'a> {
+pub struct ContextPrototype<'a, T: ContextCurrentState> {
     extensions: String,
     xconn: Arc<XConnection>,
-    opengl: &'a GlAttributes<&'a Context>,
+    opengl: &'a GlAttributes<&'a Context<T>>,
     fb_config: ffi::glx::types::GLXFBConfig,
     visual_infos: ffi::XVisualInfo,
     pixel_format: PixelFormat,
 }
 
-impl<'a> ContextPrototype<'a> {
+impl<'a, T: ContextCurrentState> ContextPrototype<'a, T> {
     #[inline]
     pub fn get_visual_infos(&self) -> &ffi::XVisualInfo {
         &self.visual_infos
     }
 
-    pub fn finish(self, win: ffi::Window) -> Result<Context, CreationError> {
+    pub fn finish(
+        self,
+        win: ffi::Window,
+    ) -> Result<Context<NotCurrentContext>, CreationError> {
         let glx = GLX.as_ref().unwrap();
         let share = match self.opengl.sharing {
-            Some(ctx) => ctx.context,
+            Some(ctx) => ctx.inner.context,
             None => std::ptr::null(),
         };
 
@@ -409,10 +491,13 @@ impl<'a> ContextPrototype<'a> {
         }
 
         Ok(Context {
-            xconn: self.xconn,
-            window: win,
-            context,
-            pixel_format: self.pixel_format,
+            inner: Takeable::new(ContextInner {
+                xconn: self.xconn,
+                window: win,
+                context,
+                pixel_format: self.pixel_format,
+            }),
+            phantom: PhantomData,
         })
     }
 }

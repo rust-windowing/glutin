@@ -1,6 +1,4 @@
 #![cfg(target_os = "macos")]
-#![allow(deprecated)] // From upstream library, caused by uses of `msg_send!`
-
 use crate::{
     ContextError, CreationError, GlAttributes, PixelFormat,
     PixelFormatRequirements, Robustness,

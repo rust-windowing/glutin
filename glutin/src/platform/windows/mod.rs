@@ -283,7 +283,7 @@ pub trait RawContextExt {
     /// Unsafe behaviour might happen if you:
     ///   - Provide us with invalid parameters.
     ///   - The window is destroyed before the context
-    unsafe fn new_raw_context(
+    unsafe fn build_raw_context(
         hwnd: *mut raw::c_void,
         cb: crate::ContextBuilder,
     ) -> Result<crate::RawContext, CreationError>
@@ -291,16 +291,16 @@ pub trait RawContextExt {
         Self: Sized;
 }
 
-impl RawContextExt for crate::Context {
+impl RawContextExt for crate::ContextBuilder {
     #[inline]
-    unsafe fn new_raw_context(
+    unsafe fn build_raw_context(
+        self,
         hwnd: *mut raw::c_void,
-        cb: crate::ContextBuilder,
     ) -> Result<crate::RawContext, CreationError>
     where
         Self: Sized,
     {
-        let crate::ContextBuilder { pf_reqs, gl_attr } = cb;
+        let crate::ContextBuilder { pf_reqs, gl_attr } = self;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
         Context::new_raw_context(hwnd as *mut _, &pf_reqs, &gl_attr)
             .map(|context| crate::Context { context })
