@@ -211,12 +211,18 @@ impl<T: ContextCurrentState> Context<T> {
         self,
     ) -> Result<Context<NotCurrentContext>, (Self, ContextError)> {
         let glx = GLX.as_ref().unwrap();
-        let res = glx.MakeCurrent(
-            self.inner.xconn.display as *mut _,
-            0,
-            std::ptr::null(),
-        );
-        self.check_make_current(Some(res))
+        if self.inner.window == glx.GetCurrentDrawable()
+            || self.inner.context == glx.GetCurrentContext()
+        {
+            let res = glx.MakeCurrent(
+                self.inner.xconn.display as *mut _,
+                0,
+                std::ptr::null(),
+            );
+            self.check_make_current(Some(res))
+        } else {
+            self.check_make_current(None)
+        }
     }
 
     #[inline]

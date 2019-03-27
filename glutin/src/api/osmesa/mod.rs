@@ -205,30 +205,31 @@ impl<T: ContextCurrentState> OsMesaContext<T> {
     pub unsafe fn make_not_current(
         self,
     ) -> Result<OsMesaContext<NotCurrentContext>, (Self, ContextError)> {
-        // Supported with the non-gallium drivers, but not the gallium ones
-        // I (gentz) have filed a patch upstream to mesa to correct this,
-        // however, older users (or anyone not running mesa-git, tbh) probably
-        // won't support this.
-        //
-        // There is no way to tell, ofc, without just calling the function and
-        // seeing if it work.
-        //
-        // https://gitlab.freedesktop.org/mesa/mesa/merge_requests/533
-        let ret = osmesa_sys::OSMesaMakeCurrent(
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-            0,
-            0,
-            0,
-        );
+        if osmesa_sys::OSMesaGetCurrentContext() == self.inner.context {
+            // Supported with the non-gallium drivers, but not the gallium ones
+            // I (gentz) have filed a patch upstream to mesa to correct this,
+            // however, older users (or anyone not running mesa-git, tbh)
+            // probably won't support this.
+            //
+            // There is no way to tell, ofc, without just calling the function
+            // and seeing if it work.
+            //
+            // https://gitlab.freedesktop.org/mesa/mesa/merge_requests/533
+            let ret = osmesa_sys::OSMesaMakeCurrent(
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                0,
+                0,
+                0,
+            );
 
-        if ret == 0 {
-            unimplemented!(
-                "OSMesaMakeCurrent failed to make the context not current. This most likely means that you're using an older gallium-based mesa driver."
-            )
+            if ret == 0 {
+                unimplemented!(
+                    "OSMesaMakeCurrent failed to make the context not current. This most likely means that you're using an older gallium-based mesa driver."
+                )
+            }
         }
-
-        self.state_sub(Some(ret))
+        self.state_sub(None)
     }
 
     #[inline]
