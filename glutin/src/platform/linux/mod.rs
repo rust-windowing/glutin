@@ -14,7 +14,6 @@ use crate::api::osmesa;
 use crate::{
     Api, ContextCurrentState, ContextError, CreationError, GlAttributes,
     NotCurrentContext, PixelFormat, PixelFormatRequirements,
-    PossiblyCurrentContext,
 };
 
 use winit::dpi;
@@ -39,17 +38,17 @@ pub enum ContextType {
 }
 
 #[derive(Debug)]
-pub enum Context<T: ContextCurrentState> {
-    WindowedX11(x11::Context<T>),
-    HeadlessX11(x11::Context<T>, winit::Window),
-    WindowedWayland(wayland::Context<T>),
-    HeadlessWayland(wayland::Context<T>, winit::Window),
-    OsMesa(osmesa::OsMesaContext<T>),
+pub enum Context {
+    WindowedX11(x11::Context),
+    HeadlessX11(x11::Context, winit::Window),
+    WindowedWayland(wayland::Context),
+    HeadlessWayland(wayland::Context, winit::Window),
+    OsMesa(osmesa::OsMesaContext),
 }
 
-impl<T: ContextCurrentState> Context<T> {
+impl Context {
     fn is_compatible(
-        c: &Option<&Context<T>>,
+        c: &Option<&Context>,
         ct: ContextType,
     ) -> Result<(), CreationError> {
         if let Some(c) = *c {
@@ -95,9 +94,8 @@ impl<T: ContextCurrentState> Context<T> {
         wb: winit::WindowBuilder,
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context<T>>,
-    ) -> Result<(winit::Window, Context<NotCurrentContext>), CreationError>
-    {
+        gl_attr: &GlAttributes<&Context>,
+    ) -> Result<(winit::Window, Self), CreationError> {
         if el.is_wayland() {
             Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
 
@@ -124,9 +122,9 @@ impl<T: ContextCurrentState> Context<T> {
     pub fn new_headless(
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context<T>>,
+        gl_attr: &GlAttributes<&Context>,
         dims: dpi::PhysicalSize,
-    ) -> Result<Context<NotCurrentContext>, CreationError> {
+    ) -> Result<Self, CreationError> {
         let wb = winit::WindowBuilder::new()
             .with_visibility(false)
             .with_dimensions(dims.to_logical(1.));
@@ -152,82 +150,26 @@ impl<T: ContextCurrentState> Context<T> {
         }
     }
 
-    fn state_sub<T2, E, FX, FW, FO>(
-        self,
-        fx: FX,
-        fw: FW,
-        fo: FO,
-    ) -> Result<Context<T2>, (Self, E)>
-    where
-        T2: ContextCurrentState,
-        FX: FnOnce(
-            x11::Context<T>,
-        ) -> Result<x11::Context<T2>, (x11::Context<T>, E)>,
-        FW: FnOnce(
-            wayland::Context<T>,
-        )
-            -> Result<wayland::Context<T2>, (wayland::Context<T>, E)>,
-        FO: FnOnce(
-            osmesa::OsMesaContext<T>,
-        ) -> Result<
-            osmesa::OsMesaContext<T2>,
-            (osmesa::OsMesaContext<T>, E),
-        >,
-    {
-        match self {
-            Context::WindowedX11(ctx) => match fx(ctx) {
-                Ok(ctx) => Ok(Context::WindowedX11(ctx)),
-                Err((ctx, e)) => Err((Context::WindowedX11(ctx), e)),
-            },
-            Context::HeadlessX11(ctx, w) => match fx(ctx) {
-                Ok(ctx) => Ok(Context::HeadlessX11(ctx, w)),
-                Err((ctx, e)) => Err((Context::HeadlessX11(ctx, w), e)),
-            },
-            Context::WindowedWayland(ctx) => match fw(ctx) {
-                Ok(ctx) => Ok(Context::WindowedWayland(ctx)),
-                Err((ctx, e)) => Err((Context::WindowedWayland(ctx), e)),
-            },
-            Context::HeadlessWayland(ctx, w) => match fw(ctx) {
-                Ok(ctx) => Ok(Context::HeadlessWayland(ctx, w)),
-                Err((ctx, e)) => Err((Context::HeadlessWayland(ctx, w), e)),
-            },
-            Context::OsMesa(ctx) => match fo(ctx) {
-                Ok(ctx) => Ok(Context::OsMesa(ctx)),
-                Err((ctx, e)) => Err((Context::OsMesa(ctx), e)),
-            },
+    #[inline]
+    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
+        match *self {
+            Context::WindowedX11(ref ctx)
+            | Context::HeadlessX11(ref ctx, _) => ctx.make_current(),
+            Context::WindowedWayland(ref ctx)
+            | Context::HeadlessWayland(ref ctx, _) => ctx.make_current(),
+            Context::OsMesa(ref ctx) => ctx.make_current(),
         }
     }
 
     #[inline]
-    pub unsafe fn make_current(
-        self,
-    ) -> Result<Context<PossiblyCurrentContext>, (Self, ContextError)> {
-        self.state_sub(
-            |ctx| ctx.make_current(),
-            |ctx| ctx.make_current(),
-            |ctx| ctx.make_current(),
-        )
-    }
-
-    #[inline]
-    pub unsafe fn make_not_current(
-        self,
-    ) -> Result<Context<NotCurrentContext>, (Self, ContextError)> {
-        self.state_sub(
-            |ctx| ctx.make_not_current(),
-            |ctx| ctx.make_not_current(),
-            |ctx| ctx.make_not_current(),
-        )
-    }
-
-    #[inline]
-    pub unsafe fn treat_as_not_current(self) -> Context<NotCurrentContext> {
-        self.state_sub::<_, (), _, _, _>(
-            |ctx| Ok(ctx.treat_as_not_current()),
-            |ctx| Ok(ctx.treat_as_not_current()),
-            |ctx| Ok(ctx.treat_as_not_current()),
-        )
-        .unwrap()
+    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+        match *self {
+            Context::WindowedX11(ref ctx)
+            | Context::HeadlessX11(ref ctx, _) => ctx.make_not_current(),
+            Context::WindowedWayland(ref ctx)
+            | Context::HeadlessWayland(ref ctx, _) => ctx.make_not_current(),
+            Context::OsMesa(ref ctx) => ctx.make_not_current(),
+        }
     }
 
     #[inline]
@@ -278,9 +220,7 @@ impl<T: ContextCurrentState> Context<T> {
             _ => None,
         }
     }
-}
 
-impl Context<PossiblyCurrentContext> {
     #[inline]
     pub fn resize(&self, width: u32, height: u32) {
         match *self {

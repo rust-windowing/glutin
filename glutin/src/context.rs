@@ -25,7 +25,7 @@ use std::marker::PhantomData;
 /// ```
 #[derive(Debug)]
 pub struct Context<T: ContextCurrentState> {
-    pub(crate) context: platform::Context<T>,
+    pub(crate) context: platform::Context,
     pub(crate) phantom: PhantomData<T>,
 }
 
@@ -89,46 +89,42 @@ impl<T: ContextCurrentState> ContextTrait for Context<T> {
     unsafe fn make_current(
         self,
     ) -> Result<Self::PossiblyCurrentContext, (Self, ContextError)> {
-        self.context
-            .make_current()
-            .map(|context| Context {
-                context,
+        match self.context.make_current() {
+            Ok(()) => Ok(Context {
+                context: self.context,
                 phantom: PhantomData,
-            })
-            .map_err(|(context, err)| {
-                (
-                    Context {
-                        context,
-                        phantom: PhantomData,
-                    },
-                    err,
-                )
-            })
+            }),
+            Err(err) => Err((
+                Context {
+                    context: self.context,
+                    phantom: PhantomData,
+                },
+                err,
+            )),
+        }
     }
 
     unsafe fn make_not_current(
         self,
     ) -> Result<Self::NotCurrentContext, (Self, ContextError)> {
-        self.context
-            .make_not_current()
-            .map(|context| Context {
-                context,
+        match self.context.make_not_current() {
+            Ok(()) => Ok(Context {
+                context: self.context,
                 phantom: PhantomData,
-            })
-            .map_err(|(context, err)| {
-                (
-                    Context {
-                        context,
-                        phantom: PhantomData,
-                    },
-                    err,
-                )
-            })
+            }),
+            Err(err) => Err((
+                Context {
+                    context: self.context,
+                    phantom: PhantomData,
+                },
+                err,
+            )),
+        }
     }
 
     unsafe fn treat_as_not_current(self) -> Self::NotCurrentContext {
         Context {
-            context: self.context.treat_as_not_current(),
+            context: self.context,
             phantom: PhantomData,
         }
     }

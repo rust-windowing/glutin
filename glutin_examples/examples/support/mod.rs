@@ -136,7 +136,7 @@ void main() {
 }
 \0";
 
-pub use context_tracker::{
+pub use self::context_tracker::{
     ContextCurrentWrapper, ContextId, ContextTracker, ContextWrapper,
 };
 

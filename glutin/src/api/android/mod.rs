@@ -123,6 +123,17 @@ impl Context {
     }
 
     #[inline]
+    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+        if let Some(ref stopped) = self.0.stopped {
+            if stopped.get() {
+                return Err(ContextError::ContextLost);
+            }
+        }
+
+        self.0.egl_context.make_not_current()
+    }
+
+    #[inline]
     pub fn resize(&self, _: u32, _: u32) {}
 
     #[inline]

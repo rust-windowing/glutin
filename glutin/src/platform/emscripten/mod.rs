@@ -1,49 +1,30 @@
 #![cfg(target_os = "emscripten")]
 
 use crate::{
-    Api, ContextCurrentState, ContextError, CreationError, GlAttributes,
-    GlRequest, NotCurrentContext, PixelFormat, PixelFormatRequirements,
-    PossiblyCurrentContext,
+    Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
+    PixelFormatRequirements,
 };
 
 use glutin_emscripten_sys as ffi;
-use takeable_option::Takeable;
 use winit;
 use winit::dpi;
 
 use std::ffi::CString;
-use std::marker::PhantomData;
 
 #[derive(Debug)]
-pub enum ContextInner {
+pub enum Context {
     Window(ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE),
     WindowedContext(winit::Window, ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE),
 }
 
-impl ContextInner {
-    fn raw_handle(&self) -> ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE {
-        match self {
-            ContextInner::Window(c) => *c,
-            ContextInner::WindowedContext(_, c) => *c,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct Context<T: ContextCurrentState> {
-    inner: Takeable<ContextInner>,
-    phantom: PhantomData<T>,
-}
-
-impl<T: ContextCurrentState> Context<T> {
+impl Context {
     #[inline]
     pub fn new_windowed(
         wb: winit::WindowBuilder,
         el: &winit::EventsLoop,
         _pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context<T>>,
-    ) -> Result<(winit::Window, Context<NotCurrentContext>), CreationError>
-    {
+        gl_attr: &GlAttributes<&Context>,
+    ) -> Result<(winit::Window, Self), CreationError> {
         let win = wb.build(el)?;
 
         let gl_attr = gl_attr.clone().map_sharing(|_| {
@@ -83,34 +64,23 @@ impl<T: ContextCurrentState> Context<T> {
 
         // TODO: emscripten_set_webglcontextrestored_callback
 
-        Ok((
-            win,
-            Context {
-                inner: Takeable::new(ContextInner::Window(context)),
-                phantom: PhantomData,
-            },
-        ))
+        Ok((win, Context::Window(context)))
     }
 
     #[inline]
     pub fn new_headless(
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context<T>>,
+        gl_attr: &GlAttributes<&Context>,
         dims: dpi::PhysicalSize,
-    ) -> Result<Context<NotCurrentContext>, CreationError> {
+    ) -> Result<Self, CreationError> {
         let wb = winit::WindowBuilder::new()
             .with_visibility(false)
             .with_dimensions(dims.to_logical(1.));
 
-        Self::new_windowed(wb, el, pf_reqs, gl_attr).map(|(w, c)| {
-            match *c.inner {
-                ContextInner::Window(c) => Context {
-                    inner: Takeable::new(ContextInner::WindowedContext(w, c)),
-                    phantom: PhantomData,
-                },
-                _ => panic!(),
-            }
+        Self::new_windowed(wb, el, pf_reqs, gl_attr).map(|(w, c)| match c {
+            Context::Window(c) => Context::WindowedContext(w, c),
+            _ => panic!(),
         })
     }
 
@@ -128,79 +98,39 @@ impl<T: ContextCurrentState> Context<T> {
 
     #[inline]
     pub unsafe fn raw_handle(&self) -> ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE {
-        self.inner.raw_handle()
-    }
-
-    fn state_sub<T2, E, F>(mut self, f: F) -> Result<Context<T2>, (Self, E)>
-    where
-        T2: ContextCurrentState,
-        F: FnOnce(ContextInner) -> Result<ContextInner, (ContextInner, E)>,
-    {
-        match f(Takeable::take(&mut self.inner)) {
-            Ok(inner) => Ok(Context {
-                inner: Takeable::new(inner),
-                phantom: PhantomData,
-            }),
-            Err((inner, err)) => Err((
-                Context {
-                    inner: Takeable::new(inner),
-                    phantom: PhantomData,
-                },
-                err,
-            )),
+        match self {
+            Context::Window(c) => *c,
+            Context::WindowedContext(_, c) => *c,
         }
     }
 
     #[inline]
-    pub unsafe fn make_current(
-        self,
-    ) -> Result<Context<PossiblyCurrentContext>, (Self, ContextError)> {
-        self.state_sub(
-            |inner| match ffi::emscripten_webgl_make_context_current(
-                inner.raw_handle(),
-            ) {
-                ffi::EMSCRIPTEN_RESULT_SUCCESS => Ok(inner),
-                err => Err((
-                    inner,
-                    ContextError::OsError(format!(
-                        "`emscripten_webgl_make_context_current` failed: {:?}",
-                        err
-                    )),
-                )),
-            },
-        )
+    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
+        match ffi::emscripten_webgl_make_context_current(self.raw_handle()) {
+            ffi::EMSCRIPTEN_RESULT_SUCCESS => Ok(()),
+            err => Err(ContextError::OsError(format!(
+                "`emscripten_webgl_make_context_current` failed: {:?}",
+                err
+            ))),
+        }
     }
 
     #[inline]
-    pub unsafe fn make_not_current(
-        self,
-    ) -> Result<Context<NotCurrentContext>, (Self, ContextError)> {
-        self.state_sub(
-            |inner| match ffi::emscripten_webgl_make_context_current(0) {
-                ffi::EMSCRIPTEN_RESULT_SUCCESS => Ok(inner),
-                err => Err((
-                    inner,
-                    ContextError::OsError(format!(
-                        "`emscripten_webgl_make_context_current` failed: {:?}",
-                        err
-                    )),
-                )),
-            },
-        )
+    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+        match ffi::emscripten_webgl_make_context_current(0) {
+            ffi::EMSCRIPTEN_RESULT_SUCCESS => Ok(()),
+            err => Err(ContextError::OsError(format!(
+                "`emscripten_webgl_make_context_current` failed: {:?}",
+                err
+            ))),
+        }
     }
 
-    #[inline]
-    pub unsafe fn treat_as_not_current(self) -> Context<NotCurrentContext> {
-        self.state_sub::<_, (), _>(|inner| Ok(inner)).unwrap()
-    }
-}
-
-impl Context<PossiblyCurrentContext> {
     #[inline]
     pub fn resize(&self, _width: u32, _height: u32) {
-        match *self.inner {
-            ContextInner::Window(_) => (), // TODO: ?
-            ContextInner::WindowedContext(_, _) => unreachable!(),
+        match *self {
+            Context::Window(_) => (), // TODO: ?
+            Context::WindowedContext(_, _) => unreachable!(),
         }
     }
 
@@ -238,12 +168,10 @@ impl Context<PossiblyCurrentContext> {
     }
 }
 
-impl<T: ContextCurrentState> Drop for Context<T> {
+impl Drop for Context {
     fn drop(&mut self) {
-        if let Some(inner) = Takeable::try_take(&mut self.inner) {
-            unsafe {
-                ffi::emscripten_webgl_destroy_context(inner.raw_handle());
-            }
+        unsafe {
+            ffi::emscripten_webgl_destroy_context(self.raw_handle());
         }
     }
 }

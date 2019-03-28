@@ -1,9 +1,8 @@
 use crate::api::egl::{Context as EglContext, NativeDisplay, EGL};
 use crate::api::glx::{Context as GlxContext, GLX};
 use crate::{
-    Api, ContextCurrentState, ContextError, CreationError, GlAttributes,
-    GlRequest, NotCurrentContext, PixelFormat, PixelFormatRequirements,
-    PossiblyCurrentContext,
+    Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
+    PixelFormatRequirements,
 };
 
 use glutin_glx_sys as ffi;
@@ -31,50 +30,39 @@ impl std::fmt::Display for NoX11Connection {
 }
 
 #[derive(Debug)]
-pub enum X11Context<T: ContextCurrentState> {
-    Glx(GlxContext<T>),
-    Egl(EglContext<T>),
+pub enum X11Context {
+    Glx(GlxContext),
+    Egl(EglContext),
 }
 
 #[derive(Debug)]
-struct ContextInner {
+pub struct Context {
     xconn: Arc<XConnection>,
     colormap: ffi::Colormap,
+    context: Takeable<X11Context>,
 }
 
-#[derive(Debug)]
-pub struct Context<T: ContextCurrentState> {
-    inner: Takeable<ContextInner>,
-    context: Takeable<X11Context<T>>,
-}
+unsafe impl Send for Context {}
+unsafe impl Sync for Context {}
 
-unsafe impl<T: ContextCurrentState> Send for Context<T> {}
-unsafe impl<T: ContextCurrentState> Sync for Context<T> {}
-
-impl<T: ContextCurrentState> Drop for Context<T> {
+impl Drop for Context {
     fn drop(&mut self) {
         unsafe {
-            Takeable::try_take(&mut self.context);
+            Takeable::take(&mut self.context);
 
-            if let Some(inner) = Takeable::try_take(&mut self.inner) {
-                (inner.xconn.xlib.XFreeColormap)(
-                    inner.xconn.display,
-                    inner.colormap,
-                );
-            }
+            (self.xconn.xlib.XFreeColormap)(self.xconn.display, self.colormap);
         }
     }
 }
 
-impl<T: ContextCurrentState> Context<T> {
+impl Context {
     #[inline]
     pub fn new(
         wb: winit::WindowBuilder,
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context<T>>,
-    ) -> Result<(winit::Window, Context<NotCurrentContext>), CreationError>
-    {
+        gl_attr: &GlAttributes<&Context>,
+    ) -> Result<(winit::Window, Self), CreationError> {
         let xconn = match el.get_xlib_xconnection() {
             Some(xconn) => xconn,
             None => {
@@ -88,9 +76,9 @@ impl<T: ContextCurrentState> Context<T> {
         let screen_id = unsafe { (xconn.xlib.XDefaultScreen)(xconn.display) };
 
         // start the context building process
-        enum Prototype<'a, T: ContextCurrentState> {
-            Glx(crate::api::glx::ContextPrototype<'a, T>),
-            Egl(crate::api::egl::ContextPrototype<'a, T>),
+        enum Prototype<'a> {
+            Glx(crate::api::glx::ContextPrototype<'a>),
+            Egl(crate::api::egl::ContextPrototype<'a>),
         }
 
         let builder = gl_attr.clone();
@@ -223,10 +211,8 @@ impl<T: ContextCurrentState> Context<T> {
         };
 
         let context = Context {
-            inner: Takeable::new(ContextInner {
-                xconn: Arc::clone(&xconn),
-                colormap,
-            }),
+            xconn: Arc::clone(&xconn),
+            colormap,
             context: Takeable::new(context),
         };
 
@@ -238,8 +224,8 @@ impl<T: ContextCurrentState> Context<T> {
         xconn: Arc<XConnection>,
         xwin: raw::c_ulong,
         pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context<T>>,
-    ) -> Result<Context<NotCurrentContext>, CreationError> {
+        gl_attr: &GlAttributes<&Context>,
+    ) -> Result<Self, CreationError> {
         let attrs = unsafe {
             let mut attrs = ::std::mem::uninitialized();
             (xconn.xlib.XGetWindowAttributes)(xconn.display, xwin, &mut attrs);
@@ -275,9 +261,9 @@ impl<T: ContextCurrentState> Context<T> {
         pf_reqs.depth_bits = Some(attrs.depth as _);
 
         // start the context building process
-        enum Prototype<'a, T: ContextCurrentState> {
-            Glx(crate::api::glx::ContextPrototype<'a, T>),
-            Egl(crate::api::egl::ContextPrototype<'a, T>),
+        enum Prototype<'a> {
+            Glx(crate::api::glx::ContextPrototype<'a>),
+            Egl(crate::api::egl::ContextPrototype<'a>),
         }
 
         let builder = gl_attr.clone();
@@ -374,77 +360,28 @@ impl<T: ContextCurrentState> Context<T> {
         };
 
         let context = Context {
-            inner: Takeable::new(ContextInner {
-                xconn: Arc::clone(&xconn),
-                colormap,
-            }),
+            xconn: Arc::clone(&xconn),
+            colormap,
             context: Takeable::new(context),
         };
 
         Ok(context)
     }
 
-    fn state_sub<T2, E, FG, FE>(
-        mut self,
-        fg: FG,
-        fe: FE,
-    ) -> Result<Context<T2>, (Self, E)>
-    where
-        T2: ContextCurrentState,
-        FG: FnOnce(GlxContext<T>) -> Result<GlxContext<T2>, (GlxContext<T>, E)>,
-        FE: FnOnce(EglContext<T>) -> Result<EglContext<T2>, (EglContext<T>, E)>,
-    {
-        let inner = Takeable::take(&mut self.inner);
-        let context = match Takeable::take(&mut self.context) {
-            X11Context::Glx(ctx) => match fg(ctx) {
-                Ok(ctx) => Ok(X11Context::Glx(ctx)),
-                Err((ctx, err)) => Err((X11Context::Glx(ctx), err)),
-            },
-            X11Context::Egl(ctx) => match fe(ctx) {
-                Ok(ctx) => Ok(X11Context::Egl(ctx)),
-                Err((ctx, err)) => Err((X11Context::Egl(ctx), err)),
-            },
-        };
-
-        match context {
-            Ok(context) => Ok(Context {
-                context: Takeable::new(context),
-                inner: Takeable::new(inner),
-            }),
-            Err((context, err)) => Err((
-                Context {
-                    context: Takeable::new(context),
-                    inner: Takeable::new(inner),
-                },
-                err,
-            )),
+    #[inline]
+    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
+        match *self.context {
+            X11Context::Glx(ref ctx) => ctx.make_current(),
+            X11Context::Egl(ref ctx) => ctx.make_current(),
         }
     }
 
     #[inline]
-    pub unsafe fn make_current(
-        self,
-    ) -> Result<Context<PossiblyCurrentContext>, (Self, ContextError)> {
-        self.state_sub(|ctx| ctx.make_current(), |ctx| ctx.make_current())
-    }
-
-    #[inline]
-    pub unsafe fn make_not_current(
-        self,
-    ) -> Result<Context<NotCurrentContext>, (Self, ContextError)> {
-        self.state_sub(
-            |ctx| ctx.make_not_current(),
-            |ctx| ctx.make_not_current(),
-        )
-    }
-
-    #[inline]
-    pub unsafe fn treat_as_not_current(self) -> Context<NotCurrentContext> {
-        self.state_sub::<_, (), _, _>(
-            |ctx| Ok(ctx.treat_as_not_current()),
-            |ctx| Ok(ctx.treat_as_not_current()),
-        )
-        .unwrap()
+    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+        match *self.context {
+            X11Context::Glx(ref ctx) => ctx.make_not_current(),
+            X11Context::Egl(ref ctx) => ctx.make_not_current(),
+        }
     }
 
     #[inline]
@@ -464,7 +401,7 @@ impl<T: ContextCurrentState> Context<T> {
     }
 
     #[inline]
-    pub unsafe fn raw_handle(&self) -> &X11Context<T> {
+    pub unsafe fn raw_handle(&self) -> &X11Context {
         &self.context
     }
 
@@ -475,9 +412,7 @@ impl<T: ContextCurrentState> Context<T> {
             _ => None,
         }
     }
-}
 
-impl Context<PossiblyCurrentContext> {
     #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const () {
         match *self.context {

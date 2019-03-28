@@ -65,7 +65,5 @@ mod this_example {
             image::RGB(8),
         )
         .unwrap();
-
-        let os_mesa = unsafe { os_mesa.make_not_current().unwrap() };
     }
 }

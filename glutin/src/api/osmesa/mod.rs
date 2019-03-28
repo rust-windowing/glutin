@@ -11,30 +11,21 @@ pub mod ffi {
 }
 
 use crate::{
-    Api, ContextCurrentState, ContextError, CreationError, GlAttributes,
-    GlProfile, GlRequest, NotCurrentContext, PixelFormatRequirements,
-    PossiblyCurrentContext, Robustness,
+    Api, ContextError, CreationError, GlAttributes, GlProfile, GlRequest,
+    PixelFormatRequirements, Robustness,
 };
 
-use takeable_option::Takeable;
 use winit::dpi;
 
 use std::ffi::CString;
-use std::marker::PhantomData;
 use std::os::raw;
 
 #[derive(Debug)]
-pub struct OsMesaContextInner {
+pub struct OsMesaContext {
     context: osmesa_sys::OSMesaContext,
     buffer: Vec<u32>,
     width: u32,
     height: u32,
-}
-
-#[derive(Debug)]
-pub struct OsMesaContext<T: ContextCurrentState> {
-    inner: Takeable<OsMesaContextInner>,
-    phantom: PhantomData<T>,
 }
 
 #[derive(Debug)]
@@ -76,12 +67,12 @@ impl std::error::Error for LoadingError {
     }
 }
 
-impl<T: ContextCurrentState> OsMesaContext<T> {
+impl OsMesaContext {
     pub fn new(
         _pf_reqs: &PixelFormatRequirements,
-        opengl: &GlAttributes<&OsMesaContext<T>>,
+        opengl: &GlAttributes<&OsMesaContext>,
         dims: dpi::PhysicalSize,
-    ) -> Result<OsMesaContext<NotCurrentContext>, CreationError> {
+    ) -> Result<Self, CreationError> {
         osmesa_sys::OsMesa::try_loading()
             .map_err(LoadingError::new)
             .map_err(|e| CreationError::NoBackendAvailable(Box::new(e)))?;
@@ -146,66 +137,48 @@ impl<T: ContextCurrentState> OsMesaContext<T> {
         let dims: (u32, u32) = dims.into();
 
         Ok(OsMesaContext {
-            inner: Takeable::new(OsMesaContextInner {
-                width: dims.0,
-                height: dims.1,
-                buffer: std::iter::repeat(unsafe { std::mem::uninitialized() })
-                    .take((dims.0 * dims.1) as usize)
-                    .collect(),
-                context: unsafe {
-                    let ctx = osmesa_sys::OSMesaCreateContextAttribs(
-                        attribs.as_ptr(),
-                        std::ptr::null_mut(),
-                    );
-                    if ctx.is_null() {
-                        return Err(CreationError::OsError(
-                            "OSMesaCreateContextAttribs failed".to_string(),
-                        ));
-                    }
-                    ctx
-                },
-            }),
-            phantom: PhantomData,
+            width: dims.0,
+            height: dims.1,
+            buffer: std::iter::repeat(unsafe { std::mem::uninitialized() })
+                .take((dims.0 * dims.1) as usize)
+                .collect(),
+            context: unsafe {
+                let ctx = osmesa_sys::OSMesaCreateContextAttribs(
+                    attribs.as_ptr(),
+                    std::ptr::null_mut(),
+                );
+                if ctx.is_null() {
+                    return Err(CreationError::OsError(
+                        "OSMesaCreateContextAttribs failed".to_string(),
+                    ));
+                }
+                ctx
+            },
         })
     }
 
-    fn state_sub<T2: ContextCurrentState>(
-        mut self,
-        ret: Option<u8>,
-    ) -> Result<OsMesaContext<T2>, (Self, ContextError)> {
+    #[inline]
+    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
+        let ret = osmesa_sys::OSMesaMakeCurrent(
+            self.context,
+            self.buffer.as_ptr() as *mut _,
+            0x1401,
+            self.width as raw::c_int,
+            self.height as raw::c_int,
+        );
+
         // an error can only happen in case of invalid parameter, which would
         // indicate a bug in glutin
-        if ret == Some(0) {
+        if ret == 0 {
             panic!("OSMesaMakeCurrent failed");
         }
 
-        Ok(OsMesaContext {
-            inner: Takeable::new(Takeable::take(&mut self.inner)),
-            phantom: PhantomData,
-        })
+        Ok(())
     }
 
     #[inline]
-    pub unsafe fn make_current(
-        self,
-    ) -> Result<OsMesaContext<PossiblyCurrentContext>, (Self, ContextError)>
-    {
-        let ret = osmesa_sys::OSMesaMakeCurrent(
-            self.inner.context,
-            self.inner.buffer.as_ptr() as *mut _,
-            0x1401,
-            self.inner.width as raw::c_int,
-            self.inner.height as raw::c_int,
-        );
-
-        self.state_sub(Some(ret))
-    }
-
-    #[inline]
-    pub unsafe fn make_not_current(
-        self,
-    ) -> Result<OsMesaContext<NotCurrentContext>, (Self, ContextError)> {
-        if osmesa_sys::OSMesaGetCurrentContext() == self.inner.context {
+    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+        if osmesa_sys::OSMesaGetCurrentContext() == self.context {
             // Supported with the non-gallium drivers, but not the gallium ones
             // I (gentz) have filed a patch upstream to mesa to correct this,
             // however, older users (or anyone not running mesa-git, tbh)
@@ -229,19 +202,13 @@ impl<T: ContextCurrentState> OsMesaContext<T> {
                 )
             }
         }
-        self.state_sub(None)
-    }
 
-    #[inline]
-    pub unsafe fn treat_as_not_current(
-        self,
-    ) -> OsMesaContext<NotCurrentContext> {
-        self.state_sub(None).unwrap()
+        Ok(())
     }
 
     #[inline]
     pub fn is_current(&self) -> bool {
-        unsafe { osmesa_sys::OSMesaGetCurrentContext() == self.inner.context }
+        unsafe { osmesa_sys::OSMesaGetCurrentContext() == self.context }
     }
 
     #[inline]
@@ -251,11 +218,9 @@ impl<T: ContextCurrentState> OsMesaContext<T> {
 
     #[inline]
     pub unsafe fn raw_handle(&self) -> *mut raw::c_void {
-        self.inner.context as *mut _
+        self.context as *mut _
     }
-}
 
-impl OsMesaContext<PossiblyCurrentContext> {
     #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const () {
         unsafe {
@@ -267,14 +232,12 @@ impl OsMesaContext<PossiblyCurrentContext> {
     }
 }
 
-impl<T: ContextCurrentState> Drop for OsMesaContext<T> {
+impl Drop for OsMesaContext {
     #[inline]
     fn drop(&mut self) {
-        if let Some(inner) = Takeable::try_take(&mut self.inner) {
-            unsafe { osmesa_sys::OSMesaDestroyContext(inner.context) }
-        }
+        unsafe { osmesa_sys::OSMesaDestroyContext(self.context) }
     }
 }
 
-unsafe impl<T: ContextCurrentState> Send for OsMesaContext<T> {}
-unsafe impl<T: ContextCurrentState> Sync for OsMesaContext<T> {}
+unsafe impl Send for OsMesaContext {}
+unsafe impl Sync for OsMesaContext {}

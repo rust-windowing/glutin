@@ -1,8 +1,7 @@
 use crate::api::egl::{Context as EglContext, NativeDisplay};
 use crate::{
-    ContextCurrentState, ContextError, CreationError, GlAttributes,
-    NotCurrentContext, PixelFormat, PixelFormatRequirements,
-    PossiblyCurrentContext,
+    ContextError, CreationError, GlAttributes, PixelFormat,
+    PixelFormatRequirements,
 };
 
 use glutin_egl_sys as ffi;
@@ -15,21 +14,20 @@ use std::os::raw;
 use std::sync::Arc;
 
 #[derive(DebugStub)]
-pub struct Context<T: ContextCurrentState> {
+pub struct Context {
     #[debug_stub = "Arc<wegl::WlEglSurface>"]
     egl_surface: Arc<wegl::WlEglSurface>,
-    context: EglContext<T>,
+    context: EglContext,
 }
 
-impl<T: ContextCurrentState> Context<T> {
+impl Context {
     #[inline]
     pub fn new(
         wb: winit::WindowBuilder,
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context<T>>,
-    ) -> Result<(winit::Window, Context<NotCurrentContext>), CreationError>
-    {
+        gl_attr: &GlAttributes<&Context>,
+    ) -> Result<(winit::Window, Self), CreationError> {
         let win = wb.build(el)?;
 
         let dpi_factor = win.get_hidpi_factor();
@@ -63,8 +61,8 @@ impl<T: ContextCurrentState> Context<T> {
         width: u32,
         height: u32,
         pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context<T>>,
-    ) -> Result<Context<NotCurrentContext>, CreationError> {
+        gl_attr: &GlAttributes<&Context>,
+    ) -> Result<Self, CreationError> {
         let egl_surface = unsafe {
             wegl::WlEglSurface::new_from_raw(
                 surface as *mut _,
@@ -87,51 +85,13 @@ impl<T: ContextCurrentState> Context<T> {
     }
 
     #[inline]
-    pub unsafe fn make_current(
-        self,
-    ) -> Result<Context<PossiblyCurrentContext>, (Self, ContextError)> {
-        let egl_surface = self.egl_surface;
-        match self.context.make_current() {
-            Ok(context) => Ok(Context {
-                context,
-                egl_surface,
-            }),
-            Err((context, err)) => Err((
-                Context {
-                    context,
-                    egl_surface,
-                },
-                err,
-            )),
-        }
+    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
+        self.context.make_current()
     }
 
     #[inline]
-    pub unsafe fn make_not_current(
-        self,
-    ) -> Result<Context<NotCurrentContext>, (Self, ContextError)> {
-        let egl_surface = self.egl_surface;
-        match self.context.make_not_current() {
-            Ok(context) => Ok(Context {
-                context,
-                egl_surface,
-            }),
-            Err((context, err)) => Err((
-                Context {
-                    context,
-                    egl_surface,
-                },
-                err,
-            )),
-        }
-    }
-
-    #[inline]
-    pub unsafe fn treat_as_not_current(self) -> Context<NotCurrentContext> {
-        Context {
-            egl_surface: self.egl_surface,
-            context: self.context.treat_as_not_current(),
-        }
+    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+        self.context.make_not_current()
     }
 
     #[inline]
@@ -153,9 +113,7 @@ impl<T: ContextCurrentState> Context<T> {
     pub unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
         Some(self.context.get_egl_display())
     }
-}
 
-impl Context<PossiblyCurrentContext> {
     #[inline]
     pub fn resize(&self, width: u32, height: u32) {
         self.egl_surface.resize(width as i32, height as i32, 0, 0);
