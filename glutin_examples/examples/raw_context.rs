@@ -60,9 +60,10 @@ mod this_example {
                 use glutin::os::windows::RawContextExt;
                 use winit::os::windows::WindowExt;
 
-                let cb = glutin::ContextBuilder::new();
+                let cb: glutin::ContextBuilder<PossiblyCurrentContext> =
+                    glutin::ContextBuilder::new();
                 let hwnd = win.get_hwnd();
-                let raw_context = glutin::Context::new_raw_context(hwnd, cb);
+                let raw_context = cb.build_raw_context(hwnd);
 
                 (raw_context.unwrap(), el, win)
             }

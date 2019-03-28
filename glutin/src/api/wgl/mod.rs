@@ -198,6 +198,19 @@ impl Context {
     }
 
     #[inline]
+    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+        if self.is_current() && gl::wgl::MakeCurrent(
+            self.hdc as *const _,
+            std::ptr::null(),
+        ) != 0
+        {
+            Ok(())
+        } else {
+            Err(ContextError::IoError(std::io::Error::last_os_error()))
+        }
+    }
+
+    #[inline]
     pub fn is_current(&self) -> bool {
         unsafe {
             gl::wgl::GetCurrentContext() == self.context.0 as *const raw::c_void

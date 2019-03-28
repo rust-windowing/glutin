@@ -2,7 +2,7 @@
 
 use crate::{
     Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
-    PixelFormatRequirements,
+    PixelFormatRequirements, NotCurrentContext, ContextCurrentState,
 };
 
 use crate::api::egl::{Context as EglContext, NativeDisplay, EGL};
@@ -14,6 +14,7 @@ use winapi::shared::windef::{HGLRC, HWND};
 use winit;
 use winit::dpi;
 
+use std::marker::PhantomData;
 use std::os::raw;
 
 /// Context handles available on Windows.
@@ -201,6 +202,18 @@ impl Context {
     }
 
     #[inline]
+    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+        match *self {
+            Context::Wgl(ref c) | Context::HiddenWindowWgl(_, ref c) => {
+                c.make_not_current()
+            }
+            Context::Egl(ref c)
+            | Context::HiddenWindowEgl(_, ref c)
+            | Context::EglPbuffer(ref c) => c.make_not_current(),
+        }
+    }
+
+    #[inline]
     pub fn is_current(&self) -> bool {
         match *self {
             Context::Wgl(ref c) | Context::HiddenWindowWgl(_, ref c) => {
@@ -284,26 +297,34 @@ pub trait RawContextExt {
     ///   - Provide us with invalid parameters.
     ///   - The window is destroyed before the context
     unsafe fn build_raw_context(
+        self,
         hwnd: *mut raw::c_void,
-        cb: crate::ContextBuilder,
-    ) -> Result<crate::RawContext, CreationError>
+    ) -> Result<crate::RawContext<NotCurrentContext>, CreationError>
     where
         Self: Sized;
 }
 
-impl RawContextExt for crate::ContextBuilder {
+impl<'a, T: ContextCurrentState> RawContextExt
+    for crate::ContextBuilder<'a, T>
+{
     #[inline]
     unsafe fn build_raw_context(
         self,
         hwnd: *mut raw::c_void,
-    ) -> Result<crate::RawContext, CreationError>
+    ) -> Result<crate::RawContext<NotCurrentContext>, CreationError>
     where
         Self: Sized,
     {
         let crate::ContextBuilder { pf_reqs, gl_attr } = self;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
         Context::new_raw_context(hwnd as *mut _, &pf_reqs, &gl_attr)
-            .map(|context| crate::Context { context })
-            .map(|context| crate::RawContext { context })
+            .map(|context| crate::Context {
+                context,
+                phantom: PhantomData,
+            })
+            .map(|context| crate::RawContext {
+                context,
+                window: (),
+            })
     }
 }
