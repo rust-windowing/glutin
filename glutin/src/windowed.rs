@@ -48,6 +48,15 @@ impl<T: ContextCurrentState> WindowedContext<T> {
     pub fn window(&self) -> &Window {
         &self.window
     }
+
+    /// Split the Window apart from the OpenGL context. Should only be used
+    /// when intending to transfer the Context to an other thread.
+    ///
+    /// Unsaftey:
+    ///   - The OpenGL context must be dropped before the window.
+    pub unsafe fn split(self) -> (RawContext<T>, Window) {
+        (RawContext { context: self.context, window: () }, self.window)
+    }
 }
 
 impl<T: ContextCurrentState, W> ContextWrapper<T, W> {

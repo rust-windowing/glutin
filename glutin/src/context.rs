@@ -44,7 +44,8 @@ where
         NotCurrentContext = Self::NotCurrentContext,
     >;
 
-    /// Sets the context as the current context.
+    /// Sets the context as the current context. The previously current context
+    /// (if any) is no longer current.
     unsafe fn make_current(
         self,
     ) -> Result<Self::PossiblyCurrentContext, (Self, ContextError)>;
@@ -54,9 +55,9 @@ where
         self,
     ) -> Result<Self::NotCurrentContext, (Self, ContextError)>;
 
-    /// Treats the context as not current, even if it is current.
-    ///
-    /// It is preferable to use `make_not_current`.
+    /// Treats the context as not current, even if it is current. We do no
+    /// checks to confirm that this is the case. Prefer to use
+    /// `make_not_current` which will do nothing if this context is not current.
     unsafe fn treat_as_not_current(self) -> Self::NotCurrentContext;
 
     /// Returns true if this context is the current one in this thread.
@@ -70,17 +71,6 @@ pub trait PossiblyCurrentContextTrait {
     /// Returns the address of an OpenGL function.
     fn get_proc_address(&self, addr: &str) -> *const ();
 }
-
-#[derive(Debug)]
-pub enum PossiblyCurrentContext {}
-
-#[derive(Debug)]
-pub enum NotCurrentContext {}
-
-pub trait ContextCurrentState: std::fmt::Debug {}
-
-impl ContextCurrentState for PossiblyCurrentContext {}
-impl ContextCurrentState for NotCurrentContext {}
 
 impl<T: ContextCurrentState> ContextTrait for Context<T> {
     type PossiblyCurrentContext = Context<PossiblyCurrentContext>;
@@ -170,3 +160,25 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
         )
     }
 }
+
+// This is nightly only:
+// impl !Send for Context<PossiblyCurrentContext> {}
+// impl !Sync for Context<PossiblyCurrentContext> {}
+//
+// Instead we add a phantom type to PossiblyCurrentContext
+
+#[derive(Debug)]
+pub struct PossiblyCurrentContext {
+    phantom: PhantomData<*mut ()>,
+}
+
+#[derive(Debug)]
+pub enum NotCurrentContext {}
+
+pub trait ContextCurrentState: std::fmt::Debug {}
+
+impl ContextCurrentState for PossiblyCurrentContext {}
+impl ContextCurrentState for NotCurrentContext {}
+
+trait FailToCompileIfNotSendSync where Self: Send + Sync {}
+impl FailToCompileIfNotSendSync for Context<NotCurrentContext> {}
