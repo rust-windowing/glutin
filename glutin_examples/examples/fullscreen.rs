@@ -1,6 +1,6 @@
 mod support;
 
-use glutin::{ContextTrait, PossiblyCurrentContext};
+use glutin::ContextTrait;
 use std::io::{self, Write};
 
 fn main() {
@@ -31,9 +31,9 @@ fn main() {
     let wb = glutin::WindowBuilder::new()
         .with_title("Hello world!")
         .with_fullscreen(Some(monitor));
-    let cb: glutin::ContextBuilder<PossiblyCurrentContext> =
-        glutin::ContextBuilder::new();
-    let windowed_context = cb.build_windowed(wb, &el).unwrap();
+    let windowed_context = glutin::ContextBuilder::new()
+        .build_windowed(wb, &el)
+        .unwrap();
 
     let windowed_context = unsafe { windowed_context.make_current().unwrap() };
 

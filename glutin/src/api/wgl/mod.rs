@@ -199,10 +199,8 @@ impl Context {
 
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
-        if self.is_current() && gl::wgl::MakeCurrent(
-            self.hdc as *const _,
-            std::ptr::null(),
-        ) != 0
+        if self.is_current()
+            && gl::wgl::MakeCurrent(self.hdc as *const _, std::ptr::null()) != 0
         {
             Ok(())
         } else {

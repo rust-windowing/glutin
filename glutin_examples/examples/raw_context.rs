@@ -11,7 +11,7 @@ fn main() {
 #[cfg(any(target_os = "linux", target_os = "windows"))]
 mod this_example {
     use super::support;
-    use glutin::{ContextTrait, PossiblyCurrentContext};
+    use glutin::ContextTrait;
 
     pub fn main() {
         let (raw_context, mut el, win) = {
@@ -26,8 +26,7 @@ mod this_example {
                 use glutin::os::unix::RawContextExt;
                 use winit::os::unix::{EventsLoopExt, WindowExt};
 
-                let cb: glutin::ContextBuilder<PossiblyCurrentContext> =
-                    glutin::ContextBuilder::new();
+                let cb = glutin::ContextBuilder::new();
                 let raw_context;
 
                 if el.is_wayland() {
@@ -40,19 +39,22 @@ mod this_example {
                         win.get_wayland_display().unwrap() as *const _;
                     let surface = win.get_wayland_surface().unwrap();
 
-                    raw_context = cb.build_raw_wayland_context(
-                        display_ptr,
-                        surface,
-                        width,
-                        height,
-                    );
+                    raw_context = cb
+                        .build_raw_wayland_context(
+                            display_ptr,
+                            surface,
+                            width,
+                            height,
+                        )
+                        .unwrap();
                 } else {
                     let xconn = el.get_xlib_xconnection().unwrap();
                     let xwindow = win.get_xlib_window().unwrap();
-                    raw_context = cb.build_raw_x11_context(xconn, xwindow);
+                    raw_context =
+                        cb.build_raw_x11_context(xconn, xwindow).unwrap();
                 }
 
-                (raw_context.unwrap(), el, win)
+                (raw_context, el, win)
             }
 
             #[cfg(target_os = "windows")]
@@ -60,12 +62,12 @@ mod this_example {
                 use glutin::os::windows::RawContextExt;
                 use winit::os::windows::WindowExt;
 
-                let cb: glutin::ContextBuilder<PossiblyCurrentContext> =
-                    glutin::ContextBuilder::new();
                 let hwnd = win.get_hwnd();
-                let raw_context = cb.build_raw_context(hwnd);
+                let raw_context = glutin::ContextBuilder::new()
+                    .build_raw_context(hwnd)
+                    .unwrap();
 
-                (raw_context.unwrap(), el, win)
+                (raw_context, el, win)
             }
         };
 

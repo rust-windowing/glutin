@@ -2,7 +2,6 @@
 
 mod support;
 
-use glutin::PossiblyCurrentContext;
 use support::{gl, ContextCurrentWrapper, ContextTracker, ContextWrapper};
 
 fn main() {
@@ -11,16 +10,14 @@ fn main() {
 
     let mut ct = ContextTracker::default();
 
-    let cb: glutin::ContextBuilder<PossiblyCurrentContext> =
-        glutin::ContextBuilder::new();
-    let headless_context = cb.build_headless(&el, size).unwrap();
+    let headless_context = glutin::ContextBuilder::new()
+        .build_headless(&el, size)
+        .unwrap();
 
     let wb = glutin::WindowBuilder::new()
         .with_title("A fantastic window!")
         .with_dimensions(glutin::dpi::LogicalSize::from_physical(size, 1.0));
-    let cb: glutin::ContextBuilder<PossiblyCurrentContext> =
-        glutin::ContextBuilder::new();
-    let windowed_context = cb
+    let windowed_context = glutin::ContextBuilder::new()
         .with_shared_lists(&headless_context)
         .build_windowed(wb, &el)
         .unwrap();

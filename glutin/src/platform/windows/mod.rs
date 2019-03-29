@@ -1,8 +1,8 @@
 #![cfg(target_os = "windows")]
 
 use crate::{
-    Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
-    PixelFormatRequirements, NotCurrentContext, ContextCurrentState,
+    Api, ContextCurrentState, ContextError, CreationError, GlAttributes,
+    GlRequest, NotCurrentContext, PixelFormat, PixelFormatRequirements,
 };
 
 use crate::api::egl::{Context as EglContext, NativeDisplay, EGL};

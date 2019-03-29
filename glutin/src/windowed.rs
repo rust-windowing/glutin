@@ -15,7 +15,7 @@ use std::marker::PhantomData;
 ///     .build_windowed(wb, &el)
 ///     .unwrap();
 ///
-/// unsafe { windowed_context.make_current().unwrap() };
+/// let windowed_context = unsafe { windowed_context.make_current().unwrap() };
 ///
 /// loop {
 ///     el.poll_events(|event| {
@@ -27,7 +27,7 @@ use std::marker::PhantomData;
 ///
 ///     // draw everything here
 ///
-///     windowed_context.swap_buffers();
+///     windowed_context.window().swap_buffers();
 ///     std::thread::sleep(std::time::Duration::from_millis(17));
 /// }
 /// # }
@@ -43,12 +43,14 @@ pub struct ContextWrapper<T: ContextCurrentState, W> {
     pub(crate) window: W,
 }
 
-impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
+impl<T: ContextCurrentState> WindowedContext<T> {
     /// Borrow the inner `W`.
-    pub fn window(&self) -> &W {
+    pub fn window(&self) -> &Window {
         &self.window
     }
+}
 
+impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
     /// Borrow the inner GL `Context`.
     pub fn context(&self) -> &Context<T> {
         &self.context

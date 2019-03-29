@@ -11,19 +11,19 @@ fn main() {
 #[cfg(target_os = "linux")]
 mod this_example {
     use super::support;
-    use glutin::{ContextTrait, PossiblyCurrentContext};
+    use glutin::ContextTrait;
     use std::path::Path;
     use support::gl;
 
     pub fn main() {
         use glutin::os::unix::OsMesaContextExt;
 
-        let cb: glutin::ContextBuilder<PossiblyCurrentContext> =
-            glutin::ContextBuilder::new()
-                .with_gl_profile(glutin::GlProfile::Core)
-                .with_gl(glutin::GlRequest::Latest);
         let dims = glutin::dpi::PhysicalSize::new(840., 640.);
-        let os_mesa = cb.build_osmesa(dims).unwrap();
+        let os_mesa = glutin::ContextBuilder::new()
+            .with_gl_profile(glutin::GlProfile::Core)
+            .with_gl(glutin::GlRequest::Latest)
+            .build_osmesa(dims)
+            .unwrap();
 
         let os_mesa = unsafe { os_mesa.make_current().unwrap() };
 

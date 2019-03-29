@@ -1,14 +1,14 @@
 mod support;
 
-use glutin::{ContextTrait, PossiblyCurrentContext};
+use glutin::ContextTrait;
 
 fn main() {
     let mut el = glutin::EventsLoop::new();
     let wb = glutin::WindowBuilder::new().with_title("A fantastic window!");
 
-    let cb: glutin::ContextBuilder<PossiblyCurrentContext> =
-        glutin::ContextBuilder::new();
-    let windowed_context = cb.build_windowed(wb, &el).unwrap();
+    let windowed_context = glutin::ContextBuilder::new()
+        .build_windowed(wb, &el)
+        .unwrap();
 
     let windowed_context = unsafe { windowed_context.make_current().unwrap() };
 

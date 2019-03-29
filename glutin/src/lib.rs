@@ -96,7 +96,7 @@ pub struct ContextBuilder<'a, T: ContextCurrentState> {
     pub pf_reqs: PixelFormatRequirements,
 }
 
-impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
+impl<'a> ContextBuilder<'a, NotCurrentContext> {
     /// Initializes a new `ContextBuilder` with default values.
     pub fn new() -> Self {
         ContextBuilder {
@@ -104,7 +104,9 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
             gl_attr: std::default::Default::default(),
         }
     }
+}
 
+impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     /// Sets how the backend should choose the OpenGL API and version.
     #[inline]
     pub fn with_gl(mut self, request: GlRequest) -> Self {

@@ -1,6 +1,6 @@
 mod support;
 
-use glutin::{ContextTrait, PossiblyCurrentContext};
+use glutin::ContextTrait;
 
 use support::{ContextCurrentWrapper, ContextTracker, ContextWrapper};
 
@@ -12,9 +12,9 @@ fn main() {
     for index in 0..3 {
         let title = format!("Charming Window #{}", index + 1);
         let wb = glutin::WindowBuilder::new().with_title(title);
-        let cb: glutin::ContextBuilder<PossiblyCurrentContext> =
-            glutin::ContextBuilder::new();
-        let windowed_context = cb.build_windowed(wb, &el).unwrap();
+        let windowed_context = glutin::ContextBuilder::new()
+            .build_windowed(wb, &el)
+            .unwrap();
         let windowed_context =
             unsafe { windowed_context.make_current().unwrap() };
         let gl = support::load(&windowed_context.context());
