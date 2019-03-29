@@ -11,7 +11,7 @@ impl<T: ContextCurrentState> ContextTraitExt for Context<T> {
     type Handle = *mut raw::c_void;
     #[inline]
     unsafe fn raw_handle(&self) -> Self::Handle {
-        self.eagl_context as *mut raw::c_void
+        self.context.raw_handle()
     }
 
     #[inline]

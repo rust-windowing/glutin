@@ -401,6 +401,11 @@ impl Context {
     }
 
     #[inline]
+    unsafe fn raw_handle(&self) -> *mut raw::c_void {
+        self.eagl_context as *mut raw::c_void
+    }
+
+    #[inline]
     pub fn get_api(&self) -> Api {
         Api::OpenGlEs
     }
