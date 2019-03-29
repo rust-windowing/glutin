@@ -359,3 +359,6 @@ impl Clone for IdRef {
         IdRef(self.0)
     }
 }
+
+unsafe impl Send for Context {}
+unsafe impl Sync for Context {}

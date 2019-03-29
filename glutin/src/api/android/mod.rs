@@ -10,14 +10,14 @@ use glutin_egl_sys as ffi;
 use winit;
 use winit::dpi;
 use winit::os::android::EventsLoopExt;
+use parking_lot::Mutex;
 
-use std::cell::Cell;
 use std::sync::Arc;
 
 #[derive(Debug)]
 struct AndroidContext {
     egl_context: EglContext,
-    stopped: Option<Cell<bool>>,
+    stopped: Option<Mutex<bool>>,
 }
 
 #[derive(Debug)]
@@ -37,7 +37,8 @@ impl android_glue::SyncEventHandler for AndroidSyncEventHandler {
             // this situation. Set stop to true to prevent
             // swap_buffer call race conditions.
             android_glue::Event::TermWindow => {
-                self.0.stopped.as_ref().unwrap().set(true);
+                let mut stopped = self.0.stopped.as_ref().unwrap().lock();
+                *stopped = true;
             }
             _ => {
                 return;
@@ -65,7 +66,7 @@ impl Context {
             .and_then(|p| p.finish(nwin as *const _))?;
         let ctx = Arc::new(AndroidContext {
             egl_context,
-            stopped: Some(Cell::new(false)),
+            stopped: Some(Mutex::new(false)),
         });
 
         let handler = Box::new(AndroidSyncEventHandler(ctx.clone()));
@@ -73,7 +74,8 @@ impl Context {
         let context = Context(ctx.clone());
 
         el.set_suspend_callback(Some(Box::new(move |suspended| {
-            ctx.stopped.as_ref().unwrap().set(suspended);
+            let mut stopped = ctx.stopped.as_ref().unwrap().lock();
+            *stopped = suspended;
             if suspended {
                 // Android has stopped the activity or sent it to background.
                 // Release the EGL surface and stop the animation loop.
@@ -114,7 +116,8 @@ impl Context {
     #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
         if let Some(ref stopped) = self.0.stopped {
-            if stopped.get() {
+            let stopped = stopped.lock();
+            if *stopped {
                 return Err(ContextError::ContextLost);
             }
         }
@@ -125,7 +128,8 @@ impl Context {
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
         if let Some(ref stopped) = self.0.stopped {
-            if stopped.get() {
+            let stopped = stopped.lock();
+            if *stopped {
                 return Err(ContextError::ContextLost);
             }
         }
@@ -149,7 +153,8 @@ impl Context {
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
         if let Some(ref stopped) = self.0.stopped {
-            if stopped.get() {
+            let stopped = stopped.lock();
+            if *stopped {
                 return Err(ContextError::ContextLost);
             }
         }

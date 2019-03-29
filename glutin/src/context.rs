@@ -180,5 +180,9 @@ pub trait ContextCurrentState: std::fmt::Debug {}
 impl ContextCurrentState for PossiblyCurrentContext {}
 impl ContextCurrentState for NotCurrentContext {}
 
-trait FailToCompileIfNotSendSync where Self: Send + Sync {}
+trait FailToCompileIfNotSendSync
+where
+    Self: Send + Sync,
+{
+}
 impl FailToCompileIfNotSendSync for Context<NotCurrentContext> {}

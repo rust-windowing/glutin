@@ -365,8 +365,7 @@ impl Context {
     pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
         let context_class = Class::get("EAGLContext")
             .expect("Failed to get class `EAGLContext`");
-        let res: BOOL =
-            msg_send![context_class, setCurrentContext: ffi::nil];
+        let res: BOOL = msg_send![context_class, setCurrentContext: ffi::nil];
         if res == YES {
             Ok(())
         } else {
@@ -465,3 +464,6 @@ impl Drop for Context {
         let _: () = unsafe { msg_send![self.eagl_context, release] };
     }
 }
+
+unsafe impl Send for Context {}
+unsafe impl Sync for Context {}

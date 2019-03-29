@@ -55,7 +55,13 @@ impl<T: ContextCurrentState> WindowedContext<T> {
     /// Unsaftey:
     ///   - The OpenGL context must be dropped before the window.
     pub unsafe fn split(self) -> (RawContext<T>, Window) {
-        (RawContext { context: self.context, window: () }, self.window)
+        (
+            RawContext {
+                context: self.context,
+                window: (),
+            },
+            self.window,
+        )
     }
 }
 
