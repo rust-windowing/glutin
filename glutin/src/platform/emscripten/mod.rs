@@ -117,12 +117,16 @@ impl Context {
 
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
-        match ffi::emscripten_webgl_make_context_current(0) {
-            ffi::EMSCRIPTEN_RESULT_SUCCESS => Ok(()),
-            err => Err(ContextError::OsError(format!(
-                "`emscripten_webgl_make_context_current` failed: {:?}",
-                err
-            ))),
+        if self.is_current() {
+            match ffi::emscripten_webgl_make_context_current(0) {
+                ffi::EMSCRIPTEN_RESULT_SUCCESS => Ok(()),
+                err => Err(ContextError::OsError(format!(
+                    "`emscripten_webgl_make_context_current` failed: {:?}",
+                    err
+                ))),
+            }
+        } else {
+            Ok(())
         }
     }
 

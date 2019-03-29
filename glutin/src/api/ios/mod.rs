@@ -363,6 +363,10 @@ impl Context {
 
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+        if !self.is_current() {
+            return Ok(());
+        }
+
         let context_class = Class::get("EAGLContext")
             .expect("Failed to get class `EAGLContext`");
         let res: BOOL = msg_send![context_class, setCurrentContext: ffi::nil];
