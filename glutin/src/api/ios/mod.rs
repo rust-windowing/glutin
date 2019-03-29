@@ -61,7 +61,6 @@
 //! SIGKILL'ed
 
 use crate::os::ios::{WindowBuilderExt, WindowExt};
-use crate::os::ContextTraitExt;
 use crate::{
     Api, ContextError, CreationError, EventsLoop, GlAttributes, GlRequest,
     PixelFormat, PixelFormatRequirements, Window, WindowBuilder,
@@ -443,18 +442,5 @@ fn create_view_class() {
 impl Drop for Context {
     fn drop(&mut self) {
         let _: () = unsafe { msg_send![self.eagl_context, release] };
-    }
-}
-
-impl ContextTraitExt for Context {
-    type Handle = *mut raw::c_void;
-    #[inline]
-    unsafe fn raw_handle(&self) -> Self::Handle {
-        self.eagl_context as *mut raw::c_void
-    }
-
-    #[inline]
-    unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
-        None
     }
 }

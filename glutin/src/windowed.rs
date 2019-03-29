@@ -27,7 +27,7 @@ use std::marker::PhantomData;
 ///
 ///     // draw everything here
 ///
-///     windowed_context.window().swap_buffers();
+///     windowed_context.swap_buffers();
 ///     std::thread::sleep(std::time::Duration::from_millis(17));
 /// }
 /// # }

@@ -29,7 +29,7 @@ glutin_egl_sys = { version = "0.1.2", path = "../glutin_egl_sys" }
 glutin_emscripten_sys = { version = "0.1.0", path = "../glutin_emscripten_sys" }
 
 [target.'cfg(any(target_os = "ios", target_os = "macos"))'.dependencies]
-objc = "0.2"
+objc = "0.2.6"
 glutin_gles2_sys = { version = "0.1.2", path = "../glutin_gles2_sys" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
