@@ -53,6 +53,11 @@ impl Context {
     }
 
     #[inline]
+    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+        unimplemented!("Glutin-Blank: Platform unsupported")
+    }
+
+    #[inline]
     pub fn is_current(&self) -> bool {
         unimplemented!("Glutin-Blank: Platform unsupported")
     }

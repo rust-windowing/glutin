@@ -26,6 +26,18 @@
 //! on some platforms. In that case use the unsafe platform-specific
 //! `RawWindowExt` available on some platforms.
 
+#![cfg(any(
+    target_os = "linux",
+    target_os = "ios",
+    target_os = "windows",
+    target_os = "macos",
+    target_os = "android",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+    target_os = "emscripten",
+))]
 #![deny(
     warnings,
     missing_debug_implementations,
