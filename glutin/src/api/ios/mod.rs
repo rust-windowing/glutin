@@ -401,7 +401,7 @@ impl Context {
     }
 
     #[inline]
-    unsafe fn raw_handle(&self) -> *mut raw::c_void {
+    pub unsafe fn raw_handle(&self) -> *mut raw::c_void {
         self.eagl_context as *mut raw::c_void
     }
 
