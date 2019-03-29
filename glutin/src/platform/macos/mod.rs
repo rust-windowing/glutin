@@ -221,6 +221,21 @@ impl Context {
     }
 
     #[inline]
+    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+        match *self {
+            Context::WindowedContext(ref c) => {
+                let _: () = msg_send![*c.context, update];
+                NSOpenGLContext::clearCurrentContext(nil);
+            }
+            Context::HeadlessContext(ref c) => {
+                let _: () = msg_send![*c.context, update];
+                NSOpenGLContext::clearCurrentContext(nil);
+            }
+        }
+        Ok(())
+    }
+
+    #[inline]
     pub fn is_current(&self) -> bool {
         unsafe {
             let context = match *self {

@@ -362,6 +362,22 @@ impl Context {
     }
 
     #[inline]
+    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+        let context_class = Class::get("EAGLContext")
+            .expect("Failed to get class `EAGLContext`");
+        let res: BOOL =
+            msg_send![context_class, setCurrentContext: ffi::nil];
+        if res == YES {
+            Ok(())
+        } else {
+            Err(ContextError::IoError(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "`EAGLContext setCurrentContext` failed",
+            )))
+        }
+    }
+
+    #[inline]
     pub fn is_current(&self) -> bool {
         // TODO: This can likely be implemented using
         // `currentContext`/`getCurrentContext`
