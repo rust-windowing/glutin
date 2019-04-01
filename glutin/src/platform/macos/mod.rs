@@ -60,9 +60,16 @@ impl Context {
         let transparent = wb.window.transparent;
         let win = wb.build(el)?;
 
-        if gl_attr.sharing.is_some() {
-            unimplemented!()
-        }
+        let share_ctx = match gl_attr.sharing {
+            Some(outer) => {
+                let inner = match outer {
+                    Context::WindowedContext(w) => w.context.clone(),
+                    Context::HeadlessContext(h) => h.context.clone(),
+                };
+                *inner
+            }
+            None => nil,
+        };
 
         match gl_attr.robustness {
             Robustness::RobustNoResetNotification
@@ -86,10 +93,9 @@ impl Context {
                 Some(pf) => pf,
             };
 
-            // TODO: Add context sharing
             let gl_context = IdRef::new(
                 NSOpenGLContext::alloc(nil)
-                    .initWithFormat_shareContext_(*pixel_format, nil),
+                    .initWithFormat_shareContext_(*pixel_format, share_ctx),
             );
             let gl_context = match gl_context.non_nil() {
                 Some(gl_context) => gl_context,
