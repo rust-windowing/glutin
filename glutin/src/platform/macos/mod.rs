@@ -60,16 +60,7 @@ impl Context {
         let transparent = wb.window.transparent;
         let win = wb.build(el)?;
 
-        let share_ctx = match gl_attr.sharing {
-            Some(outer) => {
-                let inner = match outer {
-                    Context::WindowedContext(w) => w.context.clone(),
-                    Context::HeadlessContext(h) => h.context.clone(),
-                };
-                *inner
-            }
-            None => nil,
-        };
+        let share_ctx = gl_attr.sharing.map_or(nil, |c| *c.get_id());
 
         match gl_attr.robustness {
             Robustness::RobustNoResetNotification
@@ -300,6 +291,14 @@ impl Context {
         match *self {
             Context::WindowedContext(ref c) => *c.context.deref() as *mut _,
             Context::HeadlessContext(ref c) => *c.context.deref() as *mut _,
+        }
+    }
+
+    #[inline]
+    fn get_id(&self) -> IdRef {
+        match self {
+            Context::WindowedContext(w) => w.context.clone(),
+            Context::HeadlessContext(h) => h.context.clone(),
         }
     }
 }
