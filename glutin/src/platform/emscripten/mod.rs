@@ -1,12 +1,11 @@
 #![cfg(target_os = "emscripten")]
 
-mod ffi;
-
 use crate::{
     Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
     PixelFormatRequirements,
 };
 
+use glutin_emscripten_sys as ffi;
 use winit;
 use winit::dpi;
 
@@ -86,24 +85,56 @@ impl Context {
     }
 
     #[inline]
-    pub fn resize(&self, _width: u32, _height: u32) {
+    pub fn is_current(&self) -> bool {
+        unsafe {
+            ffi::emscripten_webgl_get_current_context() == self.raw_handle()
+        }
+    }
+
+    #[inline]
+    pub fn get_api(&self) -> Api {
+        Api::WebGl
+    }
+
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE {
         match self {
-            Context::Window(_) => (), // TODO: ?
-            Context::WindowedContext(_, _) => unreachable!(),
+            Context::Window(c) => *c,
+            Context::WindowedContext(_, c) => *c,
         }
     }
 
     #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        // TOOD: check if == EMSCRIPTEN_RESULT
-        ffi::emscripten_webgl_make_context_current(self.raw_handle());
-        Ok(())
+        match ffi::emscripten_webgl_make_context_current(self.raw_handle()) {
+            ffi::EMSCRIPTEN_RESULT_SUCCESS => Ok(()),
+            err => Err(ContextError::OsError(format!(
+                "`emscripten_webgl_make_context_current` failed: {:?}",
+                err
+            ))),
+        }
     }
 
     #[inline]
-    pub fn is_current(&self) -> bool {
-        unsafe {
-            ffi::emscripten_webgl_get_current_context() == self.raw_handle()
+    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+        if self.is_current() {
+            match ffi::emscripten_webgl_make_context_current(0) {
+                ffi::EMSCRIPTEN_RESULT_SUCCESS => Ok(()),
+                err => Err(ContextError::OsError(format!(
+                    "`emscripten_webgl_make_context_current` failed: {:?}",
+                    err
+                ))),
+            }
+        } else {
+            Ok(())
+        }
+    }
+
+    #[inline]
+    pub fn resize(&self, _width: u32, _height: u32) {
+        match *self {
+            Context::Window(_) => (), // TODO: ?
+            Context::WindowedContext(_, _) => unreachable!(),
         }
     }
 
@@ -125,11 +156,6 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_api(&self) -> Api {
-        Api::WebGl
-    }
-
-    #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         // FIXME: this is a dummy pixel format
         PixelFormat {
@@ -142,14 +168,6 @@ impl Context {
             double_buffer: true,
             multisampling: None,
             srgb: true,
-        }
-    }
-
-    #[inline]
-    pub unsafe fn raw_handle(&self) -> ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE {
-        match self {
-            Context::Window(c) => *c,
-            Context::WindowedContext(_, c) => *c,
         }
     }
 }

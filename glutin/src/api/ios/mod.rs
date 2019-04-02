@@ -1,5 +1,4 @@
 #![cfg(target_os = "ios")]
-#![allow(deprecated)] // From upstream library, caused by uses of `msg_send!`
 
 //! iOS support
 //!
@@ -62,7 +61,6 @@
 //! SIGKILL'ed
 
 use crate::os::ios::{WindowBuilderExt, WindowExt};
-use crate::os::ContextTraitExt;
 use crate::{
     Api, ContextError, CreationError, EventsLoop, GlAttributes, GlRequest,
     PixelFormat, PixelFormatRequirements, Window, WindowBuilder,
@@ -364,6 +362,25 @@ impl Context {
     }
 
     #[inline]
+    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+        if !self.is_current() {
+            return Ok(());
+        }
+
+        let context_class = Class::get("EAGLContext")
+            .expect("Failed to get class `EAGLContext`");
+        let res: BOOL = msg_send![context_class, setCurrentContext: ffi::nil];
+        if res == YES {
+            Ok(())
+        } else {
+            Err(ContextError::IoError(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "`EAGLContext setCurrentContext` failed",
+            )))
+        }
+    }
+
+    #[inline]
     pub fn is_current(&self) -> bool {
         // TODO: This can likely be implemented using
         // `currentContext`/`getCurrentContext`
@@ -384,6 +401,11 @@ impl Context {
         };
         // debug!("proc {} -> {:?}", proc_name, addr);
         addr
+    }
+
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> *mut raw::c_void {
+        self.eagl_context as *mut raw::c_void
     }
 
     #[inline]
@@ -447,15 +469,5 @@ impl Drop for Context {
     }
 }
 
-impl ContextTraitExt for Context {
-    type Handle = *mut raw::c_void;
-    #[inline]
-    unsafe fn raw_handle(&self) -> Self::Handle {
-        self.eagl_context as *mut raw::c_void
-    }
-
-    #[inline]
-    unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
-        None
-    }
-}
+unsafe impl Send for Context {}
+unsafe impl Sync for Context {}

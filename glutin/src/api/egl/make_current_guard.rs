@@ -56,15 +56,13 @@ impl MakeCurrentGuard {
 
     pub fn if_any_same_then_invalidate(
         &mut self,
-        display: ffi::egl::types::EGLDisplay,
         draw_surface: ffi::egl::types::EGLSurface,
         read_surface: ffi::egl::types::EGLSurface,
         context: ffi::egl::types::EGLContext,
     ) {
         if self.possibly_invalid.is_some() {
             let pi = self.possibly_invalid.as_ref().unwrap();
-            if self.old_display == display
-                || pi.old_draw_surface == draw_surface
+            if pi.old_draw_surface == draw_surface
                 || pi.old_read_surface == read_surface
                 || pi.old_context == context
             {

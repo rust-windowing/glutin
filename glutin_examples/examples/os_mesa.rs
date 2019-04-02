@@ -18,13 +18,14 @@ mod this_example {
     pub fn main() {
         use glutin::os::unix::OsMesaContextExt;
 
-        let cb = glutin::ContextBuilder::new()
-            .with_gl_profile(glutin::GlProfile::Core)
-            .with_gl(glutin::GlRequest::Latest);
         let dims = glutin::dpi::PhysicalSize::new(840., 640.);
-        let os_mesa = glutin::Context::new_osmesa(cb, dims).unwrap();
+        let os_mesa = glutin::ContextBuilder::new()
+            .with_gl_profile(glutin::GlProfile::Core)
+            .with_gl(glutin::GlRequest::Latest)
+            .build_osmesa(dims)
+            .unwrap();
 
-        unsafe { os_mesa.make_current().unwrap() }
+        let os_mesa = unsafe { os_mesa.make_current().unwrap() };
 
         let gl = support::load(&os_mesa);
         gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
@@ -49,11 +50,16 @@ mod this_example {
             );
         }
 
-        // TODO: vertically flip image.
+        let mut pixels_flipped: Vec<gl::types::GLubyte> = vec![];
+        for v in (0..ss[3]).rev() {
+            let s = 3 * v as usize * ss[2] as usize;
+            let o = 3 * ss[2] as usize;
+            pixels_flipped.extend_from_slice(&pixels[s..(s + o)]);
+        }
 
         image::save_buffer(
             &Path::new("os_mesa.png"),
-            &pixels,
+            &pixels_flipped,
             ss[2] as u32,
             ss[3] as u32,
             image::RGB(8),

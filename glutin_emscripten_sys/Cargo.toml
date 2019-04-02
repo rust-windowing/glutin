@@ -1,0 +1,9 @@
+[package]
+name = "glutin_emscripten_sys"
+version = "0.1.0"
+authors = ["The glutin contributors", "Hal Gentz <zegentzy@protonmail.com>"]
+description = "The emscripten bindings for glutin"
+repository = "https://github.com/tomaka/glutin"
+license = "Apache-2.0"
+readme = "README.md"
+edition = "2018"

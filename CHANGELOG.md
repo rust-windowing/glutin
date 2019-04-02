@@ -1,11 +1,21 @@
 # Unreleased
 
+ - **Breaking**: Split `ContextTrait` into `ContextTrait` and `PossiblyCurrentContextTrait`.
+ - **Breaking**: Changed `WindowedContext` and `RawContext` into typedefs of
+ `ContextWrapper`.
+ - **Breaking**: Removed `new_windowed` and `new_headless` from `WindowedContext`
+ and `Context`, respectiveness.
+ - **Breaking**: Added two new types, `NotCurrentContext` and `PossiblyCurrentContext`,
+ which `RawContext`, `WindowedContext`, `ContextBuilder` and `Context` are now 
+ generic over.
+ - Added `make_not_current` into `ContextTrait`.
+ - Added `treat_as_not_current` into `ContextTrait`.
 - We now load `libGL.so` instead of `libGLX.so`.
  - **Breaking**: Added `DisplayLost` variant to `ContextError`.
  - Fixed bug where we drop the hidden window belonging to a headless context on
  on X11 and/or Wayland before the actual context.
- - "Fixed" bug where we will close `EGLDisplay`s while they are still in use by 
- others. Angry and/or salty rant can be found in `glutin/src/api/egl/mod.rs`, 
+ - "Fixed" bug where we will close `EGLDisplay`s while they are still in use by
+ others. Angry and/or salty rant can be found in `glutin/src/api/egl/mod.rs`,
  you can't miss it.
 
 # Version 0.20.0 (2019-03-09)
@@ -22,7 +32,7 @@ OsMesa contexts via a separate extension.
 - Added `ContextBuilder::build_{windowed,headless}` methods.
 - **Breaking:** Renamed `Context::new` to `Context::new_headless`. `new_headless` now accepts dimensions for the off-screen surface backing it.
 - **Breaking:** Renamed `GlWindow::new` to `WindowedContext::new_windowed`.
-- On X11 and Wayland, you can now use shared contexts, however, one limitation 
+- On X11 and Wayland, you can now use shared contexts, however, one limitation
 of the Wayland backend is that all shared contexts must use the same events
 pool as each other.
 - Added context sharing support to windows.

@@ -26,6 +26,18 @@
 //! on some platforms. In that case use the unsafe platform-specific
 //! `RawWindowExt` available on some platforms.
 
+#![cfg(any(
+    target_os = "linux",
+    target_os = "ios",
+    target_os = "windows",
+    target_os = "macos",
+    target_os = "android",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+    target_os = "emscripten",
+))]
 #![deny(
     warnings,
     missing_debug_implementations,
@@ -43,15 +55,6 @@
 ))]
 #[macro_use]
 extern crate lazy_static;
-#[cfg(any(
-    target_os = "linux",
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-))]
-#[macro_use]
-extern crate shared_library;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 #[macro_use]
 extern crate objc;
@@ -70,12 +73,13 @@ pub mod os;
 mod api;
 mod context;
 mod platform;
-mod raw_context;
 mod windowed;
 
-pub use crate::context::Context;
-pub use crate::raw_context::RawContext;
-pub use crate::windowed::WindowedContext;
+pub use crate::context::{
+    Context, ContextCurrentState, ContextTrait, NotCurrentContext,
+    PossiblyCurrentContext, PossiblyCurrentContextTrait,
+};
+pub use crate::windowed::{ContextWrapper, RawContext, WindowedContext};
 
 pub use winit::{
     dpi, AvailableMonitorsIter, AxisId, ButtonId, ControlFlow,
@@ -88,34 +92,16 @@ pub use winit::{
 
 use std::io;
 
-/// A trait for types associated with a GL context.
-pub trait ContextTrait
-where
-    Self: Sized,
-{
-    /// Sets the context as the current context.
-    unsafe fn make_current(&self) -> Result<(), ContextError>;
-
-    /// Returns true if this context is the current one in this thread.
-    fn is_current(&self) -> bool;
-
-    /// Returns the address of an OpenGL function.
-    fn get_proc_address(&self, addr: &str) -> *const ();
-
-    /// Returns the OpenGL API being used.
-    fn get_api(&self) -> Api;
-}
-
 /// Object that allows you to build `Context`s.
 #[derive(Debug)]
-pub struct ContextBuilder<'a> {
+pub struct ContextBuilder<'a, T: ContextCurrentState> {
     /// The attributes to use to create the context.
-    pub gl_attr: GlAttributes<&'a Context>,
+    pub gl_attr: GlAttributes<&'a Context<T>>,
     /// The pixel format requirements
     pub pf_reqs: PixelFormatRequirements,
 }
 
-impl<'a> ContextBuilder<'a> {
+impl<'a> ContextBuilder<'a, NotCurrentContext> {
     /// Initializes a new `ContextBuilder` with default values.
     pub fn new() -> Self {
         ContextBuilder {
@@ -123,7 +109,9 @@ impl<'a> ContextBuilder<'a> {
             gl_attr: std::default::Default::default(),
         }
     }
+}
 
+impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     /// Sets how the backend should choose the OpenGL API and version.
     #[inline]
     pub fn with_gl(mut self, request: GlRequest) -> Self {
@@ -167,9 +155,14 @@ impl<'a> ContextBuilder<'a> {
 
     /// Share the display lists with the given `Context`.
     #[inline]
-    pub fn with_shared_lists(mut self, other: &'a Context) -> Self {
-        self.gl_attr.sharing = Some(other);
-        self
+    pub fn with_shared_lists<T2: ContextCurrentState>(
+        self,
+        other: &'a Context<T2>,
+    ) -> ContextBuilder<'a, T2> {
+        ContextBuilder {
+            gl_attr: self.gl_attr.set_sharing(Some(other)),
+            pf_reqs: self.pf_reqs,
+        }
     }
 
     /// Sets the multisampling level to request. A value of `0` indicates that
@@ -264,24 +257,6 @@ impl<'a> ContextBuilder<'a> {
     ) -> Self {
         self.pf_reqs.hardware_accelerated = acceleration;
         self
-    }
-
-    /// Builds a headless context.
-    pub fn build_headless(
-        self,
-        el: &EventsLoop,
-        dims: dpi::PhysicalSize,
-    ) -> Result<Context, CreationError> {
-        Context::new_headless(el, self, dims)
-    }
-
-    /// Builds a context and it's associated window.
-    pub fn build_windowed(
-        self,
-        wb: WindowBuilder,
-        el: &EventsLoop,
-    ) -> Result<WindowedContext, CreationError> {
-        WindowedContext::new_windowed(wb, self, el)
     }
 }
 
@@ -666,6 +641,19 @@ impl<S> GlAttributes<S> {
     {
         GlAttributes {
             sharing: self.sharing.map(f),
+            version: self.version,
+            profile: self.profile,
+            debug: self.debug,
+            robustness: self.robustness,
+            vsync: self.vsync,
+        }
+    }
+
+    /// Turns the `sharing` parameter into another type.
+    #[inline]
+    fn set_sharing<T>(self, sharing: Option<T>) -> GlAttributes<T> {
+        GlAttributes {
+            sharing,
             version: self.version,
             profile: self.profile,
             debug: self.debug,

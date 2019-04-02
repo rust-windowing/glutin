@@ -149,14 +149,11 @@ impl Context {
         })
     }
 
-    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        let glx = GLX.as_ref().unwrap();
-        let res = glx.MakeCurrent(
-            self.xconn.display as *mut _,
-            self.window,
-            self.context,
-        );
-        if res == 0 {
+    unsafe fn check_make_current(
+        &self,
+        ret: Option<i32>,
+    ) -> Result<(), ContextError> {
+        if ret == Some(0) {
             let err = self.xconn.check_errors();
             Err(ContextError::OsError(format!(
                 "`glXMakeCurrent` failed: {:?}",
@@ -168,11 +165,50 @@ impl Context {
     }
 
     #[inline]
+    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
+        let glx = GLX.as_ref().unwrap();
+        let res = glx.MakeCurrent(
+            self.xconn.display as *mut _,
+            self.window,
+            self.context,
+        );
+        self.check_make_current(Some(res))
+    }
+
+    #[inline]
+    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+        let glx = GLX.as_ref().unwrap();
+        if self.window == glx.GetCurrentDrawable()
+            || self.context == glx.GetCurrentContext()
+        {
+            let res = glx.MakeCurrent(
+                self.xconn.display as *mut _,
+                0,
+                std::ptr::null(),
+            );
+            self.check_make_current(Some(res))
+        } else {
+            self.check_make_current(None)
+        }
+    }
+
+    #[inline]
     pub fn is_current(&self) -> bool {
         let glx = GLX.as_ref().unwrap();
         unsafe { glx.GetCurrentContext() == self.context }
     }
 
+    #[inline]
+    pub fn get_api(&self) -> crate::Api {
+        crate::Api::OpenGl
+    }
+
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> ffi::GLXContext {
+        self.context
+    }
+
+    #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const () {
         let glx = GLX.as_ref().unwrap();
         let addr = CString::new(addr.as_bytes()).unwrap();
@@ -197,18 +233,8 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_api(&self) -> crate::Api {
-        crate::Api::OpenGl
-    }
-
-    #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         self.pixel_format.clone()
-    }
-
-    #[inline]
-    pub unsafe fn raw_handle(&self) -> ffi::GLXContext {
-        self.context
     }
 }
 

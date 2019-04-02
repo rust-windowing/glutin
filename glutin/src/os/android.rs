@@ -1,14 +1,14 @@
 #![cfg(any(target_os = "android"))]
 
 use crate::os::ContextTraitExt;
-use crate::Context;
+use crate::{Context, ContextCurrentState};
 pub use glutin_egl_sys::EGLContext;
 
 pub use winit::os::android::{WindowBuilderExt, WindowExt};
 
 use std::os::raw;
 
-impl ContextTraitExt for Context {
+impl<T: ContextCurrentState> ContextTraitExt for Context<T> {
     type Handle = EGLContext;
 
     #[inline]

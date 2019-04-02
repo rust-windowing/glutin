@@ -11,10 +11,13 @@
     target_os = "emscripten",
 )))]
 
-use crate::Context;
+use crate::os::ContextTraitExt;
+use crate::{Context, ContextCurrentState};
 
-impl ContextTraitExt for Context {
-    type Handle = !;
+use std::os::raw;
+
+impl<T: ContextCurrentState> ContextTraitExt for Context<T> {
+    type Handle = ();
 
     #[inline]
     unsafe fn raw_handle(&self) -> Self::Handle {

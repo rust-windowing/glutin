@@ -2,7 +2,7 @@
 
 use crate::os::ContextTraitExt;
 pub use crate::platform::{RawContextExt, RawHandle};
-use crate::Context;
+use crate::{Context, ContextCurrentState};
 pub use glutin_egl_sys::EGLContext;
 
 pub use winapi::shared::windef::HGLRC;
@@ -12,7 +12,7 @@ pub use winit::os::windows::{
 
 use std::os::raw;
 
-impl ContextTraitExt for Context {
+impl<T: ContextCurrentState> ContextTraitExt for Context<T> {
     type Handle = RawHandle;
 
     #[inline]

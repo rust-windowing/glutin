@@ -85,18 +85,38 @@ impl Context {
     }
 
     #[inline]
-    pub fn resize(&self, width: u32, height: u32) {
-        self.egl_surface.resize(width as i32, height as i32, 0, 0);
-    }
-
-    #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
         self.context.make_current()
     }
 
     #[inline]
+    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+        self.context.make_not_current()
+    }
+
+    #[inline]
     pub fn is_current(&self) -> bool {
         self.context.is_current()
+    }
+
+    #[inline]
+    pub fn get_api(&self) -> crate::Api {
+        self.context.get_api()
+    }
+
+    #[inline]
+    pub unsafe fn raw_handle(&self) -> ffi::EGLContext {
+        self.context.raw_handle()
+    }
+
+    #[inline]
+    pub unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
+        Some(self.context.get_egl_display())
+    }
+
+    #[inline]
+    pub fn resize(&self, width: u32, height: u32) {
+        self.egl_surface.resize(width as i32, height as i32, 0, 0);
     }
 
     #[inline]
@@ -110,22 +130,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_api(&self) -> crate::Api {
-        self.context.get_api()
-    }
-
-    #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         self.context.get_pixel_format().clone()
-    }
-
-    #[inline]
-    pub unsafe fn raw_handle(&self) -> ffi::EGLContext {
-        self.context.raw_handle()
-    }
-
-    #[inline]
-    pub unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
-        Some(self.context.get_egl_display())
     }
 }

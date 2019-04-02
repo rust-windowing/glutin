@@ -1,5 +1,7 @@
 use super::*;
 
+use std::marker::PhantomData;
+
 /// Represents an OpenGL context and the `Window` with which it is associated.
 ///
 /// # Example
@@ -13,7 +15,7 @@ use super::*;
 ///     .build_windowed(wb, &el)
 ///     .unwrap();
 ///
-/// unsafe { windowed_context.make_current().unwrap() };
+/// let windowed_context = unsafe { windowed_context.make_current().unwrap() };
 ///
 /// loop {
 ///     el.poll_events(|event| {
@@ -30,49 +32,47 @@ use super::*;
 /// }
 /// # }
 /// ```
+pub type WindowedContext<T> = ContextWrapper<T, Window>;
+
+/// Represents a raw OpenGL context.
+pub type RawContext<T> = ContextWrapper<T, ()>;
+
 #[derive(Debug)]
-pub struct WindowedContext {
-    context: Context,
-    window: Window,
+pub struct ContextWrapper<T: ContextCurrentState, W> {
+    pub(crate) context: Context<T>,
+    pub(crate) window: W,
 }
 
-impl WindowedContext {
-    /// Builds the given window along with the associated GL context, returning
-    /// the pair as a `WindowedContext`.
-    ///
-    /// One notable limitation of the Wayland backend when it comes to shared
-    /// contexts is that both contexts must use the same events loop.
-    ///
-    /// Errors can occur in two scenarios:
-    ///  - If the window could not be created (via permission denied,
-    ///  incompatible system, out of memory, etc.). This should be very rare.
-    ///  - If the OpenGL context could not be created. This generally happens
-    ///  because the underlying platform doesn't support a requested feature.
-    pub fn new_windowed(
-        wb: WindowBuilder,
-        cb: ContextBuilder,
-        el: &EventsLoop,
-    ) -> Result<Self, CreationError> {
-        let ContextBuilder { pf_reqs, gl_attr } = cb;
-        let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
-        platform::Context::new_windowed(wb, el, &pf_reqs, &gl_attr).map(
-            |(window, context)| WindowedContext {
-                window,
-                context: Context { context },
-            },
-        )
-    }
-
-    /// Borrow the inner `Window`.
+impl<T: ContextCurrentState> WindowedContext<T> {
+    /// Borrow the inner `W`.
     pub fn window(&self) -> &Window {
         &self.window
     }
 
+    /// Split the Window apart from the OpenGL context. Should only be used
+    /// when intending to transfer the Context to an other thread.
+    ///
+    /// Unsaftey:
+    ///   - The OpenGL context must be dropped before the window.
+    pub unsafe fn split(self) -> (RawContext<T>, Window) {
+        (
+            RawContext {
+                context: self.context,
+                window: (),
+            },
+            self.window,
+        )
+    }
+}
+
+impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
     /// Borrow the inner GL `Context`.
-    pub fn context(&self) -> &Context {
+    pub fn context(&self) -> &Context<T> {
         &self.context
     }
+}
 
+impl<W> ContextWrapper<PossiblyCurrentContext, W> {
     /// Swaps the buffers in case of double or triple buffering.
     ///
     /// You should call this function every time you have finished rendering, or
@@ -105,17 +105,43 @@ impl WindowedContext {
     }
 }
 
-impl ContextTrait for WindowedContext {
-    unsafe fn make_current(&self) -> Result<(), ContextError> {
-        self.context.make_current()
+impl<T: ContextCurrentState, W> ContextTrait for ContextWrapper<T, W> {
+    type PossiblyCurrentContext = ContextWrapper<PossiblyCurrentContext, W>;
+    type NotCurrentContext = ContextWrapper<NotCurrentContext, W>;
+
+    unsafe fn make_current(
+        self,
+    ) -> Result<Self::PossiblyCurrentContext, (Self, ContextError)> {
+        let window = self.window;
+        match self.context.make_current() {
+            Ok(context) => Ok(ContextWrapper { window, context }),
+            Err((context, err)) => {
+                Err((ContextWrapper { window, context }, err))
+            }
+        }
+    }
+
+    unsafe fn make_not_current(
+        self,
+    ) -> Result<Self::NotCurrentContext, (Self, ContextError)> {
+        let window = self.window;
+        match self.context.make_not_current() {
+            Ok(context) => Ok(ContextWrapper { window, context }),
+            Err((context, err)) => {
+                Err((ContextWrapper { window, context }, err))
+            }
+        }
+    }
+
+    unsafe fn treat_as_not_current(self) -> Self::NotCurrentContext {
+        ContextWrapper {
+            context: self.context.treat_as_not_current(),
+            window: self.window,
+        }
     }
 
     fn is_current(&self) -> bool {
         self.context.is_current()
-    }
-
-    fn get_proc_address(&self, addr: &str) -> *const () {
-        self.context.get_proc_address(addr)
     }
 
     fn get_api(&self) -> Api {
@@ -123,9 +149,48 @@ impl ContextTrait for WindowedContext {
     }
 }
 
-impl std::ops::Deref for WindowedContext {
-    type Target = Window;
+impl<W> PossiblyCurrentContextTrait
+    for ContextWrapper<PossiblyCurrentContext, W>
+{
+    fn get_proc_address(&self, addr: &str) -> *const () {
+        self.context.get_proc_address(addr)
+    }
+}
+
+impl<T: ContextCurrentState, W> std::ops::Deref for ContextWrapper<T, W> {
+    type Target = Context<T>;
     fn deref(&self) -> &Self::Target {
-        &self.window
+        &self.context
+    }
+}
+
+impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
+    /// Builds the given window along with the associated GL context, returning
+    /// the pair as a `WindowedContext`.
+    ///
+    /// One notable limitation of the Wayland backend when it comes to shared
+    /// contexts is that both contexts must use the same events loop.
+    ///
+    /// Errors can occur in two scenarios:
+    ///  - If the window could not be created (via permission denied,
+    ///  incompatible system, out of memory, etc.). This should be very rare.
+    ///  - If the OpenGL context could not be created. This generally happens
+    ///  because the underlying platform doesn't support a requested feature.
+    pub fn build_windowed(
+        self,
+        wb: WindowBuilder,
+        el: &EventsLoop,
+    ) -> Result<WindowedContext<NotCurrentContext>, CreationError> {
+        let ContextBuilder { pf_reqs, gl_attr } = self;
+        let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
+        platform::Context::new_windowed(wb, el, &pf_reqs, &gl_attr).map(
+            |(window, context)| WindowedContext {
+                window,
+                context: Context {
+                    context,
+                    phantom: PhantomData,
+                },
+            },
+        )
     }
 }

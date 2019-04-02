@@ -1,6 +1,4 @@
 #![cfg(target_os = "macos")]
-#![allow(deprecated)] // From upstream library, caused by uses of `msg_send!`
-
 use crate::{
     ContextError, CreationError, GlAttributes, PixelFormat,
     PixelFormatRequirements, Robustness,
@@ -220,6 +218,23 @@ impl Context {
     }
 
     #[inline]
+    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+        if self.is_current() {
+            match *self {
+                Context::WindowedContext(ref c) => {
+                    let _: () = msg_send![*c.context, update];
+                    NSOpenGLContext::clearCurrentContext(nil);
+                }
+                Context::HeadlessContext(ref c) => {
+                    let _: () = msg_send![*c.context, update];
+                    NSOpenGLContext::clearCurrentContext(nil);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[inline]
     pub fn is_current(&self) -> bool {
         unsafe {
             let context = match *self {
@@ -351,3 +366,6 @@ impl Clone for IdRef {
         IdRef(self.0)
     }
 }
+
+unsafe impl Send for Context {}
+unsafe impl Sync for Context {}
