@@ -167,15 +167,15 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
 //
 // Instead we add a phantom type to PossiblyCurrentContext
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PossiblyCurrentContext {
     phantom: PhantomData<*mut ()>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum NotCurrentContext {}
 
-pub trait ContextCurrentState: std::fmt::Debug {}
+pub trait ContextCurrentState: std::fmt::Debug + Clone {}
 
 impl ContextCurrentState for PossiblyCurrentContext {}
 impl ContextCurrentState for NotCurrentContext {}

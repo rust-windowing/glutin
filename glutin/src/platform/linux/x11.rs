@@ -8,9 +8,11 @@ use crate::{
 use glutin_glx_sys as ffi;
 use takeable_option::Takeable;
 use winit;
+use winit::dpi;
 pub use winit::os::unix::x11::{XConnection, XError, XNotSupported};
 use winit::os::unix::{EventsLoopExt, WindowBuilderExt, WindowExt};
 
+use std::ops::{Deref, DerefMut};
 use std::os::raw;
 use std::sync::Arc;
 
@@ -36,16 +38,43 @@ pub enum X11Context {
 }
 
 #[derive(Debug)]
-pub struct Context {
+pub struct ContextInner {
     xconn: Arc<XConnection>,
     colormap: ffi::Colormap,
     context: Takeable<X11Context>,
 }
 
+#[derive(Debug)]
+#[allow(dead_code)]
+pub enum Context {
+    Headless(ContextInner, winit::Window),
+    Windowed(ContextInner),
+}
+
+impl Deref for Context {
+    type Target = ContextInner;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Context::Headless(ctx, _) => ctx,
+            Context::Windowed(ctx) => ctx,
+        }
+    }
+}
+
+impl DerefMut for Context {
+    fn deref_mut(&mut self) -> &mut ContextInner {
+        match self {
+            Context::Headless(ctx, _) => ctx,
+            Context::Windowed(ctx) => ctx,
+        }
+    }
+}
+
 unsafe impl Send for Context {}
 unsafe impl Sync for Context {}
 
-impl Drop for Context {
+impl Drop for ContextInner {
     fn drop(&mut self) {
         unsafe {
             Takeable::take(&mut self.context);
@@ -57,12 +86,33 @@ impl Drop for Context {
 
 impl Context {
     #[inline]
+    pub fn new_headless(
+        _el: &winit::EventsLoop,
+        _pf_reqs: &PixelFormatRequirements,
+        _gl_attr: &GlAttributes<&Context>,
+        _dims: dpi::PhysicalSize,
+    ) -> Result<Self, CreationError> {
+        unimplemented!()
+    }
+
+    #[inline]
     pub fn new(
         wb: winit::WindowBuilder,
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<(winit::Window, Self), CreationError> {
+        Self::new_inner(wb, el, pf_reqs, gl_attr)
+            .map(|(win, ctx)| (win, Context::Windowed(ctx)))
+    }
+
+    #[inline]
+    pub fn new_inner(
+        wb: winit::WindowBuilder,
+        el: &winit::EventsLoop,
+        pf_reqs: &PixelFormatRequirements,
+        gl_attr: &GlAttributes<&Context>,
+    ) -> Result<(winit::Window, ContextInner), CreationError> {
         let xconn = match el.get_xlib_xconnection() {
             Some(xconn) => xconn,
             None => {
@@ -210,7 +260,7 @@ impl Context {
             cmap
         };
 
-        let context = Context {
+        let context = ContextInner {
             xconn: Arc::clone(&xconn),
             colormap,
             context: Takeable::new(context),
@@ -359,11 +409,11 @@ impl Context {
             cmap
         };
 
-        let context = Context {
+        let context = Context::Windowed(ContextInner {
             xconn: Arc::clone(&xconn),
             colormap,
             context: Takeable::new(context),
-        };
+        });
 
         Ok(context)
     }

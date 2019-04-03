@@ -8,19 +8,49 @@ use glutin_egl_sys as ffi;
 use wayland_client::egl as wegl;
 pub use wayland_client::sys::client::wl_display;
 use winit;
+use winit::dpi;
 use winit::os::unix::WindowExt;
 
+use std::ops::Deref;
 use std::os::raw;
 use std::sync::Arc;
 
 #[derive(DebugStub)]
-pub struct Context {
+pub struct ContextInner {
     #[debug_stub = "Arc<wegl::WlEglSurface>"]
     egl_surface: Arc<wegl::WlEglSurface>,
     context: EglContext,
 }
 
+#[derive(Debug)]
+#[allow(dead_code)]
+pub enum Context {
+    Headless(ContextInner, winit::Window),
+    Windowed(ContextInner),
+}
+
+impl Deref for Context {
+    type Target = ContextInner;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Context::Headless(ctx, _) => ctx,
+            Context::Windowed(ctx) => ctx,
+        }
+    }
+}
+
 impl Context {
+    #[inline]
+    pub fn new_headless(
+        _el: &winit::EventsLoop,
+        _pf_reqs: &PixelFormatRequirements,
+        _gl_attr: &GlAttributes<&Context>,
+        _dims: dpi::PhysicalSize,
+    ) -> Result<Self, CreationError> {
+        unimplemented!()
+    }
+
     #[inline]
     pub fn new(
         wb: winit::WindowBuilder,
@@ -77,10 +107,10 @@ impl Context {
             EglContext::new(pf_reqs, &gl_attr, native_display)
                 .and_then(|p| p.finish(egl_surface.ptr() as *const _))?
         };
-        let context = Context {
+        let context = Context::Windowed(ContextInner {
             egl_surface: Arc::new(egl_surface),
             context,
-        };
+        });
         Ok(context)
     }
 

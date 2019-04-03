@@ -93,7 +93,7 @@ pub use winit::{
 use std::io;
 
 /// Object that allows you to build `Context`s.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ContextBuilder<'a, T: ContextCurrentState> {
     /// The attributes to use to create the context.
     pub gl_attr: GlAttributes<&'a Context<T>>,

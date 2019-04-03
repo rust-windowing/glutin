@@ -7,10 +7,10 @@ use crate::{
 };
 
 use glutin_egl_sys as ffi;
+use parking_lot::Mutex;
 use winit;
 use winit::dpi;
 use winit::os::android::EventsLoopExt;
-use parking_lot::Mutex;
 
 use std::sync::Arc;
 
