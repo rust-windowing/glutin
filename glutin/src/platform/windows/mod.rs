@@ -93,6 +93,7 @@ impl Context {
                             &pf_reqs,
                             &gl_attr_egl,
                             NativeDisplay::Other(Some(std::ptr::null())),
+                            false,
                         )
                         .and_then(|p| p.finish(hwnd))
                         .map(|c| Context::Egl(c))
@@ -108,6 +109,7 @@ impl Context {
                             &pf_reqs,
                             &gl_attr_egl,
                             NativeDisplay::Other(Some(std::ptr::null())),
+                            false,
                         )
                         .and_then(|p| p.finish(hwnd))
                         {
@@ -142,7 +144,7 @@ impl Context {
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-        dims: dpi::PhysicalSize,
+        size: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
         // if EGL is available, we try using EGL first
         // if EGL returns an error, we try the hidden window method
@@ -160,10 +162,14 @@ impl Context {
                     });
 
                 let native_display = NativeDisplay::Other(None);
-                let context =
-                    EglContext::new(pf_reqs, &gl_attr_egl, native_display)
-                        .and_then(|prototype| prototype.finish_pbuffer(dims))
-                        .map(|ctx| Context::EglPbuffer(ctx));
+                let context = EglContext::new(
+                    pf_reqs,
+                    &gl_attr_egl,
+                    native_display,
+                    true,
+                )
+                .and_then(|prototype| prototype.finish_pbuffer(size))
+                .map(|ctx| Context::EglPbuffer(ctx));
 
                 if let Ok(context) = context {
                     return Ok(context);
@@ -174,7 +180,7 @@ impl Context {
 
         let wb = winit::WindowBuilder::new()
             .with_visibility(false)
-            .with_dimensions(dims.to_logical(1.));
+            .with_dimensions(size.to_logical(1.));
         Self::new_windowed(wb, &el, pf_reqs, gl_attr).map(|(win, context)| {
             match context {
                 Context::Egl(context) => Context::HiddenWindowEgl(win, context),

@@ -116,7 +116,16 @@ impl Context {
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-        dims: dpi::PhysicalSize,
+        size: dpi::PhysicalSize,
+    ) -> Result<Self, CreationError> {
+        Self::new_headless_impl(el, pf_reqs, gl_attr, Some(size))
+    }
+
+    pub fn new_headless_impl(
+        el: &winit::EventsLoop,
+        pf_reqs: &PixelFormatRequirements,
+        gl_attr: &GlAttributes<&Context>,
+        size: Option<dpi::PhysicalSize>,
     ) -> Result<Self, CreationError> {
         if el.is_wayland() {
             Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
@@ -124,7 +133,7 @@ impl Context {
                 Context::Wayland(ref ctx) => ctx,
                 _ => unreachable!(),
             });
-            wayland::Context::new_headless(&el, pf_reqs, &gl_attr, dims)
+            wayland::Context::new_headless(&el, pf_reqs, &gl_attr, size)
                 .map(|ctx| Context::Wayland(ctx))
         } else {
             Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
@@ -132,7 +141,7 @@ impl Context {
                 Context::X11(ref ctx) => ctx,
                 _ => unreachable!(),
             });
-            x11::Context::new_headless(&el, pf_reqs, &gl_attr, dims)
+            x11::Context::new_headless(&el, pf_reqs, &gl_attr, size)
                 .map(|ctx| Context::X11(ctx))
         }
     }
@@ -231,16 +240,23 @@ impl Context {
     }
 }
 
-pub trait OsMesaContextExt {
+pub trait HeadlessContextExt {
     fn build_osmesa(
         self,
-        dims: dpi::PhysicalSize,
+        size: dpi::PhysicalSize,
+    ) -> Result<crate::Context<NotCurrentContext>, CreationError>
+    where
+        Self: Sized;
+
+    fn build_surfaceless(
+        self,
+        el: &winit::EventsLoop,
     ) -> Result<crate::Context<NotCurrentContext>, CreationError>
     where
         Self: Sized;
 }
 
-impl<'a, T: ContextCurrentState> OsMesaContextExt
+impl<'a, T: ContextCurrentState> HeadlessContextExt
     for crate::ContextBuilder<'a, T>
 {
     /// Builds the given OsMesa context.
@@ -251,7 +267,7 @@ impl<'a, T: ContextCurrentState> OsMesaContextExt
     #[inline]
     fn build_osmesa(
         self,
-        dims: dpi::PhysicalSize,
+        size: dpi::PhysicalSize,
     ) -> Result<crate::Context<NotCurrentContext>, CreationError>
     where
         Self: Sized,
@@ -263,12 +279,35 @@ impl<'a, T: ContextCurrentState> OsMesaContextExt
             Context::OsMesa(ref ctx) => ctx,
             _ => unreachable!(),
         });
-        osmesa::OsMesaContext::new(&pf_reqs, &gl_attr, dims)
+        osmesa::OsMesaContext::new(&pf_reqs, &gl_attr, size)
             .map(|context| Context::OsMesa(context))
             .map(|context| crate::Context {
                 context,
                 phantom: PhantomData,
             })
+    }
+
+    /// Builds an egl-surfaceless context.
+    ///
+    /// Errors can occur if the OpenGL context could not be created. This
+    /// generally happens because the underlying platform doesn't support a
+    /// requested feature.
+    #[inline]
+    fn build_surfaceless(
+        self,
+        el: &winit::EventsLoop,
+    ) -> Result<crate::Context<NotCurrentContext>, CreationError>
+    where
+        Self: Sized,
+    {
+        let crate::ContextBuilder { pf_reqs, gl_attr } = self;
+        let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
+        Context::new_headless_impl(el, &pf_reqs, &gl_attr, None).map(
+            |context| crate::Context {
+                context,
+                phantom: PhantomData,
+            },
+        )
     }
 }
 

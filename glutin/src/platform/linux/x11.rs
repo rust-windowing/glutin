@@ -6,7 +6,6 @@ use crate::{
 };
 
 use glutin_glx_sys as ffi;
-use takeable_option::Takeable;
 use winit;
 use winit::dpi;
 pub use winit::os::unix::x11::{XConnection, XError, XNotSupported};
@@ -40,8 +39,12 @@ pub enum X11Context {
 #[derive(Debug)]
 pub struct ContextInner {
     xconn: Arc<XConnection>,
-    colormap: ffi::Colormap,
-    context: Takeable<X11Context>,
+    context: X11Context,
+}
+
+enum Prototype<'a> {
+    Glx(crate::api::glx::ContextPrototype<'a>),
+    Egl(crate::api::egl::ContextPrototype<'a>),
 }
 
 #[derive(Debug)]
@@ -74,97 +77,107 @@ impl DerefMut for Context {
 unsafe impl Send for Context {}
 unsafe impl Sync for Context {}
 
-impl Drop for ContextInner {
-    fn drop(&mut self) {
-        unsafe {
-            Takeable::take(&mut self.context);
-
-            (self.xconn.xlib.XFreeColormap)(self.xconn.display, self.colormap);
-        }
-    }
-}
-
 impl Context {
     #[inline]
     pub fn new_headless(
-        _el: &winit::EventsLoop,
-        _pf_reqs: &PixelFormatRequirements,
-        _gl_attr: &GlAttributes<&Context>,
-        _dims: dpi::PhysicalSize,
+        el: &winit::EventsLoop,
+        pf_reqs: &PixelFormatRequirements,
+        gl_attr: &GlAttributes<&Context>,
+        size: Option<dpi::PhysicalSize>,
     ) -> Result<Self, CreationError> {
-        unimplemented!()
-    }
+        if let Some(size) = size {
+            let xconn = match el.get_xlib_xconnection() {
+                Some(xconn) => xconn,
+                None => {
+                    return Err(CreationError::NoBackendAvailable(Box::new(
+                        NoX11Connection,
+                    )));
+                }
+            };
 
-    #[inline]
-    pub fn new(
-        wb: winit::WindowBuilder,
-        el: &winit::EventsLoop,
-        pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context>,
-    ) -> Result<(winit::Window, Self), CreationError> {
-        Self::new_inner(wb, el, pf_reqs, gl_attr)
-            .map(|(win, ctx)| (win, Context::Windowed(ctx)))
-    }
+            // Get the screen_id for the window being built.
+            let screen_id =
+                unsafe { (xconn.xlib.XDefaultScreen)(xconn.display) };
 
-    #[inline]
-    pub fn new_inner(
-        wb: winit::WindowBuilder,
-        el: &winit::EventsLoop,
-        pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context>,
-    ) -> Result<(winit::Window, ContextInner), CreationError> {
-        let xconn = match el.get_xlib_xconnection() {
-            Some(xconn) => xconn,
-            None => {
-                return Err(CreationError::NoBackendAvailable(Box::new(
-                    NoX11Connection,
-                )));
-            }
-        };
+            let mut builder_glx_u = None;
+            let mut builder_egl_u = None;
 
-        // Get the screen_id for the window being built.
-        let screen_id = unsafe { (xconn.xlib.XDefaultScreen)(xconn.display) };
+            // start the context building process
+            let context = Self::new_first_stage(
+                &xconn,
+                pf_reqs,
+                gl_attr,
+                screen_id,
+                &mut builder_glx_u,
+                &mut builder_egl_u,
+                true,
+            )?;
 
-        // start the context building process
-        enum Prototype<'a> {
-            Glx(crate::api::glx::ContextPrototype<'a>),
-            Egl(crate::api::egl::ContextPrototype<'a>),
+            // finish creating the OpenGL context
+            let context = match context {
+                // Prototype::Glx(ctx) =>
+                // X11Context::Glx(ctx.finish_pbuffer(xwin)?),
+                Prototype::Egl(ctx) => {
+                    X11Context::Egl(ctx.finish_pbuffer(size)?)
+                }
+                _ => unimplemented!(),
+            };
+
+            let context = Context::Windowed(ContextInner {
+                xconn: Arc::clone(&xconn),
+                context,
+            });
+
+            Ok(context)
+        } else {
+            // Surfaceless
+            unimplemented!()
         }
+    }
 
+    #[inline]
+    fn new_first_stage<'a>(
+        xconn: &Arc<XConnection>,
+        pf_reqs: &PixelFormatRequirements,
+        gl_attr: &'a GlAttributes<&'a Context>,
+        screen_id: raw::c_int,
+        builder_glx_u: &'a mut Option<GlAttributes<&'a GlxContext>>,
+        builder_egl_u: &'a mut Option<GlAttributes<&'a EglContext>>,
+        pbuffer_bit: bool,
+    ) -> Result<Prototype<'a>, CreationError> {
         let builder = gl_attr.clone();
 
-        let builder_glx_u;
-        let builder_egl_u;
-
-        let context = match gl_attr.version {
+        Ok(match gl_attr.version {
             GlRequest::Latest
             | GlRequest::Specific(Api::OpenGl, _)
             | GlRequest::GlThenGles { .. } => {
                 // GLX should be preferred over EGL, otherwise crashes may occur
                 // on X11 – issue #314
                 if let Some(_) = *GLX {
-                    builder_glx_u = builder.map_sharing(|c| match *c.context {
-                        X11Context::Glx(ref c) => c,
-                        _ => panic!(),
-                    });
+                    *builder_glx_u =
+                        Some(builder.map_sharing(|c| match c.context {
+                            X11Context::Glx(ref c) => c,
+                            _ => panic!(),
+                        }));
                     Prototype::Glx(GlxContext::new(
                         Arc::clone(&xconn),
                         pf_reqs,
-                        &builder_glx_u,
+                        builder_glx_u.as_ref().unwrap(),
                         screen_id,
-                        wb.window.transparent,
                     )?)
                 } else if let Some(_) = *EGL {
-                    builder_egl_u = builder.map_sharing(|c| match *c.context {
-                        X11Context::Egl(ref c) => c,
-                        _ => panic!(),
-                    });
+                    *builder_egl_u =
+                        Some(builder.map_sharing(|c| match c.context {
+                            X11Context::Egl(ref c) => c,
+                            _ => panic!(),
+                        }));
                     let native_display =
                         NativeDisplay::X11(Some(xconn.display as *const _));
                     Prototype::Egl(EglContext::new(
                         pf_reqs,
-                        &builder_egl_u,
+                        builder_egl_u.as_ref().unwrap(),
                         native_display,
+                        pbuffer_bit,
                     )?)
                 } else {
                     return Err(CreationError::NotSupported(
@@ -174,14 +187,16 @@ impl Context {
             }
             GlRequest::Specific(Api::OpenGlEs, _) => {
                 if let Some(_) = *EGL {
-                    builder_egl_u = builder.map_sharing(|c| match *c.context {
-                        X11Context::Egl(ref c) => c,
-                        _ => panic!(),
-                    });
+                    *builder_egl_u =
+                        Some(builder.map_sharing(|c| match c.context {
+                            X11Context::Egl(ref c) => c,
+                            _ => panic!(),
+                        }));
                     Prototype::Egl(EglContext::new(
                         pf_reqs,
-                        &builder_egl_u,
+                        builder_egl_u.as_ref().unwrap(),
                         NativeDisplay::X11(Some(xconn.display as *const _)),
+                        pbuffer_bit,
                     )?)
                 } else {
                     return Err(CreationError::NotSupported(
@@ -194,7 +209,41 @@ impl Context {
                     "requested specific without gl or gles",
                 ));
             }
+        })
+    }
+
+    #[inline]
+    pub fn new(
+        wb: winit::WindowBuilder,
+        el: &winit::EventsLoop,
+        pf_reqs: &PixelFormatRequirements,
+        gl_attr: &GlAttributes<&Context>,
+    ) -> Result<(winit::Window, Self), CreationError> {
+        let xconn = match el.get_xlib_xconnection() {
+            Some(xconn) => xconn,
+            None => {
+                return Err(CreationError::NoBackendAvailable(Box::new(
+                    NoX11Connection,
+                )));
+            }
         };
+
+        // Get the screen_id for the window being built.
+        let screen_id = unsafe { (xconn.xlib.XDefaultScreen)(xconn.display) };
+
+        let mut builder_glx_u = None;
+        let mut builder_egl_u = None;
+
+        // start the context building process
+        let context = Self::new_first_stage(
+            &xconn,
+            pf_reqs,
+            gl_attr,
+            screen_id,
+            &mut builder_glx_u,
+            &mut builder_egl_u,
+            false,
+        )?;
 
         // getting the `visual_infos` (a struct that contains information about
         // the visual to use)
@@ -240,31 +289,10 @@ impl Context {
             Prototype::Egl(ctx) => X11Context::Egl(ctx.finish(xwin as _)?),
         };
 
-        // getting the root window
-        let root = unsafe { (xconn.xlib.XDefaultRootWindow)(xconn.display) };
-        xconn.check_errors().expect("Failed to get root window");
-
-        // creating the color map
-        let colormap = {
-            let cmap = unsafe {
-                (xconn.xlib.XCreateColormap)(
-                    xconn.display,
-                    root,
-                    visual_infos.visual as *mut _,
-                    ffi::AllocNone,
-                )
-            };
-            xconn
-                .check_errors()
-                .expect("Failed to call XCreateColormap");
-            cmap
-        };
-
-        let context = ContextInner {
+        let context = Context::Windowed(ContextInner {
             xconn: Arc::clone(&xconn),
-            colormap,
-            context: Takeable::new(context),
-        };
+            context,
+        });
 
         Ok((win, context))
     }
@@ -310,78 +338,19 @@ impl Context {
         pf_reqs.x11_visual_xid = Some(visual_xid);
         pf_reqs.depth_bits = Some(attrs.depth as _);
 
+        let mut builder_glx_u = None;
+        let mut builder_egl_u = None;
+
         // start the context building process
-        enum Prototype<'a> {
-            Glx(crate::api::glx::ContextPrototype<'a>),
-            Egl(crate::api::egl::ContextPrototype<'a>),
-        }
-
-        let builder = gl_attr.clone();
-
-        let builder_glx_u;
-        let builder_egl_u;
-
-        let context = match gl_attr.version {
-            GlRequest::Latest
-            | GlRequest::Specific(Api::OpenGl, _)
-            | GlRequest::GlThenGles { .. } => {
-                // GLX should be preferred over EGL, otherwise crashes may occur
-                // on X11 – issue #314
-                if let Some(_) = *GLX {
-                    builder_glx_u = builder.map_sharing(|c| match *c.context {
-                        X11Context::Glx(ref c) => c,
-                        _ => panic!(),
-                    });
-                    Prototype::Glx(GlxContext::new(
-                        Arc::clone(&xconn),
-                        &pf_reqs,
-                        &builder_glx_u,
-                        screen_id,
-                        // We assume they don't want transparency, as we can't
-                        // know.
-                        false,
-                    )?)
-                } else if let Some(_) = *EGL {
-                    builder_egl_u = builder.map_sharing(|c| match *c.context {
-                        X11Context::Egl(ref c) => c,
-                        _ => panic!(),
-                    });
-                    let native_display =
-                        NativeDisplay::X11(Some(xconn.display as *const _));
-                    Prototype::Egl(EglContext::new(
-                        &pf_reqs,
-                        &builder_egl_u,
-                        native_display,
-                    )?)
-                } else {
-                    return Err(CreationError::NotSupported(
-                        "both libglx and libEGL not present",
-                    ));
-                }
-            }
-            GlRequest::Specific(Api::OpenGlEs, _) => {
-                if let Some(_) = *EGL {
-                    builder_egl_u = builder.map_sharing(|c| match *c.context {
-                        X11Context::Egl(ref c) => c,
-                        _ => panic!(),
-                    });
-                    Prototype::Egl(EglContext::new(
-                        &pf_reqs,
-                        &builder_egl_u,
-                        NativeDisplay::X11(Some(xconn.display as *const _)),
-                    )?)
-                } else {
-                    return Err(CreationError::NotSupported(
-                        "libEGL not present",
-                    ));
-                }
-            }
-            GlRequest::Specific(_, _) => {
-                return Err(CreationError::NotSupported(
-                    "requested specific without gl or gles",
-                ));
-            }
-        };
+        let context = Self::new_first_stage(
+            &xconn,
+            &pf_reqs,
+            gl_attr,
+            screen_id,
+            &mut builder_glx_u,
+            &mut builder_egl_u,
+            false,
+        )?;
 
         // finish creating the OpenGL context
         let context = match context {
@@ -389,30 +358,9 @@ impl Context {
             Prototype::Egl(ctx) => X11Context::Egl(ctx.finish(xwin as _)?),
         };
 
-        // getting the root window
-        let root = unsafe { (xconn.xlib.XDefaultRootWindow)(xconn.display) };
-        xconn.check_errors().expect("Failed to get root window");
-
-        // creating the color map
-        let colormap = {
-            let cmap = unsafe {
-                (xconn.xlib.XCreateColormap)(
-                    xconn.display,
-                    root,
-                    attrs.visual as *mut _,
-                    ffi::AllocNone,
-                )
-            };
-            xconn
-                .check_errors()
-                .expect("Failed to call XCreateColormap");
-            cmap
-        };
-
         let context = Context::Windowed(ContextInner {
             xconn: Arc::clone(&xconn),
-            colormap,
-            context: Takeable::new(context),
+            context,
         });
 
         Ok(context)
@@ -420,7 +368,7 @@ impl Context {
 
     #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        match *self.context {
+        match self.context {
             X11Context::Glx(ref ctx) => ctx.make_current(),
             X11Context::Egl(ref ctx) => ctx.make_current(),
         }
@@ -428,7 +376,7 @@ impl Context {
 
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
-        match *self.context {
+        match self.context {
             X11Context::Glx(ref ctx) => ctx.make_not_current(),
             X11Context::Egl(ref ctx) => ctx.make_not_current(),
         }
@@ -436,7 +384,7 @@ impl Context {
 
     #[inline]
     pub fn is_current(&self) -> bool {
-        match *self.context {
+        match self.context {
             X11Context::Glx(ref ctx) => ctx.is_current(),
             X11Context::Egl(ref ctx) => ctx.is_current(),
         }
@@ -444,7 +392,7 @@ impl Context {
 
     #[inline]
     pub fn get_api(&self) -> Api {
-        match *self.context {
+        match self.context {
             X11Context::Glx(ref ctx) => ctx.get_api(),
             X11Context::Egl(ref ctx) => ctx.get_api(),
         }
@@ -457,7 +405,7 @@ impl Context {
 
     #[inline]
     pub unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
-        match *self.context {
+        match self.context {
             X11Context::Egl(ref ctx) => Some(ctx.get_egl_display()),
             _ => None,
         }
@@ -465,7 +413,7 @@ impl Context {
 
     #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const () {
-        match *self.context {
+        match self.context {
             X11Context::Glx(ref ctx) => ctx.get_proc_address(addr),
             X11Context::Egl(ref ctx) => ctx.get_proc_address(addr),
         }
@@ -473,7 +421,7 @@ impl Context {
 
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
-        match *self.context {
+        match self.context {
             X11Context::Glx(ref ctx) => ctx.swap_buffers(),
             X11Context::Egl(ref ctx) => ctx.swap_buffers(),
         }
@@ -481,7 +429,7 @@ impl Context {
 
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
-        match *self.context {
+        match self.context {
             X11Context::Glx(ref ctx) => ctx.get_pixel_format(),
             X11Context::Egl(ref ctx) => ctx.get_pixel_format(),
         }

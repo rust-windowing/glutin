@@ -148,11 +148,11 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     pub fn build_headless(
         self,
         el: &EventsLoop,
-        dims: dpi::PhysicalSize,
+        size: dpi::PhysicalSize,
     ) -> Result<Context<NotCurrentContext>, CreationError> {
         let ContextBuilder { pf_reqs, gl_attr } = self;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
-        platform::Context::new_headless(el, &pf_reqs, &gl_attr, dims).map(
+        platform::Context::new_headless(el, &pf_reqs, &gl_attr, size).map(
             |context| Context {
                 context,
                 phantom: PhantomData,

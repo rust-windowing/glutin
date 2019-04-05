@@ -82,7 +82,6 @@ impl Context {
         pf_reqs: &PixelFormatRequirements,
         opengl: &'a GlAttributes<&'a Context>,
         screen_id: raw::c_int,
-        transparent: bool,
     ) -> Result<ContextPrototype<'a>, CreationError> {
         let glx = GLX.as_ref().unwrap();
         // This is completely ridiculous, but VirtualBox's OpenGL driver needs
@@ -120,7 +119,6 @@ impl Context {
                 xconn.display,
                 screen_id,
                 pf_reqs,
-                transparent,
             )
             .map_err(|_| CreationError::NoAvailablePixelFormat)?
         };
@@ -588,7 +586,6 @@ unsafe fn choose_fbconfig(
     display: *mut ffi::Display,
     screen_id: raw::c_int,
     reqs: &PixelFormatRequirements,
-    transparent: bool,
 ) -> Result<(ffi::glx::types::GLXFBConfig, PixelFormat), ()> {
     let descriptor = {
         let mut out: Vec<raw::c_int> = Vec::with_capacity(37);
@@ -720,22 +717,7 @@ unsafe fn choose_fbconfig(
         if num_configs == 0 {
             return Err(());
         }
-
-        let config = if transparent {
-            let configs =
-                std::slice::from_raw_parts(configs, num_configs as usize);
-            configs.iter().find(|&config| {
-                let vi = glx.GetVisualFromFBConfig(display as *mut _, *config);
-                // Transparency was requested, so only choose configs with 32
-                // bits for RGBA.
-                let found = !vi.is_null() && (*vi).depth == 32;
-                (xlib.XFree)(vi as *mut _);
-
-                found
-            })
-        } else {
-            Some(&*configs)
-        };
+        let config = Some(&*configs);
 
         let res = if let Some(&conf) = config {
             Ok(conf)

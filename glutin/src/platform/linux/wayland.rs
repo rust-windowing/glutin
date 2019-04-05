@@ -46,9 +46,14 @@ impl Context {
         _el: &winit::EventsLoop,
         _pf_reqs: &PixelFormatRequirements,
         _gl_attr: &GlAttributes<&Context>,
-        _dims: dpi::PhysicalSize,
+        size: Option<dpi::PhysicalSize>,
     ) -> Result<Self, CreationError> {
-        unimplemented!()
+        if let Some(size) = size {
+            unimplemented!("{:?}", size)
+        } else {
+            // Surfaceless
+            unimplemented!()
+        }
     }
 
     #[inline]
@@ -104,7 +109,7 @@ impl Context {
             let gl_attr = gl_attr.clone().map_sharing(|c| &c.context);
             let native_display =
                 NativeDisplay::Wayland(Some(display_ptr as *const _));
-            EglContext::new(pf_reqs, &gl_attr, native_display)
+            EglContext::new(pf_reqs, &gl_attr, native_display, false)
                 .and_then(|p| p.finish(egl_surface.ptr() as *const _))?
         };
         let context = Context::Windowed(ContextInner {

@@ -7,7 +7,7 @@
 ))]
 
 use crate::os::ContextTraitExt;
-pub use crate::platform::{OsMesaContextExt, RawContextExt, RawHandle};
+pub use crate::platform::{HeadlessContextExt, RawContextExt, RawHandle};
 use crate::{Context, ContextCurrentState};
 pub use glutin_egl_sys::EGLContext;
 pub use glutin_glx_sys::GLXContext;

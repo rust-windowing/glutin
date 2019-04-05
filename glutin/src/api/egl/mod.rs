@@ -67,7 +67,15 @@ use crate::{
 
 use glutin_egl_sys as ffi;
 use parking_lot::Mutex;
-#[cfg(any(target_os = "android", target_os = "windows"))]
+#[cfg(any(
+    target_os = "android",
+    target_os = "windows",
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+))]
 use winit::dpi;
 
 use std::ffi::{CStr, CString};
@@ -298,6 +306,7 @@ impl Context {
         pf_reqs: &PixelFormatRequirements,
         opengl: &'a GlAttributes<&'a Context>,
         ndisp: NativeDisplay,
+        pbuffer_bit: bool,
     ) -> Result<ContextPrototype<'a>, CreationError> {
         let egl = EGL.as_ref().unwrap();
         // calling `eglGetDisplay` or equivalent
@@ -399,7 +408,15 @@ impl Context {
         };
 
         let (config_id, pixel_format) = unsafe {
-            choose_fbconfig(egl, display, &egl_version, api, version, pf_reqs)?
+            choose_fbconfig(
+                egl,
+                display,
+                &egl_version,
+                api,
+                version,
+                pf_reqs,
+                pbuffer_bit,
+            )?
         };
 
         Ok(ContextPrototype {
@@ -739,19 +756,32 @@ impl<'a> ContextPrototype<'a> {
         self.finish_impl(surface)
     }
 
-    #[cfg(any(target_os = "android", target_os = "windows"))]
+    #[cfg(any(
+        target_os = "android",
+        target_os = "windows",
+        target_os = "linux",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd",
+    ))]
     pub fn finish_pbuffer(
         self,
-        dims: dpi::PhysicalSize,
+        size: dpi::PhysicalSize,
     ) -> Result<Context, CreationError> {
-        let dims: (u32, u32) = dims.into();
+        let size: (u32, u32) = size.into();
 
         let egl = EGL.as_ref().unwrap();
+        let tex_fmt = if self.pixel_format.alpha_bits > 0 {
+            ffi::egl::TEXTURE_RGBA
+        } else {
+            ffi::egl::TEXTURE_RGB
+        };
         let attrs = &[
             ffi::egl::WIDTH as raw::c_int,
-            dims.0 as raw::c_int,
+            size.0 as raw::c_int,
             ffi::egl::HEIGHT as raw::c_int,
-            dims.1 as raw::c_int,
+            size.1 as raw::c_int,
             ffi::egl::NONE as raw::c_int,
         ];
 
@@ -761,7 +791,7 @@ impl<'a> ContextPrototype<'a> {
                 self.config_id,
                 attrs.as_ptr(),
             );
-            if surface.is_null() {
+            if surface.is_null() || surface == ffi::egl::NO_SURFACE {
                 return Err(CreationError::OsError(format!(
                     "eglCreatePbufferSurface failed"
                 )));
@@ -884,6 +914,7 @@ unsafe fn choose_fbconfig(
     api: Api,
     version: Option<(u8, u8)>,
     reqs: &PixelFormatRequirements,
+    pbuffer_bit: bool,
 ) -> Result<(ffi::egl::types::EGLConfig, PixelFormat), CreationError> {
     let descriptor = {
         let mut out: Vec<raw::c_int> = Vec::with_capacity(37);
@@ -894,9 +925,12 @@ unsafe fn choose_fbconfig(
         }
 
         out.push(ffi::egl::SURFACE_TYPE as raw::c_int);
-        // TODO: Some versions of Mesa report a BAD_ATTRIBUTE error
-        // if we ask for PBUFFER_BIT as well as WINDOW_BIT
-        out.push((ffi::egl::WINDOW_BIT) as raw::c_int);
+        let surface_type = if pbuffer_bit {
+            ffi::egl::PBUFFER_BIT
+        } else {
+            ffi::egl::WINDOW_BIT
+        };
+        out.push(surface_type as raw::c_int);
 
         match (api, version) {
             (Api::OpenGlEs, Some((3, _))) => {

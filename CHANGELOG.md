@@ -8,6 +8,8 @@
  current context, if the context dropped wasn't the current context.
  - Added context sharing support to MacOS.
  - **Breaking**: Split `ContextTrait` into `ContextTrait` and `PossiblyCurrentContextTrait`.
+ - **Breaking**: Renamed `OsMesaContextExt` to `HeadlessContextExt`. Added functions
+ for using egl-surfaceless.
  - **Breaking**: Changed `WindowedContext` and `RawContext` into typedefs of
  `ContextWrapper`.
  - **Breaking**: Removed `new_windowed` and `new_headless` from `WindowedContext`

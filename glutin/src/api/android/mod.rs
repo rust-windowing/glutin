@@ -62,8 +62,9 @@ impl Context {
             return Err(OsError(format!("Android's native window is null")));
         }
         let native_display = NativeDisplay::Android;
-        let egl_context = EglContext::new(pf_reqs, &gl_attr, native_display)
-            .and_then(|p| p.finish(nwin as *const _))?;
+        let egl_context =
+            EglContext::new(pf_reqs, &gl_attr, native_display, false)
+                .and_then(|p| p.finish(nwin as *const _))?;
         let ctx = Arc::new(AndroidContext {
             egl_context,
             stopped: Some(Mutex::new(false)),
@@ -100,12 +101,12 @@ impl Context {
         _el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-        dims: dpi::PhysicalSize,
+        size: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
         let gl_attr = gl_attr.clone().map_sharing(|c| &c.0.egl_context);
         let context =
-            EglContext::new(pf_reqs, &gl_attr, NativeDisplay::Android)?;
-        let egl_context = context.finish_pbuffer(dims)?;
+            EglContext::new(pf_reqs, &gl_attr, NativeDisplay::Android, true)?;
+        let egl_context = context.finish_pbuffer(size)?;
         let ctx = Arc::new(AndroidContext {
             egl_context,
             stopped: None,
