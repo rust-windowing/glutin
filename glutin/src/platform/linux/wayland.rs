@@ -1,4 +1,6 @@
-use crate::api::egl::{Context as EglContext, NativeDisplay};
+use crate::api::egl::{
+    Context as EglContext, NativeDisplay, SurfaceType as EglSurfaceType,
+};
 use crate::{
     ContextError, CreationError, GlAttributes, PixelFormat,
     PixelFormatRequirements,
@@ -9,33 +11,32 @@ use wayland_client::egl as wegl;
 pub use wayland_client::sys::client::wl_display;
 use winit;
 use winit::dpi;
-use winit::os::unix::WindowExt;
+use winit::os::unix::{EventsLoopExt, WindowExt};
 
 use std::ops::Deref;
 use std::os::raw;
 use std::sync::Arc;
 
-#[derive(DebugStub)]
-pub struct ContextInner {
-    #[debug_stub = "Arc<wegl::WlEglSurface>"]
-    egl_surface: Arc<wegl::WlEglSurface>,
-    context: EglContext,
-}
+// Wrapper for Debug
+#[derive(Derivative)]
+#[derivative(Debug)]
+pub struct EglSurface(#[derivative(Debug = "ignore")] Arc<wegl::WlEglSurface>);
 
 #[derive(Debug)]
-#[allow(dead_code)]
 pub enum Context {
-    Headless(ContextInner, winit::Window),
-    Windowed(ContextInner),
+    Windowed(EglContext, EglSurface),
+    PBuffer(EglContext),
+    Surfaceless(EglContext),
 }
 
 impl Deref for Context {
-    type Target = ContextInner;
+    type Target = EglContext;
 
     fn deref(&self) -> &Self::Target {
         match self {
-            Context::Headless(ctx, _) => ctx,
-            Context::Windowed(ctx) => ctx,
+            Context::Windowed(ctx, _) => ctx,
+            Context::PBuffer(ctx) => ctx,
+            Context::Surfaceless(ctx) => ctx,
         }
     }
 }
@@ -43,16 +44,36 @@ impl Deref for Context {
 impl Context {
     #[inline]
     pub fn new_headless(
-        _el: &winit::EventsLoop,
-        _pf_reqs: &PixelFormatRequirements,
-        _gl_attr: &GlAttributes<&Context>,
+        el: &winit::EventsLoop,
+        pf_reqs: &PixelFormatRequirements,
+        gl_attr: &GlAttributes<&Context>,
         size: Option<dpi::PhysicalSize>,
     ) -> Result<Self, CreationError> {
+        let gl_attr = gl_attr.clone().map_sharing(|c| &**c);
+        let display_ptr = el.get_wayland_display().unwrap() as *const _;
+        let native_display =
+            NativeDisplay::Wayland(Some(display_ptr as *const _));
         if let Some(size) = size {
-            unimplemented!("{:?}", size)
+            let context = EglContext::new(
+                pf_reqs,
+                &gl_attr,
+                native_display,
+                EglSurfaceType::PBuffer,
+            )
+            .and_then(|p| p.finish_pbuffer(size))?;
+            let context = Context::PBuffer(context);
+            Ok(context)
         } else {
             // Surfaceless
-            unimplemented!()
+            let context = EglContext::new(
+                pf_reqs,
+                &gl_attr,
+                native_display,
+                EglSurfaceType::Surfaceless,
+            )
+            .and_then(|p| p.finish_surfaceless())?;
+            let context = Context::Surfaceless(context);
+            Ok(context)
         }
     }
 
@@ -106,66 +127,74 @@ impl Context {
             )
         };
         let context = {
-            let gl_attr = gl_attr.clone().map_sharing(|c| &c.context);
+            let gl_attr = gl_attr.clone().map_sharing(|c| &**c);
             let native_display =
                 NativeDisplay::Wayland(Some(display_ptr as *const _));
-            EglContext::new(pf_reqs, &gl_attr, native_display, false)
-                .and_then(|p| p.finish(egl_surface.ptr() as *const _))?
+            EglContext::new(
+                pf_reqs,
+                &gl_attr,
+                native_display,
+                EglSurfaceType::Window,
+            )
+            .and_then(|p| p.finish(egl_surface.ptr() as *const _))?
         };
-        let context = Context::Windowed(ContextInner {
-            egl_surface: Arc::new(egl_surface),
-            context,
-        });
+        let context =
+            Context::Windowed(context, EglSurface(Arc::new(egl_surface)));
         Ok(context)
     }
 
     #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        self.context.make_current()
+        (**self).make_current()
     }
 
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
-        self.context.make_not_current()
+        (**self).make_not_current()
     }
 
     #[inline]
     pub fn is_current(&self) -> bool {
-        self.context.is_current()
+        (**self).is_current()
     }
 
     #[inline]
     pub fn get_api(&self) -> crate::Api {
-        self.context.get_api()
+        (**self).get_api()
     }
 
     #[inline]
     pub unsafe fn raw_handle(&self) -> ffi::EGLContext {
-        self.context.raw_handle()
+        (**self).raw_handle()
     }
 
     #[inline]
     pub unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
-        Some(self.context.get_egl_display())
+        Some((**self).get_egl_display())
     }
 
     #[inline]
     pub fn resize(&self, width: u32, height: u32) {
-        self.egl_surface.resize(width as i32, height as i32, 0, 0);
+        match self {
+            Context::Windowed(_, surface) => {
+                surface.0.resize(width as i32, height as i32, 0, 0)
+            }
+            _ => unreachable!(),
+        }
     }
 
     #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const () {
-        self.context.get_proc_address(addr)
+        (**self).get_proc_address(addr)
     }
 
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
-        self.context.swap_buffers()
+        (**self).swap_buffers()
     }
 
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
-        self.context.get_pixel_format().clone()
+        (**self).get_pixel_format().clone()
     }
 }

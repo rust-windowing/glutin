@@ -66,7 +66,7 @@ extern crate objc;
     target_os = "openbsd",
 ))]
 #[macro_use]
-extern crate debug_stub_derive;
+extern crate derivative;
 
 pub mod os;
 
@@ -283,7 +283,10 @@ impl CreationError {
                 errs.push(Box::new(err));
                 CreationError::CreationErrors(errs)
             }
-            _ => CreationError::CreationErrors(vec![Box::new(err), Box::new(self)]),
+            _ => CreationError::CreationErrors(vec![
+                Box::new(err),
+                Box::new(self),
+            ]),
         }
     }
 
@@ -305,9 +308,7 @@ impl CreationError {
             CreationError::Window(ref err) => {
                 std::error::Error::description(err)
             }
-            CreationError::CreationErrors(_) => {
-                "Received multiple errors."
-            }
+            CreationError::CreationErrors(_) => "Received multiple errors.",
         }
     }
 }

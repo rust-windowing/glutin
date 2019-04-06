@@ -60,5 +60,5 @@ wayland-client = { version = "0.21", features = ["egl", "dlopen"] }
 libloading = "0.5"
 glutin_egl_sys = { version = "0.1.2", path = "../glutin_egl_sys" }
 glutin_glx_sys = { version = "0.1.2", path = "../glutin_glx_sys" }
-debug_stub_derive = "0.3"
+derivative = "1.0"
 parking_lot = "0.7"

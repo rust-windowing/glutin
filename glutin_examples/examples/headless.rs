@@ -46,7 +46,7 @@ fn build_context<T1: glutin::ContextCurrentState>(
     //
     // If willing, you could attempt to use hidden windows instead of os mesa,
     // but note that you must handle events for the window that come on the
-    // eventsloop.
+    // events loop.
     let el = glutin::EventsLoop::new();
 
     println!("Trying surfaceless");
@@ -102,8 +102,11 @@ fn main() {
         // Using the fb backing a pbuffer is very much a bad idea. Fails on
         // many platforms, and is deprecated. Better just make your own fb.
         //
-        // Not neccesary with osmesa, however, can't be bothered to have
-        // more code paths.
+        // Surfaceless doesn't come with a surface, as the name implies, so
+        // you must make your own fb.
+        //
+        // Making an fb is not neccesary with osmesa, however, can't be bothered
+        // to have a different code path.
         gl.gl.GenRenderbuffers(1, &mut render_buf);
         gl.gl.BindRenderbuffer(gl::RENDERBUFFER, render_buf);
         gl.gl.RenderbufferStorage(

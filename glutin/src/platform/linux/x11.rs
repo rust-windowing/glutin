@@ -1,4 +1,6 @@
-use crate::api::egl::{Context as EglContext, NativeDisplay, EGL};
+use crate::api::egl::{
+    Context as EglContext, NativeDisplay, SurfaceType as EglSurfaceType, EGL,
+};
 use crate::api::glx::{Context as GlxContext, GLX};
 use crate::{
     Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
@@ -81,14 +83,15 @@ unsafe impl Sync for Context {}
 
 impl Context {
     fn try_then_fallback<F, T>(mut f: F) -> Result<T, CreationError>
-        where F: FnMut(bool) -> Result<T, CreationError>
+    where
+        F: FnMut(bool) -> Result<T, CreationError>,
     {
         match f(false) {
             Ok(ok) => Ok(ok),
             Err(err1) => match f(true) {
                 Ok(ok) => Ok(ok),
                 Err(err2) => Err(err1.append(err2)),
-            }
+            },
         }
     }
 
@@ -99,7 +102,15 @@ impl Context {
         gl_attr: &GlAttributes<&Context>,
         size: Option<dpi::PhysicalSize>,
     ) -> Result<Self, CreationError> {
-        Self::try_then_fallback(|fallback| Self::new_headless_impl(el, pf_reqs, gl_attr, size.clone(), fallback))
+        Self::try_then_fallback(|fallback| {
+            Self::new_headless_impl(
+                el,
+                pf_reqs,
+                gl_attr,
+                size.clone(),
+                fallback,
+            )
+        })
     }
 
     fn new_headless_impl(
@@ -133,7 +144,7 @@ impl Context {
                 screen_id,
                 &mut builder_glx_u,
                 &mut builder_egl_u,
-                true,
+                EglSurfaceType::PBuffer,
                 fallback,
                 fallback,
             )?;
@@ -163,7 +174,7 @@ impl Context {
                 screen_id,
                 &mut builder_glx_u,
                 &mut builder_egl_u,
-                true,
+                EglSurfaceType::Surfaceless,
                 !fallback,
                 fallback,
             )?;
@@ -213,7 +224,7 @@ impl Context {
         screen_id: raw::c_int,
         builder_glx_u: &'a mut Option<GlAttributes<&'a GlxContext>>,
         builder_egl_u: &'a mut Option<GlAttributes<&'a EglContext>>,
-        pbuffer_bit: bool,
+        surface_type: EglSurfaceType,
         prefer_egl: bool,
         force_prefer_unless_only: bool,
     ) -> Result<Prototype<'a>, CreationError> {
@@ -254,7 +265,7 @@ impl Context {
                         pf_reqs,
                         builder_u.as_ref().unwrap(),
                         native_display,
-                        pbuffer_bit,
+                        surface_type,
                     )?))
                 };
 
@@ -277,13 +288,13 @@ impl Context {
                     match (&*GLX, &*EGL, prefer_egl) {
                         (Some(_), _, false) => return glx(builder_glx_u),
                         (_, Some(_), true) => return egl(builder_egl_u),
-                        _ => ()
+                        _ => (),
                     }
 
                     match (&*GLX, &*EGL, prefer_egl) {
                         (_, Some(_), false) => return egl(builder_egl_u),
                         (Some(_), _, true) => return glx(builder_glx_u),
-                        _ => ()
+                        _ => (),
                     }
 
                     return Err(CreationError::NotSupported(
@@ -293,7 +304,7 @@ impl Context {
                     match (&*GLX, &*EGL, prefer_egl) {
                         (Some(_), Some(_), true) => return egl(builder_egl_u),
                         (Some(_), Some(_), false) => return glx(builder_glx_u),
-                        _ => ()
+                        _ => (),
                     }
 
                     return Err(CreationError::NotSupported(
@@ -313,7 +324,7 @@ impl Context {
                         pf_reqs,
                         builder_egl_u.as_ref().unwrap(),
                         NativeDisplay::X11(Some(xconn.display as *const _)),
-                        pbuffer_bit,
+                        surface_type,
                     )?)
                 } else {
                     return Err(CreationError::NotSupported(
@@ -336,7 +347,9 @@ impl Context {
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<(winit::Window, Self), CreationError> {
-        Self::try_then_fallback(|fallback| Self::new_impl(wb.clone(), el, pf_reqs, gl_attr, fallback))
+        Self::try_then_fallback(|fallback| {
+            Self::new_impl(wb.clone(), el, pf_reqs, gl_attr, fallback)
+        })
     }
 
     fn new_impl(
@@ -369,7 +382,7 @@ impl Context {
             screen_id,
             &mut builder_glx_u,
             &mut builder_egl_u,
-            false,
+            EglSurfaceType::Window,
             fallback,
             fallback,
         )?;
@@ -433,7 +446,9 @@ impl Context {
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<Self, CreationError> {
-        Self::try_then_fallback(|fallback| Self::new_raw_context_impl(&xconn, xwin, pf_reqs, gl_attr, fallback))
+        Self::try_then_fallback(|fallback| {
+            Self::new_raw_context_impl(&xconn, xwin, pf_reqs, gl_attr, fallback)
+        })
     }
 
     fn new_raw_context_impl(
@@ -488,7 +503,7 @@ impl Context {
             screen_id,
             &mut builder_glx_u,
             &mut builder_egl_u,
-            false,
+            EglSurfaceType::Window,
             fallback,
             fallback,
         )?;

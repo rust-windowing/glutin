@@ -295,6 +295,13 @@ fn get_native_display(egl: &Egl, ndisp: NativeDisplay) -> *const raw::c_void {
     }
 }
 
+#[derive(Copy, Clone, PartialEq)]
+pub enum SurfaceType {
+    PBuffer,
+    Window,
+    Surfaceless,
+}
+
 impl Context {
     /// Start building an EGL context.
     ///
@@ -306,7 +313,7 @@ impl Context {
         pf_reqs: &PixelFormatRequirements,
         opengl: &'a GlAttributes<&'a Context>,
         ndisp: NativeDisplay,
-        pbuffer_bit: bool,
+        surface_type: SurfaceType,
     ) -> Result<ContextPrototype<'a>, CreationError> {
         let egl = EGL.as_ref().unwrap();
         // calling `eglGetDisplay` or equivalent
@@ -415,7 +422,7 @@ impl Context {
                 api,
                 version,
                 pf_reqs,
-                pbuffer_bit,
+                surface_type,
             )?
         };
 
@@ -953,7 +960,7 @@ unsafe fn choose_fbconfig(
     api: Api,
     version: Option<(u8, u8)>,
     reqs: &PixelFormatRequirements,
-    pbuffer_bit: bool,
+    surface_type: SurfaceType,
 ) -> Result<(ffi::egl::types::EGLConfig, PixelFormat), CreationError> {
     let descriptor = {
         let mut out: Vec<raw::c_int> = Vec::with_capacity(37);
@@ -963,13 +970,15 @@ unsafe fn choose_fbconfig(
             out.push(ffi::egl::RGB_BUFFER as raw::c_int);
         }
 
-        out.push(ffi::egl::SURFACE_TYPE as raw::c_int);
-        let surface_type = if pbuffer_bit {
-            ffi::egl::PBUFFER_BIT
-        } else {
-            ffi::egl::WINDOW_BIT
-        };
-        out.push(surface_type as raw::c_int);
+        if surface_type != SurfaceType::Surfaceless {
+            out.push(ffi::egl::SURFACE_TYPE as raw::c_int);
+            let surface_type = match surface_type {
+                SurfaceType::Window => ffi::egl::WINDOW_BIT,
+                SurfaceType::PBuffer => ffi::egl::PBUFFER_BIT,
+                _ => unreachable!(),
+            };
+            out.push(surface_type as raw::c_int);
+        }
 
         match (api, version) {
             (Api::OpenGlEs, Some((3, _))) => {
