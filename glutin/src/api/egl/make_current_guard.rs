@@ -63,7 +63,9 @@ impl MakeCurrentGuard {
         if self.possibly_invalid.is_some() {
             let pi = self.possibly_invalid.as_ref().unwrap();
             if pi.old_draw_surface == draw_surface
+                && draw_surface != ffi::egl::NO_SURFACE
                 || pi.old_read_surface == read_surface
+                    && read_surface != ffi::egl::NO_SURFACE
                 || pi.old_context == context
             {
                 self.invalidate();

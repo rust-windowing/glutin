@@ -1,5 +1,6 @@
 # Unreleased
 
+ - **Breaking:** Replaced `CreationErrorPair` enum variant with `CreationErrors`.
  - Added `Clone` to `ContextBuilder`.
  - Added headless example.
  - Removed internal code relating to libcaca.

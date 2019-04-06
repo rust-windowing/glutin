@@ -123,7 +123,7 @@ pub enum NativeDisplay {
 pub struct Context {
     display: ffi::egl::types::EGLDisplay,
     context: ffi::egl::types::EGLContext,
-    surface: Mutex<ffi::egl::types::EGLSurface>,
+    surface: Option<Mutex<ffi::egl::types::EGLSurface>>,
     api: Api,
     pixel_format: PixelFormat,
     #[cfg(target_os = "android")]
@@ -453,21 +453,29 @@ impl Context {
     }
 
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        let surface = self.surface.lock();
         let egl = EGL.as_ref().unwrap();
-        let ret =
-            egl.MakeCurrent(self.display, *surface, *surface, self.context);
+        let surface = self
+            .surface
+            .as_ref()
+            .map(|s| *s.lock())
+            .unwrap_or(ffi::egl::NO_SURFACE);
+        let ret = egl.MakeCurrent(self.display, surface, surface, self.context);
 
         self.check_make_current(Some(ret))
     }
 
     pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
         let egl = EGL.as_ref().unwrap();
-        let surface = self.surface.lock();
-        if egl.GetCurrentSurface(ffi::egl::DRAW as i32) == *surface
-            || egl.GetCurrentSurface(ffi::egl::READ as i32) == *surface
-            || egl.GetCurrentContext() == self.context
-        {
+
+        let surface_eq =
+            if let Some(surface) = self.surface.as_ref().map(|s| *s.lock()) {
+                egl.GetCurrentSurface(ffi::egl::DRAW as i32) == surface
+                    || egl.GetCurrentSurface(ffi::egl::READ as i32) == surface
+            } else {
+                false
+            };
+
+        if surface_eq || egl.GetCurrentContext() == self.context {
             let ret = egl.MakeCurrent(
                 self.display,
                 ffi::egl::NO_SURFACE,
@@ -509,7 +517,7 @@ impl Context {
     #[cfg(target_os = "android")]
     pub unsafe fn on_surface_created(&self, nwin: ffi::EGLNativeWindowType) {
         let egl = EGL.as_ref().unwrap();
-        let mut surface = self.surface.lock();
+        let mut surface = self.surface.unwrap().lock();
         if *surface != ffi::egl::NO_SURFACE {
             return;
         }
@@ -542,7 +550,7 @@ impl Context {
     #[cfg(target_os = "android")]
     pub unsafe fn on_surface_destroyed(&self) {
         let egl = EGL.as_ref().unwrap();
-        let mut surface = self.surface.lock();
+        let mut surface = self.surface.unwrap().lock();
         if *surface == ffi::egl::NO_SURFACE {
             return;
         }
@@ -574,7 +582,7 @@ impl Context {
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
         let egl = EGL.as_ref().unwrap();
-        let surface = self.surface.lock();
+        let surface = self.surface.as_ref().unwrap().lock();
         if *surface == ffi::egl::NO_SURFACE {
             return Err(ContextError::ContextLost);
         }
@@ -610,20 +618,24 @@ impl Drop for Context {
         unsafe {
             // https://stackoverflow.com/questions/54402688/recreate-eglcreatewindowsurface-with-same-native-window
             let egl = EGL.as_ref().unwrap();
-            let mut surface = self.surface.lock();
+            let surface = self
+                .surface
+                .as_ref()
+                .map(|s| *s.lock())
+                .unwrap_or(ffi::egl::NO_SURFACE);
             // Ok, so we got to call `glFinish` before destroying the context
             // to ensure it actually gets destroyed. This requires making the
             // this context current.
             let mut guard = MakeCurrentGuard::new(
                 self.display,
-                *surface,
-                *surface,
+                surface,
+                surface,
                 self.context,
             )
             .map_err(|err| ContextError::OsError(err))
             .unwrap();
 
-            guard.if_any_same_then_invalidate(*surface, *surface, self.context);
+            guard.if_any_same_then_invalidate(surface, surface, self.context);
 
             let gl_finish_fn = self.get_proc_address("glFinish");
             assert!(gl_finish_fn != std::ptr::null());
@@ -633,8 +645,11 @@ impl Drop for Context {
 
             egl.DestroyContext(self.display, self.context);
             self.context = ffi::egl::NO_CONTEXT;
-            egl.DestroySurface(self.display, *surface);
-            *surface = ffi::egl::NO_SURFACE;
+            egl.DestroySurface(self.display, surface);
+            if let Some(ref surface) = self.surface {
+                let mut surface = surface.lock();
+                *surface = ffi::egl::NO_SURFACE;
+            }
 
             // In a reasonable world, we could uncomment the line bellow.
             //
@@ -753,7 +768,31 @@ impl<'a> ContextPrototype<'a> {
             surface
         };
 
-        self.finish_impl(surface)
+        self.finish_impl(Some(surface))
+    }
+
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd",
+    ))]
+    pub fn finish_surfaceless(self) -> Result<Context, CreationError> {
+        // FIXME: Also check for the GL_OES_surfaceless_context *CONTEXT*
+        // extension
+        if self
+            .extensions
+            .iter()
+            .find(|s| s == &"EGL_KHR_surfaceless_context")
+            .is_none()
+        {
+            Err(CreationError::OsError(format!(
+                "EGL surfaceless not supported."
+            )))
+        } else {
+            self.finish_impl(None)
+        }
     }
 
     #[cfg(any(
@@ -799,12 +838,12 @@ impl<'a> ContextPrototype<'a> {
             surface
         };
 
-        self.finish_impl(surface)
+        self.finish_impl(Some(surface))
     }
 
     fn finish_impl(
         self,
-        surface: ffi::egl::types::EGLSurface,
+        surface: Option<ffi::egl::types::EGLSurface>,
     ) -> Result<Context, CreationError> {
         let share = match self.opengl.sharing {
             Some(ctx) => ctx.context,
@@ -898,7 +937,7 @@ impl<'a> ContextPrototype<'a> {
         Ok(Context {
             display: self.display,
             context,
-            surface: Mutex::new(surface),
+            surface: surface.map(|s| Mutex::new(s)),
             api: self.api,
             pixel_format: self.pixel_format,
             #[cfg(target_os = "android")]

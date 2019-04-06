@@ -273,10 +273,20 @@ pub enum CreationError {
     PlatformSpecific(String),
     Window(WindowCreationError),
     /// We received two errors, instead of one.
-    CreationErrorPair(Box<CreationError>, Box<CreationError>),
+    CreationErrors(Vec<Box<CreationError>>),
 }
 
 impl CreationError {
+    pub fn append(self, err: CreationError) -> Self {
+        match self {
+            CreationError::CreationErrors(mut errs) => {
+                errs.push(Box::new(err));
+                CreationError::CreationErrors(errs)
+            }
+            _ => CreationError::CreationErrors(vec![Box::new(err), Box::new(self)]),
+        }
+    }
+
     fn to_string(&self) -> &str {
         match *self {
             CreationError::OsError(ref text) => &text,
@@ -295,8 +305,8 @@ impl CreationError {
             CreationError::Window(ref err) => {
                 std::error::Error::description(err)
             }
-            CreationError::CreationErrorPair(ref _err1, ref _err2) => {
-                "Received two errors."
+            CreationError::CreationErrors(_) => {
+                "Received multiple errors."
             }
         }
     }
@@ -309,13 +319,11 @@ impl std::fmt::Display for CreationError {
     ) -> Result<(), std::fmt::Error> {
         formatter.write_str(self.to_string())?;
 
-        if let CreationError::CreationErrorPair(ref e1, ref e2) = *self {
-            write!(formatter, " Error 1: \"")?;
-            e1.fmt(formatter)?;
-            write!(formatter, "\"")?;
-            write!(formatter, " Error 2: \"")?;
-            e2.fmt(formatter)?;
-            write!(formatter, "\"")?;
+        if let CreationError::CreationErrors(ref es) = *self {
+            use std::fmt::Debug;
+            write!(formatter, " Errors: `")?;
+            es.fmt(formatter)?;
+            write!(formatter, "`")?;
         }
 
         if let &CreationError::NotSupported(msg) = self {
