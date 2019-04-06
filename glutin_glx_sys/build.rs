@@ -38,6 +38,7 @@ fn main() {
                 "GLX_ARB_multisample",
                 "GLX_EXT_swap_control",
                 "GLX_SGI_swap_control",
+                "GLX_MESA_swap_control",
             ],
         )
         .write_bindings(gl_generator::StructGenerator, &mut file)

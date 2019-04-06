@@ -58,6 +58,7 @@ use crate::{
 };
 
 use glutin_glx_sys as ffi;
+use winit::dpi;
 use winit::os::unix::x11::XConnection;
 
 use std::ffi::{CStr, CString};
@@ -71,7 +72,7 @@ lazy_static! {
 #[derive(Debug)]
 pub struct Context {
     xconn: Arc<XConnection>,
-    window: ffi::Window,
+    drawable: ffi::Window,
     context: ffi::GLXContext,
     pixel_format: PixelFormat,
 }
@@ -167,7 +168,7 @@ impl Context {
         let glx = GLX.as_ref().unwrap();
         let res = glx.MakeCurrent(
             self.xconn.display as *mut _,
-            self.window,
+            self.drawable,
             self.context,
         );
         self.check_make_current(Some(res))
@@ -176,7 +177,7 @@ impl Context {
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
         let glx = GLX.as_ref().unwrap();
-        if self.window == glx.GetCurrentDrawable()
+        if self.drawable == glx.GetCurrentDrawable()
             || self.context == glx.GetCurrentContext()
         {
             let res = glx.MakeCurrent(
@@ -218,7 +219,7 @@ impl Context {
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
         let glx = GLX.as_ref().unwrap();
         unsafe {
-            glx.SwapBuffers(self.xconn.display as *mut _, self.window);
+            glx.SwapBuffers(self.xconn.display as *mut _, self.drawable);
         }
         if let Err(err) = self.xconn.check_errors() {
             Err(ContextError::OsError(format!(
@@ -245,7 +246,7 @@ impl Drop for Context {
         unsafe {
             // See `drop` for `crate::api::egl::Context` for rationale.
             let mut guard =
-                MakeCurrentGuard::new(&self.xconn, self.window, self.context)
+                MakeCurrentGuard::new(&self.xconn, self.drawable, self.context)
                     .map_err(|err| ContextError::OsError(err))
                     .unwrap();
 
@@ -281,7 +282,10 @@ impl<'a> ContextPrototype<'a> {
         &self.visual_infos
     }
 
-    pub fn finish(self, win: ffi::Window) -> Result<Context, CreationError> {
+    // creating GL context
+    fn create_context(
+        &self,
+    ) -> Result<(ffi::glx_extra::Glx, ffi::GLXContext), CreationError> {
         let glx = GLX.as_ref().unwrap();
         let share = match self.opengl.sharing {
             Some(ctx) => ctx.context,
@@ -296,7 +300,6 @@ impl<'a> ContextPrototype<'a> {
             }
         });
 
-        // creating GL context
         let context = match self.opengl.version {
             GlRequest::Latest => {
                 let opengl_versions = [
@@ -386,9 +389,48 @@ impl<'a> ContextPrototype<'a> {
             )?,
         };
 
+        Ok((extra_functions, context))
+    }
+
+    pub fn finish_pbuffer(
+        self,
+        size: dpi::PhysicalSize,
+    ) -> Result<Context, CreationError> {
+        let glx = GLX.as_ref().unwrap();
+        let size: (u32, u32) = size.into();
+        let (_extra_functions, context) = self.create_context()?;
+
+        let attributes: Vec<raw::c_int> = vec![
+            ffi::glx::PBUFFER_WIDTH as raw::c_int,
+            size.0 as raw::c_int,
+            ffi::glx::PBUFFER_HEIGHT as raw::c_int,
+            size.1 as raw::c_int,
+            0,
+        ];
+
+        let pbuffer = unsafe {
+            glx.CreatePbuffer(
+                self.xconn.display as *mut _,
+                self.fb_config,
+                attributes.as_ptr(),
+            )
+        };
+
+        Ok(Context {
+            xconn: self.xconn,
+            drawable: pbuffer,
+            context,
+            pixel_format: self.pixel_format,
+        })
+    }
+
+    pub fn finish(self, window: ffi::Window) -> Result<Context, CreationError> {
+        let glx = GLX.as_ref().unwrap();
+        let (extra_functions, context) = self.create_context()?;
+
         // vsync
         if self.opengl.vsync {
-            let _guard = MakeCurrentGuard::new(&self.xconn, win, context)
+            let _guard = MakeCurrentGuard::new(&self.xconn, window, context)
                 .map_err(|err| CreationError::OsError(err))?;
 
             if check_ext(&self.extensions, "GLX_EXT_swap_control")
@@ -396,45 +438,48 @@ impl<'a> ContextPrototype<'a> {
             {
                 // this should be the most common extension
                 unsafe {
-                    extra_functions.SwapIntervalEXT(self.xconn.display as *mut _, win, 1);
+                    extra_functions.SwapIntervalEXT(
+                        self.xconn.display as *mut _,
+                        window,
+                        1,
+                    );
                 }
 
-            // checking that it worked
-            // TODO: handle this
-            /*if self.builder.strict {
                 let mut swap = unsafe { std::mem::uninitialized() };
                 unsafe {
-                    glx.QueryDrawable(self.xconn.display as *mut _, window,
-                                           ffi::glx_extra::SWAP_INTERVAL_EXT as i32,
-                                           &mut swap);
+                    glx.QueryDrawable(
+                        self.xconn.display as *mut _,
+                        window,
+                        ffi::glx_extra::SWAP_INTERVAL_EXT as i32,
+                        &mut swap,
+                    );
                 }
 
                 if swap != 1 {
-                    return Err(CreationError::OsError(format!("Couldn't setup vsync: expected \
-                                                interval `1` but got `{}`", swap)));
+                    return Err(CreationError::OsError(format!("Couldn't setup vsync: expected interval `1` but got `{}`", swap)));
                 }
-            }*/
-
-            // GLX_MESA_swap_control is not official
-            /*} else if extra_functions.SwapIntervalMESA.is_loaded() {
-            unsafe {
-                extra_functions.SwapIntervalMESA(1);
-            }*/
+            } else if check_ext(&self.extensions, "GLX_MESA_swap_control")
+                && extra_functions.SwapIntervalMESA.is_loaded()
+            {
+                unsafe {
+                    extra_functions.SwapIntervalMESA(1);
+                }
             } else if check_ext(&self.extensions, "GLX_SGI_swap_control")
                 && extra_functions.SwapIntervalSGI.is_loaded()
             {
                 unsafe {
                     extra_functions.SwapIntervalSGI(1);
                 }
-            } /* else if self.builder.strict {
-                  // TODO: handle this
-                  return Err(CreationError::OsError(format!("Couldn't find any available vsync extension")));
-              }*/
+            } else {
+                return Err(CreationError::OsError(format!(
+                    "Couldn't find any available vsync extension"
+                )));
+            }
         }
 
         Ok(Context {
             xconn: self.xconn,
-            window: win,
+            drawable: window,
             context,
             pixel_format: self.pixel_format,
         })

@@ -151,12 +151,12 @@ impl Context {
 
             // finish creating the OpenGL context
             let context = match context {
-                // Prototype::Glx(ctx) =>
-                // X11Context::Glx(ctx.finish_pbuffer(xwin)?),
+                Prototype::Glx(ctx) => {
+                    X11Context::Glx(ctx.finish_pbuffer(size)?)
+                }
                 Prototype::Egl(ctx) => {
                     X11Context::Egl(ctx.finish_pbuffer(size)?)
                 }
-                _ => unimplemented!(),
             };
 
             let context = Context::PBuffer(ContextInner {
