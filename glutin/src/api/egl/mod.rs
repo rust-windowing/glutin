@@ -330,9 +330,9 @@ impl Context {
             let mut minor: ffi::egl::types::EGLint = std::mem::uninitialized();
 
             if egl.Initialize(display, &mut major, &mut minor) == 0 {
-                return Err(CreationError::OsError(format!(
-                    "eglInitialize failed"
-                )));
+                return Err(CreationError::OsError(
+                    "eglInitialize failed".to_string(),
+                ));
             }
 
             (major, minor)
@@ -768,9 +768,9 @@ impl<'a> ContextPrototype<'a> {
                 std::ptr::null(),
             );
             if surface.is_null() {
-                return Err(CreationError::OsError(format!(
-                    "eglCreateWindowSurface failed"
-                )));
+                return Err(CreationError::OsError(
+                    "eglCreateWindowSurface failed".to_string(),
+                ));
             }
             surface
         };
@@ -794,9 +794,9 @@ impl<'a> ContextPrototype<'a> {
             .find(|s| s == &"EGL_KHR_surfaceless_context")
             .is_none()
         {
-            Err(CreationError::OsError(format!(
-                "EGL surfaceless not supported."
-            )))
+            Err(CreationError::NotSupported(
+                "EGL surfaceless not supported".to_string(),
+            ))
         } else {
             self.finish_impl(None)
         }
@@ -838,9 +838,9 @@ impl<'a> ContextPrototype<'a> {
                 attrs.as_ptr(),
             );
             if surface.is_null() || surface == ffi::egl::NO_SURFACE {
-                return Err(CreationError::OsError(format!(
-                    "eglCreatePbufferSurface failed"
-                )));
+                return Err(CreationError::OsError(
+                    "eglCreatePbufferSurface failed".to_string(),
+                ));
             }
             surface
         };
@@ -1100,7 +1100,9 @@ unsafe fn choose_fbconfig(
         &mut num_configs,
     ) == 0
     {
-        return Err(CreationError::OsError(format!("eglChooseConfig failed")));
+        return Err(CreationError::OsError(
+            "eglChooseConfig failed".to_string(),
+        ));
     }
     if num_configs == 0 {
         return Err(CreationError::NoAvailablePixelFormat);
@@ -1117,9 +1119,9 @@ unsafe fn choose_fbconfig(
                 &mut value,
             );
             if res == 0 {
-                return Err(CreationError::OsError(format!(
-                    "eglGetConfigAttrib failed"
-                )));
+                return Err(CreationError::OsError(
+                    "eglGetConfigAttrib failed".to_string(),
+                ));
             }
             value
         }};

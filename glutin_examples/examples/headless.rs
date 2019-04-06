@@ -1,7 +1,6 @@
 mod support;
 
 use glutin::dpi::PhysicalSize;
-use glutin::ContextTrait;
 use std::path::Path;
 use support::gl;
 

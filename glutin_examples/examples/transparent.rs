@@ -1,7 +1,5 @@
 mod support;
 
-use glutin::ContextTrait;
-
 fn main() {
     let mut el = glutin::EventsLoop::new();
     let wb = glutin::WindowBuilder::new()

@@ -239,9 +239,10 @@ impl Context {
             version -= 1;
         }
         if valid_context == ffi::nil {
-            Err(CreationError::OsError(format!(
+            Err(CreationError::OsError(
                 "Failed to create an OpenGL ES context with any version"
-            )))
+                    .to_string(),
+            ))
         } else {
             Ok(eagl_context)
         }

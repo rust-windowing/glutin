@@ -298,7 +298,7 @@ impl Context {
                     }
 
                     return Err(CreationError::NotSupported(
-                        "both libGL and libEGL are not present",
+                        "both libGL and libEGL are not present".to_string(),
                     ));
                 } else {
                     match (&*GLX, &*EGL, prefer_egl) {
@@ -308,7 +308,7 @@ impl Context {
                     }
 
                     return Err(CreationError::NotSupported(
-                        "lacking either libGL or libEGL so could not fallback to other",
+                        "lacking either libGL or libEGL so could not fallback to other".to_string(),
                     ));
                 }
             }
@@ -328,13 +328,13 @@ impl Context {
                     )?)
                 } else {
                     return Err(CreationError::NotSupported(
-                        "libEGL not present",
+                        "libEGL not present".to_string(),
                     ));
                 }
             }
             GlRequest::Specific(_, _) => {
                 return Err(CreationError::NotSupported(
-                    "requested specific without gl or gles",
+                    "requested specific without gl or gles".to_string(),
                 ));
             }
         })

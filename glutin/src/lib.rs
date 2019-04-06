@@ -43,6 +43,8 @@
     missing_debug_implementations,
     //missing_docs,
 )]
+// Docs for subcrates are borked.
+#![allow(intra_doc_link_resolution_failure)]
 
 #[cfg(any(
     target_os = "windows",
@@ -76,8 +78,7 @@ mod platform;
 mod windowed;
 
 pub use crate::context::{
-    Context, ContextCurrentState, ContextTrait, NotCurrentContext,
-    PossiblyCurrentContext, PossiblyCurrentContextTrait,
+    Context, ContextCurrentState, NotCurrentContext, PossiblyCurrentContext,
 };
 pub use crate::windowed::{ContextWrapper, RawContext, WindowedContext};
 
@@ -264,20 +265,19 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
 #[derive(Debug)]
 pub enum CreationError {
     OsError(String),
-    /// TODO: remove this error
-    NotSupported(&'static str),
+    NotSupported(String),
     NoBackendAvailable(Box<std::error::Error + Send + Sync>),
     RobustnessNotSupported,
     OpenGlVersionNotSupported,
     NoAvailablePixelFormat,
     PlatformSpecific(String),
     Window(WindowCreationError),
-    /// We received two errors, instead of one.
+    /// We received multiple errors, instead of one.
     CreationErrors(Vec<Box<CreationError>>),
 }
 
 impl CreationError {
-    pub fn append(self, err: CreationError) -> Self {
+    pub(crate) fn append(self, err: CreationError) -> Self {
         match self {
             CreationError::CreationErrors(mut errs) => {
                 errs.push(Box::new(err));
@@ -292,8 +292,8 @@ impl CreationError {
 
     fn to_string(&self) -> &str {
         match *self {
-            CreationError::OsError(ref text) => &text,
-            CreationError::NotSupported(text) => &text,
+            CreationError::OsError(ref text)
+            | CreationError::NotSupported(ref text) => &text,
             CreationError::NoBackendAvailable(_) => "No backend is available",
             CreationError::RobustnessNotSupported => {
                 "You requested robustness, but it is not supported."
@@ -327,9 +327,6 @@ impl std::fmt::Display for CreationError {
             write!(formatter, "`")?;
         }
 
-        if let &CreationError::NotSupported(msg) = self {
-            write!(formatter, ": {}", msg)?;
-        }
         if let Some(err) = std::error::Error::source(self) {
             write!(formatter, ": {}", err)?;
         }
@@ -508,17 +505,20 @@ pub enum ReleaseBehavior {
     Flush,
 }
 
-/// Describes a possible format. Unused.
+/// Describes a possible format.
 #[allow(missing_docs)]
 #[derive(Debug, Clone)]
 pub struct PixelFormat {
     pub hardware_accelerated: bool,
+    /// The number of color bits. Does not include alpha bits.
     pub color_bits: u8,
     pub alpha_bits: u8,
     pub depth_bits: u8,
     pub stencil_bits: u8,
     pub stereoscopy: bool,
     pub double_buffer: bool,
+    /// `None` if multisampling is disabled, otherwise `Some(N)` where `N` is
+    /// the multisampling level.
     pub multisampling: Option<u16>,
     pub srgb: bool,
 }
@@ -551,7 +551,7 @@ pub struct PixelFormatRequirements {
     /// The default value is `Some(24)`.
     pub depth_bits: Option<u8>,
 
-    /// Minimum number of bits for the depth buffer. `None` means "don't care".
+    /// Minimum number of stencil bits. `None` means "don't care".
     /// The default value is `Some(8)`.
     pub stencil_bits: Option<u8>,
 

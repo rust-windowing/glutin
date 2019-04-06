@@ -95,7 +95,9 @@ impl Context {
         let surface = match surface {
             Some(s) => s,
             None => {
-                return Err(CreationError::NotSupported("Wayland not found"));
+                return Err(CreationError::NotSupported(
+                    "Wayland not found".to_string(),
+                ));
             }
         };
 

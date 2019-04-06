@@ -1,7 +1,5 @@
 mod support;
 
-use glutin::ContextTrait;
-
 use support::{ContextCurrentWrapper, ContextTracker, ContextWrapper};
 
 fn main() {

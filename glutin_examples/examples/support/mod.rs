@@ -1,4 +1,4 @@
-use glutin::{self, PossiblyCurrentContext, PossiblyCurrentContextTrait};
+use glutin::{self, PossiblyCurrentContext};
 
 use std::ffi::CStr;
 
@@ -168,8 +168,8 @@ pub use self::context_tracker::{
 #[allow(dead_code)] // Not used by all examples
 mod context_tracker {
     use glutin::{
-        self, Context, ContextCurrentState, ContextError, ContextTrait,
-        NotCurrentContext, PossiblyCurrentContext, WindowedContext,
+        self, Context, ContextCurrentState, ContextError, NotCurrentContext,
+        PossiblyCurrentContext, WindowedContext,
     };
     use takeable_option::Takeable;
 
@@ -368,6 +368,17 @@ mod context_tracker {
                             }) {
                                 panic!("Could not `make_current` nor `make_not_current`, {:?}, {:?}", err, err2);
                             }
+                        }
+
+                        if let Err(err2) = self.modify(id, |ctx| {
+                            ctx.map_possibly(|ctx| {
+                                ctx.map(
+                                    |ctx| ctx.make_not_current(),
+                                    |ctx| ctx.make_not_current(),
+                                )
+                            })
+                        }) {
+                            panic!("Could not `make_current` nor `make_not_current`, {:?}, {:?}", err, err2);
                         }
 
                         return Err(err);

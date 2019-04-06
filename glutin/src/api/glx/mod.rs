@@ -103,9 +103,10 @@ impl Context {
             let extensions =
                 glx.QueryExtensionsString(xconn.display as *mut _, screen_id);
             if extensions.is_null() {
-                return Err(CreationError::OsError(format!(
+                return Err(CreationError::OsError(
                     "`glXQueryExtensionsString` found no glX extensions"
-                )));
+                        .to_string(),
+                ));
             }
             let extensions = CStr::from_ptr(extensions).to_bytes().to_vec();
             String::from_utf8(extensions).unwrap()
@@ -129,9 +130,10 @@ impl Context {
             let vi =
                 glx.GetVisualFromFBConfig(xconn.display as *mut _, fb_config);
             if vi.is_null() {
-                return Err(CreationError::OsError(format!(
+                return Err(CreationError::OsError(
                     "`glXGetVisualFromFBConfig` failed: invalid `GLXFBConfig`"
-                )));
+                        .to_string(),
+                ));
             }
             let vi_copy = std::ptr::read(vi as *const _);
             (xconn.xlib.XFree)(vi as *mut _);
@@ -471,9 +473,9 @@ impl<'a> ContextPrototype<'a> {
                     extra_functions.SwapIntervalSGI(1);
                 }
             } else {
-                return Err(CreationError::OsError(format!(
-                    "Couldn't find any available vsync extension"
-                )));
+                return Err(CreationError::OsError(
+                    "Couldn't find any available vsync extension".to_string(),
+                ));
             }
         }
 
@@ -614,9 +616,9 @@ fn create_context(
 
         if context.is_null() {
             // TODO: check for errors and return `OpenGlVersionNotSupported`
-            return Err(CreationError::OsError(format!(
-                "GL context creation failed"
-            )));
+            return Err(CreationError::OsError(
+                "GL context creation failed".to_string(),
+            ));
         }
 
         Ok(context)

@@ -10,7 +10,6 @@ use std::marker::PhantomData;
 /// # Example
 ///
 /// ```no_run
-/// # use glutin::ContextTrait;
 /// # fn main() {
 /// # let el = glutin::EventsLoop::new();
 /// # let wb = glutin::WindowBuilder::new();
@@ -29,56 +28,14 @@ pub struct Context<T: ContextCurrentState> {
     pub(crate) phantom: PhantomData<T>,
 }
 
-/// A trait for types associated with a GL context.
-pub trait ContextTrait
-where
-    Self: Sized,
-{
-    type PossiblyCurrentContext: PossiblyCurrentContextTrait
-        + ContextTrait<
-            PossiblyCurrentContext = Self::PossiblyCurrentContext,
-            NotCurrentContext = Self::NotCurrentContext,
-        >;
-    type NotCurrentContext: ContextTrait<
-        PossiblyCurrentContext = Self::PossiblyCurrentContext,
-        NotCurrentContext = Self::NotCurrentContext,
-    >;
-
-    /// Sets the context as the current context. The previously current context
-    /// (if any) is no longer current.
-    unsafe fn make_current(
+impl<T: ContextCurrentState> Context<T> {
+    /// See [`ContextWrapper::make_current`].
+    ///
+    /// [`ContextWrapper::make_current`]:
+    /// struct.ContextWrapper.html#method.make_current
+    pub unsafe fn make_current(
         self,
-    ) -> Result<Self::PossiblyCurrentContext, (Self, ContextError)>;
-
-    /// If this context is current, makes the context not current.
-    unsafe fn make_not_current(
-        self,
-    ) -> Result<Self::NotCurrentContext, (Self, ContextError)>;
-
-    /// Treats the context as not current, even if it is current. We do no
-    /// checks to confirm that this is the case. Prefer to use
-    /// `make_not_current` which will do nothing if this context is not current.
-    unsafe fn treat_as_not_current(self) -> Self::NotCurrentContext;
-
-    /// Returns true if this context is the current one in this thread.
-    fn is_current(&self) -> bool;
-
-    /// Returns the OpenGL API being used.
-    fn get_api(&self) -> Api;
-}
-
-pub trait PossiblyCurrentContextTrait {
-    /// Returns the address of an OpenGL function.
-    fn get_proc_address(&self, addr: &str) -> *const ();
-}
-
-impl<T: ContextCurrentState> ContextTrait for Context<T> {
-    type PossiblyCurrentContext = Context<PossiblyCurrentContext>;
-    type NotCurrentContext = Context<NotCurrentContext>;
-
-    unsafe fn make_current(
-        self,
-    ) -> Result<Self::PossiblyCurrentContext, (Self, ContextError)> {
+    ) -> Result<Context<PossiblyCurrentContext>, (Self, ContextError)> {
         match self.context.make_current() {
             Ok(()) => Ok(Context {
                 context: self.context,
@@ -94,9 +51,13 @@ impl<T: ContextCurrentState> ContextTrait for Context<T> {
         }
     }
 
-    unsafe fn make_not_current(
+    /// See [`ContextWrapper::make_not_current`].
+    ///
+    /// [`ContextWrapper::make_not_current`]:
+    /// struct.ContextWrapper.html#method.make_not_current
+    pub unsafe fn make_not_current(
         self,
-    ) -> Result<Self::NotCurrentContext, (Self, ContextError)> {
+    ) -> Result<Context<NotCurrentContext>, (Self, ContextError)> {
         match self.context.make_not_current() {
             Ok(()) => Ok(Context {
                 context: self.context,
@@ -112,24 +73,39 @@ impl<T: ContextCurrentState> ContextTrait for Context<T> {
         }
     }
 
-    unsafe fn treat_as_not_current(self) -> Self::NotCurrentContext {
+    /// See [`ContextWrapper::treat_as_not_current`].
+    ///
+    /// [`ContextWrapper::treat_as_not_current`]:
+    /// struct.ContextWrapper.html#method.treat_as_not_current
+    pub unsafe fn treat_as_not_current(self) -> Context<NotCurrentContext> {
         Context {
             context: self.context,
             phantom: PhantomData,
         }
     }
 
-    fn is_current(&self) -> bool {
+    /// See [`ContextWrapper::is_current`].
+    ///
+    /// [`ContextWrapper::is_current`]:
+    /// struct.ContextWrapper.html#method.is_current
+    pub fn is_current(&self) -> bool {
         self.context.is_current()
     }
 
-    fn get_api(&self) -> Api {
+    /// See [`ContextWrapper::get_api`].
+    ///
+    /// [`ContextWrapper::get_api`]: struct.ContextWrapper.html#method.get_api
+    pub fn get_api(&self) -> Api {
         self.context.get_api()
     }
 }
 
-impl PossiblyCurrentContextTrait for Context<PossiblyCurrentContext> {
-    fn get_proc_address(&self, addr: &str) -> *const () {
+impl Context<PossiblyCurrentContext> {
+    /// See [`ContextWrapper::get_proc_address`].
+    ///
+    /// [`ContextWrapper::get_proc_address`]:
+    /// struct.ContextWrapper.html#method.get_proc_address
+    pub fn get_proc_address(&self, addr: &str) -> *const () {
         self.context.get_proc_address(addr)
     }
 }
@@ -140,11 +116,43 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     /// One notable limitation of the Wayland backend when it comes to shared
     /// contexts is that both contexts must use the same events loop.
     ///
+    /// When on linux, prefer [`build_surfaceless`]. If both
+    /// [`build_surfaceless`] and `build_headless` fail, try using a hidden
+    /// window, or [`build_osmesa`]. Please note that if you choose to use a
+    /// hidden window, you must still handle the events it generates on the
+    /// events loop.
+    ///
     /// Errors can occur in two scenarios:
     ///  - If the window could not be created (via permission denied,
     ///  incompatible system, out of memory, etc.). This should be very rare.
     ///  - If the OpenGL context could not be created. This generally happens
     ///  because the underlying platform doesn't support a requested feature.
+    #[cfg_attr(
+        not(any(
+            target_os = "linux",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd",
+        )),
+        doc = "\
+    [`build_surfaceless`]: os/index.html
+    [`build_osmesa`]: os/index.html
+    "
+    )]
+    #[cfg_attr(
+        any(
+            target_os = "linux",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd",
+        ),
+        doc = "\
+    [`build_surfaceless`]: os/unix/trait.HeadlessContextExt.html#tymethod.build_surfaceless
+    [`build_osmesa`]: os/unix/trait.HeadlessContextExt.html#tymethod.build_osmesa
+    "
+    )]
     pub fn build_headless(
         self,
         el: &EventsLoop,
@@ -167,14 +175,33 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
 //
 // Instead we add a phantom type to PossiblyCurrentContext
 
-#[derive(Debug, Clone)]
+/// A type that contexts which might possibly be currently current on some
+/// thread take as a generic.
+///
+/// See [`ContextWrapper::make_current`] for more details.
+///
+/// [`ContextWrapper::make_current`]:
+/// struct.ContextWrapper.html#method.make_current
+#[derive(Debug, Clone, Copy)]
 pub struct PossiblyCurrentContext {
     phantom: PhantomData<*mut ()>,
 }
 
-#[derive(Debug, Clone)]
+/// A type that contexts which are not currently current on any thread take as
+/// a generic.
+///
+/// See [`ContextWrapper::make_current`] for more details.
+///
+/// [`ContextWrapper::make_current`]:
+/// struct.ContextWrapper.html#method.make_current
+#[derive(Debug, Clone, Copy)]
 pub enum NotCurrentContext {}
 
+/// A trait implemented on both [`NotCurrentContext`] and
+/// [`PossiblyCurrentContext`].
+///
+/// [`NotCurrentContext`]: enum.NotCurrentContext.html
+/// [`PossiblyCurrentContext`]: struct.PossiblyCurrentContext.html
 pub trait ContextCurrentState: std::fmt::Debug + Clone {}
 
 impl ContextCurrentState for PossiblyCurrentContext {}

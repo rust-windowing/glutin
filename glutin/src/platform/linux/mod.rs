@@ -26,7 +26,9 @@ use std::sync::Arc;
 /// Context handles available on Unix-like platforms.
 #[derive(Clone, Debug)]
 pub enum RawHandle {
+    /// Context handles for glx contexts.
     Glx(glutin_glx_sys::GLXContext),
+    /// Context handles for egl contexts.
     Egl(glutin_egl_sys::EGLContext),
 }
 
@@ -240,7 +242,16 @@ impl Context {
     }
 }
 
+/// A linux-specific extension to the [`ContextBuilder`] which allows building
+/// linux specific headless contexts.
+///
+/// [`ContextBuilder`]: struct.ContextBuilder.html
 pub trait HeadlessContextExt {
+    /// Builds the given OsMesa context.
+    ///
+    /// Errors can occur if the OpenGL context could not be created. This
+    /// generally happens because the underlying platform doesn't support a
+    /// requested feature.
     fn build_osmesa(
         self,
         size: dpi::PhysicalSize,
@@ -248,6 +259,11 @@ pub trait HeadlessContextExt {
     where
         Self: Sized;
 
+    /// Builds an EGL-surfaceless context.
+    ///
+    /// Errors can occur if the OpenGL context could not be created. This
+    /// generally happens because the underlying platform doesn't support a
+    /// requested feature.
     fn build_surfaceless(
         self,
         el: &winit::EventsLoop,
@@ -259,11 +275,6 @@ pub trait HeadlessContextExt {
 impl<'a, T: ContextCurrentState> HeadlessContextExt
     for crate::ContextBuilder<'a, T>
 {
-    /// Builds the given OsMesa context.
-    ///
-    /// Errors can occur if the OpenGL context could not be created. This
-    /// generally happens because the underlying platform doesn't support a
-    /// requested feature.
     #[inline]
     fn build_osmesa(
         self,
@@ -287,11 +298,6 @@ impl<'a, T: ContextCurrentState> HeadlessContextExt
             })
     }
 
-    /// Builds an egl-surfaceless context.
-    ///
-    /// Errors can occur if the OpenGL context could not be created. This
-    /// generally happens because the underlying platform doesn't support a
-    /// requested feature.
     #[inline]
     fn build_surfaceless(
         self,
@@ -311,6 +317,11 @@ impl<'a, T: ContextCurrentState> HeadlessContextExt
     }
 }
 
+/// A linux-specific for the [`ContextBuilder`] which allows assembling
+/// [`RawContext<T>`]s.
+///
+/// [`RawContext<T>`]: type.RawContext.html
+/// [`ContextBuilder`]: struct.ContextBuilder.html
 pub trait RawContextExt {
     /// Creates a raw context on the provided surface.
     ///

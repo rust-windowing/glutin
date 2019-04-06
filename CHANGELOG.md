@@ -5,10 +5,10 @@
  - Added headless example.
  - Removed internal code relating to libcaca.
  - Implemented `Debug` on all public facing types.
- - Dropping contexts on platforms using egl and/or glx no longer resets the 
+ - Dropping contexts on platforms using egl and/or glx no longer resets the
  current context, if the context dropped wasn't the current context.
  - Added context sharing support to MacOS.
- - **Breaking**: Split `ContextTrait` into `ContextTrait` and `PossiblyCurrentContextTrait`.
+ - **Breaking**: Removed `ContextTrait`.
  - **Breaking**: Renamed `OsMesaContextExt` to `HeadlessContextExt`. Added functions
  for using egl-surfaceless.
  - **Breaking**: Changed `WindowedContext` and `RawContext` into typedefs of
@@ -16,10 +16,9 @@
  - **Breaking**: Removed `new_windowed` and `new_headless` from `WindowedContext`
  and `Context`, respectively.
  - **Breaking**: Added two new types, `NotCurrentContext` and `PossiblyCurrentContext`,
- which `RawContext`, `WindowedContext`, `ContextBuilder` and `Context` are now 
+ which `RawContext`, `WindowedContext`, `ContextBuilder` and `Context` are now
  generic over.
- - Added `make_not_current` function into `ContextTrait`.
- - Added `treat_as_not_current` function into `ContextTrait`.
+ - Added `{make,treat_as}_not_current` function to `{Raw,Windowed,}Context`.
  - We now load `libGL.so` instead of `libGLX.so`.
  - **Breaking**: Added `DisplayLost` variant to `ContextError`.
  - Fixed bug where we drop the hidden window belonging to a headless context on

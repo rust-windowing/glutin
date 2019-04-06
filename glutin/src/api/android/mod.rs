@@ -59,7 +59,7 @@ impl Context {
         let gl_attr = gl_attr.clone().map_sharing(|c| &c.0.egl_context);
         let nwin = unsafe { android_glue::get_native_window() };
         if nwin.is_null() {
-            return Err(OsError(format!("Android's native window is null")));
+            return Err(OsError("Android's native window is null".to_string()));
         }
         let native_display = NativeDisplay::Android;
         let egl_context =
