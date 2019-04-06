@@ -10,4 +10,4 @@ build = "build.rs"
 edition = "2018"
 
 [build-dependencies]
-gl_generator = "0.10"
+gl_generator = "0.11"
