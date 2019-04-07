@@ -129,7 +129,8 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     /// Errors can occur in two scenarios:
     ///  - If the window could not be created (via permission denied,
     ///  incompatible system, out of memory, etc.). This should be very rare.
-    ///  - If the OpenGL [`Context`] could not be created. This generally happens
+    ///  - If the OpenGL [`Context`] could not be created. This generally
+    ///    happens
     ///  because the underlying platform doesn't support a requested feature.
     ///
     /// [`Context`]: struct.Context.html
@@ -194,8 +195,8 @@ pub struct PossiblyCurrentContext {
     phantom: PhantomData<*mut ()>,
 }
 
-/// A type that [`Context`]s which are not currently current on any thread take as
-/// a generic.
+/// A type that [`Context`]s which are not currently current on any thread take
+/// as a generic.
 ///
 /// See [`ContextWrapper::make_current`] for more details.
 ///

@@ -72,9 +72,8 @@ impl Drop for MakeCurrentGuard {
             old_display => old_display,
         };
 
-        let res = unsafe {
-            glx.MakeCurrent(display as *mut _, drawable, context)
-        };
+        let res =
+            unsafe { glx.MakeCurrent(display as *mut _, drawable, context) };
 
         if res == 0 {
             let err = self.xconn.check_errors();

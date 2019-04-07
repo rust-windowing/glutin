@@ -2,7 +2,8 @@ use super::*;
 
 use std::marker::PhantomData;
 
-/// Represents an OpenGL [`Context`] and the [`Window`] with which it is associated.
+/// Represents an OpenGL [`Context`] and the [`Window`] with which it is
+/// associated.
 ///
 /// Please see [`ContextWrapper<T, Window>`].
 ///
@@ -112,8 +113,9 @@ impl<T: ContextCurrentState> WindowedContext<T> {
         &self.window
     }
 
-    /// Split the [`Window`] apart from the OpenGL [`Context`]. Should only be used
-    /// when intending to transfer the [`RawContext<T>`] to an other thread.
+    /// Split the [`Window`] apart from the OpenGL [`Context`]. Should only be
+    /// used when intending to transfer the [`RawContext<T>`] to an other
+    /// thread.
     ///
     /// Unsaftey:
     ///   - The OpenGL [`Context`] must be dropped before the [`Window`].
@@ -315,7 +317,8 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     /// Errors can occur in two scenarios:
     ///  - If the window could not be created (via permission denied,
     ///  incompatible system, out of memory, etc.). This should be very rare.
-    ///  - If the OpenGL [`Context`] could not be created. This generally happens
+    ///  - If the OpenGL [`Context`] could not be created. This generally
+    ///    happens
     ///  because the underlying platform doesn't support a requested feature.
     ///
     /// [`WindowedContext<T>`]: type.WindowedContext.html

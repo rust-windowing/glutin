@@ -3,11 +3,12 @@
 //!
 //! # Building a [`WindowedContext<T>`]
 //!
-//! A [`WindowedContext<T>`] is composed of a [`Window`] and an OpenGL [`Context`].
+//! A [`WindowedContext<T>`] is composed of a [`Window`] and an OpenGL
+//! [`Context`].
 //!
 //! Due to some operating-system-specific quirks, glutin prefers control over
-//! the order of creation of the [`Context`] and [`Window`]. Here is an example of
-//! building a [`WindowedContext<T>`]:
+//! the order of creation of the [`Context`] and [`Window`]. Here is an example
+//! of building a [`WindowedContext<T>`]:
 //!
 //! ```no_run
 //! # fn main() {
@@ -64,7 +65,6 @@
 [`RawContextExt`]: os/unix/trait.RawContextExt.html
 "
 )]
-
 #![cfg(any(
     target_os = "linux",
     target_os = "ios",
@@ -82,7 +82,6 @@
     missing_debug_implementations,
     //missing_docs,
 )]
-
 // Docs for subcrates are borked.
 #![allow(intra_doc_link_resolution_failure)]
 
@@ -186,7 +185,8 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
         self
     }
 
-    /// Sets the robustness of the OpenGL context. See the docs of [`Robustness`].
+    /// Sets the robustness of the OpenGL context. See the docs of
+    /// [`Robustness`].
     ///
     /// [`Robustness`]: enum.Robustness.html
     #[inline]
