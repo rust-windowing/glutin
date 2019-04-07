@@ -37,7 +37,7 @@ use std::marker::PhantomData;
 /// [`ContextWrapper<T, Window>`]: struct.ContextWrapper.html
 pub type WindowedContext<T> = ContextWrapper<T, Window>;
 
-/// Represents am OpenGL context which has an underlying window that is
+/// Represents an OpenGL context which has an underlying window that is
 /// stored separately.
 ///
 /// This type can only be created via one of three ways:
