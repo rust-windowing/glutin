@@ -1,13 +1,13 @@
-//! The purpose of this library is to provide an OpenGL context on as many
+//! The purpose of this library is to provide an OpenGL [`Context`] on as many
 //! platforms as possible.
 //!
-//! # Building a WindowedContext
+//! # Building a [`WindowedContext<T>`]
 //!
-//! A `WindowedContext` is composed of a `Window` and an OpenGL `Context`.
+//! A [`WindowedContext<T>`] is composed of a [`Window`] and an OpenGL [`Context`].
 //!
 //! Due to some operating-system-specific quirks, glutin prefers control over
-//! the order of creation of the `Context` and `Window`. Here is an example of
-//! building a WindowedContext:
+//! the order of creation of the [`Context`] and [`Window`]. Here is an example of
+//! building a [`WindowedContext<T>`]:
 //!
 //! ```no_run
 //! # fn main() {
@@ -21,10 +21,49 @@
 //! # }
 //! ```
 //!
-//! You can, of course, create an OpenGL `Context` separately from an existing
+//! You can, of course, create a [`RawContext<T>`] separately from an existing
 //! window, however that may result in an suboptimal configuration of the window
 //! on some platforms. In that case use the unsafe platform-specific
-//! `RawWindowExt` available on some platforms.
+//! [`RawContextExt`] available on linux and windows.
+//!
+//! You can also produce headless [`Context`]s via the
+//! [`ContextBuilder::build_headless`] function.
+//!
+//! [`Window`]: struct.Window.html
+//! [`Context`]: struct.Context.html
+//! [`WindowedContext<T>`]: type.WindowedContext.html
+//! [`RawContext<T>`]: type.RawContext.html
+#![cfg_attr(
+    target_os = "windows",
+    doc = "\
+[`RawContextExt`]: os/windows/trait.RawContextExt.html
+"
+)]
+#![cfg_attr(
+    not(any(
+        target_os = "linux",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "windows",
+        target_os = "openbsd",
+    )),
+    doc = "\
+[`RawContextExt`]: os/index.html
+"
+)]
+#![cfg_attr(
+    any(
+        target_os = "linux",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd",
+    ),
+    doc = "\
+[`RawContextExt`]: os/unix/trait.RawContextExt.html
+"
+)]
 
 #![cfg(any(
     target_os = "linux",
@@ -43,6 +82,7 @@
     missing_debug_implementations,
     //missing_docs,
 )]
+
 // Docs for subcrates are borked.
 #![allow(intra_doc_link_resolution_failure)]
 
@@ -93,7 +133,15 @@ pub use winit::{
 
 use std::io;
 
-/// Object that allows you to build `Context`s.
+/// An object that allows you to build [`Context`]s, [`RawContext<T>`]s and
+/// [`WindowedContext<T>`]s.
+///
+/// One notable limitation of the Wayland backend when it comes to shared
+/// [`Context`]s is that both contexts must use the same events loop.
+///
+/// [`Context`]: struct.Context.html
+/// [`WindowedContext<T>`]: type.WindowedContext.html
+/// [`RawContext<T>`]: type.RawContext.html
 #[derive(Debug, Clone)]
 pub struct ContextBuilder<'a, T: ContextCurrentState> {
     /// The attributes to use to create the context.
@@ -138,7 +186,9 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
         self
     }
 
-    /// Sets the robustness of the OpenGL context. See the docs of `Robustness`.
+    /// Sets the robustness of the OpenGL context. See the docs of [`Robustness`].
+    ///
+    /// [`Robustness`]: enum.Robustness.html
     #[inline]
     pub fn with_gl_robustness(mut self, robustness: Robustness) -> Self {
         self.gl_attr.robustness = robustness;
@@ -154,7 +204,9 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
         self
     }
 
-    /// Share the display lists with the given `Context`.
+    /// Share the display lists with the given [`Context`].
+    ///
+    /// [`Context`]: struct.Context.html
     #[inline]
     pub fn with_shared_lists<T2: ContextCurrentState>(
         self,

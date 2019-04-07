@@ -9,22 +9,24 @@
 //!  - `windows`
 //!
 
-/// Platform specific methods for android.
+/// Platform-specific methods for android.
 pub mod android;
-/// Platform specific methods for blank backend.
+/// Platform-specific methods for blank backend.
 pub mod blank;
-/// Platform specific methods for iOS.
+/// Platform-specific methods for iOS.
 pub mod ios;
-/// Platform specific methods for macOS.
+/// Platform-specific methods for macOS.
 pub mod macos;
-/// Platform specific methods for unix.
+/// Platform-specific methods for unix.
 pub mod unix;
-/// Platform specific methods for Windows.
+/// Platform-specific methods for Windows.
 pub mod windows;
 
 use std::os::raw;
 
-/// Platform-specific extensions for OpenGL contexts.
+/// Platform-specific extensions for OpenGL [`Context`]s.
+///
+/// [`Context`]: ../struct.Context.html
 pub trait ContextTraitExt {
     /// Raw context handle.
     type Handle;

@@ -2,10 +2,13 @@ use super::*;
 
 use std::marker::PhantomData;
 
-/// Represents an OpenGL context.
+/// Represents an OpenGL [`Context`].
 ///
 /// A `Context` is normally associated with a single Window, however `Context`s
 /// can be *shared* between multiple windows or be headless.
+///
+/// If a context is backed by a window, it will be wrapped by either
+/// [`RawContext<T>`] or [`WindowedContext<T>`].
 ///
 /// # Example
 ///
@@ -22,6 +25,10 @@ use std::marker::PhantomData;
 ///     .with_shared_lists(some_context.context());
 /// # }
 /// ```
+///
+/// [`WindowedContext<T>`]: type.WindowedContext.html
+/// [`RawContext<T>`]: type.RawContext.html
+/// [`Context`]: struct.Context.html
 #[derive(Debug)]
 pub struct Context<T: ContextCurrentState> {
     pub(crate) context: platform::Context,
@@ -113,9 +120,6 @@ impl Context<PossiblyCurrentContext> {
 impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     /// Builds the given GL context.
     ///
-    /// One notable limitation of the Wayland backend when it comes to shared
-    /// contexts is that both contexts must use the same events loop.
-    ///
     /// When on linux, prefer [`build_surfaceless`]. If both
     /// [`build_surfaceless`] and `build_headless` fail, try using a hidden
     /// window, or [`build_osmesa`]. Please note that if you choose to use a
@@ -125,8 +129,10 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     /// Errors can occur in two scenarios:
     ///  - If the window could not be created (via permission denied,
     ///  incompatible system, out of memory, etc.). This should be very rare.
-    ///  - If the OpenGL context could not be created. This generally happens
+    ///  - If the OpenGL [`Context`] could not be created. This generally happens
     ///  because the underlying platform doesn't support a requested feature.
+    ///
+    /// [`Context`]: struct.Context.html
     #[cfg_attr(
         not(any(
             target_os = "linux",
@@ -175,25 +181,27 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
 //
 // Instead we add a phantom type to PossiblyCurrentContext
 
-/// A type that contexts which might possibly be currently current on some
+/// A type that [`Context`]s which might possibly be currently current on some
 /// thread take as a generic.
 ///
 /// See [`ContextWrapper::make_current`] for more details.
 ///
 /// [`ContextWrapper::make_current`]:
 /// struct.ContextWrapper.html#method.make_current
+/// [`Context`]: struct.Context.html
 #[derive(Debug, Clone, Copy)]
 pub struct PossiblyCurrentContext {
     phantom: PhantomData<*mut ()>,
 }
 
-/// A type that contexts which are not currently current on any thread take as
+/// A type that [`Context`]s which are not currently current on any thread take as
 /// a generic.
 ///
 /// See [`ContextWrapper::make_current`] for more details.
 ///
 /// [`ContextWrapper::make_current`]:
 /// struct.ContextWrapper.html#method.make_current
+/// [`Context`]: struct.Context.html
 #[derive(Debug, Clone, Copy)]
 pub enum NotCurrentContext {}
 

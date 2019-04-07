@@ -2,7 +2,7 @@ use super::*;
 
 use std::marker::PhantomData;
 
-/// Represents an OpenGL context and the `Window` with which it is associated.
+/// Represents an OpenGL [`Context`] and the [`Window`] with which it is associated.
 ///
 /// Please see [`ContextWrapper<T, Window>`].
 ///
@@ -35,9 +35,11 @@ use std::marker::PhantomData;
 /// ```
 ///
 /// [`ContextWrapper<T, Window>`]: struct.ContextWrapper.html
+/// [`Window`]: struct.Window.html
+/// [`Context`]: struct.Context.html
 pub type WindowedContext<T> = ContextWrapper<T, Window>;
 
-/// Represents an OpenGL context which has an underlying window that is
+/// Represents an OpenGL [`Context`] which has an underlying window that is
 /// stored separately.
 ///
 /// This type can only be created via one of three ways:
@@ -50,6 +52,7 @@ pub type WindowedContext<T> = ContextWrapper<T, Window>;
 ///
 /// [`ContextWrapper<T, ()>`]: struct.ContextWrapper.html
 /// [`WindowedContext<T>::split`]: type.WindowedContext.html#method.split
+/// [`Context`]: struct.Context.html
 #[cfg_attr(
     target_os = "windows",
     doc = "\
@@ -96,6 +99,7 @@ pub type RawContext<T> = ContextWrapper<T, ()>;
 ///
 /// [`WindowedContext<T>`]: type.WindowedContext.html
 /// [`RawContext<T>`]: type.RawContext.html
+/// [`Context`]: struct.Context.html
 #[derive(Debug)]
 pub struct ContextWrapper<T: ContextCurrentState, W> {
     pub(crate) context: Context<T>,
@@ -108,11 +112,15 @@ impl<T: ContextCurrentState> WindowedContext<T> {
         &self.window
     }
 
-    /// Split the Window apart from the OpenGL context. Should only be used
-    /// when intending to transfer the Context to an other thread.
+    /// Split the [`Window`] apart from the OpenGL [`Context`]. Should only be used
+    /// when intending to transfer the [`RawContext<T>`] to an other thread.
     ///
     /// Unsaftey:
-    ///   - The OpenGL context must be dropped before the window.
+    ///   - The OpenGL [`Context`] must be dropped before the [`Window`].
+    ///
+    /// [`RawContext<T>`]: type.RawContext.html
+    /// [`Window`]: struct.Window.html
+    /// [`Context`]: struct.Context.html
     pub unsafe fn split(self) -> (RawContext<T>, Window) {
         (
             RawContext {
@@ -148,9 +156,13 @@ impl<W> ContextWrapper<PossiblyCurrentContext, W> {
     /// Some platforms (macOS, Wayland) require being manually updated when
     /// their window or surface is resized.
     ///
-    /// The easiest way of doing this is to take every `Resized` window event
-    /// that is received with a `LogicalSize` and convert it to a
-    /// `PhysicalSize` and pass it into this function.
+    /// The easiest way of doing this is to take every [`Resized`] window event
+    /// that is received with a [`LogicalSize`] and convert it to a
+    /// [`PhysicalSize`] and pass it into this function.
+    ///
+    /// [`LogicalSize`]: dpi/struct.LogicalSize.html
+    /// [`PhysicalSize`]: dpi/struct.PhysicalSize.html
+    /// [`Resized`]: enum.WindowEvent.html#variant.Resized
     pub fn resize(&self, size: dpi::PhysicalSize) {
         let (width, height) = size.into();
         self.context.context.resize(width, height);
@@ -158,7 +170,9 @@ impl<W> ContextWrapper<PossiblyCurrentContext, W> {
 }
 
 impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
-    /// Borrow the inner GL `Context`.
+    /// Borrow the inner GL [`Context`].
+    ///
+    /// [`Context`]: struct.Context.html
     pub fn context(&self) -> &Context<T> {
         &self.context
     }
@@ -296,16 +310,15 @@ impl<T: ContextCurrentState, W> std::ops::Deref for ContextWrapper<T, W> {
 
 impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     /// Builds the given window along with the associated GL context, returning
-    /// the pair as a `WindowedContext`.
-    ///
-    /// One notable limitation of the Wayland backend when it comes to shared
-    /// contexts is that both contexts must use the same events loop.
+    /// the pair as a [`WindowedContext<T>`].
     ///
     /// Errors can occur in two scenarios:
     ///  - If the window could not be created (via permission denied,
     ///  incompatible system, out of memory, etc.). This should be very rare.
-    ///  - If the OpenGL context could not be created. This generally happens
+    ///  - If the OpenGL [`Context`] could not be created. This generally happens
     ///  because the underlying platform doesn't support a requested feature.
+    ///
+    /// [`WindowedContext<T>`]: type.WindowedContext.html
     pub fn build_windowed(
         self,
         wb: WindowBuilder,
