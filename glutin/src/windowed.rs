@@ -191,7 +191,7 @@ impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
     ///
     ///  * Call `make_current` on an other context, then call
     ///  [`treat_as_not_current`] on this context.
-    ///  * Call [`make_current`] on this context.
+    ///  * Call `make_current` on this context.
     ///
     /// If you are aware of what context you intend to make current next, it is
     /// preferable for performance reasons to call `make_current` on that
@@ -203,7 +203,7 @@ impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
     /// [`make_not_current`] on this context.
     ///
     /// Please avoid calling [`make_not_current`] on one context only to call
-    /// [`make_current`] on an other context before and/or after. This hurts
+    /// `make_current` on an other context before and/or after. This hurts
     /// performance by requiring glutin to:
     ///
     ///  * Check if this context is current; then
