@@ -8,6 +8,7 @@ use std::sync::Arc;
 #[derive(Debug)]
 pub struct MakeCurrentGuard {
     old_display: *mut ffi::Display,
+    display: *mut ffi::Display,
     xconn: Arc<XConnection>,
     possibly_invalid: Option<MakeCurrentGuardInner>,
 }
@@ -29,6 +30,7 @@ impl MakeCurrentGuard {
 
             let ret = MakeCurrentGuard {
                 old_display: glx.GetCurrentDisplay() as *mut _,
+                display: xconn.display as *mut _,
                 xconn: Arc::clone(xconn),
                 possibly_invalid: Some(MakeCurrentGuardInner {
                     old_drawable: glx.GetCurrentDrawable(),
@@ -65,8 +67,13 @@ impl Drop for MakeCurrentGuard {
             None => (0, std::ptr::null()),
         };
 
+        let display = match self.old_display {
+            old_display if old_display == std::ptr::null_mut() => self.display,
+            old_display => old_display,
+        };
+
         let res = unsafe {
-            glx.MakeCurrent(self.old_display as *mut _, drawable, context)
+            glx.MakeCurrent(display as *mut _, drawable, context)
         };
 
         if res == 0 {
