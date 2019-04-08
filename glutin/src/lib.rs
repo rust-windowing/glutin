@@ -329,6 +329,13 @@ pub enum CreationError {
 }
 
 impl CreationError {
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd",
+    ))]
     pub(crate) fn append(self, err: CreationError) -> Self {
         match self {
             CreationError::CreationErrors(mut errs) => {
