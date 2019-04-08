@@ -63,7 +63,7 @@ impl Context {
         }
         let native_display = NativeDisplay::Android;
         let egl_context =
-            EglContext::new(pf_reqs, &gl_attr, native_display, false)
+            EglContext::new(pf_reqs, &gl_attr, native_display, EglSurfaceType::Window)
                 .and_then(|p| p.finish(nwin as *const _))?;
         let ctx = Arc::new(AndroidContext {
             egl_context,
@@ -105,7 +105,7 @@ impl Context {
     ) -> Result<Self, CreationError> {
         let gl_attr = gl_attr.clone().map_sharing(|c| &c.0.egl_context);
         let context =
-            EglContext::new(pf_reqs, &gl_attr, NativeDisplay::Android, true)?;
+            EglContext::new(pf_reqs, &gl_attr, NativeDisplay::Android, EglSurfaceType::PBuffer)?;
         let egl_context = context.finish_pbuffer(size)?;
         let ctx = Arc::new(AndroidContext {
             egl_context,

@@ -109,7 +109,7 @@ impl Context {
                             &pf_reqs,
                             &gl_attr_egl,
                             NativeDisplay::Other(Some(std::ptr::null())),
-                            false,
+                            EglSurfaceType::Window,
                         )
                         .and_then(|p| p.finish(hwnd))
                         {
@@ -166,7 +166,7 @@ impl Context {
                     pf_reqs,
                     &gl_attr_egl,
                     native_display,
-                    true,
+                    EglSurfaceType::PBuffer,
                 )
                 .and_then(|prototype| prototype.finish_pbuffer(size))
                 .map(|ctx| Context::EglPbuffer(ctx));
