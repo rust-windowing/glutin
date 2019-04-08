@@ -23,7 +23,7 @@ Join us in any of these:
 
 ## Usage Examples
 
-Warning: these are examples for master. For the latest released version, 0.20, view [here](https://github.com/tomaka/glutin/tree/521a3522e348f5c52a5490b1a659f417698ea953).
+Warning: these are examples for master. For the latest released version, 0.21, view [here](https://github.com/tomaka/glutin/commit/1ed68d6f979b4bc81e2215793232129dd45dab60)
 
 ### Try it!
 
