@@ -524,7 +524,7 @@ impl Context {
     #[cfg(target_os = "android")]
     pub unsafe fn on_surface_created(&self, nwin: ffi::EGLNativeWindowType) {
         let egl = EGL.as_ref().unwrap();
-        let mut surface = self.surface.as_mut().unwrap().lock();
+        let mut surface = self.surface.as_ref().unwrap().lock();
         if *surface != ffi::egl::NO_SURFACE {
             return;
         }
@@ -557,7 +557,7 @@ impl Context {
     #[cfg(target_os = "android")]
     pub unsafe fn on_surface_destroyed(&self) {
         let egl = EGL.as_ref().unwrap();
-        let mut surface = self.surface.as_mut().unwrap().lock();
+        let mut surface = self.surface.as_ref().unwrap().lock();
         if *surface == ffi::egl::NO_SURFACE {
             return;
         }
