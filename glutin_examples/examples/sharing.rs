@@ -1,22 +1,37 @@
-//! Requires OpenGL 4.2 minimium.
-
 mod support;
 
+use glutin::dpi::{LogicalSize, PhysicalSize};
 use support::{gl, ContextCurrentWrapper, ContextTracker, ContextWrapper};
+
+fn make_renderbuf(gl: &support::Gl, size: PhysicalSize) -> gl::types::GLuint {
+    let mut render_buf = 0;
+    unsafe {
+        gl.gl.GenRenderbuffers(1, &mut render_buf);
+        gl.gl.BindRenderbuffer(gl::RENDERBUFFER, render_buf);
+        gl.gl.RenderbufferStorage(
+            gl::RENDERBUFFER,
+            gl::RGB8,
+            size.width as _,
+            size.height as _,
+        );
+    }
+
+    render_buf
+}
 
 fn main() {
     let mut el = glutin::EventsLoop::new();
-    let mut size = glutin::dpi::PhysicalSize::new(768., 480.);
+    let mut size = PhysicalSize::new(768., 480.);
 
     let mut ct = ContextTracker::default();
 
     let headless_context = glutin::ContextBuilder::new()
-        .build_headless(&el, size)
+        .build_headless(&el, PhysicalSize::new(1., 1.))
         .unwrap();
 
     let wb = glutin::WindowBuilder::new()
         .with_title("A fantastic window!")
-        .with_dimensions(glutin::dpi::LogicalSize::from_physical(size, 1.0));
+        .with_dimensions(LogicalSize::from_physical(size, 1.0));
     let windowed_context = glutin::ContextBuilder::new()
         .with_shared_lists(&headless_context)
         .build_windowed(wb, &el)
@@ -36,31 +51,23 @@ fn main() {
     );
     let glw = support::load(&windowed_context.windowed().context());
 
-    let mut render_tex = 0;
-    unsafe {
-        glw.gl.GenTextures(1, &mut render_tex);
-        glw.gl.BindTexture(gl::TEXTURE_2D, render_tex);
-        glw.gl.TexStorage2D(
-            gl::TEXTURE_2D,
-            1,
-            gl::SRGB8_ALPHA8,
-            size.width as _,
-            size.height as _,
-        );
-    }
+    let render_buf = make_renderbuf(&glw, size);
 
     let mut window_fb = 0;
     unsafe {
         glw.gl.GenFramebuffers(1, &mut window_fb);
-        glw.gl.BindFramebuffer(gl::READ_FRAMEBUFFER, window_fb);
-        glw.gl.BindFramebuffer(gl::DRAW_FRAMEBUFFER, 0);
-        glw.gl.FramebufferTexture2D(
-            gl::READ_FRAMEBUFFER,
+        // Both `GL_DRAW_FRAMEBUFFER` and `GL_READ_FRAMEBUFFER` need to be
+        // non-zero for `glFramebufferRenderbuffer`. We can change
+        // `GL_DRAW_FRAMEBUFFER` after.
+        glw.gl.BindFramebuffer(gl::FRAMEBUFFER, window_fb);
+        glw.gl.FramebufferRenderbuffer(
+            gl::FRAMEBUFFER,
             gl::COLOR_ATTACHMENT0,
-            gl::TEXTURE_2D,
-            render_tex,
-            0,
+            gl::RENDERBUFFER,
+            render_buf,
         );
+        glw.gl.BindFramebuffer(gl::DRAW_FRAMEBUFFER, 0);
+        glw.gl.Viewport(0, 0, size.width as _, size.height as _);
     }
     std::mem::drop(windowed_context);
 
@@ -69,14 +76,16 @@ fn main() {
 
     let mut context_fb = 0;
     unsafe {
+        // Using the fb backing a pbuffer is very much a bad idea. Fails on
+        // many platforms, and is deprecated. Better just make your own fb.
         glc.gl.GenFramebuffers(1, &mut context_fb);
         glc.gl.BindFramebuffer(gl::FRAMEBUFFER, context_fb);
-        glc.gl.FramebufferTexture2D(
+        glc.gl.BindRenderbuffer(gl::RENDERBUFFER, render_buf);
+        glc.gl.FramebufferRenderbuffer(
             gl::FRAMEBUFFER,
             gl::COLOR_ATTACHMENT0,
-            gl::TEXTURE_2D,
-            render_tex,
-            0,
+            gl::RENDERBUFFER,
+            render_buf,
         );
         glc.gl.Viewport(0, 0, size.width as _, size.height as _);
     }
@@ -101,47 +110,21 @@ fn main() {
 
                         unsafe {
                             windowed_context.windowed().swap_buffers().unwrap();
-                            glw.gl.DeleteTextures(1, &render_tex);
-                            glw.gl.DeleteFramebuffers(1, &window_fb);
-
-                            glw.gl.GenTextures(1, &mut render_tex);
-                            glw.gl.BindTexture(gl::TEXTURE_2D, render_tex);
-                            glw.gl.TexStorage2D(
-                                gl::TEXTURE_2D,
-                                1,
-                                gl::SRGB8_ALPHA8,
+                            glw.gl.RenderbufferStorage(
+                                gl::RENDERBUFFER,
+                                gl::RGB8,
                                 size.width as _,
                                 size.height as _,
                             );
-
-                            glw.gl.GenFramebuffers(1, &mut window_fb);
-                            glw.gl.BindFramebuffer(
-                                gl::READ_FRAMEBUFFER,
-                                window_fb,
-                            );
-                            glw.gl.BindFramebuffer(gl::DRAW_FRAMEBUFFER, 0);
-                            glw.gl.FramebufferTexture2D(
-                                gl::READ_FRAMEBUFFER,
-                                gl::COLOR_ATTACHMENT0,
-                                gl::TEXTURE_2D,
-                                render_tex,
+                            glw.gl.Viewport(
                                 0,
+                                0,
+                                size.width as _,
+                                size.height as _,
                             );
                             std::mem::drop(windowed_context);
 
                             let _ = ct.get_current(headless_id).unwrap();
-                            glc.gl.DeleteFramebuffers(1, &context_fb);
-
-                            glc.gl.GenFramebuffers(1, &mut context_fb);
-                            glc.gl.BindFramebuffer(gl::FRAMEBUFFER, context_fb);
-                            glc.gl.FramebufferTexture2D(
-                                gl::FRAMEBUFFER,
-                                gl::COLOR_ATTACHMENT0,
-                                gl::TEXTURE_2D,
-                                render_tex,
-                                0,
-                            );
-
                             glc.gl.Viewport(
                                 0,
                                 0,
@@ -180,8 +163,8 @@ fn main() {
 
     unsafe {
         let windowed_context = ct.get_current(windowed_id).unwrap();
-        glw.gl.DeleteTextures(1, &render_tex);
         glw.gl.DeleteFramebuffers(1, &window_fb);
+        glw.gl.DeleteRenderbuffers(1, &render_buf);
         std::mem::drop(windowed_context);
         let _ = ct.get_current(headless_id).unwrap();
         glc.gl.DeleteFramebuffers(1, &context_fb);

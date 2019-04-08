@@ -29,7 +29,7 @@ impl<'a, 'b> CurrentContextGuard<'a, 'b> {
         if result == 0 {
             return Err(CreationError::OsError(format!(
                 "wglMakeCurrent function failed: {}",
-                format!("{}", io::Error::last_os_error())
+                io::Error::last_os_error()
             )));
         }
 

@@ -67,7 +67,15 @@ use crate::{
 
 use glutin_egl_sys as ffi;
 use parking_lot::Mutex;
-#[cfg(any(target_os = "android", target_os = "windows"))]
+#[cfg(any(
+    target_os = "android",
+    target_os = "windows",
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+))]
 use winit::dpi;
 
 use std::ffi::{CStr, CString};
@@ -115,7 +123,7 @@ pub enum NativeDisplay {
 pub struct Context {
     display: ffi::egl::types::EGLDisplay,
     context: ffi::egl::types::EGLContext,
-    surface: Mutex<ffi::egl::types::EGLSurface>,
+    surface: Option<Mutex<ffi::egl::types::EGLSurface>>,
     api: Api,
     pixel_format: PixelFormat,
     #[cfg(target_os = "android")]
@@ -287,6 +295,13 @@ fn get_native_display(egl: &Egl, ndisp: NativeDisplay) -> *const raw::c_void {
     }
 }
 
+#[derive(Copy, Clone, PartialEq)]
+pub enum SurfaceType {
+    PBuffer,
+    Window,
+    Surfaceless,
+}
+
 impl Context {
     /// Start building an EGL context.
     ///
@@ -298,6 +313,7 @@ impl Context {
         pf_reqs: &PixelFormatRequirements,
         opengl: &'a GlAttributes<&'a Context>,
         ndisp: NativeDisplay,
+        surface_type: SurfaceType,
     ) -> Result<ContextPrototype<'a>, CreationError> {
         let egl = EGL.as_ref().unwrap();
         // calling `eglGetDisplay` or equivalent
@@ -314,9 +330,9 @@ impl Context {
             let mut minor: ffi::egl::types::EGLint = std::mem::uninitialized();
 
             if egl.Initialize(display, &mut major, &mut minor) == 0 {
-                return Err(CreationError::OsError(format!(
-                    "eglInitialize failed"
-                )));
+                return Err(CreationError::OsError(
+                    "eglInitialize failed".to_string(),
+                ));
             }
 
             (major, minor)
@@ -399,7 +415,15 @@ impl Context {
         };
 
         let (config_id, pixel_format) = unsafe {
-            choose_fbconfig(egl, display, &egl_version, api, version, pf_reqs)?
+            choose_fbconfig(
+                egl,
+                display,
+                &egl_version,
+                api,
+                version,
+                pf_reqs,
+                surface_type,
+            )?
         };
 
         Ok(ContextPrototype {
@@ -436,21 +460,29 @@ impl Context {
     }
 
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        let surface = self.surface.lock();
         let egl = EGL.as_ref().unwrap();
-        let ret =
-            egl.MakeCurrent(self.display, *surface, *surface, self.context);
+        let surface = self
+            .surface
+            .as_ref()
+            .map(|s| *s.lock())
+            .unwrap_or(ffi::egl::NO_SURFACE);
+        let ret = egl.MakeCurrent(self.display, surface, surface, self.context);
 
         self.check_make_current(Some(ret))
     }
 
     pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
         let egl = EGL.as_ref().unwrap();
-        let surface = self.surface.lock();
-        if egl.GetCurrentSurface(ffi::egl::DRAW as i32) == *surface
-            || egl.GetCurrentSurface(ffi::egl::READ as i32) == *surface
-            || egl.GetCurrentContext() == self.context
-        {
+
+        let surface_eq =
+            if let Some(surface) = self.surface.as_ref().map(|s| *s.lock()) {
+                egl.GetCurrentSurface(ffi::egl::DRAW as i32) == surface
+                    || egl.GetCurrentSurface(ffi::egl::READ as i32) == surface
+            } else {
+                false
+            };
+
+        if surface_eq || egl.GetCurrentContext() == self.context {
             let ret = egl.MakeCurrent(
                 self.display,
                 ffi::egl::NO_SURFACE,
@@ -492,7 +524,7 @@ impl Context {
     #[cfg(target_os = "android")]
     pub unsafe fn on_surface_created(&self, nwin: ffi::EGLNativeWindowType) {
         let egl = EGL.as_ref().unwrap();
-        let mut surface = self.surface.lock();
+        let mut surface = self.surface.as_ref().unwrap().lock();
         if *surface != ffi::egl::NO_SURFACE {
             return;
         }
@@ -525,7 +557,7 @@ impl Context {
     #[cfg(target_os = "android")]
     pub unsafe fn on_surface_destroyed(&self) {
         let egl = EGL.as_ref().unwrap();
-        let mut surface = self.surface.lock();
+        let mut surface = self.surface.as_ref().unwrap().lock();
         if *surface == ffi::egl::NO_SURFACE {
             return;
         }
@@ -557,7 +589,7 @@ impl Context {
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
         let egl = EGL.as_ref().unwrap();
-        let surface = self.surface.lock();
+        let surface = self.surface.as_ref().unwrap().lock();
         if *surface == ffi::egl::NO_SURFACE {
             return Err(ContextError::ContextLost);
         }
@@ -593,20 +625,24 @@ impl Drop for Context {
         unsafe {
             // https://stackoverflow.com/questions/54402688/recreate-eglcreatewindowsurface-with-same-native-window
             let egl = EGL.as_ref().unwrap();
-            let mut surface = self.surface.lock();
+            let surface = self
+                .surface
+                .as_ref()
+                .map(|s| *s.lock())
+                .unwrap_or(ffi::egl::NO_SURFACE);
             // Ok, so we got to call `glFinish` before destroying the context
             // to ensure it actually gets destroyed. This requires making the
             // this context current.
             let mut guard = MakeCurrentGuard::new(
                 self.display,
-                *surface,
-                *surface,
+                surface,
+                surface,
                 self.context,
             )
             .map_err(|err| ContextError::OsError(err))
             .unwrap();
 
-            guard.if_any_same_then_invalidate(*surface, *surface, self.context);
+            guard.if_any_same_then_invalidate(surface, surface, self.context);
 
             let gl_finish_fn = self.get_proc_address("glFinish");
             assert!(gl_finish_fn != std::ptr::null());
@@ -616,8 +652,11 @@ impl Drop for Context {
 
             egl.DestroyContext(self.display, self.context);
             self.context = ffi::egl::NO_CONTEXT;
-            egl.DestroySurface(self.display, *surface);
-            *surface = ffi::egl::NO_SURFACE;
+            egl.DestroySurface(self.display, surface);
+            if let Some(ref surface) = self.surface {
+                let mut surface = surface.lock();
+                *surface = ffi::egl::NO_SURFACE;
+            }
 
             // In a reasonable world, we could uncomment the line bellow.
             //
@@ -729,29 +768,66 @@ impl<'a> ContextPrototype<'a> {
                 std::ptr::null(),
             );
             if surface.is_null() {
-                return Err(CreationError::OsError(format!(
-                    "eglCreateWindowSurface failed"
-                )));
+                return Err(CreationError::OsError(
+                    "eglCreateWindowSurface failed".to_string(),
+                ));
             }
             surface
         };
 
-        self.finish_impl(surface)
+        self.finish_impl(Some(surface))
     }
 
-    #[cfg(any(target_os = "android", target_os = "windows"))]
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd",
+    ))]
+    pub fn finish_surfaceless(self) -> Result<Context, CreationError> {
+        // FIXME: Also check for the GL_OES_surfaceless_context *CONTEXT*
+        // extension
+        if self
+            .extensions
+            .iter()
+            .find(|s| s == &"EGL_KHR_surfaceless_context")
+            .is_none()
+        {
+            Err(CreationError::NotSupported(
+                "EGL surfaceless not supported".to_string(),
+            ))
+        } else {
+            self.finish_impl(None)
+        }
+    }
+
+    #[cfg(any(
+        target_os = "android",
+        target_os = "windows",
+        target_os = "linux",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd",
+    ))]
     pub fn finish_pbuffer(
         self,
-        dims: dpi::PhysicalSize,
+        size: dpi::PhysicalSize,
     ) -> Result<Context, CreationError> {
-        let dims: (u32, u32) = dims.into();
+        let size: (u32, u32) = size.into();
 
         let egl = EGL.as_ref().unwrap();
+        let tex_fmt = if self.pixel_format.alpha_bits > 0 {
+            ffi::egl::TEXTURE_RGBA
+        } else {
+            ffi::egl::TEXTURE_RGB
+        };
         let attrs = &[
             ffi::egl::WIDTH as raw::c_int,
-            dims.0 as raw::c_int,
+            size.0 as raw::c_int,
             ffi::egl::HEIGHT as raw::c_int,
-            dims.1 as raw::c_int,
+            size.1 as raw::c_int,
             ffi::egl::NONE as raw::c_int,
         ];
 
@@ -761,20 +837,20 @@ impl<'a> ContextPrototype<'a> {
                 self.config_id,
                 attrs.as_ptr(),
             );
-            if surface.is_null() {
-                return Err(CreationError::OsError(format!(
-                    "eglCreatePbufferSurface failed"
-                )));
+            if surface.is_null() || surface == ffi::egl::NO_SURFACE {
+                return Err(CreationError::OsError(
+                    "eglCreatePbufferSurface failed".to_string(),
+                ));
             }
             surface
         };
 
-        self.finish_impl(surface)
+        self.finish_impl(Some(surface))
     }
 
     fn finish_impl(
         self,
-        surface: ffi::egl::types::EGLSurface,
+        surface: Option<ffi::egl::types::EGLSurface>,
     ) -> Result<Context, CreationError> {
         let share = match self.opengl.sharing {
             Some(ctx) => ctx.context,
@@ -868,7 +944,7 @@ impl<'a> ContextPrototype<'a> {
         Ok(Context {
             display: self.display,
             context,
-            surface: Mutex::new(surface),
+            surface: surface.map(|s| Mutex::new(s)),
             api: self.api,
             pixel_format: self.pixel_format,
             #[cfg(target_os = "android")]
@@ -884,6 +960,7 @@ unsafe fn choose_fbconfig(
     api: Api,
     version: Option<(u8, u8)>,
     reqs: &PixelFormatRequirements,
+    surface_type: SurfaceType,
 ) -> Result<(ffi::egl::types::EGLConfig, PixelFormat), CreationError> {
     let descriptor = {
         let mut out: Vec<raw::c_int> = Vec::with_capacity(37);
@@ -893,10 +970,15 @@ unsafe fn choose_fbconfig(
             out.push(ffi::egl::RGB_BUFFER as raw::c_int);
         }
 
-        out.push(ffi::egl::SURFACE_TYPE as raw::c_int);
-        // TODO: Some versions of Mesa report a BAD_ATTRIBUTE error
-        // if we ask for PBUFFER_BIT as well as WINDOW_BIT
-        out.push((ffi::egl::WINDOW_BIT) as raw::c_int);
+        if surface_type != SurfaceType::Surfaceless {
+            out.push(ffi::egl::SURFACE_TYPE as raw::c_int);
+            let surface_type = match surface_type {
+                SurfaceType::Window => ffi::egl::WINDOW_BIT,
+                SurfaceType::PBuffer => ffi::egl::PBUFFER_BIT,
+                _ => unreachable!(),
+            };
+            out.push(surface_type as raw::c_int);
+        }
 
         match (api, version) {
             (Api::OpenGlEs, Some((3, _))) => {
@@ -1018,7 +1100,9 @@ unsafe fn choose_fbconfig(
         &mut num_configs,
     ) == 0
     {
-        return Err(CreationError::OsError(format!("eglChooseConfig failed")));
+        return Err(CreationError::OsError(
+            "eglChooseConfig failed".to_string(),
+        ));
     }
     if num_configs == 0 {
         return Err(CreationError::NoAvailablePixelFormat);
@@ -1035,9 +1119,9 @@ unsafe fn choose_fbconfig(
                 &mut value,
             );
             if res == 0 {
-                return Err(CreationError::OsError(format!(
-                    "eglGetConfigAttrib failed"
-                )));
+                return Err(CreationError::OsError(
+                    "eglGetConfigAttrib failed".to_string(),
+                ));
             }
             value
         }};

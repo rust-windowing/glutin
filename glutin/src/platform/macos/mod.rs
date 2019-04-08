@@ -90,7 +90,7 @@ impl Context {
                 Some(gl_context) => gl_context,
                 None => {
                     return Err(CreationError::NotSupported(
-                        "could not open gl context",
+                        "could not open gl context".to_string(),
                     ));
                 }
             };
@@ -167,7 +167,7 @@ impl Context {
         _el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-        _dims: dpi::PhysicalSize,
+        _size: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
         let gl_profile = helpers::get_gl_profile(gl_attr, pf_reqs)?;
         let attributes = helpers::build_nsattributes(pf_reqs, gl_profile)?;
@@ -175,16 +175,16 @@ impl Context {
             let pixelformat = NSOpenGLPixelFormat::alloc(nil)
                 .initWithAttributes_(&attributes);
             if pixelformat == nil {
-                return Err(CreationError::OsError(format!(
-                    "Could not create the pixel format"
-                )));
+                return Err(CreationError::OsError(
+                    "Could not create the pixel format".to_string(),
+                ));
             }
             let context = NSOpenGLContext::alloc(nil)
                 .initWithFormat_shareContext_(pixelformat, nil);
             if context == nil {
-                return Err(CreationError::OsError(format!(
-                    "Could not create the rendering context"
-                )));
+                return Err(CreationError::OsError(
+                    "Could not create the rendering context".to_string(),
+                ));
             }
 
             IdRef::new(context)

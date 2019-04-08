@@ -71,7 +71,7 @@ impl OsMesaContext {
     pub fn new(
         _pf_reqs: &PixelFormatRequirements,
         opengl: &GlAttributes<&OsMesaContext>,
-        dims: dpi::PhysicalSize,
+        size: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
         osmesa_sys::OsMesa::try_loading()
             .map_err(LoadingError::new)
@@ -134,13 +134,13 @@ impl OsMesaContext {
         // attribs array must be NULL terminated.
         attribs.push(0);
 
-        let dims: (u32, u32) = dims.into();
+        let size: (u32, u32) = size.into();
 
         Ok(OsMesaContext {
-            width: dims.0,
-            height: dims.1,
+            width: size.0,
+            height: size.1,
             buffer: std::iter::repeat(unsafe { std::mem::uninitialized() })
-                .take((dims.0 * dims.1) as usize)
+                .take((size.0 * size.1) as usize)
                 .collect(),
             context: unsafe {
                 let ctx = osmesa_sys::OSMesaCreateContextAttribs(

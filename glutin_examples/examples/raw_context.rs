@@ -11,7 +11,6 @@ fn main() {
 #[cfg(any(target_os = "linux", target_os = "windows"))]
 mod this_example {
     use super::support;
-    use glutin::ContextTrait;
 
     pub fn main() {
         let (raw_context, mut el, win) = {

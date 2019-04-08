@@ -26,7 +26,9 @@ use std::sync::Arc;
 /// Context handles available on Unix-like platforms.
 #[derive(Clone, Debug)]
 pub enum RawHandle {
+    /// Context handle for a glx context.
     Glx(glutin_glx_sys::GLXContext),
+    /// Context handle for a egl context.
     Egl(glutin_egl_sys::EGLContext),
 }
 
@@ -39,10 +41,8 @@ pub enum ContextType {
 
 #[derive(Debug)]
 pub enum Context {
-    WindowedX11(x11::Context),
-    HeadlessX11(x11::Context, winit::Window),
-    WindowedWayland(wayland::Context),
-    HeadlessWayland(wayland::Context, winit::Window),
+    X11(x11::Context),
+    Wayland(wayland::Context),
     OsMesa(osmesa::OsMesaContext),
 }
 
@@ -63,9 +63,7 @@ impl Context {
                     }
                 },
                 ContextType::X11 => match *c {
-                    Context::WindowedX11(_) | Context::HeadlessX11(_, _) => {
-                        Ok(())
-                    }
+                    Context::X11(_) => Ok(()),
                     _ => {
                         let msg = "Cannot share an X11 context with a non-X11 context";
                         return Err(CreationError::PlatformSpecific(
@@ -74,8 +72,7 @@ impl Context {
                     }
                 },
                 ContextType::Wayland => match *c {
-                    Context::WindowedWayland(_)
-                    | Context::HeadlessWayland(_, _) => Ok(()),
+                    Context::Wayland(_) => Ok(()),
                     _ => {
                         let msg = "Cannot share a Wayland context with a non-Wayland context";
                         return Err(CreationError::PlatformSpecific(
@@ -100,21 +97,19 @@ impl Context {
             Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
 
             let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
-                Context::WindowedWayland(ref ctx)
-                | Context::HeadlessWayland(ref ctx, _) => ctx,
+                Context::Wayland(ref ctx) => ctx,
                 _ => unreachable!(),
             });
             wayland::Context::new(wb, el, pf_reqs, &gl_attr)
-                .map(|(win, context)| (win, Context::WindowedWayland(context)))
+                .map(|(win, context)| (win, Context::Wayland(context)))
         } else {
             Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
             let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
-                Context::WindowedX11(ref ctx)
-                | Context::HeadlessX11(ref ctx, _) => ctx,
+                Context::X11(ref ctx) => ctx,
                 _ => unreachable!(),
             });
             x11::Context::new(wb, el, pf_reqs, &gl_attr)
-                .map(|(win, context)| (win, Context::WindowedX11(context)))
+                .map(|(win, context)| (win, Context::X11(context)))
         }
     }
 
@@ -123,40 +118,41 @@ impl Context {
         el: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-        dims: dpi::PhysicalSize,
+        size: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
-        let wb = winit::WindowBuilder::new()
-            .with_visibility(false)
-            .with_dimensions(dims.to_logical(1.));
+        Self::new_headless_impl(el, pf_reqs, gl_attr, Some(size))
+    }
 
+    pub fn new_headless_impl(
+        el: &winit::EventsLoop,
+        pf_reqs: &PixelFormatRequirements,
+        gl_attr: &GlAttributes<&Context>,
+        size: Option<dpi::PhysicalSize>,
+    ) -> Result<Self, CreationError> {
         if el.is_wayland() {
             Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
             let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
-                Context::WindowedWayland(ref ctx)
-                | Context::HeadlessWayland(ref ctx, _) => ctx,
+                Context::Wayland(ref ctx) => ctx,
                 _ => unreachable!(),
             });
-            wayland::Context::new(wb, &el, pf_reqs, &gl_attr)
-                .map(|(win, ctx)| Context::HeadlessWayland(ctx, win))
+            wayland::Context::new_headless(&el, pf_reqs, &gl_attr, size)
+                .map(|ctx| Context::Wayland(ctx))
         } else {
             Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
             let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
-                Context::WindowedX11(ref ctx)
-                | Context::HeadlessX11(ref ctx, _) => ctx,
+                Context::X11(ref ctx) => ctx,
                 _ => unreachable!(),
             });
-            x11::Context::new(wb, &el, pf_reqs, &gl_attr)
-                .map(|(win, ctx)| Context::HeadlessX11(ctx, win))
+            x11::Context::new_headless(&el, pf_reqs, &gl_attr, size)
+                .map(|ctx| Context::X11(ctx))
         }
     }
 
     #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
         match *self {
-            Context::WindowedX11(ref ctx)
-            | Context::HeadlessX11(ref ctx, _) => ctx.make_current(),
-            Context::WindowedWayland(ref ctx)
-            | Context::HeadlessWayland(ref ctx, _) => ctx.make_current(),
+            Context::X11(ref ctx) => ctx.make_current(),
+            Context::Wayland(ref ctx) => ctx.make_current(),
             Context::OsMesa(ref ctx) => ctx.make_current(),
         }
     }
@@ -164,10 +160,8 @@ impl Context {
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
         match *self {
-            Context::WindowedX11(ref ctx)
-            | Context::HeadlessX11(ref ctx, _) => ctx.make_not_current(),
-            Context::WindowedWayland(ref ctx)
-            | Context::HeadlessWayland(ref ctx, _) => ctx.make_not_current(),
+            Context::X11(ref ctx) => ctx.make_not_current(),
+            Context::Wayland(ref ctx) => ctx.make_not_current(),
             Context::OsMesa(ref ctx) => ctx.make_not_current(),
         }
     }
@@ -175,10 +169,8 @@ impl Context {
     #[inline]
     pub fn is_current(&self) -> bool {
         match *self {
-            Context::WindowedX11(ref ctx)
-            | Context::HeadlessX11(ref ctx, _) => ctx.is_current(),
-            Context::WindowedWayland(ref ctx)
-            | Context::HeadlessWayland(ref ctx, _) => ctx.is_current(),
+            Context::X11(ref ctx) => ctx.is_current(),
+            Context::Wayland(ref ctx) => ctx.is_current(),
             Context::OsMesa(ref ctx) => ctx.is_current(),
         }
     }
@@ -186,10 +178,8 @@ impl Context {
     #[inline]
     pub fn get_api(&self) -> Api {
         match *self {
-            Context::WindowedX11(ref ctx)
-            | Context::HeadlessX11(ref ctx, _) => ctx.get_api(),
-            Context::WindowedWayland(ref ctx)
-            | Context::HeadlessWayland(ref ctx, _) => ctx.get_api(),
+            Context::X11(ref ctx) => ctx.get_api(),
+            Context::Wayland(ref ctx) => ctx.get_api(),
             Context::OsMesa(ref ctx) => ctx.get_api(),
         }
     }
@@ -197,15 +187,11 @@ impl Context {
     #[inline]
     pub unsafe fn raw_handle(&self) -> RawHandle {
         match *self {
-            Context::WindowedX11(ref ctx)
-            | Context::HeadlessX11(ref ctx, _) => match *ctx.raw_handle() {
+            Context::X11(ref ctx) => match *ctx.raw_handle() {
                 X11Context::Glx(ref ctx) => RawHandle::Glx(ctx.raw_handle()),
                 X11Context::Egl(ref ctx) => RawHandle::Egl(ctx.raw_handle()),
             },
-            Context::WindowedWayland(ref ctx)
-            | Context::HeadlessWayland(ref ctx, _) => {
-                RawHandle::Egl(ctx.raw_handle())
-            }
+            Context::Wayland(ref ctx) => RawHandle::Egl(ctx.raw_handle()),
             Context::OsMesa(ref ctx) => RawHandle::Egl(ctx.raw_handle()),
         }
     }
@@ -213,10 +199,8 @@ impl Context {
     #[inline]
     pub unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
         match *self {
-            Context::WindowedX11(ref ctx)
-            | Context::HeadlessX11(ref ctx, _) => ctx.get_egl_display(),
-            Context::WindowedWayland(ref ctx)
-            | Context::HeadlessWayland(ref ctx, _) => ctx.get_egl_display(),
+            Context::X11(ref ctx) => ctx.get_egl_display(),
+            Context::Wayland(ref ctx) => ctx.get_egl_display(),
             _ => None,
         }
     }
@@ -224,8 +208,8 @@ impl Context {
     #[inline]
     pub fn resize(&self, width: u32, height: u32) {
         match *self {
-            Context::WindowedX11(_) => (),
-            Context::WindowedWayland(ref ctx) => ctx.resize(width, height),
+            Context::X11(_) => (),
+            Context::Wayland(ref ctx) => ctx.resize(width, height),
             _ => unreachable!(),
         }
     }
@@ -233,12 +217,8 @@ impl Context {
     #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const () {
         match *self {
-            Context::WindowedX11(ref ctx)
-            | Context::HeadlessX11(ref ctx, _) => ctx.get_proc_address(addr),
-            Context::WindowedWayland(ref ctx)
-            | Context::HeadlessWayland(ref ctx, _) => {
-                ctx.get_proc_address(addr)
-            }
+            Context::X11(ref ctx) => ctx.get_proc_address(addr),
+            Context::Wayland(ref ctx) => ctx.get_proc_address(addr),
             Context::OsMesa(ref ctx) => ctx.get_proc_address(addr),
         }
     }
@@ -246,8 +226,8 @@ impl Context {
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
         match *self {
-            Context::WindowedX11(ref ctx) => ctx.swap_buffers(),
-            Context::WindowedWayland(ref ctx) => ctx.swap_buffers(),
+            Context::X11(ref ctx) => ctx.swap_buffers(),
+            Context::Wayland(ref ctx) => ctx.swap_buffers(),
             _ => unreachable!(),
         }
     }
@@ -255,34 +235,54 @@ impl Context {
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         match *self {
-            Context::WindowedX11(ref ctx) => ctx.get_pixel_format(),
-            Context::WindowedWayland(ref ctx) => ctx.get_pixel_format(),
+            Context::X11(ref ctx) => ctx.get_pixel_format(),
+            Context::Wayland(ref ctx) => ctx.get_pixel_format(),
             _ => unreachable!(),
         }
     }
 }
 
-pub trait OsMesaContextExt {
+/// A linux-specific extension to the [`ContextBuilder`] which allows building
+/// linux-specific headless contexts.
+///
+/// [`ContextBuilder`]: ../../struct.ContextBuilder.html
+pub trait HeadlessContextExt {
+    /// Builds an OsMesa context.
+    ///
+    /// Errors can occur if the OpenGL [`Context`] could not be created. This
+    /// generally happens because the underlying platform doesn't support a
+    /// requested feature.
+    ///
+    /// [`Context`]: struct.Context.html
     fn build_osmesa(
         self,
-        dims: dpi::PhysicalSize,
+        size: dpi::PhysicalSize,
+    ) -> Result<crate::Context<NotCurrentContext>, CreationError>
+    where
+        Self: Sized;
+
+    /// Builds an EGL-surfaceless context.
+    ///
+    /// Errors can occur if the OpenGL [`Context`] could not be created. This
+    /// generally happens because the underlying platform doesn't support a
+    /// requested feature.
+    ///
+    /// [`Context`]: struct.Context.html
+    fn build_surfaceless(
+        self,
+        el: &winit::EventsLoop,
     ) -> Result<crate::Context<NotCurrentContext>, CreationError>
     where
         Self: Sized;
 }
 
-impl<'a, T: ContextCurrentState> OsMesaContextExt
+impl<'a, T: ContextCurrentState> HeadlessContextExt
     for crate::ContextBuilder<'a, T>
 {
-    /// Builds the given OsMesa context.
-    ///
-    /// Errors can occur if the OpenGL context could not be created. This
-    /// generally happens because the underlying platform doesn't support a
-    /// requested feature.
     #[inline]
     fn build_osmesa(
         self,
-        dims: dpi::PhysicalSize,
+        size: dpi::PhysicalSize,
     ) -> Result<crate::Context<NotCurrentContext>, CreationError>
     where
         Self: Sized,
@@ -294,15 +294,38 @@ impl<'a, T: ContextCurrentState> OsMesaContextExt
             Context::OsMesa(ref ctx) => ctx,
             _ => unreachable!(),
         });
-        osmesa::OsMesaContext::new(&pf_reqs, &gl_attr, dims)
+        osmesa::OsMesaContext::new(&pf_reqs, &gl_attr, size)
             .map(|context| Context::OsMesa(context))
             .map(|context| crate::Context {
                 context,
                 phantom: PhantomData,
             })
     }
+
+    #[inline]
+    fn build_surfaceless(
+        self,
+        el: &winit::EventsLoop,
+    ) -> Result<crate::Context<NotCurrentContext>, CreationError>
+    where
+        Self: Sized,
+    {
+        let crate::ContextBuilder { pf_reqs, gl_attr } = self;
+        let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
+        Context::new_headless_impl(el, &pf_reqs, &gl_attr, None).map(
+            |context| crate::Context {
+                context,
+                phantom: PhantomData,
+            },
+        )
+    }
 }
 
+/// A linux-specific extension for the [`ContextBuilder`] which allows
+/// assembling [`RawContext<T>`]s.
+///
+/// [`RawContext<T>`]: ../../type.RawContext.html
+/// [`ContextBuilder`]: ../../struct.ContextBuilder.html
 pub trait RawContextExt {
     /// Creates a raw context on the provided surface.
     ///
@@ -323,7 +346,7 @@ pub trait RawContextExt {
     ///
     /// Unsafe behaviour might happen if you:
     ///   - Provide us with invalid parameters.
-    ///   - The xconn/xwin is destroyed before the context
+    ///   - The xwin is destroyed before the context
     unsafe fn build_raw_x11_context(
         self,
         xconn: Arc<x11::XConnection>,
@@ -351,8 +374,7 @@ impl<'a, T: ContextCurrentState> RawContextExt
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
         Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
         let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
-            Context::WindowedWayland(ref ctx)
-            | Context::HeadlessWayland(ref ctx, _) => ctx,
+            Context::Wayland(ref ctx) => ctx,
             _ => unreachable!(),
         });
         wayland::Context::new_raw_context(
@@ -363,7 +385,7 @@ impl<'a, T: ContextCurrentState> RawContextExt
             &pf_reqs,
             &gl_attr,
         )
-        .map(|context| Context::WindowedWayland(context))
+        .map(|context| Context::Wayland(context))
         .map(|context| crate::Context {
             context,
             phantom: PhantomData,
@@ -387,12 +409,11 @@ impl<'a, T: ContextCurrentState> RawContextExt
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
         Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
         let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
-            Context::WindowedX11(ref ctx)
-            | Context::HeadlessX11(ref ctx, _) => ctx,
+            Context::X11(ref ctx) => ctx,
             _ => unreachable!(),
         });
         x11::Context::new_raw_context(xconn, xwin, &pf_reqs, &gl_attr)
-            .map(|context| Context::WindowedX11(context))
+            .map(|context| Context::X11(context))
             .map(|context| crate::Context {
                 context,
                 phantom: PhantomData,

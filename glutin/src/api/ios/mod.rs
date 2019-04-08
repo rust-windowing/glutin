@@ -218,11 +218,11 @@ impl Context {
         el: &EventsLoop,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-        dims: dpi::PhysicalSize,
+        size: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
         let wb = WindowBuilder::new()
             .with_visibility(false)
-            .with_dimensions(dims.to_logical(1.));
+            .with_dimensions(size.to_logical(1.));
         Self::new_windowed(wb, el, pf_reqs, gl_attr)
             .map(|(_window, context)| context)
     }
@@ -239,9 +239,10 @@ impl Context {
             version -= 1;
         }
         if valid_context == ffi::nil {
-            Err(CreationError::OsError(format!(
+            Err(CreationError::OsError(
                 "Failed to create an OpenGL ES context with any version"
-            )))
+                    .to_string(),
+            ))
         } else {
             Ok(eagl_context)
         }

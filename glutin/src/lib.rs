@@ -1,13 +1,14 @@
-//! The purpose of this library is to provide an OpenGL context on as many
+//! The purpose of this library is to provide an OpenGL [`Context`] on as many
 //! platforms as possible.
 //!
-//! # Building a WindowedContext
+//! # Building a [`WindowedContext<T>`]
 //!
-//! A `WindowedContext` is composed of a `Window` and an OpenGL `Context`.
+//! A [`WindowedContext<T>`] is composed of a [`Window`] and an OpenGL
+//! [`Context`].
 //!
 //! Due to some operating-system-specific quirks, glutin prefers control over
-//! the order of creation of the `Context` and `Window`. Here is an example of
-//! building a WindowedContext:
+//! the order of creation of the [`Context`] and [`Window`]. Here is an example
+//! of building a [`WindowedContext<T>`]:
 //!
 //! ```no_run
 //! # fn main() {
@@ -21,11 +22,49 @@
 //! # }
 //! ```
 //!
-//! You can, of course, create an OpenGL `Context` separately from an existing
+//! You can, of course, create a [`RawContext<T>`] separately from an existing
 //! window, however that may result in an suboptimal configuration of the window
 //! on some platforms. In that case use the unsafe platform-specific
-//! `RawWindowExt` available on some platforms.
-
+//! [`RawContextExt`] available on linux and windows.
+//!
+//! You can also produce headless [`Context`]s via the
+//! [`ContextBuilder::build_headless`] function.
+//!
+//! [`Window`]: struct.Window.html
+//! [`Context`]: struct.Context.html
+//! [`WindowedContext<T>`]: type.WindowedContext.html
+//! [`RawContext<T>`]: type.RawContext.html
+#![cfg_attr(
+    target_os = "windows",
+    doc = "\
+[`RawContextExt`]: os/windows/trait.RawContextExt.html
+"
+)]
+#![cfg_attr(
+    not(any(
+        target_os = "linux",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "windows",
+        target_os = "openbsd",
+    )),
+    doc = "\
+[`RawContextExt`]: os/index.html
+"
+)]
+#![cfg_attr(
+    any(
+        target_os = "linux",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd",
+    ),
+    doc = "\
+[`RawContextExt`]: os/unix/trait.RawContextExt.html
+"
+)]
 #![cfg(any(
     target_os = "linux",
     target_os = "ios",
@@ -43,6 +82,8 @@
     missing_debug_implementations,
     //missing_docs,
 )]
+// Docs for subcrates are borked.
+#![allow(intra_doc_link_resolution_failure)]
 
 #[cfg(any(
     target_os = "windows",
@@ -66,7 +107,7 @@ extern crate objc;
     target_os = "openbsd",
 ))]
 #[macro_use]
-extern crate debug_stub_derive;
+extern crate derivative;
 
 pub mod os;
 
@@ -76,8 +117,7 @@ mod platform;
 mod windowed;
 
 pub use crate::context::{
-    Context, ContextCurrentState, ContextTrait, NotCurrentContext,
-    PossiblyCurrentContext, PossiblyCurrentContextTrait,
+    Context, ContextCurrentState, NotCurrentContext, PossiblyCurrentContext,
 };
 pub use crate::windowed::{ContextWrapper, RawContext, WindowedContext};
 
@@ -92,8 +132,16 @@ pub use winit::{
 
 use std::io;
 
-/// Object that allows you to build `Context`s.
-#[derive(Debug)]
+/// An object that allows you to build [`Context`]s, [`RawContext<T>`]s and
+/// [`WindowedContext<T>`]s.
+///
+/// One notable limitation of the Wayland backend when it comes to shared
+/// [`Context`]s is that both contexts must use the same events loop.
+///
+/// [`Context`]: struct.Context.html
+/// [`WindowedContext<T>`]: type.WindowedContext.html
+/// [`RawContext<T>`]: type.RawContext.html
+#[derive(Debug, Clone)]
 pub struct ContextBuilder<'a, T: ContextCurrentState> {
     /// The attributes to use to create the context.
     pub gl_attr: GlAttributes<&'a Context<T>>,
@@ -137,7 +185,10 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
         self
     }
 
-    /// Sets the robustness of the OpenGL context. See the docs of `Robustness`.
+    /// Sets the robustness of the OpenGL context. See the docs of
+    /// [`Robustness`].
+    ///
+    /// [`Robustness`]: enum.Robustness.html
     #[inline]
     pub fn with_gl_robustness(mut self, robustness: Robustness) -> Self {
         self.gl_attr.robustness = robustness;
@@ -153,7 +204,9 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
         self
     }
 
-    /// Share the display lists with the given `Context`.
+    /// Share the display lists with the given [`Context`].
+    ///
+    /// [`Context`]: struct.Context.html
     #[inline]
     pub fn with_shared_lists<T2: ContextCurrentState>(
         self,
@@ -264,23 +317,42 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
 #[derive(Debug)]
 pub enum CreationError {
     OsError(String),
-    /// TODO: remove this error
-    NotSupported(&'static str),
+    NotSupported(String),
     NoBackendAvailable(Box<std::error::Error + Send + Sync>),
     RobustnessNotSupported,
     OpenGlVersionNotSupported,
     NoAvailablePixelFormat,
     PlatformSpecific(String),
     Window(WindowCreationError),
-    /// We received two errors, instead of one.
-    CreationErrorPair(Box<CreationError>, Box<CreationError>),
+    /// We received multiple errors, instead of one.
+    CreationErrors(Vec<Box<CreationError>>),
 }
 
 impl CreationError {
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd",
+    ))]
+    pub(crate) fn append(self, err: CreationError) -> Self {
+        match self {
+            CreationError::CreationErrors(mut errs) => {
+                errs.push(Box::new(err));
+                CreationError::CreationErrors(errs)
+            }
+            _ => CreationError::CreationErrors(vec![
+                Box::new(err),
+                Box::new(self),
+            ]),
+        }
+    }
+
     fn to_string(&self) -> &str {
         match *self {
-            CreationError::OsError(ref text) => &text,
-            CreationError::NotSupported(text) => &text,
+            CreationError::OsError(ref text)
+            | CreationError::NotSupported(ref text) => &text,
             CreationError::NoBackendAvailable(_) => "No backend is available",
             CreationError::RobustnessNotSupported => {
                 "You requested robustness, but it is not supported."
@@ -295,9 +367,7 @@ impl CreationError {
             CreationError::Window(ref err) => {
                 std::error::Error::description(err)
             }
-            CreationError::CreationErrorPair(ref _err1, ref _err2) => {
-                "Received two errors."
-            }
+            CreationError::CreationErrors(_) => "Received multiple errors.",
         }
     }
 }
@@ -309,18 +379,13 @@ impl std::fmt::Display for CreationError {
     ) -> Result<(), std::fmt::Error> {
         formatter.write_str(self.to_string())?;
 
-        if let CreationError::CreationErrorPair(ref e1, ref e2) = *self {
-            write!(formatter, " Error 1: \"")?;
-            e1.fmt(formatter)?;
-            write!(formatter, "\"")?;
-            write!(formatter, " Error 2: \"")?;
-            e2.fmt(formatter)?;
-            write!(formatter, "\"")?;
+        if let CreationError::CreationErrors(ref es) = *self {
+            use std::fmt::Debug;
+            write!(formatter, " Errors: `")?;
+            es.fmt(formatter)?;
+            write!(formatter, "`")?;
         }
 
-        if let &CreationError::NotSupported(msg) = self {
-            write!(formatter, ": {}", msg)?;
-        }
         if let Some(err) = std::error::Error::source(self) {
             write!(formatter, ": {}", err)?;
         }
@@ -499,17 +564,20 @@ pub enum ReleaseBehavior {
     Flush,
 }
 
-/// Describes a possible format. Unused.
+/// Describes a possible format.
 #[allow(missing_docs)]
 #[derive(Debug, Clone)]
 pub struct PixelFormat {
     pub hardware_accelerated: bool,
+    /// The number of color bits. Does not include alpha bits.
     pub color_bits: u8,
     pub alpha_bits: u8,
     pub depth_bits: u8,
     pub stencil_bits: u8,
     pub stereoscopy: bool,
     pub double_buffer: bool,
+    /// `None` if multisampling is disabled, otherwise `Some(N)` where `N` is
+    /// the multisampling level.
     pub multisampling: Option<u16>,
     pub srgb: bool,
 }
@@ -542,7 +610,7 @@ pub struct PixelFormatRequirements {
     /// The default value is `Some(24)`.
     pub depth_bits: Option<u8>,
 
-    /// Minimum number of bits for the depth buffer. `None` means "don't care".
+    /// Minimum number of stencil bits. `None` means "don't care".
     /// The default value is `Some(8)`.
     pub stencil_bits: Option<u8>,
 

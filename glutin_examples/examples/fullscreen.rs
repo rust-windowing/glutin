@@ -1,6 +1,5 @@
 mod support;
 
-use glutin::ContextTrait;
 use std::io::{self, Write};
 
 fn main() {

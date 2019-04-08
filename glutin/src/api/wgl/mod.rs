@@ -84,7 +84,7 @@ impl Context {
         if hdc.is_null() {
             let err = Err(CreationError::OsError(format!(
                 "GetDC function failed: {}",
-                format!("{}", std::io::Error::last_os_error())
+                std::io::Error::last_os_error()
             )));
             return err;
         }
@@ -164,9 +164,9 @@ impl Context {
             if extra_functions.SwapIntervalEXT(if opengl.vsync { 1 } else { 0 })
                 == 0
             {
-                return Err(CreationError::OsError(format!(
-                    "wglSwapIntervalEXT failed"
-                )));
+                return Err(CreationError::OsError(
+                    "wglSwapIntervalEXT failed".to_string(),
+                ));
             }
         }
 
@@ -361,7 +361,7 @@ unsafe fn create_context(
                     attributes.push(flag as raw::c_int);
                 } else {
                     return Err(CreationError::NotSupported(
-                        "required extension \"WGL_ARB_create_context_profile\" not found",
+                        "required extension \"WGL_ARB_create_context_profile\" not found".to_string(),
                     ));
                 }
             }
@@ -437,7 +437,7 @@ unsafe fn create_context(
             if ctx.is_null() {
                 return Err(CreationError::OsError(format!(
                     "wglCreateContextAttribsARB failed: {}",
-                    format!("{}", std::io::Error::last_os_error())
+                    std::io::Error::last_os_error()
                 )));
             } else {
                 return Ok(ContextWrapper(ctx as HGLRC));
@@ -451,7 +451,7 @@ unsafe fn create_context(
     if ctx.is_null() {
         return Err(CreationError::OsError(format!(
             "wglCreateContext failed: {}",
-            format!("{}", std::io::Error::last_os_error())
+            std::io::Error::last_os_error()
         )));
     }
 
@@ -459,7 +459,7 @@ unsafe fn create_context(
         if gl::wgl::ShareLists(share as *const raw::c_void, ctx) == 0 {
             return Err(CreationError::OsError(format!(
                 "wglShareLists failed: {}",
-                format!("{}", std::io::Error::last_os_error())
+                std::io::Error::last_os_error()
             )));
         }
     };
@@ -850,14 +850,14 @@ unsafe fn set_pixel_format(
     {
         return Err(CreationError::OsError(format!(
             "DescribePixelFormat function failed: {}",
-            format!("{}", std::io::Error::last_os_error())
+            std::io::Error::last_os_error()
         )));
     }
 
     if SetPixelFormat(hdc, id, &output) == 0 {
         return Err(CreationError::OsError(format!(
             "SetPixelFormat function failed: {}",
-            format!("{}", std::io::Error::last_os_error())
+            std::io::Error::last_os_error()
         )));
     }
 
@@ -876,7 +876,7 @@ unsafe fn load_opengl32_dll() -> Result<HMODULE, CreationError> {
     if lib.is_null() {
         return Err(CreationError::OsError(format!(
             "LoadLibrary function failed: {}",
-            format!("{}", std::io::Error::last_os_error())
+            std::io::Error::last_os_error()
         )));
     }
 
@@ -912,7 +912,7 @@ unsafe fn load_extra_functions(
         if GetClassNameW(win, class_name.as_mut_ptr(), 128) == 0 {
             return Err(CreationError::OsError(format!(
                 "GetClassNameW function failed: {}",
-                format!("{}", std::io::Error::last_os_error())
+                std::io::Error::last_os_error()
             )));
         }
 
@@ -923,7 +923,7 @@ unsafe fn load_extra_functions(
         if GetClassInfoExW(instance, class_name.as_ptr(), &mut class) == 0 {
             return Err(CreationError::OsError(format!(
                 "GetClassInfoExW function failed: {}",
-                format!("{}", std::io::Error::last_os_error())
+                std::io::Error::last_os_error()
             )));
         }
 
@@ -968,7 +968,7 @@ unsafe fn load_extra_functions(
         if win.is_null() {
             return Err(CreationError::OsError(format!(
                 "CreateWindowEx function failed: {}",
-                format!("{}", std::io::Error::last_os_error())
+                std::io::Error::last_os_error()
             )));
         }
 
@@ -976,7 +976,7 @@ unsafe fn load_extra_functions(
         if hdc.is_null() {
             let err = Err(CreationError::OsError(format!(
                 "GetDC function failed: {}",
-                format!("{}", std::io::Error::last_os_error())
+                std::io::Error::last_os_error()
             )));
             return err;
         }

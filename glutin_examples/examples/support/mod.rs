@@ -1,4 +1,4 @@
-use glutin::{self, PossiblyCurrentContext, PossiblyCurrentContextTrait};
+use glutin::{self, PossiblyCurrentContext};
 
 use std::ffi::CStr;
 
@@ -11,9 +11,34 @@ pub struct Gl {
     pub gl: gl::Gl,
 }
 
+extern "system" fn dbg_callback(
+    source: gl::types::GLenum,
+    etype: gl::types::GLenum,
+    _id: gl::types::GLuint,
+    severity: gl::types::GLenum,
+    _msg_length: gl::types::GLsizei,
+    msg: *const gl::types::GLchar,
+    _user_data: *mut std::ffi::c_void,
+) {
+    unsafe {
+        println!(
+            "dbg_callback {:#X} {:#X} {:#X} {:?}",
+            source,
+            etype,
+            severity,
+            std::ffi::CStr::from_ptr(msg),
+        );
+    }
+}
+
 pub fn load(gl_context: &glutin::Context<PossiblyCurrentContext>) -> Gl {
     let gl =
         gl::Gl::load_with(|ptr| gl_context.get_proc_address(ptr) as *const _);
+
+    unsafe {
+        gl.Enable(gl::DEBUG_OUTPUT);
+        gl.DebugMessageCallback(dbg_callback, std::ptr::null());
+    }
 
     let version = unsafe {
         let data = CStr::from_ptr(gl.GetString(gl::VERSION) as *const _)
@@ -143,8 +168,8 @@ pub use self::context_tracker::{
 #[allow(dead_code)] // Not used by all examples
 mod context_tracker {
     use glutin::{
-        self, Context, ContextCurrentState, ContextError, ContextTrait,
-        NotCurrentContext, PossiblyCurrentContext, WindowedContext,
+        self, Context, ContextCurrentState, ContextError, NotCurrentContext,
+        PossiblyCurrentContext, WindowedContext,
     };
     use takeable_option::Takeable;
 
@@ -343,6 +368,17 @@ mod context_tracker {
                             }) {
                                 panic!("Could not `make_current` nor `make_not_current`, {:?}, {:?}", err, err2);
                             }
+                        }
+
+                        if let Err(err2) = self.modify(id, |ctx| {
+                            ctx.map_possibly(|ctx| {
+                                ctx.map(
+                                    |ctx| ctx.make_not_current(),
+                                    |ctx| ctx.make_not_current(),
+                                )
+                            })
+                        }) {
+                            panic!("Could not `make_current` nor `make_not_current`, {:?}, {:?}", err, err2);
                         }
 
                         return Err(err);

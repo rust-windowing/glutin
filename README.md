@@ -43,7 +43,6 @@ gl = "*"
 
 ```rust
 use glutin::dpi::*;
-use glutin::ContextTrait;
 
 fn main() {
     let mut el = glutin::EventsLoop::new();
