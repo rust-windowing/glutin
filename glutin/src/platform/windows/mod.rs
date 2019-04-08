@@ -5,7 +5,7 @@ use crate::{
     GlRequest, NotCurrentContext, PixelFormat, PixelFormatRequirements,
 };
 
-use crate::api::egl::{Context as EglContext, NativeDisplay, EGL};
+use crate::api::egl::{Context as EglContext, NativeDisplay, EGL, SurfaceType as EglSurfaceType};
 use crate::api::wgl::Context as WglContext;
 use crate::os::windows::WindowExt;
 
@@ -93,7 +93,7 @@ impl Context {
                             &pf_reqs,
                             &gl_attr_egl,
                             NativeDisplay::Other(Some(std::ptr::null())),
-                            false,
+                            EglSurfaceType::Window,
                         )
                         .and_then(|p| p.finish(hwnd))
                         .map(|c| Context::Egl(c))

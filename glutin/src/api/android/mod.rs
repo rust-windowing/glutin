@@ -1,6 +1,6 @@
 #![cfg(target_os = "android")]
 
-use crate::api::egl::{Context as EglContext, NativeDisplay};
+use crate::api::egl::{Context as EglContext, NativeDisplay, SurfaceType as EglSurfaceType};
 use crate::CreationError::{self, OsError};
 use crate::{
     Api, ContextError, GlAttributes, PixelFormat, PixelFormatRequirements,

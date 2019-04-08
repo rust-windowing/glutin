@@ -4,6 +4,7 @@ use glutin::dpi::PhysicalSize;
 use std::path::Path;
 use support::gl;
 
+#[cfg(target_os = "linux")]
 fn build_context_surfaceless<T1: glutin::ContextCurrentState>(
     cb: glutin::ContextBuilder<T1>,
     el: &glutin::EventsLoop,

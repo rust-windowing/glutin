@@ -14,8 +14,6 @@ publish = false
 glutin = { path = "../glutin" }
 winit = "0.19"
 takeable-option = "0.4"
-
-[target.'cfg(target_os = "linux")'.dependencies]
 image = "0.21"
 
 [build-dependencies]
