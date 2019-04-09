@@ -2,10 +2,12 @@
 
 use crate::{
     Api, ContextCurrentState, ContextError, CreationError, GlAttributes,
-    GlRequest, NotCurrentContext, PixelFormat, PixelFormatRequirements,
+    GlRequest, NotCurrent, PixelFormat, PixelFormatRequirements,
 };
 
-use crate::api::egl::{Context as EglContext, NativeDisplay, EGL, SurfaceType as EglSurfaceType};
+use crate::api::egl::{
+    Context as EglContext, NativeDisplay, SurfaceType as EglSurfaceType, EGL,
+};
 use crate::api::wgl::Context as WglContext;
 use crate::os::windows::WindowExt;
 
@@ -305,7 +307,7 @@ pub trait RawContextExt {
     unsafe fn build_raw_context(
         self,
         hwnd: *mut raw::c_void,
-    ) -> Result<crate::RawContext<NotCurrentContext>, CreationError>
+    ) -> Result<crate::RawContext<NotCurrent>, CreationError>
     where
         Self: Sized;
 }
@@ -317,7 +319,7 @@ impl<'a, T: ContextCurrentState> RawContextExt
     unsafe fn build_raw_context(
         self,
         hwnd: *mut raw::c_void,
-    ) -> Result<crate::RawContext<NotCurrentContext>, CreationError>
+    ) -> Result<crate::RawContext<NotCurrent>, CreationError>
     where
         Self: Sized,
     {

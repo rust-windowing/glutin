@@ -1,6 +1,13 @@
 # Unreleased
 
-# Version 0.21.0-rc1 (2019-03-09)
+# Version 0.21.0-rc2 (2019-04-08)
+
+ - **Breaking**: Removed `DisplayLost` variant to `ContextError`.
+ - **Breaking**: Renamed `NotCurrentContext` to `NotCurrent`.
+ - **Breaking**: Renamed `PossiblyCurrentContext` to `PossiblyCurrent`.
+ - Added `treat_as_current` function.
+
+# Version 0.21.0-rc1 (2019-04-07)
 
  - **Breaking:** Replaced `CreationErrorPair` enum variant with `CreationErrors`.
  - Added `Clone` to `ContextBuilder`.
@@ -28,6 +35,8 @@
  - "Fixed" bug where we will close `EGLDisplay`s while they are still in use by
  others. Angry and/or salty rant can be found in `glutin/src/api/egl/mod.rs`,
  you can't miss it.
+ - **Breaking**: `WindowedContext`s now deref to `Context`, not `Window`. 
+ Please use `.window()` to access the window.
 
 # Version 0.20.0 (2019-03-09)
 

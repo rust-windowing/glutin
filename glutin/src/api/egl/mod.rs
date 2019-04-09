@@ -446,9 +446,6 @@ impl Context {
         if ret == Some(0) {
             match egl.GetError() as u32 {
                 ffi::egl::CONTEXT_LOST => Err(ContextError::ContextLost),
-                // Can be returned (among other reasons) if the window has been
-                // closed by the user.
-                ffi::egl::BAD_DISPLAY => Err(ContextError::DisplayLost),
                 err => panic!(
                     "make_current: eglMakeCurrent failed (eglGetError returned 0x{:x})",
                     err

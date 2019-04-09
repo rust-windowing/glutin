@@ -4,10 +4,10 @@ use std::marker::PhantomData;
 
 /// Represents an OpenGL [`Context`].
 ///
-/// A `Context` is normally associated with a single Window, however `Context`s
-/// can be *shared* between multiple windows or be headless.
+/// A [`Context`] is normally associated with a single Window, however
+/// [`Context`]s can be *shared* between multiple windows or be headless.
 ///
-/// If a context is backed by a window, it will be wrapped by either
+/// If a [`Context`] is backed by a window, it will be wrapped by either
 /// [`RawContext<T>`] or [`WindowedContext<T>`].
 ///
 /// # Example
@@ -42,7 +42,7 @@ impl<T: ContextCurrentState> Context<T> {
     /// struct.ContextWrapper.html#method.make_current
     pub unsafe fn make_current(
         self,
-    ) -> Result<Context<PossiblyCurrentContext>, (Self, ContextError)> {
+    ) -> Result<Context<PossiblyCurrent>, (Self, ContextError)> {
         match self.context.make_current() {
             Ok(()) => Ok(Context {
                 context: self.context,
@@ -64,7 +64,7 @@ impl<T: ContextCurrentState> Context<T> {
     /// struct.ContextWrapper.html#method.make_not_current
     pub unsafe fn make_not_current(
         self,
-    ) -> Result<Context<NotCurrentContext>, (Self, ContextError)> {
+    ) -> Result<Context<NotCurrent>, (Self, ContextError)> {
         match self.context.make_not_current() {
             Ok(()) => Ok(Context {
                 context: self.context,
@@ -84,7 +84,18 @@ impl<T: ContextCurrentState> Context<T> {
     ///
     /// [`ContextWrapper::treat_as_not_current`]:
     /// struct.ContextWrapper.html#method.treat_as_not_current
-    pub unsafe fn treat_as_not_current(self) -> Context<NotCurrentContext> {
+    pub unsafe fn treat_as_not_current(self) -> Context<NotCurrent> {
+        Context {
+            context: self.context,
+            phantom: PhantomData,
+        }
+    }
+
+    /// See [`ContextWrapper::treat_as_current`].
+    ///
+    /// [`ContextWrapper::treat_as_current`]:
+    /// struct.ContextWrapper.html#method.treat_as_current
+    pub unsafe fn treat_as_current(self) -> Context<PossiblyCurrent> {
         Context {
             context: self.context,
             phantom: PhantomData,
@@ -107,7 +118,7 @@ impl<T: ContextCurrentState> Context<T> {
     }
 }
 
-impl Context<PossiblyCurrentContext> {
+impl Context<PossiblyCurrent> {
     /// See [`ContextWrapper::get_proc_address`].
     ///
     /// [`ContextWrapper::get_proc_address`]:
@@ -164,7 +175,7 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
         self,
         el: &EventsLoop,
         size: dpi::PhysicalSize,
-    ) -> Result<Context<NotCurrentContext>, CreationError> {
+    ) -> Result<Context<NotCurrent>, CreationError> {
         let ContextBuilder { pf_reqs, gl_attr } = self;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
         platform::Context::new_headless(el, &pf_reqs, &gl_attr, size).map(
@@ -177,10 +188,10 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
 }
 
 // This is nightly only:
-// impl !Send for Context<PossiblyCurrentContext> {}
-// impl !Sync for Context<PossiblyCurrentContext> {}
+// impl !Send for Context<PossiblyCurrent> {}
+// impl !Sync for Context<PossiblyCurrent> {}
 //
-// Instead we add a phantom type to PossiblyCurrentContext
+// Instead we add a phantom type to PossiblyCurrent
 
 /// A type that [`Context`]s which might possibly be currently current on some
 /// thread take as a generic.
@@ -191,7 +202,7 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
 /// struct.ContextWrapper.html#method.make_current
 /// [`Context`]: struct.Context.html
 #[derive(Debug, Clone, Copy)]
-pub struct PossiblyCurrentContext {
+pub struct PossiblyCurrent {
     phantom: PhantomData<*mut ()>,
 }
 
@@ -204,21 +215,21 @@ pub struct PossiblyCurrentContext {
 /// struct.ContextWrapper.html#method.make_current
 /// [`Context`]: struct.Context.html
 #[derive(Debug, Clone, Copy)]
-pub enum NotCurrentContext {}
+pub enum NotCurrent {}
 
-/// A trait implemented on both [`NotCurrentContext`] and
-/// [`PossiblyCurrentContext`].
+/// A trait implemented on both [`NotCurrent`] and
+/// [`PossiblyCurrent`].
 ///
-/// [`NotCurrentContext`]: enum.NotCurrentContext.html
-/// [`PossiblyCurrentContext`]: struct.PossiblyCurrentContext.html
+/// [`NotCurrent`]: enum.NotCurrent.html
+/// [`PossiblyCurrent`]: struct.PossiblyCurrent.html
 pub trait ContextCurrentState: std::fmt::Debug + Clone {}
 
-impl ContextCurrentState for PossiblyCurrentContext {}
-impl ContextCurrentState for NotCurrentContext {}
+impl ContextCurrentState for PossiblyCurrent {}
+impl ContextCurrentState for NotCurrent {}
 
 trait FailToCompileIfNotSendSync
 where
     Self: Send + Sync,
 {
 }
-impl FailToCompileIfNotSendSync for Context<NotCurrentContext> {}
+impl FailToCompileIfNotSendSync for Context<NotCurrent> {}

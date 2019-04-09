@@ -117,7 +117,7 @@ mod platform;
 mod windowed;
 
 pub use crate::context::{
-    Context, ContextCurrentState, NotCurrentContext, PossiblyCurrentContext,
+    Context, ContextCurrentState, NotCurrent, PossiblyCurrent,
 };
 pub use crate::windowed::{ContextWrapper, RawContext, WindowedContext};
 
@@ -149,7 +149,7 @@ pub struct ContextBuilder<'a, T: ContextCurrentState> {
     pub pf_reqs: PixelFormatRequirements,
 }
 
-impl<'a> ContextBuilder<'a, NotCurrentContext> {
+impl<'a> ContextBuilder<'a, NotCurrent> {
     /// Initializes a new `ContextBuilder` with default values.
     pub fn new() -> Self {
         ContextBuilder {
@@ -167,27 +167,32 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
         self
     }
 
-    /// Sets the desired OpenGL context profile.
+    /// Sets the desired OpenGL [`Context`] profile.
+    ///
+    /// [`Context`]: struct.Context.html
     #[inline]
     pub fn with_gl_profile(mut self, profile: GlProfile) -> Self {
         self.gl_attr.profile = Some(profile);
         self
     }
 
-    /// Sets the *debug* flag for the OpenGL context.
+    /// Sets the *debug* flag for the OpenGL [`Context`].
     ///
     /// The default value for this flag is `cfg!(debug_assertions)`, which means
     /// that it's enabled when you run `cargo build` and disabled when you run
     /// `cargo build --release`.
+    ///
+    /// [`Context`]: struct.Context.html
     #[inline]
     pub fn with_gl_debug_flag(mut self, flag: bool) -> Self {
         self.gl_attr.debug = flag;
         self
     }
 
-    /// Sets the robustness of the OpenGL context. See the docs of
+    /// Sets the robustness of the OpenGL [`Context`]. See the docs of
     /// [`Robustness`].
     ///
+    /// [`Context`]: struct.Context.html
     /// [`Robustness`]: enum.Robustness.html
     #[inline]
     pub fn with_gl_robustness(mut self, robustness: Robustness) -> Self {
@@ -413,14 +418,15 @@ impl From<WindowCreationError> for CreationError {
     }
 }
 
-/// Error that can happen when manipulating an OpenGL context.
+/// Error that can happen when manipulating an OpenGL [`Context`].
+///
+/// [`Context`]: struct.Context.html
 #[derive(Debug)]
 pub enum ContextError {
     /// General platform error.
     OsError(String),
     IoError(io::Error),
     ContextLost,
-    DisplayLost,
 }
 
 impl ContextError {
@@ -430,7 +436,6 @@ impl ContextError {
             ContextError::OsError(ref string) => string,
             ContextError::IoError(ref err) => err.description(),
             ContextError::ContextLost => "Context lost",
-            ContextError::DisplayLost => "Display lost",
         }
     }
 }
@@ -461,7 +466,9 @@ pub enum Api {
     WebGl,
 }
 
-/// Describes the requested OpenGL context profiles.
+/// Describes the requested OpenGL [`Context`] profiles.
+///
+/// [`Context`]: struct.Context.html
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GlProfile {
     /// Include all the immediate more functions and definitions.
@@ -484,9 +491,11 @@ pub enum GlRequest {
     /// Example: `GlRequest::Specific(Api::OpenGl, (3, 3))`.
     Specific(Api, (u8, u8)),
 
-    /// If OpenGL is available, create an OpenGL context with the specified
+    /// If OpenGL is available, create an OpenGL [`Context`] with the specified
     /// `opengl_version`. Else if OpenGL ES or WebGL is available, create a
     /// context with the specified `opengles_version`.
+    ///
+    /// [`Context`]: struct.Context.html
     GlThenGles {
         /// The version to use for OpenGL.
         opengl_version: (u8, u8),
@@ -515,9 +524,11 @@ impl GlRequest {
 /// the compatibility profile features.
 pub static GL_CORE: GlRequest = GlRequest::Specific(Api::OpenGl, (3, 2));
 
-/// Specifies the tolerance of the OpenGL context to faults. If you accept raw
-/// OpenGL commands and/or raw shader code from an untrusted source, you should
-/// definitely care about this.
+/// Specifies the tolerance of the OpenGL [`Context`] to faults. If you accept
+/// raw OpenGL commands and/or raw shader code from an untrusted source, you
+/// should definitely care about this.
+///
+/// [`Context`]: struct.Context.html
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Robustness {
     /// Not everything is checked. Your application can crash if you do
@@ -530,7 +541,9 @@ pub enum Robustness {
     ///
     /// Since this option is purely an optimization, no error will be returned
     /// if the backend doesn't support it. Instead it will automatically
-    /// fall back to `NotRobust`.
+    /// fall back to [`NotRobust`].
+    ///
+    /// [`NotRobust`]: enum.Robustness.html#variant.NotRobust
     NoError,
 
     /// Everything is checked to avoid any crash. The driver will attempt to
@@ -538,8 +551,11 @@ pub enum Robustness {
     /// implementation-defined. You are just guaranteed not to get a crash.
     RobustNoResetNotification,
 
-    /// Same as `RobustNoResetNotification` but the context creation doesn't
+    /// Same as [`RobustNoResetNotification`] but the context creation doesn't
     /// fail if it's not supported.
+    ///
+    /// [`RobustNoResetNotification`]:
+    /// enum.Robustness.html#variant.RobustNoResetNotification
     TryRobustNoResetNotification,
 
     /// Everything is checked to avoid any crash. If a problem occurs, the
@@ -548,8 +564,11 @@ pub enum Robustness {
     /// a context with the same window :-/
     RobustLoseContextOnReset,
 
-    /// Same as `RobustLoseContextOnReset` but the context creation doesn't
+    /// Same as [`RobustLoseContextOnReset`] but the context creation doesn't
     /// fail if it's not supported.
+    ///
+    /// [`RobustLoseContextOnReset`]:
+    /// enum.Robustness.html#variant.RobustLoseContextOnReset
     TryRobustLoseContextOnReset,
 }
 
@@ -660,7 +679,9 @@ impl Default for PixelFormatRequirements {
     }
 }
 
-/// Attributes to use when creating an OpenGL context.
+/// Attributes to use when creating an OpenGL [`Context`].
+///
+/// [`Context`]: struct.Context.html
 #[derive(Clone, Debug)]
 pub struct GlAttributes<S> {
     /// An existing context with which some OpenGL objects get shared.
@@ -668,9 +689,12 @@ pub struct GlAttributes<S> {
     /// The default is `None`.
     pub sharing: Option<S>,
 
-    /// Version to try create. See `GlRequest` for more infos.
+    /// Version to try create. See [`GlRequest`] for more infos.
     ///
-    /// The default is `Latest`.
+    /// The default is [`Latest`].
+    ///
+    /// [`Latest`]: enum.GlRequest.html#variant.Latest
+    /// [`GlRequest`]: enum.GlRequest.html
     pub version: GlRequest,
 
     /// OpenGL profile to use.
@@ -685,11 +709,15 @@ pub struct GlAttributes<S> {
     /// The default is `true` in debug mode and `false` in release mode.
     pub debug: bool,
 
-    /// How the OpenGL context should detect errors.
+    /// How the OpenGL [`Context`] should detect errors.
     ///
     /// The default is `NotRobust` because this is what is typically expected
-    /// when you create an OpenGL context. However for safety you should
-    /// consider `TryRobustLoseContextOnReset`.
+    /// when you create an OpenGL [`Context`]. However for safety you should
+    /// consider [`TryRobustLoseContextOnReset`].
+    ///
+    /// [`Context`]: struct.Context.html
+    /// [`TryRobustLoseContextOnReset`]:
+    /// enum.Robustness.html#variant.TryRobustLoseContextOnReset
     pub robustness: Robustness,
 
     /// Whether to use vsync. If vsync is enabled, calling `swap_buffers` will

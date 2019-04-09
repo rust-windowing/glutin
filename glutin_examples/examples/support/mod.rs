@@ -1,4 +1,4 @@
-use glutin::{self, PossiblyCurrentContext};
+use glutin::{self, PossiblyCurrent};
 
 use std::ffi::CStr;
 
@@ -31,7 +31,7 @@ extern "system" fn dbg_callback(
     }
 }
 
-pub fn load(gl_context: &glutin::Context<PossiblyCurrentContext>) -> Gl {
+pub fn load(gl_context: &glutin::Context<PossiblyCurrent>) -> Gl {
     let gl =
         gl::Gl::load_with(|ptr| gl_context.get_proc_address(ptr) as *const _);
 
@@ -168,8 +168,8 @@ pub use self::context_tracker::{
 #[allow(dead_code)] // Not used by all examples
 mod context_tracker {
     use glutin::{
-        self, Context, ContextCurrentState, ContextError, NotCurrentContext,
-        PossiblyCurrentContext, WindowedContext,
+        self, Context, ContextCurrentState, ContextError, NotCurrent,
+        PossiblyCurrent, WindowedContext,
     };
     use takeable_option::Takeable;
 
@@ -228,18 +228,18 @@ mod context_tracker {
     }
 
     pub enum ContextCurrentWrapper {
-        PossiblyCurrent(ContextWrapper<PossiblyCurrentContext>),
-        NotCurrent(ContextWrapper<NotCurrentContext>),
+        PossiblyCurrent(ContextWrapper<PossiblyCurrent>),
+        NotCurrent(ContextWrapper<NotCurrent>),
     }
 
     impl ContextCurrentWrapper {
         fn map_possibly<F>(self, f: F) -> Result<Self, (Self, ContextError)>
         where
             F: FnOnce(
-                ContextWrapper<PossiblyCurrentContext>,
+                ContextWrapper<PossiblyCurrent>,
             ) -> Result<
-                ContextWrapper<NotCurrentContext>,
-                (ContextWrapper<PossiblyCurrentContext>, ContextError),
+                ContextWrapper<NotCurrent>,
+                (ContextWrapper<PossiblyCurrent>, ContextError),
             >,
         {
             match self {
@@ -256,10 +256,10 @@ mod context_tracker {
         fn map_not<F>(self, f: F) -> Result<Self, (Self, ContextError)>
         where
             F: FnOnce(
-                ContextWrapper<NotCurrentContext>,
+                ContextWrapper<NotCurrent>,
             ) -> Result<
-                ContextWrapper<PossiblyCurrentContext>,
-                (ContextWrapper<NotCurrentContext>, ContextError),
+                ContextWrapper<PossiblyCurrent>,
+                (ContextWrapper<NotCurrent>, ContextError),
             >,
         {
             match self {
@@ -284,12 +284,26 @@ mod context_tracker {
 
     impl ContextTracker {
         pub fn insert(&mut self, ctx: ContextCurrentWrapper) -> ContextId {
-            if let ContextCurrentWrapper::PossiblyCurrent(_) = ctx {
-                assert!(self.current.is_none()); // Lost sync
-            }
-
             let id = self.next_id;
             self.next_id += 1;
+
+            if let ContextCurrentWrapper::PossiblyCurrent(_) = ctx {
+                if let Some(old_current) = self.current {
+                    unsafe {
+                        self.modify(old_current, |ctx| {
+                            ctx.map_possibly(|ctx| {
+                                ctx.map(
+                                    |ctx| Ok(ctx.treat_as_not_current()),
+                                    |ctx| Ok(ctx.treat_as_not_current()),
+                                )
+                            })
+                        })
+                        .unwrap()
+                    }
+                }
+                self.current = Some(id);
+            }
+
             self.others.push((id, Takeable::new(ctx)));
             id
         }
@@ -337,7 +351,7 @@ mod context_tracker {
         pub fn get_current(
             &mut self,
             id: ContextId,
-        ) -> Result<&mut ContextWrapper<PossiblyCurrentContext>, ContextError>
+        ) -> Result<&mut ContextWrapper<PossiblyCurrent>, ContextError>
         {
             unsafe {
                 let this_index = self
