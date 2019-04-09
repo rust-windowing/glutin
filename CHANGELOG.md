@@ -1,11 +1,13 @@
 # Unreleased
 
+# Version 0.21.0-rc2 (2019-04-08)
+
  - **Breaking**: Removed `DisplayLost` variant to `ContextError`.
  - **Breaking**: Renamed `NotCurrentContext` to `NotCurrent`.
  - **Breaking**: Renamed `PossiblyCurrentContext` to `PossiblyCurrent`.
  - Added `treat_as_current` function.
 
-# Version 0.21.0-rc1 (2019-03-09)
+# Version 0.21.0-rc1 (2019-04-07)
 
  - **Breaking:** Replaced `CreationErrorPair` enum variant with `CreationErrors`.
  - Added `Clone` to `ContextBuilder`.

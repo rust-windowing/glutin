@@ -286,7 +286,7 @@ impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
     ///
     /// This function should only be used if you intend to track context
     /// currency without the limited aid of glutin, and you wish to store
-    /// all [`Context`]s as [`NotCurrent`].
+    /// all the [`Context`]s as [`NotCurrent`].
     ///
     /// Please see [`make_current`] for the prefered method of handling context
     /// currency.
