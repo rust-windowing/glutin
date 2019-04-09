@@ -134,7 +134,7 @@ impl<T: ContextCurrentState> WindowedContext<T> {
     }
 }
 
-impl<W> ContextWrapper<PossiblyCurrentContext, W> {
+impl<W> ContextWrapper<PossiblyCurrent, W> {
     /// Swaps the buffers in case of double or triple buffering.
     ///
     /// You should call this function every time you have finished rendering, or
@@ -235,7 +235,7 @@ impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
     /// [`is_current`]: struct.ContextWrapper.html#method.is_current
     pub unsafe fn make_current(
         self,
-    ) -> Result<ContextWrapper<PossiblyCurrentContext, W>, (Self, ContextError)>
+    ) -> Result<ContextWrapper<PossiblyCurrent, W>, (Self, ContextError)>
     {
         let window = self.window;
         match self.context.make_current() {
@@ -254,7 +254,7 @@ impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
     /// [`make_current`]: struct.ContextWrapper.html#method.make_current
     pub unsafe fn make_not_current(
         self,
-    ) -> Result<ContextWrapper<NotCurrentContext, W>, (Self, ContextError)>
+    ) -> Result<ContextWrapper<NotCurrent, W>, (Self, ContextError)>
     {
         let window = self.window;
         match self.context.make_not_current() {
@@ -278,9 +278,31 @@ impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
     /// [`make_current`]: struct.ContextWrapper.html#method.make_current
     pub unsafe fn treat_as_not_current(
         self,
-    ) -> ContextWrapper<NotCurrentContext, W> {
+    ) -> ContextWrapper<NotCurrent, W> {
         ContextWrapper {
             context: self.context.treat_as_not_current(),
+            window: self.window,
+        }
+    }
+
+    /// Treats this context as current, even if it is not current. We do no
+    /// checks to confirm that this is actually case.
+    ///
+    /// This function should only be used if you intend to track context
+    /// currency without the limited aid of glutin, and you wish to store
+    /// all [`Context`]s as [`NotCurrent`].
+    ///
+    /// Please see [`make_current`] for the prefered method of handling context
+    /// currency.
+    ///
+    /// [`make_current`]: struct.ContextWrapper.html#method.make_current
+    /// [`NotCurrent`]: enum.NotCurrent.html
+    /// [`Context`]: struct.Context.html
+    pub unsafe fn treat_as_current(
+        self,
+    ) -> ContextWrapper<PossiblyCurrent, W> {
+        ContextWrapper {
+            context: self.context.treat_as_current(),
             window: self.window,
         }
     }
@@ -296,7 +318,7 @@ impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
     }
 }
 
-impl<W> ContextWrapper<PossiblyCurrentContext, W> {
+impl<W> ContextWrapper<PossiblyCurrent, W> {
     /// Returns the address of an OpenGL function.
     pub fn get_proc_address(&self, addr: &str) -> *const () {
         self.context.get_proc_address(addr)
@@ -322,11 +344,12 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     ///  because the underlying platform doesn't support a requested feature.
     ///
     /// [`WindowedContext<T>`]: type.WindowedContext.html
+    /// [`Context`]: struct.Context.html
     pub fn build_windowed(
         self,
         wb: WindowBuilder,
         el: &EventsLoop,
-    ) -> Result<WindowedContext<NotCurrentContext>, CreationError> {
+    ) -> Result<WindowedContext<NotCurrent>, CreationError> {
         let ContextBuilder { pf_reqs, gl_attr } = self;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
         platform::Context::new_windowed(wb, el, &pf_reqs, &gl_attr).map(

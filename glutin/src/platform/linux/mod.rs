@@ -13,7 +13,7 @@ use self::x11::X11Context;
 use crate::api::osmesa;
 use crate::{
     Api, ContextCurrentState, ContextError, CreationError, GlAttributes,
-    NotCurrentContext, PixelFormat, PixelFormatRequirements,
+    NotCurrent, PixelFormat, PixelFormatRequirements,
 };
 
 use winit::dpi;
@@ -257,7 +257,7 @@ pub trait HeadlessContextExt {
     fn build_osmesa(
         self,
         size: dpi::PhysicalSize,
-    ) -> Result<crate::Context<NotCurrentContext>, CreationError>
+    ) -> Result<crate::Context<NotCurrent>, CreationError>
     where
         Self: Sized;
 
@@ -271,7 +271,7 @@ pub trait HeadlessContextExt {
     fn build_surfaceless(
         self,
         el: &winit::EventsLoop,
-    ) -> Result<crate::Context<NotCurrentContext>, CreationError>
+    ) -> Result<crate::Context<NotCurrent>, CreationError>
     where
         Self: Sized;
 }
@@ -283,7 +283,7 @@ impl<'a, T: ContextCurrentState> HeadlessContextExt
     fn build_osmesa(
         self,
         size: dpi::PhysicalSize,
-    ) -> Result<crate::Context<NotCurrentContext>, CreationError>
+    ) -> Result<crate::Context<NotCurrent>, CreationError>
     where
         Self: Sized,
     {
@@ -306,7 +306,7 @@ impl<'a, T: ContextCurrentState> HeadlessContextExt
     fn build_surfaceless(
         self,
         el: &winit::EventsLoop,
-    ) -> Result<crate::Context<NotCurrentContext>, CreationError>
+    ) -> Result<crate::Context<NotCurrent>, CreationError>
     where
         Self: Sized,
     {
@@ -338,7 +338,7 @@ pub trait RawContextExt {
         surface: *mut raw::c_void,
         width: u32,
         height: u32,
-    ) -> Result<crate::RawContext<NotCurrentContext>, CreationError>
+    ) -> Result<crate::RawContext<NotCurrent>, CreationError>
     where
         Self: Sized;
 
@@ -351,7 +351,7 @@ pub trait RawContextExt {
         self,
         xconn: Arc<x11::XConnection>,
         xwin: raw::c_ulong,
-    ) -> Result<crate::RawContext<NotCurrentContext>, CreationError>
+    ) -> Result<crate::RawContext<NotCurrent>, CreationError>
     where
         Self: Sized;
 }
@@ -366,7 +366,7 @@ impl<'a, T: ContextCurrentState> RawContextExt
         surface: *mut raw::c_void,
         width: u32,
         height: u32,
-    ) -> Result<crate::RawContext<NotCurrentContext>, CreationError>
+    ) -> Result<crate::RawContext<NotCurrent>, CreationError>
     where
         Self: Sized,
     {
@@ -401,7 +401,7 @@ impl<'a, T: ContextCurrentState> RawContextExt
         self,
         xconn: Arc<x11::XConnection>,
         xwin: raw::c_ulong,
-    ) -> Result<crate::RawContext<NotCurrentContext>, CreationError>
+    ) -> Result<crate::RawContext<NotCurrent>, CreationError>
     where
         Self: Sized,
     {

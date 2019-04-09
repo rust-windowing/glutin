@@ -8,7 +8,7 @@ use support::gl;
 fn build_context_surfaceless<T1: glutin::ContextCurrentState>(
     cb: glutin::ContextBuilder<T1>,
     el: &glutin::EventsLoop,
-) -> Result<glutin::Context<glutin::NotCurrentContext>, glutin::CreationError> {
+) -> Result<glutin::Context<glutin::NotCurrent>, glutin::CreationError> {
     use glutin::os::unix::HeadlessContextExt;
     cb.build_surfaceless(&el)
 }
@@ -16,7 +16,7 @@ fn build_context_surfaceless<T1: glutin::ContextCurrentState>(
 fn build_context_headless<T1: glutin::ContextCurrentState>(
     cb: glutin::ContextBuilder<T1>,
     el: &glutin::EventsLoop,
-) -> Result<glutin::Context<glutin::NotCurrentContext>, glutin::CreationError> {
+) -> Result<glutin::Context<glutin::NotCurrent>, glutin::CreationError> {
     let size_one = PhysicalSize::new(1., 1.);
     cb.build_headless(&el, size_one)
 }
@@ -24,7 +24,7 @@ fn build_context_headless<T1: glutin::ContextCurrentState>(
 #[cfg(target_os = "linux")]
 fn build_context_osmesa<T1: glutin::ContextCurrentState>(
     cb: glutin::ContextBuilder<T1>,
-) -> Result<glutin::Context<glutin::NotCurrentContext>, glutin::CreationError> {
+) -> Result<glutin::Context<glutin::NotCurrent>, glutin::CreationError> {
     use glutin::os::unix::HeadlessContextExt;
     let size_one = PhysicalSize::new(1., 1.);
     cb.build_osmesa(size_one)
@@ -35,7 +35,7 @@ fn build_context<T1: glutin::ContextCurrentState>(
     cb: glutin::ContextBuilder<T1>,
 ) -> Result<
     (
-        glutin::Context<glutin::NotCurrentContext>,
+        glutin::Context<glutin::NotCurrent>,
         glutin::EventsLoop,
     ),
     [glutin::CreationError; 3],
@@ -75,7 +75,7 @@ fn build_context<T1: glutin::ContextCurrentState>(
     cb: glutin::ContextBuilder<T1>,
 ) -> Result<
     (
-        glutin::Context<glutin::NotCurrentContext>,
+        glutin::Context<glutin::NotCurrent>,
         glutin::EventsLoop,
     ),
     glutin::CreationError,

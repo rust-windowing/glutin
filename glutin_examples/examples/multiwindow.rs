@@ -57,12 +57,9 @@ fn main() {
         for (index, window) in windows.values().enumerate() {
             let mut color = [1.0, 0.5, 0.7, 1.0];
             color.swap(0, index % 3);
-            let windowed_context = ct.get_current(window.0);
-            // window might have been closed, so can't make current
-            if windowed_context.is_ok() {
-                window.1.draw_frame(color);
-                windowed_context.unwrap().windowed().swap_buffers().unwrap();
-            }
+            let windowed_context = ct.get_current(window.0).unwrap();
+            window.1.draw_frame(color);
+            windowed_context.windowed().swap_buffers().unwrap();
         }
     }
 }
