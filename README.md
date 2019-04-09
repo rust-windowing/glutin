@@ -36,57 +36,8 @@ cargo run --example window
 ### Usage
 
 Glutin is an OpenGL context creation library and doesn't directly provide OpenGL bindings for you.
-```toml
-[dependencies]
-gl = "*"
-```
 
-```rust
-use glutin::dpi::*;
-
-fn main() {
-    let mut el = glutin::EventsLoop::new();
-    let wb = glutin::WindowBuilder::new()
-        .with_title("Hello, world!")
-        .with_dimensions(LogicalSize::new(1024.0, 768.0));
-    let windowed_context = glutin::ContextBuilder::new()
-        .with_vsync(true)
-        .build_windowed(wb, &el)
-        .unwrap();
-
-    unsafe {
-        windowed_context.make_current().unwrap();
-    }
-
-    unsafe {
-        gl::load_with(|symbol| windowed_context.get_proc_address(symbol) as *const _);
-        gl::ClearColor(0.0, 1.0, 0.0, 1.0);
-    }
-
-    let mut running = true;
-    while running {
-        el.poll_events(|event| {
-            match event {
-                glutin::Event::WindowEvent{ event, .. } => match event {
-                    glutin::WindowEvent::CloseRequested => running = false,
-                    glutin::WindowEvent::Resized(logical_size) => {
-                        let dpi_factor = windowed_context.get_hidpi_factor();
-                        windowed_context.resize(logical_size.to_physical(dpi_factor));
-                    },
-                    _ => ()
-                },
-                _ => ()
-            }
-        });
-
-        unsafe {
-            gl::Clear(gl::COLOR_BUFFER_BIT);
-        }
-
-        windowed_context.swap_buffers().unwrap();
-    }
-}
-```
+For examples, please look [here.](https://github.com/tomaka/glutin/tree/master/glutin_examples)
 
 Note that glutin aims at being a low-level brick in your rendering infrastructure. You are encouraged to write another layer of abstraction between glutin and your application.
 
