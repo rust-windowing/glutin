@@ -12,7 +12,7 @@ use std::marker::PhantomData;
 ///
 /// # Example
 ///
-/// ```no_run
+/// ```
 /// # fn main() {
 /// # let el = glutin::EventsLoop::new();
 /// # let wb = glutin::WindowBuilder::new();

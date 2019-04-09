@@ -10,7 +10,7 @@
 //! the order of creation of the [`Context`] and [`Window`]. Here is an example
 //! of building a [`WindowedContext<T>`]:
 //!
-//! ```no_run
+//! ```
 //! # fn main() {
 //! let el = glutin::EventsLoop::new();
 //! let wb = glutin::WindowBuilder::new()
