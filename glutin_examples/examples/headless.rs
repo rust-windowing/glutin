@@ -34,10 +34,7 @@ fn build_context_osmesa<T1: glutin::ContextCurrentState>(
 fn build_context<T1: glutin::ContextCurrentState>(
     cb: glutin::ContextBuilder<T1>,
 ) -> Result<
-    (
-        glutin::Context<glutin::NotCurrent>,
-        glutin::EventsLoop,
-    ),
+    (glutin::Context<glutin::NotCurrent>, glutin::EventsLoop),
     [glutin::CreationError; 3],
 > {
     // On linux, you should always try for surfaceless first, and if that
@@ -74,10 +71,7 @@ fn build_context<T1: glutin::ContextCurrentState>(
 fn build_context<T1: glutin::ContextCurrentState>(
     cb: glutin::ContextBuilder<T1>,
 ) -> Result<
-    (
-        glutin::Context<glutin::NotCurrent>,
-        glutin::EventsLoop,
-    ),
+    (glutin::Context<glutin::NotCurrent>, glutin::EventsLoop),
     glutin::CreationError,
 > {
     let el = glutin::EventsLoop::new();

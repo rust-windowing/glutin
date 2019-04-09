@@ -235,8 +235,7 @@ impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
     /// [`is_current`]: struct.ContextWrapper.html#method.is_current
     pub unsafe fn make_current(
         self,
-    ) -> Result<ContextWrapper<PossiblyCurrent, W>, (Self, ContextError)>
-    {
+    ) -> Result<ContextWrapper<PossiblyCurrent, W>, (Self, ContextError)> {
         let window = self.window;
         match self.context.make_current() {
             Ok(context) => Ok(ContextWrapper { window, context }),
@@ -254,8 +253,7 @@ impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
     /// [`make_current`]: struct.ContextWrapper.html#method.make_current
     pub unsafe fn make_not_current(
         self,
-    ) -> Result<ContextWrapper<NotCurrent, W>, (Self, ContextError)>
-    {
+    ) -> Result<ContextWrapper<NotCurrent, W>, (Self, ContextError)> {
         let window = self.window;
         match self.context.make_not_current() {
             Ok(context) => Ok(ContextWrapper { window, context }),
@@ -276,9 +274,7 @@ impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
     ///
     /// [`make_not_current`]: struct.ContextWrapper.html#method.make_not_current
     /// [`make_current`]: struct.ContextWrapper.html#method.make_current
-    pub unsafe fn treat_as_not_current(
-        self,
-    ) -> ContextWrapper<NotCurrent, W> {
+    pub unsafe fn treat_as_not_current(self) -> ContextWrapper<NotCurrent, W> {
         ContextWrapper {
             context: self.context.treat_as_not_current(),
             window: self.window,
@@ -298,9 +294,7 @@ impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
     /// [`make_current`]: struct.ContextWrapper.html#method.make_current
     /// [`NotCurrent`]: enum.NotCurrent.html
     /// [`Context`]: struct.Context.html
-    pub unsafe fn treat_as_current(
-        self,
-    ) -> ContextWrapper<PossiblyCurrent, W> {
+    pub unsafe fn treat_as_current(self) -> ContextWrapper<PossiblyCurrent, W> {
         ContextWrapper {
             context: self.context.treat_as_current(),
             window: self.window,

@@ -4,8 +4,8 @@ use std::marker::PhantomData;
 
 /// Represents an OpenGL [`Context`].
 ///
-/// A [`Context`] is normally associated with a single Window, however [`Context`]s
-/// can be *shared* between multiple windows or be headless.
+/// A [`Context`] is normally associated with a single Window, however
+/// [`Context`]s can be *shared* between multiple windows or be headless.
 ///
 /// If a [`Context`] is backed by a window, it will be wrapped by either
 /// [`RawContext<T>`] or [`WindowedContext<T>`].

@@ -288,17 +288,19 @@ mod context_tracker {
             self.next_id += 1;
 
             if let ContextCurrentWrapper::PossiblyCurrent(_) = ctx {
-                if let Some(old_current) = self.current { unsafe {
-                    self.modify(old_current, |ctx| {
-                        ctx.map_possibly(|ctx| {
-                            ctx.map(
-                                |ctx| Ok(ctx.treat_as_not_current()),
-                                |ctx| Ok(ctx.treat_as_not_current()),
-                            )
+                if let Some(old_current) = self.current {
+                    unsafe {
+                        self.modify(old_current, |ctx| {
+                            ctx.map_possibly(|ctx| {
+                                ctx.map(
+                                    |ctx| Ok(ctx.treat_as_not_current()),
+                                    |ctx| Ok(ctx.treat_as_not_current()),
+                                )
+                            })
                         })
-                    })
                         .unwrap()
-                }}
+                    }
+                }
                 self.current = Some(id);
             }
 

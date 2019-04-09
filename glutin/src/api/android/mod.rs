@@ -1,6 +1,8 @@
 #![cfg(target_os = "android")]
 
-use crate::api::egl::{Context as EglContext, NativeDisplay, SurfaceType as EglSurfaceType};
+use crate::api::egl::{
+    Context as EglContext, NativeDisplay, SurfaceType as EglSurfaceType,
+};
 use crate::CreationError::{self, OsError};
 use crate::{
     Api, ContextError, GlAttributes, PixelFormat, PixelFormatRequirements,
@@ -62,9 +64,13 @@ impl Context {
             return Err(OsError("Android's native window is null".to_string()));
         }
         let native_display = NativeDisplay::Android;
-        let egl_context =
-            EglContext::new(pf_reqs, &gl_attr, native_display, EglSurfaceType::Window)
-                .and_then(|p| p.finish(nwin as *const _))?;
+        let egl_context = EglContext::new(
+            pf_reqs,
+            &gl_attr,
+            native_display,
+            EglSurfaceType::Window,
+        )
+        .and_then(|p| p.finish(nwin as *const _))?;
         let ctx = Arc::new(AndroidContext {
             egl_context,
             stopped: Some(Mutex::new(false)),
@@ -104,8 +110,12 @@ impl Context {
         size: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
         let gl_attr = gl_attr.clone().map_sharing(|c| &c.0.egl_context);
-        let context =
-            EglContext::new(pf_reqs, &gl_attr, NativeDisplay::Android, EglSurfaceType::PBuffer)?;
+        let context = EglContext::new(
+            pf_reqs,
+            &gl_attr,
+            NativeDisplay::Android,
+            EglSurfaceType::PBuffer,
+        )?;
         let egl_context = context.finish_pbuffer(size)?;
         let ctx = Arc::new(AndroidContext {
             egl_context,

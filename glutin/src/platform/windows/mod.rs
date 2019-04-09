@@ -5,7 +5,9 @@ use crate::{
     GlRequest, NotCurrent, PixelFormat, PixelFormatRequirements,
 };
 
-use crate::api::egl::{Context as EglContext, NativeDisplay, EGL, SurfaceType as EglSurfaceType};
+use crate::api::egl::{
+    Context as EglContext, NativeDisplay, SurfaceType as EglSurfaceType, EGL,
+};
 use crate::api::wgl::Context as WglContext;
 use crate::os::windows::WindowExt;
 

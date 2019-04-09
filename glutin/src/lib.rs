@@ -524,9 +524,9 @@ impl GlRequest {
 /// the compatibility profile features.
 pub static GL_CORE: GlRequest = GlRequest::Specific(Api::OpenGl, (3, 2));
 
-/// Specifies the tolerance of the OpenGL [`Context`] to faults. If you accept raw
-/// OpenGL commands and/or raw shader code from an untrusted source, you should
-/// definitely care about this.
+/// Specifies the tolerance of the OpenGL [`Context`] to faults. If you accept
+/// raw OpenGL commands and/or raw shader code from an untrusted source, you
+/// should definitely care about this.
 ///
 /// [`Context`]: struct.Context.html
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -554,7 +554,8 @@ pub enum Robustness {
     /// Same as [`RobustNoResetNotification`] but the context creation doesn't
     /// fail if it's not supported.
     ///
-    /// [`RobustNoResetNotification`]: enum.Robustness.html#variant.RobustNoResetNotification
+    /// [`RobustNoResetNotification`]:
+    /// enum.Robustness.html#variant.RobustNoResetNotification
     TryRobustNoResetNotification,
 
     /// Everything is checked to avoid any crash. If a problem occurs, the
@@ -566,7 +567,8 @@ pub enum Robustness {
     /// Same as [`RobustLoseContextOnReset`] but the context creation doesn't
     /// fail if it's not supported.
     ///
-    /// [`RobustLoseContextOnReset`]: enum.Robustness.html#variant.RobustLoseContextOnReset
+    /// [`RobustLoseContextOnReset`]:
+    /// enum.Robustness.html#variant.RobustLoseContextOnReset
     TryRobustLoseContextOnReset,
 }
 
@@ -714,7 +716,8 @@ pub struct GlAttributes<S> {
     /// consider [`TryRobustLoseContextOnReset`].
     ///
     /// [`Context`]: struct.Context.html
-    /// [`TryRobustLoseContextOnReset`]: enum.Robustness.html#variant.TryRobustLoseContextOnReset
+    /// [`TryRobustLoseContextOnReset`]:
+    /// enum.Robustness.html#variant.TryRobustLoseContextOnReset
     pub robustness: Robustness,
 
     /// Whether to use vsync. If vsync is enabled, calling `swap_buffers` will
