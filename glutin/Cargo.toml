@@ -18,7 +18,7 @@ icon_loading = ["winit/icon_loading"]
 serde = ["winit/serde"]
 
 [dependencies]
-lazy_static = "1.1"
+lazy_static = "1.3"
 winit = "^0.19.1"
 
 [target.'cfg(target_os = "android")'.dependencies]
@@ -56,7 +56,7 @@ parking_lot = "0.7"
 
 [target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "dragonfly", target_os = "netbsd", target_os = "openbsd"))'.dependencies]
 osmesa-sys = "0.1"
-wayland-client = { version = "0.23", features = ["egl", "dlopen"] }
+wayland-client = { version = "0.21", features = ["egl", "dlopen"] }
 libloading = "0.5"
 glutin_egl_sys = { version = "0.1.3", path = "../glutin_egl_sys" }
 glutin_glx_sys = { version = "0.1.4", path = "../glutin_glx_sys" }
