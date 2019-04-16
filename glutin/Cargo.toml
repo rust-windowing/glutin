@@ -1,6 +1,6 @@
 [package]
 name = "glutin"
-version = "0.21.0-rc3"
+version = "0.21.0-rc4"
 authors = ["The glutin contributors", "Pierre Krieger <pierre.krieger1708@gmail.com>"]
 description = "Cross-platform OpenGL context provider."
 keywords = ["windowing", "opengl"]
@@ -59,6 +59,6 @@ osmesa-sys = "0.1"
 wayland-client = { version = "0.21", features = ["egl", "dlopen"] }
 libloading = "0.5"
 glutin_egl_sys = { version = "0.1.3", path = "../glutin_egl_sys" }
-glutin_glx_sys = { version = "0.1.4", path = "../glutin_glx_sys" }
+glutin_glx_sys = { version = "0.1.5", path = "../glutin_glx_sys" }
 derivative = "1.0"
 parking_lot = "0.7"

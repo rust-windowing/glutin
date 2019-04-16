@@ -1,6 +1,6 @@
 [package]
 name = "glutin_glx_sys"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["The glutin contributors", "Hal Gentz <zegentzy@protonmail.com>"]
 description = "The glx bindings for glutin"
 repository = "https://github.com/tomaka/glutin"
