@@ -11,7 +11,7 @@
     target_os = "emscripten",
 )))]
 
-use crate::os::ContextTraitExt;
+use crate::platform::ContextTraitExt;
 use crate::{Context, ContextCurrentState};
 
 use std::os::raw;

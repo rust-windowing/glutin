@@ -9,7 +9,7 @@ use crate::api::egl::{
     Context as EglContext, NativeDisplay, SurfaceType as EglSurfaceType, EGL,
 };
 use crate::api::wgl::Context as WglContext;
-use crate::os::windows::WindowExt;
+use crate::platform::windows::WindowExtWindows;
 
 use glutin_egl_sys as ffi;
 use winapi::shared::windef::{HGLRC, HWND};
@@ -32,8 +32,8 @@ pub enum Context {
     Egl(EglContext),
     Wgl(WglContext),
     /// A regular window, but invisible.
-    HiddenWindowEgl(winit::Window, EglContext),
-    HiddenWindowWgl(winit::Window, WglContext),
+    HiddenWindowEgl(winit::window::Window, EglContext),
+    HiddenWindowWgl(winit::window::Window, WglContext),
     /// An EGL pbuffer.
     EglPbuffer(EglContext),
 }
@@ -44,12 +44,12 @@ unsafe impl Sync for Context {}
 impl Context {
     /// See the docs in the crate root file.
     #[inline]
-    pub fn new_windowed(
-        wb: winit::WindowBuilder,
-        el: &winit::EventsLoop,
+    pub fn new_windowed<T>(
+        wb: winit::window::WindowBuilder,
+        el: &winit::event_loop::EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Self>,
-    ) -> Result<(winit::Window, Self), CreationError> {
+    ) -> Result<(winit::window::Window, Self), CreationError> {
         let win = wb.build(el)?;
         let hwnd = win.get_hwnd() as HWND;
         let ctx = Self::new_raw_context(hwnd, pf_reqs, gl_attr)?;
@@ -142,8 +142,8 @@ impl Context {
     }
 
     #[inline]
-    pub fn new_headless(
-        el: &winit::EventsLoop,
+    pub fn new_headless<T>(
+        el: &winit::event_loop::EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: dpi::PhysicalSize,
@@ -180,7 +180,7 @@ impl Context {
             _ => (),
         }
 
-        let wb = winit::WindowBuilder::new()
+        let wb = winit::window::WindowBuilder::new()
             .with_visibility(false)
             .with_dimensions(size.to_logical(1.));
         Self::new_windowed(wb, &el, pf_reqs, gl_attr).map(|(win, context)| {

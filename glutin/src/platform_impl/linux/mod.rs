@@ -17,7 +17,8 @@ use crate::{
 };
 
 use winit::dpi;
-use winit::os::unix::EventsLoopExt;
+use crate::platform::unix::EventLoopExtUnix;
+use crate::platform::unix::x11::XConnection;
 
 use std::marker::PhantomData;
 use std::os::raw;
@@ -87,12 +88,12 @@ impl Context {
     }
 
     #[inline]
-    pub fn new_windowed(
-        wb: winit::WindowBuilder,
-        el: &winit::EventsLoop,
+    pub fn new_windowed<T>(
+        wb: winit::window::WindowBuilder,
+        el: &winit::event_loop::EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-    ) -> Result<(winit::Window, Self), CreationError> {
+    ) -> Result<(winit::window::Window, Self), CreationError> {
         if el.is_wayland() {
             Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
 
@@ -114,8 +115,8 @@ impl Context {
     }
 
     #[inline]
-    pub fn new_headless(
-        el: &winit::EventsLoop,
+    pub fn new_headless<T>(
+        el: &winit::event_loop::EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: dpi::PhysicalSize,
@@ -123,8 +124,8 @@ impl Context {
         Self::new_headless_impl(el, pf_reqs, gl_attr, Some(size))
     }
 
-    pub fn new_headless_impl(
-        el: &winit::EventsLoop,
+    pub fn new_headless_impl<T>(
+        el: &winit::event_loop::EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: Option<dpi::PhysicalSize>,
@@ -268,9 +269,9 @@ pub trait HeadlessContextExt {
     /// requested feature.
     ///
     /// [`Context`]: struct.Context.html
-    fn build_surfaceless(
+    fn build_surfaceless<TE>(
         self,
-        el: &winit::EventsLoop,
+        el: &winit::event_loop::EventLoop<TE>,
     ) -> Result<crate::Context<NotCurrent>, CreationError>
     where
         Self: Sized;
@@ -303,9 +304,9 @@ impl<'a, T: ContextCurrentState> HeadlessContextExt
     }
 
     #[inline]
-    fn build_surfaceless(
+    fn build_surfaceless<TE>(
         self,
-        el: &winit::EventsLoop,
+        el: &winit::event_loop::EventLoop<TE>,
     ) -> Result<crate::Context<NotCurrent>, CreationError>
     where
         Self: Sized,
@@ -349,7 +350,7 @@ pub trait RawContextExt {
     ///   - The xwin is destroyed before the context
     unsafe fn build_raw_x11_context(
         self,
-        xconn: Arc<x11::XConnection>,
+        xconn: Arc<XConnection>,
         xwin: raw::c_ulong,
     ) -> Result<crate::RawContext<NotCurrent>, CreationError>
     where
@@ -399,7 +400,7 @@ impl<'a, T: ContextCurrentState> RawContextExt
     #[inline]
     unsafe fn build_raw_x11_context(
         self,
-        xconn: Arc<x11::XConnection>,
+        xconn: Arc<XConnection>,
         xwin: raw::c_ulong,
     ) -> Result<crate::RawContext<NotCurrent>, CreationError>
     where

@@ -60,10 +60,10 @@
 //! Also note that app will not receive Destroyed event if suspended, it will be
 //! SIGKILL'ed
 
-use crate::os::ios::{WindowBuilderExt, WindowExt};
+use crate::platform::ios::{WindowBuilderExtIOS, WindowExtIOS};
 use crate::{
-    Api, ContextError, CreationError, EventsLoop, GlAttributes, GlRequest,
-    PixelFormat, PixelFormatRequirements, Window, WindowBuilder,
+    Api, ContextError, CreationError, GlAttributes, GlRequest,
+    PixelFormat, PixelFormatRequirements
 };
 
 use glutin_gles2_sys as ffi;
@@ -152,7 +152,7 @@ fn multisampling_for_view(view: ffi::id) -> Option<u16> {
 #[derive(Debug)]
 pub struct Context {
     eagl_context: ffi::id,
-    view: ffi::id, // this will be invalid after the `EventsLoop` is dropped
+    view: ffi::id, // this will be invalid after the `EventLoop` is dropped
 }
 
 fn validate_version(version: u8) -> Result<ffi::NSUInteger, CreationError> {
@@ -171,12 +171,12 @@ fn validate_version(version: u8) -> Result<ffi::NSUInteger, CreationError> {
 
 impl Context {
     #[inline]
-    pub fn new_windowed(
-        builder: WindowBuilder,
-        event_loop: &EventsLoop,
+    pub fn new_windowed<T>(
+        builder: winit::window::WindowBuilder,
+        el: &winit::event_loop::EventLoop<T>,
         _: &PixelFormatRequirements,
         gl_attrs: &GlAttributes<&Context>,
-    ) -> Result<(Window, Self), CreationError> {
+    ) -> Result<(winit::window::Window, Self), CreationError> {
         create_view_class();
         let view_class =
             Class::get("MainGLView").expect("Failed to get class `MainGLView`");
@@ -202,7 +202,7 @@ impl Context {
                 ..
             } => validate_version(major)?,
         };
-        let win = builder.build(event_loop)?;
+        let win = builder.build(el)?;
         let context = unsafe {
             let eagl_context = Context::create_context(version)?;
             let view = win.get_uiview() as ffi::id;
@@ -214,13 +214,13 @@ impl Context {
     }
 
     #[inline]
-    pub fn new_headless(
-        el: &EventsLoop,
+    pub fn new_headless<T>(
+        el: &winit::event_loop::EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
-        let wb = WindowBuilder::new()
+        let wb = winit::window::WindowBuilder::new()
             .with_visibility(false)
             .with_dimensions(size.to_logical(1.));
         Self::new_windowed(wb, el, pf_reqs, gl_attr)
@@ -248,7 +248,7 @@ impl Context {
         }
     }
 
-    unsafe fn init_context(&mut self, win: &Window) {
+    unsafe fn init_context(&mut self, win: &winit::window::Window) {
         let dict_class = Class::get("NSDictionary")
             .expect("Failed to get class `NSDictionary`");
         let number_class =

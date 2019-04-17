@@ -6,18 +6,13 @@
     target_os = "openbsd",
 ))]
 
-use crate::os::ContextTraitExt;
-pub use crate::platform::{HeadlessContextExt, RawContextExt, RawHandle};
+use crate::platform::ContextTraitExt;
+pub use crate::platform_impl::{HeadlessContextExt, RawContextExt, RawHandle};
 use crate::{Context, ContextCurrentState};
 pub use glutin_egl_sys::EGLContext;
 pub use glutin_glx_sys::GLXContext;
 
-pub use winit::os::unix::EventsLoopExt;
-pub use winit::os::unix::MonitorIdExt;
-pub use winit::os::unix::WindowBuilderExt;
-pub use winit::os::unix::WindowExt;
-pub use winit::os::unix::XNotSupported;
-pub use winit::os::unix::XWindowType;
+pub use winit::platform::unix::*;
 
 use std::os::raw;
 

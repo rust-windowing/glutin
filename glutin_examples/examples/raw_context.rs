@@ -11,19 +11,19 @@ fn main() {
 #[cfg(any(target_os = "linux", target_os = "windows"))]
 mod this_example {
     use super::support;
+    use takeable_option::Takeable;
 
     pub fn main() {
-        let (raw_context, mut el, win) = {
-            let el = glutin::EventsLoop::new();
-            let win = glutin::WindowBuilder::new()
+        let (raw_context, el, win) = {
+            let el = glutin::event_loop::EventLoop::new();
+            let win = glutin::window::WindowBuilder::new()
                 .with_title("A fantastic window!")
                 .build(&el)
                 .unwrap();
 
             #[cfg(target_os = "linux")]
             unsafe {
-                use glutin::os::unix::RawContextExt;
-                use winit::os::unix::{EventsLoopExt, WindowExt};
+                use glutin::platform::unix::{RawContextExt, EventLoopExtUnix, WindowExtUnix};
 
                 let cb = glutin::ContextBuilder::new();
                 let raw_context;
@@ -58,8 +58,7 @@ mod this_example {
 
             #[cfg(target_os = "windows")]
             unsafe {
-                use glutin::os::windows::RawContextExt;
-                use winit::os::windows::WindowExt;
+                use glutin::platform::windows::{RawContextExt, WindowExtWindows};
 
                 let hwnd = win.get_hwnd();
                 let raw_context = glutin::ContextBuilder::new()
@@ -79,39 +78,35 @@ mod this_example {
 
         let gl = support::load(&*raw_context);
 
-        let mut running = true;
-        while running {
-            el.poll_events(|event| {
-                println!("el {:?}", event);
-                match event {
-                    glutin::Event::WindowEvent { event, .. } => match event {
-                        glutin::WindowEvent::KeyboardInput {
-                            input:
-                                glutin::KeyboardInput {
-                                    virtual_keycode:
-                                        Some(glutin::VirtualKeyCode::Escape),
-                                    ..
-                                },
-                            ..
-                        }
-                        | glutin::WindowEvent::CloseRequested => {
-                            running = false
-                        }
-                        glutin::WindowEvent::Resized(logical_size) => {
-                            let dpi_factor = win.get_hidpi_factor();
-                            raw_context
-                                .resize(logical_size.to_physical(dpi_factor));
-                        }
-                        _ => (),
-                    },
+        let mut raw_context = Takeable::new(raw_context);
+        el.run(move |event, _, control_flow| {
+            println!("el {:?}", event);
+            match event {
+                glutin::event::Event::LoopDestroyed => {
+                    Takeable::take(&mut raw_context); // Make sure it drops first
+                    return
+                },
+                glutin::event::Event::WindowEvent { ref event, .. } => match event {
+                    glutin::event::WindowEvent::Resized(logical_size) => {
+                        let dpi_factor = win.get_hidpi_factor();
+                        raw_context
+                            .resize(logical_size.to_physical(dpi_factor));
+                    }
                     _ => (),
-                }
-            });
+                },
+                _ => (),
+            }
 
             gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
             raw_context.swap_buffers().unwrap();
-        }
 
-        std::mem::drop(raw_context) // Make sure it drops first
+            match event {
+                glutin::event::Event::WindowEvent {
+                    event: glutin::event::WindowEvent::CloseRequested,
+                    ..
+                } => *control_flow = winit::event_loop::ControlFlow::Exit,
+                _ => *control_flow = winit::event_loop::ControlFlow::Wait,
+            }
+        });
     }
 }

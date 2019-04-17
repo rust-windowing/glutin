@@ -1,8 +1,8 @@
 mod support;
 
 fn main() {
-    let mut el = glutin::EventsLoop::new();
-    let wb = glutin::WindowBuilder::new()
+    let mut el = glutin::event_loop::EventLoop::new();
+    let wb = glutin::window::WindowBuilder::new()
         .with_title("A transparent window!")
         .with_decorations(false)
         .with_transparency(true);
@@ -20,35 +20,40 @@ fn main() {
 
     let gl = support::load(&windowed_context.context());
 
-    let mut running = true;
-    while running {
-        el.poll_events(|event| {
-            println!("{:?}", event);
-            match event {
-                glutin::Event::WindowEvent { event, .. } => match event {
-                    glutin::WindowEvent::CloseRequested => running = false,
-                    glutin::WindowEvent::Resized(logical_size) => {
-                        let dpi_factor =
-                            windowed_context.window().get_hidpi_factor();
-                        windowed_context
-                            .resize(logical_size.to_physical(dpi_factor));
-                    }
-                    glutin::WindowEvent::KeyboardInput {
-                        input:
-                            glutin::KeyboardInput {
-                                virtual_keycode:
-                                    Some(glutin::VirtualKeyCode::Escape),
-                                ..
-                            },
-                        ..
-                    } => running = false,
-                    _ => (),
-                },
+    el.run(move |event, _, control_flow| {
+        println!("{:?}", event);
+        match event {
+            glutin::event::Event::LoopDestroyed => return,
+            glutin::event::Event::WindowEvent { event, .. } => match event {
+                glutin::event::WindowEvent::Resized(logical_size) => {
+                    let dpi_factor =
+                        windowed_context.window().get_hidpi_factor();
+                    windowed_context
+                        .resize(logical_size.to_physical(dpi_factor));
+                }
+                glutin::event::WindowEvent::KeyboardInput {
+                    input:
+                        glutin::KeyboardInput {
+                            virtual_keycode:
+                                Some(glutin::VirtualKeyCode::Escape),
+                            ..
+                        },
+                    ..
+                } => running = false,
                 _ => (),
-            }
-        });
+            },
+            _ => (),
+        }
 
         gl.draw_frame([0.0; 4]);
         windowed_context.swap_buffers().unwrap();
-    }
+
+        match event {
+            glutin::event::Event::WindowEvent {
+                event: glutin::event::WindowEvent::CloseRequested,
+                ..
+            } => *control_flow = winit::event_loop::ControlFlow::Exit,
+            _ => *control_flow = winit::event_loop::ControlFlow::Wait,
+        }
+    });
 }

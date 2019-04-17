@@ -10,8 +10,8 @@ use crate::{
 use glutin_glx_sys as ffi;
 use winit;
 use winit::dpi;
-pub use winit::os::unix::x11::{XConnection, XError, XNotSupported};
-use winit::os::unix::{EventsLoopExt, WindowBuilderExt, WindowExt};
+use crate::platform::unix::x11::XConnection;
+use crate::platform::unix::{EventLoopExtUnix, WindowBuilderExtUnix, WindowExtUnix};
 
 use std::ops::{Deref, DerefMut};
 use std::os::raw;
@@ -96,8 +96,8 @@ impl Context {
     }
 
     #[inline]
-    pub fn new_headless(
-        el: &winit::EventsLoop,
+    pub fn new_headless<T>(
+        el: &winit::event_loop::EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: Option<dpi::PhysicalSize>,
@@ -113,8 +113,8 @@ impl Context {
         })
     }
 
-    fn new_headless_impl(
-        el: &winit::EventsLoop,
+    fn new_headless_impl<T>(
+        el: &winit::event_loop::EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: Option<dpi::PhysicalSize>,
@@ -341,24 +341,24 @@ impl Context {
     }
 
     #[inline]
-    pub fn new(
-        wb: winit::WindowBuilder,
-        el: &winit::EventsLoop,
+    pub fn new<T>(
+        wb: winit::window::WindowBuilder,
+        el: &winit::event_loop::EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-    ) -> Result<(winit::Window, Self), CreationError> {
+    ) -> Result<(winit::window::Window, Self), CreationError> {
         Self::try_then_fallback(|fallback| {
             Self::new_impl(wb.clone(), el, pf_reqs, gl_attr, fallback)
         })
     }
 
-    fn new_impl(
-        wb: winit::WindowBuilder,
-        el: &winit::EventsLoop,
+    fn new_impl<T>(
+        wb: winit::window::WindowBuilder,
+        el: &winit::event_loop::EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         fallback: bool,
-    ) -> Result<(winit::Window, Self), CreationError> {
+    ) -> Result<(winit::window::Window, Self), CreationError> {
         let xconn = match el.get_xlib_xconnection() {
             Some(xconn) => xconn,
             None => {

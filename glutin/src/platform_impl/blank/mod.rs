@@ -23,18 +23,18 @@ pub enum Context {}
 
 impl Context {
     #[inline]
-    pub fn new_windowed(
-        _: winit::WindowBuilder,
-        _: &winit::EventsLoop,
+    pub fn new_windowed<T>(
+        _: winit::window::WindowBuilder,
+        _: &winit::event_loop::EventLoop<T>,
         _: &PixelFormatRequirements,
         _: &GlAttributes<&Context>,
-    ) -> Result<(winit::Window, Self), CreationError> {
+    ) -> Result<(winit::window::Window, Self), CreationError> {
         unimplemented!("Glutin-Blank: Platform unsupported")
     }
 
     #[inline]
-    pub fn new_headless(
-        _: &winit::EventsLoop,
+    pub fn new_headless<T>(
+        _: &winit::event_loop::EventLoop<T>,
         _: &PixelFormatRequirements,
         _: &GlAttributes<&Context>,
         _: dpi::PhysicalSize,

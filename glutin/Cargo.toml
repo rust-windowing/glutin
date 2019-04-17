@@ -11,10 +11,9 @@ documentation = "https://docs.rs/glutin"
 edition = "2018"
 
 [package.metadata.docs.rs]
-features = ["icon_loading", "serde"]
+features = ["serde"]
 
 [features]
-icon_loading = ["winit/icon_loading"]
 serde = ["winit/serde"]
 
 [dependencies]

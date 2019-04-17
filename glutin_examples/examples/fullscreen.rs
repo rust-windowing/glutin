@@ -3,7 +3,7 @@ mod support;
 use std::io::{self, Write};
 
 fn main() {
-    let mut el = glutin::EventsLoop::new();
+    let el = glutin::event_loop::EventLoop::new();
 
     // enumerating monitors
     let monitor = {
@@ -27,7 +27,7 @@ fn main() {
         monitor
     };
 
-    let wb = glutin::WindowBuilder::new()
+    let wb = glutin::window::WindowBuilder::new()
         .with_title("Hello world!")
         .with_fullscreen(Some(monitor));
     let windowed_context = glutin::ContextBuilder::new()
@@ -39,52 +39,54 @@ fn main() {
     let gl = support::load(&windowed_context.context());
 
     let mut fullscreen = true;
-    let mut running = true;
-    while running {
-        el.poll_events(|event| {
-            println!("{:?}", event);
-            match event {
-                glutin::Event::WindowEvent { event, .. } => match event {
-                    glutin::WindowEvent::CloseRequested => running = false,
-                    glutin::WindowEvent::Resized(logical_size) => {
-                        let dpi_factor =
-                            windowed_context.window().get_hidpi_factor();
-                        windowed_context
-                            .resize(logical_size.to_physical(dpi_factor));
-                    }
-                    glutin::WindowEvent::KeyboardInput { input, .. } => {
-                        match input.virtual_keycode {
-                            Some(glutin::VirtualKeyCode::Escape) => {
-                                running = false
-                            }
-                            Some(glutin::VirtualKeyCode::F)
-                                if input.state
-                                    == glutin::ElementState::Pressed =>
-                            {
-                                let monitor = if fullscreen {
-                                    None
-                                } else {
-                                    Some(
-                                        windowed_context
-                                            .window()
-                                            .get_current_monitor(),
-                                    )
-                                };
-                                windowed_context
-                                    .window()
-                                    .set_fullscreen(monitor);
-                                fullscreen = !fullscreen;
-                            }
-                            _ => (),
+    el.run(move |event, _, control_flow| {
+        println!("{:?}", event);
+        match event {
+            glutin::event::Event::LoopDestroyed => return,
+            glutin::event::Event::WindowEvent { ref event, .. } => match event {
+                glutin::event::WindowEvent::Resized(logical_size) => {
+                    let dpi_factor =
+                        windowed_context.window().get_hidpi_factor();
+                    windowed_context
+                        .resize(logical_size.to_physical(dpi_factor));
+                }
+                glutin::event::WindowEvent::KeyboardInput { input, .. } => {
+                    match input.virtual_keycode {
+                        Some(glutin::event::VirtualKeyCode::F)
+                            if input.state
+                                == glutin::event::ElementState::Pressed =>
+                        {
+                            let monitor = if fullscreen {
+                                None
+                            } else {
+                                Some(
+                                    windowed_context
+                                        .window()
+                                        .get_current_monitor(),
+                                )
+                            };
+                            windowed_context
+                                .window()
+                                .set_fullscreen(monitor);
+                            fullscreen = !fullscreen;
                         }
+                        _ => (),
                     }
-                    _ => (),
-                },
+                }
                 _ => (),
-            }
-        });
+            },
+            _ => (),
+        }
 
         gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
         windowed_context.swap_buffers().unwrap();
-    }
+
+        match event {
+            glutin::event::Event::WindowEvent {
+                event: glutin::event::WindowEvent::CloseRequested,
+                ..
+            } => *control_flow = winit::event_loop::ControlFlow::Exit,
+            _ => *control_flow = winit::event_loop::ControlFlow::Wait,
+        }
+    });
 }

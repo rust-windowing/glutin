@@ -20,7 +20,7 @@ use objc::runtime::{BOOL, NO};
 
 use winit;
 use winit::dpi;
-use winit::os::macos::WindowExt;
+use crate::platform::macos::WindowExtMacOS;
 pub use winit::MonitorId;
 
 use std::ops::Deref;
@@ -49,12 +49,12 @@ pub struct HeadlessContext {
 
 impl Context {
     #[inline]
-    pub fn new_windowed(
-        wb: winit::WindowBuilder,
-        el: &winit::EventsLoop,
+    pub fn new_windowed<T>(
+        wb: winit::window::WindowBuilder,
+        el: &winit::event_loop::EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-    ) -> Result<(winit::Window, Self), CreationError> {
+    ) -> Result<(winit::window::Window, Self), CreationError> {
         let transparent = wb.window.transparent;
         let win = wb.build(el)?;
 
@@ -163,8 +163,8 @@ impl Context {
     }
 
     #[inline]
-    pub fn new_headless(
-        _el: &winit::EventsLoop,
+    pub fn new_headless<T>(
+        _el: &winit::event_loop::EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         _size: dpi::PhysicalSize,

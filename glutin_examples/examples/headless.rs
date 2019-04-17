@@ -7,15 +7,15 @@ use support::gl;
 #[cfg(target_os = "linux")]
 fn build_context_surfaceless<T1: glutin::ContextCurrentState>(
     cb: glutin::ContextBuilder<T1>,
-    el: &glutin::EventsLoop,
+    el: &glutin::event_loop::EventLoop,
 ) -> Result<glutin::Context<glutin::NotCurrent>, glutin::CreationError> {
-    use glutin::os::unix::HeadlessContextExt;
+    use glutin::platform::unix::HeadlessContextExt;
     cb.build_surfaceless(&el)
 }
 
 fn build_context_headless<T1: glutin::ContextCurrentState>(
     cb: glutin::ContextBuilder<T1>,
-    el: &glutin::EventsLoop,
+    el: &glutin::event_loop::EventLoop,
 ) -> Result<glutin::Context<glutin::NotCurrent>, glutin::CreationError> {
     let size_one = PhysicalSize::new(1., 1.);
     cb.build_headless(&el, size_one)
@@ -25,7 +25,7 @@ fn build_context_headless<T1: glutin::ContextCurrentState>(
 fn build_context_osmesa<T1: glutin::ContextCurrentState>(
     cb: glutin::ContextBuilder<T1>,
 ) -> Result<glutin::Context<glutin::NotCurrent>, glutin::CreationError> {
-    use glutin::os::unix::HeadlessContextExt;
+    use glutin::platform::unix::HeadlessContextExt;
     let size_one = PhysicalSize::new(1., 1.);
     cb.build_osmesa(size_one)
 }
@@ -34,7 +34,7 @@ fn build_context_osmesa<T1: glutin::ContextCurrentState>(
 fn build_context<T1: glutin::ContextCurrentState>(
     cb: glutin::ContextBuilder<T1>,
 ) -> Result<
-    (glutin::Context<glutin::NotCurrent>, glutin::EventsLoop),
+    (glutin::Context<glutin::NotCurrent>, glutin::event_loop::EventLoop),
     [glutin::CreationError; 3],
 > {
     // On linux, you should always try for surfaceless first, and if that
@@ -44,7 +44,7 @@ fn build_context<T1: glutin::ContextCurrentState>(
     // If willing, you could attempt to use hidden windows instead of os mesa,
     // but note that you must handle events for the window that come on the
     // events loop.
-    let el = glutin::EventsLoop::new();
+    let el = glutin::event_loop::EventLoop::new();
 
     println!("Trying surfaceless");
     let err1 = match build_context_surfaceless(cb.clone(), &el) {
@@ -71,10 +71,10 @@ fn build_context<T1: glutin::ContextCurrentState>(
 fn build_context<T1: glutin::ContextCurrentState>(
     cb: glutin::ContextBuilder<T1>,
 ) -> Result<
-    (glutin::Context<glutin::NotCurrent>, glutin::EventsLoop),
+    (glutin::Context<glutin::NotCurrent>, glutin::event_loop::EventLoop),
     glutin::CreationError,
 > {
-    let el = glutin::EventsLoop::new();
+    let el = glutin::event_loop::EventLoop::new();
     build_context_headless(cb.clone(), &el).map(|ctx| (ctx, el))
 }
 

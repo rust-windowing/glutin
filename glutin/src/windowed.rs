@@ -11,42 +11,28 @@ use std::marker::PhantomData;
 ///
 /// ```no_run
 /// # fn main() {
-/// let mut el = glutin::EventsLoop::new();
-/// let wb = glutin::WindowBuilder::new();
+/// let mut el = glutin::event_loop::EventLoop::new();
+/// let wb = glutin::window::WindowBuilder::new();
 /// let windowed_context = glutin::ContextBuilder::new()
 ///     .build_windowed(wb, &el)
 ///     .unwrap();
 ///
 /// let windowed_context = unsafe { windowed_context.make_current().unwrap() };
-///
-/// loop {
-///     el.poll_events(|event| {
-///         match event {
-///             // process events here
-///             _ => (),
-///         }
-///     });
-///
-///     // draw everything here
-///
-///     windowed_context.swap_buffers();
-///     std::thread::sleep(std::time::Duration::from_millis(17));
-/// }
 /// # }
 /// ```
 ///
 /// [`ContextWrapper<T, Window>`]: struct.ContextWrapper.html
 /// [`Window`]: struct.Window.html
 /// [`Context`]: struct.Context.html
-pub type WindowedContext<T> = ContextWrapper<T, Window>;
+pub type WindowedContext<T> = ContextWrapper<T, winit::window::Window>;
 
 /// Represents an OpenGL [`Context`] which has an underlying window that is
 /// stored separately.
 ///
 /// This type can only be created via one of three ways:
 ///
-///  * [`os::unix::RawContextExt`]
-///  * [`os::windows::RawContextExt`]
+///  * [`platform::unix::RawContextExt`]
+///  * [`platform::windows::RawContextExt`]
 ///  * [`WindowedContext<T>::split`]
 ///
 /// Please see [`ContextWrapper<T, ()>`].
@@ -57,13 +43,13 @@ pub type WindowedContext<T> = ContextWrapper<T, Window>;
 #[cfg_attr(
     target_os = "windows",
     doc = "\
-[`os::windows::RawContextExt`]: os/windows/enum.RawHandle.html
+[`platform::windows::RawContextExt`]: os/windows/enum.RawHandle.html
 "
 )]
 #[cfg_attr(
     not(target_os = "windows",),
     doc = "\
-[`os::windows::RawContextExt`]: os/index.html
+[`platform::windows::RawContextExt`]: os/index.html
 "
 )]
 #[cfg_attr(
@@ -75,7 +61,7 @@ pub type WindowedContext<T> = ContextWrapper<T, Window>;
         target_os = "openbsd",
     )),
     doc = "\
-[`os::unix::RawContextExt`]: os/index.html
+[`platform::unix::RawContextExt`]: os/index.html
 "
 )]
 #[cfg_attr(
@@ -87,7 +73,7 @@ pub type WindowedContext<T> = ContextWrapper<T, Window>;
         target_os = "openbsd",
     ),
     doc = "\
-[`os::unix::RawContextExt`]: os/unix/enum.RawHandle.html
+[`platform::unix::RawContextExt`]: os/unix/enum.RawHandle.html
 "
 )]
 pub type RawContext<T> = ContextWrapper<T, ()>;
@@ -109,7 +95,7 @@ pub struct ContextWrapper<T: ContextCurrentState, W> {
 
 impl<T: ContextCurrentState> WindowedContext<T> {
     /// Borrow the inner `W`.
-    pub fn window(&self) -> &Window {
+    pub fn window(&self) -> &winit::window::Window {
         &self.window
     }
 
@@ -123,7 +109,7 @@ impl<T: ContextCurrentState> WindowedContext<T> {
     /// [`RawContext<T>`]: type.RawContext.html
     /// [`Window`]: struct.Window.html
     /// [`Context`]: struct.Context.html
-    pub unsafe fn split(self) -> (RawContext<T>, Window) {
+    pub unsafe fn split(self) -> (RawContext<T>, winit::window::Window) {
         (
             RawContext {
                 context: self.context,
@@ -164,7 +150,7 @@ impl<W> ContextWrapper<PossiblyCurrent, W> {
     ///
     /// [`LogicalSize`]: dpi/struct.LogicalSize.html
     /// [`PhysicalSize`]: dpi/struct.PhysicalSize.html
-    /// [`Resized`]: enum.WindowEvent.html#variant.Resized
+    /// [`Resized`]: event/enum.WindowEvent.html#variant.Resized
     pub fn resize(&self, size: dpi::PhysicalSize) {
         let (width, height) = size.into();
         self.context.context.resize(width, height);
@@ -339,14 +325,14 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     ///
     /// [`WindowedContext<T>`]: type.WindowedContext.html
     /// [`Context`]: struct.Context.html
-    pub fn build_windowed(
+    pub fn build_windowed<TE>(
         self,
-        wb: WindowBuilder,
-        el: &EventsLoop,
+        wb: winit::window::WindowBuilder,
+        el: &winit::event_loop::EventLoop<TE>,
     ) -> Result<WindowedContext<NotCurrent>, CreationError> {
         let ContextBuilder { pf_reqs, gl_attr } = self;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
-        platform::Context::new_windowed(wb, el, &pf_reqs, &gl_attr).map(
+        platform_impl::Context::new_windowed(wb, el, &pf_reqs, &gl_attr).map(
             |(window, context)| WindowedContext {
                 window,
                 context: Context {
