@@ -7,11 +7,13 @@ use crate::{
     PixelFormatRequirements,
 };
 
+use crate::platform::unix::x11::XConnection;
+use crate::platform::unix::{
+    EventLoopExtUnix, WindowBuilderExtUnix, WindowExtUnix,
+};
 use glutin_glx_sys as ffi;
 use winit;
 use winit::dpi;
-use crate::platform::unix::x11::XConnection;
-use crate::platform::unix::{EventLoopExtUnix, WindowBuilderExtUnix, WindowExtUnix};
 
 use std::ops::{Deref, DerefMut};
 use std::os::raw;

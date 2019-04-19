@@ -1,5 +1,5 @@
-use glutin_glx_sys as ffi;
 use crate::platform::unix::x11::XConnection;
+use glutin_glx_sys as ffi;
 
 use std::sync::Arc;
 

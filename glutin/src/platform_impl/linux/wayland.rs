@@ -6,12 +6,12 @@ use crate::{
     PixelFormatRequirements,
 };
 
+use crate::platform::unix::{EventLoopExtUnix, WindowExtUnix};
 use glutin_egl_sys as ffi;
 use wayland_client::egl as wegl;
 pub use wayland_client::sys::client::wl_display;
 use winit;
 use winit::dpi;
-use crate::platform::unix::{EventLoopExtUnix, WindowExtUnix};
 
 use std::ops::Deref;
 use std::os::raw;

@@ -57,9 +57,9 @@ use crate::{
     PixelFormat, PixelFormatRequirements, ReleaseBehavior, Robustness,
 };
 
+use crate::platform::unix::x11::XConnection;
 use glutin_glx_sys as ffi;
 use winit::dpi;
-use crate::platform::unix::x11::XConnection;
 
 use std::ffi::{CStr, CString};
 use std::os::raw;

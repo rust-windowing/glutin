@@ -103,46 +103,48 @@ fn main() {
                     let _ = ct.get_current(headless_id).unwrap();
                     glc.gl.DeleteFramebuffers(1, &context_fb);
                 }
-                return
+                return;
             }
-            glutin::event::Event::WindowEvent { ref event, .. } => match event {
-                glutin::event::WindowEvent::Resized(logical_size) => {
-                    let windowed_context =
-                        ct.get_current(windowed_id).unwrap();
-                    let dpi_factor = windowed_context
-                        .windowed()
-                        .window()
-                        .get_hidpi_factor();
-                    size = logical_size.to_physical(dpi_factor);
-                    windowed_context.windowed().resize(size);
+            glutin::event::Event::WindowEvent { ref event, .. } => {
+                match event {
+                    glutin::event::WindowEvent::Resized(logical_size) => {
+                        let windowed_context =
+                            ct.get_current(windowed_id).unwrap();
+                        let dpi_factor = windowed_context
+                            .windowed()
+                            .window()
+                            .get_hidpi_factor();
+                        size = logical_size.to_physical(dpi_factor);
+                        windowed_context.windowed().resize(size);
 
-                    unsafe {
-                        windowed_context.windowed().swap_buffers().unwrap();
-                        glw.gl.RenderbufferStorage(
-                            gl::RENDERBUFFER,
-                            gl::RGB8,
-                            size.width as _,
-                            size.height as _,
-                        );
-                        glw.gl.Viewport(
-                            0,
-                            0,
-                            size.width as _,
-                            size.height as _,
-                        );
-                        std::mem::drop(windowed_context);
+                        unsafe {
+                            windowed_context.windowed().swap_buffers().unwrap();
+                            glw.gl.RenderbufferStorage(
+                                gl::RENDERBUFFER,
+                                gl::RGB8,
+                                size.width as _,
+                                size.height as _,
+                            );
+                            glw.gl.Viewport(
+                                0,
+                                0,
+                                size.width as _,
+                                size.height as _,
+                            );
+                            std::mem::drop(windowed_context);
 
-                        let _ = ct.get_current(headless_id).unwrap();
-                        glc.gl.Viewport(
-                            0,
-                            0,
-                            size.width as _,
-                            size.height as _,
-                        );
+                            let _ = ct.get_current(headless_id).unwrap();
+                            glc.gl.Viewport(
+                                0,
+                                0,
+                                size.width as _,
+                                size.height as _,
+                            );
+                        }
                     }
+                    _ => (),
                 }
-                _ => (),
-            },
+            }
             _ => (),
         }
 

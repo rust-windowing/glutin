@@ -16,9 +16,9 @@ use crate::{
     NotCurrent, PixelFormat, PixelFormatRequirements,
 };
 
-use winit::dpi;
-use crate::platform::unix::EventLoopExtUnix;
 use crate::platform::unix::x11::XConnection;
+use crate::platform::unix::EventLoopExtUnix;
+use winit::dpi;
 
 use std::marker::PhantomData;
 use std::os::raw;

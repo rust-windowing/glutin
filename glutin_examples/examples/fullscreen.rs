@@ -43,15 +43,17 @@ fn main() {
         println!("{:?}", event);
         match event {
             glutin::event::Event::LoopDestroyed => return,
-            glutin::event::Event::WindowEvent { ref event, .. } => match event {
-                glutin::event::WindowEvent::Resized(logical_size) => {
-                    let dpi_factor =
-                        windowed_context.window().get_hidpi_factor();
-                    windowed_context
-                        .resize(logical_size.to_physical(dpi_factor));
-                }
-                glutin::event::WindowEvent::KeyboardInput { input, .. } => {
-                    match input.virtual_keycode {
+            glutin::event::Event::WindowEvent { ref event, .. } => {
+                match event {
+                    glutin::event::WindowEvent::Resized(logical_size) => {
+                        let dpi_factor =
+                            windowed_context.window().get_hidpi_factor();
+                        windowed_context
+                            .resize(logical_size.to_physical(dpi_factor));
+                    }
+                    glutin::event::WindowEvent::KeyboardInput {
+                        input, ..
+                    } => match input.virtual_keycode {
                         Some(glutin::event::VirtualKeyCode::F)
                             if input.state
                                 == glutin::event::ElementState::Pressed =>
@@ -65,16 +67,14 @@ fn main() {
                                         .get_current_monitor(),
                                 )
                             };
-                            windowed_context
-                                .window()
-                                .set_fullscreen(monitor);
+                            windowed_context.window().set_fullscreen(monitor);
                             fullscreen = !fullscreen;
                         }
                         _ => (),
-                    }
+                    },
+                    _ => (),
                 }
-                _ => (),
-            },
+            }
             _ => (),
         }
 

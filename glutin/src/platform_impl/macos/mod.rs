@@ -18,9 +18,9 @@ use core_foundation::bundle::{
 use core_foundation::string::CFString;
 use objc::runtime::{BOOL, NO};
 
+use crate::platform::macos::WindowExtMacOS;
 use winit;
 use winit::dpi;
-use crate::platform::macos::WindowExtMacOS;
 pub use winit::MonitorId;
 
 use std::ops::Deref;

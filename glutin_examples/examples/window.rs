@@ -2,7 +2,8 @@ mod support;
 
 fn main() {
     let el = glutin::event_loop::EventLoop::new();
-    let wb = glutin::window::WindowBuilder::new().with_title("A fantastic window!");
+    let wb =
+        glutin::window::WindowBuilder::new().with_title("A fantastic window!");
 
     let windowed_context = glutin::ContextBuilder::new()
         .build_windowed(wb, &el)
@@ -21,15 +22,17 @@ fn main() {
         println!("{:?}", event);
         match event {
             glutin::event::Event::LoopDestroyed => return,
-            glutin::event::Event::WindowEvent { ref event, .. } => match event {
-                glutin::event::WindowEvent::Resized(logical_size) => {
-                    let dpi_factor =
-                        windowed_context.window().get_hidpi_factor();
-                    windowed_context
-                        .resize(logical_size.to_physical(dpi_factor));
+            glutin::event::Event::WindowEvent { ref event, .. } => {
+                match event {
+                    glutin::event::WindowEvent::Resized(logical_size) => {
+                        let dpi_factor =
+                            windowed_context.window().get_hidpi_factor();
+                        windowed_context
+                            .resize(logical_size.to_physical(dpi_factor));
+                    }
+                    _ => (),
                 }
-                _ => (),
-            },
+            }
             _ => (),
         }
 

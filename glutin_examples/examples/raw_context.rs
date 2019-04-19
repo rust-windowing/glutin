@@ -23,7 +23,9 @@ mod this_example {
 
             #[cfg(target_os = "linux")]
             unsafe {
-                use glutin::platform::unix::{RawContextExt, EventLoopExtUnix, WindowExtUnix};
+                use glutin::platform::unix::{
+                    EventLoopExtUnix, RawContextExt, WindowExtUnix,
+                };
 
                 let cb = glutin::ContextBuilder::new();
                 let raw_context;
@@ -58,7 +60,9 @@ mod this_example {
 
             #[cfg(target_os = "windows")]
             unsafe {
-                use glutin::platform::windows::{RawContextExt, WindowExtWindows};
+                use glutin::platform::windows::{
+                    RawContextExt, WindowExtWindows,
+                };
 
                 let hwnd = win.get_hwnd();
                 let raw_context = glutin::ContextBuilder::new()
@@ -84,16 +88,18 @@ mod this_example {
             match event {
                 glutin::event::Event::LoopDestroyed => {
                     Takeable::take(&mut raw_context); // Make sure it drops first
-                    return
-                },
-                glutin::event::Event::WindowEvent { ref event, .. } => match event {
-                    glutin::event::WindowEvent::Resized(logical_size) => {
-                        let dpi_factor = win.get_hidpi_factor();
-                        raw_context
-                            .resize(logical_size.to_physical(dpi_factor));
+                    return;
+                }
+                glutin::event::Event::WindowEvent { ref event, .. } => {
+                    match event {
+                        glutin::event::WindowEvent::Resized(logical_size) => {
+                            let dpi_factor = win.get_hidpi_factor();
+                            raw_context
+                                .resize(logical_size.to_physical(dpi_factor));
+                        }
+                        _ => (),
                     }
-                    _ => (),
-                },
+                }
                 _ => (),
             }
 

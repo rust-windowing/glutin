@@ -62,8 +62,8 @@
 
 use crate::platform::ios::{WindowBuilderExtIOS, WindowExtIOS};
 use crate::{
-    Api, ContextError, CreationError, GlAttributes, GlRequest,
-    PixelFormat, PixelFormatRequirements
+    Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
+    PixelFormatRequirements,
 };
 
 use glutin_gles2_sys as ffi;
