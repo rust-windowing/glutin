@@ -7,7 +7,7 @@ use support::gl;
 #[cfg(target_os = "linux")]
 fn build_context_surfaceless<T1: glutin::ContextCurrentState>(
     cb: glutin::ContextBuilder<T1>,
-    el: &glutin::event_loop::EventLoop,
+    el: &glutin::event_loop::EventLoop<()>,
 ) -> Result<glutin::Context<glutin::NotCurrent>, glutin::CreationError> {
     use glutin::platform::unix::HeadlessContextExt;
     cb.build_surfaceless(&el)
@@ -15,7 +15,7 @@ fn build_context_surfaceless<T1: glutin::ContextCurrentState>(
 
 fn build_context_headless<T1: glutin::ContextCurrentState>(
     cb: glutin::ContextBuilder<T1>,
-    el: &glutin::event_loop::EventLoop,
+    el: &glutin::event_loop::EventLoop<()>,
 ) -> Result<glutin::Context<glutin::NotCurrent>, glutin::CreationError> {
     let size_one = PhysicalSize::new(1., 1.);
     cb.build_headless(&el, size_one)
@@ -36,7 +36,7 @@ fn build_context<T1: glutin::ContextCurrentState>(
 ) -> Result<
     (
         glutin::Context<glutin::NotCurrent>,
-        glutin::event_loop::EventLoop,
+        glutin::event_loop::EventLoop<()>,
     ),
     [glutin::CreationError; 3],
 > {

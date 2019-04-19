@@ -72,14 +72,15 @@ fn main() {
                         }
                         _ => (),
                     },
+                    glutin::event::WindowEvent::RedrawRequested => {
+                        gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
+                        windowed_context.swap_buffers().unwrap();
+                    }
                     _ => (),
                 }
             }
             _ => (),
         }
-
-        gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
-        windowed_context.swap_buffers().unwrap();
 
         match event {
             glutin::event::Event::WindowEvent {

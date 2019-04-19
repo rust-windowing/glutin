@@ -1,7 +1,7 @@
 mod support;
 
 fn main() {
-    let mut el = glutin::event_loop::EventLoop::new();
+    let el = glutin::event_loop::EventLoop::new();
     let wb = glutin::window::WindowBuilder::new()
         .with_title("A transparent window!")
         .with_decorations(false)
@@ -24,29 +24,21 @@ fn main() {
         println!("{:?}", event);
         match event {
             glutin::event::Event::LoopDestroyed => return,
-            glutin::event::Event::WindowEvent { event, .. } => match event {
+            glutin::event::Event::WindowEvent { ref event, .. } => match event {
                 glutin::event::WindowEvent::Resized(logical_size) => {
                     let dpi_factor =
                         windowed_context.window().get_hidpi_factor();
                     windowed_context
                         .resize(logical_size.to_physical(dpi_factor));
                 }
-                glutin::event::WindowEvent::KeyboardInput {
-                    input:
-                        glutin::KeyboardInput {
-                            virtual_keycode:
-                                Some(glutin::VirtualKeyCode::Escape),
-                            ..
-                        },
-                    ..
-                } => running = false,
+                glutin::event::WindowEvent::RedrawRequested => {
+                    gl.draw_frame([0.0; 4]);
+                    windowed_context.swap_buffers().unwrap();
+                }
                 _ => (),
             },
             _ => (),
         }
-
-        gl.draw_frame([0.0; 4]);
-        windowed_context.swap_buffers().unwrap();
 
         match event {
             glutin::event::Event::WindowEvent {

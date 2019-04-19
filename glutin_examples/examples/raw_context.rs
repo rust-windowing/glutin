@@ -97,14 +97,15 @@ mod this_example {
                             raw_context
                                 .resize(logical_size.to_physical(dpi_factor));
                         }
+                        glutin::event::WindowEvent::RedrawRequested => {
+                            gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
+                            raw_context.swap_buffers().unwrap();
+                        }
                         _ => (),
                     }
                 }
                 _ => (),
             }
-
-            gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
-            raw_context.swap_buffers().unwrap();
 
             match event {
                 glutin::event::Event::WindowEvent {

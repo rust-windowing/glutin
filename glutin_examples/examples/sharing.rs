@@ -142,32 +142,33 @@ fn main() {
                             );
                         }
                     }
+                    glutin::event::WindowEvent::RedrawRequested => {
+                        let headless_context = ct.get_current(headless_id).unwrap();
+                        glc.draw_frame([1.0, 0.5, 0.7, 1.0]);
+                        std::mem::drop(headless_context);
+
+                        let windowed_context = ct.get_current(windowed_id).unwrap();
+                        unsafe {
+                            glw.gl.BlitFramebuffer(
+                                0,
+                                0,
+                                size.width as _,
+                                size.height as _,
+                                0,
+                                0,
+                                size.width as _,
+                                size.height as _,
+                                gl::COLOR_BUFFER_BIT,
+                                gl::NEAREST,
+                            );
+                        }
+                        windowed_context.windowed().swap_buffers().unwrap();
+                    }
                     _ => (),
                 }
             }
             _ => (),
         }
-
-        let headless_context = ct.get_current(headless_id).unwrap();
-        glc.draw_frame([1.0, 0.5, 0.7, 1.0]);
-        std::mem::drop(headless_context);
-
-        let windowed_context = ct.get_current(windowed_id).unwrap();
-        unsafe {
-            glw.gl.BlitFramebuffer(
-                0,
-                0,
-                size.width as _,
-                size.height as _,
-                0,
-                0,
-                size.width as _,
-                size.height as _,
-                gl::COLOR_BUFFER_BIT,
-                gl::NEAREST,
-            );
-        }
-        windowed_context.windowed().swap_buffers().unwrap();
 
         match event {
             glutin::event::Event::WindowEvent {

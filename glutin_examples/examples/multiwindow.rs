@@ -20,7 +20,7 @@ fn main() {
         let context_id = ct.insert(ContextCurrentWrapper::PossiblyCurrent(
             ContextWrapper::Windowed(windowed_context),
         ));
-        windows.insert(window_id, (context_id, gl));
+        windows.insert(window_id, (context_id, gl, index));
     }
 
     el.run(move |event, _, control_flow| {
@@ -39,7 +39,7 @@ fn main() {
                             .resize(logical_size.to_physical(dpi_factor));
                     }
                     glutin::event::WindowEvent::CloseRequested => {
-                        if let Some((cid, _)) = windows.remove(&window_id) {
+                        if let Some((cid, _, _)) = windows.remove(&window_id) {
                             ct.remove(cid);
                             println!(
                                 "Window with ID {:?} has been closed",
@@ -47,18 +47,22 @@ fn main() {
                             );
                         }
                     }
+                    glutin::event::WindowEvent::RedrawRequested => {
+                        let window = &windows[&window_id];
+
+                        let mut color = [1.0, 0.5, 0.7, 1.0];
+                        color.swap(0, window.2 % 3);
+
+                        let windowed_context =
+                            ct.get_current(window.0).unwrap();
+
+                        window.1.draw_frame(color);
+                        windowed_context.windowed().swap_buffers().unwrap();
+                    }
                     _ => (),
                 }
             }
             _ => (),
-        }
-
-        for (index, window) in windows.values().enumerate() {
-            let mut color = [1.0, 0.5, 0.7, 1.0];
-            color.swap(0, index % 3);
-            let windowed_context = ct.get_current(window.0).unwrap();
-            window.1.draw_frame(color);
-            windowed_context.windowed().swap_buffers().unwrap();
         }
 
         if windows.is_empty() {
