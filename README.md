@@ -12,6 +12,7 @@ glutin = "*"
 ```
 
 ## [Documentation](https://docs.rs/glutin)
+## [0.21.0 Migration guide](https://gentz.rocks/posts/glutin-v0-21-0-migration-guide/)
 
 ## Contact Us
 
@@ -21,13 +22,9 @@ Join us in any of these:
 [![Matrix](https://img.shields.io/badge/Matrix-%23Glutin%3Amatrix.org-blueviolet.svg)](https://matrix.to/#/#Glutin:matrix.org)
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/tomaka/glutin?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-## 0.21.0 Migration guide
-
-[A migration guide can be found here](https://gentz.rocks/posts/glutin-v0-21-0-migration-guide/)
-
 ## Usage Examples
 
-Warning: these are examples for master. For the latest released version, 0.21, view [here](https://github.com/tomaka/glutin/commit/1ed68d6f979b4bc81e2215793232129dd45dab60)
+Warning: these are examples for master. For the latest released version, 0.21, view [here.](https://github.com/rust-windowing/glutin/tree/2e816ae2654ba80eb3e201d0ce51d238cc105226)
 
 ### Try it!
 
