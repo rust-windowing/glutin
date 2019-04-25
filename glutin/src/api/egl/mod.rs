@@ -700,8 +700,8 @@ impl Drop for Context {
             // Yeah, we could have a global static that does ref counting
             // ourselves, but what if some other library is using the display.
             //
-            // On Linux, we could preload a little lib that does ref
-            // counting on that level, but:
+            // On unix operating systems, we could preload a little lib that
+            // does ref counting on that level, but:
             //      A) What about other platforms?
             //      B) Do you *really* want all glutin programs to preload a
             //      library?

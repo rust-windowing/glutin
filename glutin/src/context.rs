@@ -1,6 +1,7 @@
 use super::*;
 
 use std::marker::PhantomData;
+use winit::event_loop::EventLoop;
 
 /// Represents an OpenGL [`Context`].
 ///
@@ -131,7 +132,7 @@ impl Context<PossiblyCurrent> {
 impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     /// Builds the given GL context.
     ///
-    /// When on linux, prefer [`build_surfaceless`]. If both
+    /// When on a unix operating system, prefer [`build_surfaceless`]. If both
     /// [`build_surfaceless`] and `build_headless` fail, try using a hidden
     /// window, or [`build_osmesa`]. Please note that if you choose to use a
     /// hidden window, you must still handle the events it generates on the
@@ -173,7 +174,7 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     )]
     pub fn build_headless<TE>(
         self,
-        el: &winit::event_loop::EventLoop<TE>,
+        el: &EventLoop<TE>,
         size: dpi::PhysicalSize,
     ) -> Result<Context<NotCurrent>, CreationError> {
         let ContextBuilder { pf_reqs, gl_attr } = self;

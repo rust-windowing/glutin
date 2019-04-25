@@ -10,7 +10,7 @@ mod platform_impl;
     target_os = "netbsd",
     target_os = "openbsd",
 ))]
-#[path = "linux/mod.rs"]
+#[path = "unix/mod.rs"]
 mod platform_impl;
 #[cfg(target_os = "macos")]
 #[path = "macos/mod.rs"]
@@ -23,19 +23,4 @@ mod platform_impl;
 mod platform_impl;
 #[cfg(target_os = "emscripten")]
 #[path = "emscripten/mod.rs"]
-mod platform_impl;
-
-#[cfg(not(any(
-    target_os = "ios",
-    target_os = "windows",
-    target_os = "linux",
-    target_os = "macos",
-    target_os = "android",
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "emscripten",
-)))]
-#[path = "blank/mod.rs"]
 mod platform_impl;

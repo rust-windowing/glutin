@@ -1,53 +1,52 @@
 mod support;
 
 use glutin::dpi::PhysicalSize;
+use glutin::event_loop::EventLoop;
+use glutin::{
+    Context, ContextBuilder, ContextCurrentState, CreationError, GlProfile,
+    GlRequest, NotCurrent,
+};
 use std::path::Path;
 use support::gl;
 
 #[cfg(target_os = "linux")]
-fn build_context_surfaceless<T1: glutin::ContextCurrentState>(
-    cb: glutin::ContextBuilder<T1>,
-    el: &glutin::event_loop::EventLoop<()>,
-) -> Result<glutin::Context<glutin::NotCurrent>, glutin::CreationError> {
+fn build_context_surfaceless<T1: ContextCurrentState>(
+    cb: ContextBuilder<T1>,
+    el: &EventLoop<()>,
+) -> Result<Context<NotCurrent>, CreationError> {
     use glutin::platform::unix::HeadlessContextExt;
     cb.build_surfaceless(&el)
 }
 
-fn build_context_headless<T1: glutin::ContextCurrentState>(
-    cb: glutin::ContextBuilder<T1>,
-    el: &glutin::event_loop::EventLoop<()>,
-) -> Result<glutin::Context<glutin::NotCurrent>, glutin::CreationError> {
+fn build_context_headless<T1: ContextCurrentState>(
+    cb: ContextBuilder<T1>,
+    el: &EventLoop<()>,
+) -> Result<Context<NotCurrent>, CreationError> {
     let size_one = PhysicalSize::new(1., 1.);
     cb.build_headless(&el, size_one)
 }
 
 #[cfg(target_os = "linux")]
-fn build_context_osmesa<T1: glutin::ContextCurrentState>(
-    cb: glutin::ContextBuilder<T1>,
-) -> Result<glutin::Context<glutin::NotCurrent>, glutin::CreationError> {
+fn build_context_osmesa<T1: ContextCurrentState>(
+    cb: ContextBuilder<T1>,
+) -> Result<Context<NotCurrent>, CreationError> {
     use glutin::platform::unix::HeadlessContextExt;
     let size_one = PhysicalSize::new(1., 1.);
     cb.build_osmesa(size_one)
 }
 
 #[cfg(target_os = "linux")]
-fn build_context<T1: glutin::ContextCurrentState>(
-    cb: glutin::ContextBuilder<T1>,
-) -> Result<
-    (
-        glutin::Context<glutin::NotCurrent>,
-        glutin::event_loop::EventLoop<()>,
-    ),
-    [glutin::CreationError; 3],
-> {
-    // On linux, you should always try for surfaceless first, and if that
-    // does not work, headless (pbuffers), and if that too fails, finally
-    // osmesa.
+fn build_context<T1: ContextCurrentState>(
+    cb: ContextBuilder<T1>,
+) -> Result<(Context<NotCurrent>, EventLoop<()>), [CreationError; 3]> {
+    // On unix operating systems, you should always try for surfaceless first,
+    // and if that does not work, headless (pbuffers), and if that too fails,
+    // finally osmesa.
     //
     // If willing, you could attempt to use hidden windows instead of os mesa,
     // but note that you must handle events for the window that come on the
     // events loop.
-    let el = glutin::event_loop::EventLoop::new();
+    let el = EventLoop::new();
 
     println!("Trying surfaceless");
     let err1 = match build_context_surfaceless(cb.clone(), &el) {
@@ -71,23 +70,17 @@ fn build_context<T1: glutin::ContextCurrentState>(
 }
 
 #[cfg(not(target_os = "linux"))]
-fn build_context<T1: glutin::ContextCurrentState>(
-    cb: glutin::ContextBuilder<T1>,
-) -> Result<
-    (
-        glutin::Context<glutin::NotCurrent>,
-        glutin::event_loop::EventLoop,
-    ),
-    glutin::CreationError,
-> {
-    let el = glutin::event_loop::EventLoop::new();
+fn build_context<T1: ContextCurrentState>(
+    cb: ContextBuilder<T1>,
+) -> Result<(Context<NotCurrent>, EventLoop), CreationError> {
+    let el = EventLoop::new();
     build_context_headless(cb.clone(), &el).map(|ctx| (ctx, el))
 }
 
 fn main() {
-    let cb = glutin::ContextBuilder::new()
-        .with_gl_profile(glutin::GlProfile::Core)
-        .with_gl(glutin::GlRequest::Latest);
+    let cb = ContextBuilder::new()
+        .with_gl_profile(GlProfile::Core)
+        .with_gl(GlRequest::Latest);
     let size = PhysicalSize::new(768., 480.);
 
     let (headless_context, _el) = build_context(cb).unwrap();

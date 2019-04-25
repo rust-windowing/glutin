@@ -19,6 +19,8 @@ use crate::{
 use crate::platform::unix::x11::XConnection;
 use crate::platform::unix::EventLoopExtUnix;
 use winit::dpi;
+use winit::event_loop::EventLoop;
+use winit::window::{Window, WindowBuilder};
 
 use std::marker::PhantomData;
 use std::os::raw;
@@ -89,11 +91,11 @@ impl Context {
 
     #[inline]
     pub fn new_windowed<T>(
-        wb: winit::window::WindowBuilder,
-        el: &winit::event_loop::EventLoop<T>,
+        wb: WindowBuilder,
+        el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-    ) -> Result<(winit::window::Window, Self), CreationError> {
+    ) -> Result<(Window, Self), CreationError> {
         if el.is_wayland() {
             Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
 
@@ -116,7 +118,7 @@ impl Context {
 
     #[inline]
     pub fn new_headless<T>(
-        el: &winit::event_loop::EventLoop<T>,
+        el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: dpi::PhysicalSize,
@@ -125,7 +127,7 @@ impl Context {
     }
 
     pub fn new_headless_impl<T>(
-        el: &winit::event_loop::EventLoop<T>,
+        el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: Option<dpi::PhysicalSize>,
@@ -243,8 +245,8 @@ impl Context {
     }
 }
 
-/// A linux-specific extension to the [`ContextBuilder`] which allows building
-/// linux-specific headless contexts.
+/// A unix-specific extension to the [`ContextBuilder`] which allows building
+/// unix-specific headless contexts.
 ///
 /// [`ContextBuilder`]: ../../struct.ContextBuilder.html
 pub trait HeadlessContextExt {
@@ -271,7 +273,7 @@ pub trait HeadlessContextExt {
     /// [`Context`]: struct.Context.html
     fn build_surfaceless<TE>(
         self,
-        el: &winit::event_loop::EventLoop<TE>,
+        el: &EventLoop<TE>,
     ) -> Result<crate::Context<NotCurrent>, CreationError>
     where
         Self: Sized;
@@ -306,7 +308,7 @@ impl<'a, T: ContextCurrentState> HeadlessContextExt
     #[inline]
     fn build_surfaceless<TE>(
         self,
-        el: &winit::event_loop::EventLoop<TE>,
+        el: &EventLoop<TE>,
     ) -> Result<crate::Context<NotCurrent>, CreationError>
     where
         Self: Sized,
@@ -322,7 +324,7 @@ impl<'a, T: ContextCurrentState> HeadlessContextExt
     }
 }
 
-/// A linux-specific extension for the [`ContextBuilder`] which allows
+/// A unix-specific extension for the [`ContextBuilder`] which allows
 /// assembling [`RawContext<T>`]s.
 ///
 /// [`RawContext<T>`]: ../../type.RawContext.html

@@ -15,6 +15,8 @@ use glutin_egl_sys as ffi;
 use winapi::shared::windef::{HGLRC, HWND};
 use winit;
 use winit::dpi;
+use winit::event_loop::EventLoop;
+use winit::window::{Window, WindowBuilder};
 
 use std::marker::PhantomData;
 use std::os::raw;
@@ -32,8 +34,8 @@ pub enum Context {
     Egl(EglContext),
     Wgl(WglContext),
     /// A regular window, but invisible.
-    HiddenWindowEgl(winit::window::Window, EglContext),
-    HiddenWindowWgl(winit::window::Window, WglContext),
+    HiddenWindowEgl(Window, EglContext),
+    HiddenWindowWgl(Window, WglContext),
     /// An EGL pbuffer.
     EglPbuffer(EglContext),
 }
@@ -45,11 +47,11 @@ impl Context {
     /// See the docs in the crate root file.
     #[inline]
     pub fn new_windowed<T>(
-        wb: winit::window::WindowBuilder,
-        el: &winit::event_loop::EventLoop<T>,
+        wb: WindowBuilder,
+        el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Self>,
-    ) -> Result<(winit::window::Window, Self), CreationError> {
+    ) -> Result<(Window, Self), CreationError> {
         let win = wb.build(el)?;
         let hwnd = win.get_hwnd() as HWND;
         let ctx = Self::new_raw_context(hwnd, pf_reqs, gl_attr)?;
@@ -143,7 +145,7 @@ impl Context {
 
     #[inline]
     pub fn new_headless<T>(
-        el: &winit::event_loop::EventLoop<T>,
+        el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: dpi::PhysicalSize,
@@ -180,7 +182,7 @@ impl Context {
             _ => (),
         }
 
-        let wb = winit::window::WindowBuilder::new()
+        let wb = WindowBuilder::new()
             .with_visibility(false)
             .with_dimensions(size.to_logical(1.));
         Self::new_windowed(wb, &el, pf_reqs, gl_attr).map(|(win, context)| {

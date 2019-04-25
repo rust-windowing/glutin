@@ -12,6 +12,8 @@ use wayland_client::egl as wegl;
 pub use wayland_client::sys::client::wl_display;
 use winit;
 use winit::dpi;
+use winit::event_loop::EventLoop;
+use winit::window::{Window, WindowBuilder};
 
 use std::ops::Deref;
 use std::os::raw;
@@ -44,7 +46,7 @@ impl Deref for Context {
 impl Context {
     #[inline]
     pub fn new_headless<T>(
-        el: &winit::event_loop::EventLoop<T>,
+        el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: Option<dpi::PhysicalSize>,
@@ -79,11 +81,11 @@ impl Context {
 
     #[inline]
     pub fn new<T>(
-        wb: winit::window::WindowBuilder,
-        el: &winit::event_loop::EventLoop<T>,
+        wb: WindowBuilder,
+        el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-    ) -> Result<(winit::window::Window, Self), CreationError> {
+    ) -> Result<(Window, Self), CreationError> {
         let win = wb.build(el)?;
 
         let dpi_factor = win.get_hidpi_factor();

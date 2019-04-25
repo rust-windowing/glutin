@@ -1,6 +1,8 @@
 use super::*;
 
 use std::marker::PhantomData;
+use winit::event_loop::EventLoop;
+use winit::window::{Window, WindowBuilder};
 
 /// Represents an OpenGL [`Context`] and the [`Window`] with which it is
 /// associated.
@@ -24,7 +26,7 @@ use std::marker::PhantomData;
 /// [`ContextWrapper<T, Window>`]: struct.ContextWrapper.html
 /// [`Window`]: struct.Window.html
 /// [`Context`]: struct.Context.html
-pub type WindowedContext<T> = ContextWrapper<T, winit::window::Window>;
+pub type WindowedContext<T> = ContextWrapper<T, Window>;
 
 /// Represents an OpenGL [`Context`] which has an underlying window that is
 /// stored separately.
@@ -95,7 +97,7 @@ pub struct ContextWrapper<T: ContextCurrentState, W> {
 
 impl<T: ContextCurrentState> WindowedContext<T> {
     /// Borrow the inner `W`.
-    pub fn window(&self) -> &winit::window::Window {
+    pub fn window(&self) -> &Window {
         &self.window
     }
 
@@ -109,7 +111,7 @@ impl<T: ContextCurrentState> WindowedContext<T> {
     /// [`RawContext<T>`]: type.RawContext.html
     /// [`Window`]: struct.Window.html
     /// [`Context`]: struct.Context.html
-    pub unsafe fn split(self) -> (RawContext<T>, winit::window::Window) {
+    pub unsafe fn split(self) -> (RawContext<T>, Window) {
         (
             RawContext {
                 context: self.context,
@@ -327,8 +329,8 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     /// [`Context`]: struct.Context.html
     pub fn build_windowed<TE>(
         self,
-        wb: winit::window::WindowBuilder,
-        el: &winit::event_loop::EventLoop<TE>,
+        wb: WindowBuilder,
+        el: &EventLoop<TE>,
     ) -> Result<WindowedContext<NotCurrent>, CreationError> {
         let ContextBuilder { pf_reqs, gl_attr } = self;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);

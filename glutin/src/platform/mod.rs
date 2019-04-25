@@ -11,13 +11,11 @@
 
 /// Platform-specific methods for android.
 pub mod android;
-/// Platform-specific methods for blank backend.
-pub mod blank;
 /// Platform-specific methods for iOS.
 pub mod ios;
 /// Platform-specific methods for macOS.
 pub mod macos;
-/// Platform-specific methods for unix.
+/// Platform-specific methods for unix operating systems.
 pub mod unix;
 /// Platform-specific methods for Windows.
 pub mod windows;

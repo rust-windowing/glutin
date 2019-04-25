@@ -11,12 +11,16 @@ fn main() {
 #[cfg(any(target_os = "linux", target_os = "windows"))]
 mod this_example {
     use super::support;
+    use glutin::event::{Event, WindowEvent};
+    use glutin::event_loop::{ControlFlow, EventLoop};
+    use glutin::window::WindowBuilder;
+    use glutin::ContextBuilder;
     use takeable_option::Takeable;
 
     pub fn main() {
         let (raw_context, el, win) = {
-            let el = glutin::event_loop::EventLoop::new();
-            let win = glutin::window::WindowBuilder::new()
+            let el = EventLoop::new();
+            let win = WindowBuilder::new()
                 .with_title("A fantastic window!")
                 .build(&el)
                 .unwrap();
@@ -27,7 +31,7 @@ mod this_example {
                     EventLoopExtUnix, RawContextExt, WindowExtUnix,
                 };
 
-                let cb = glutin::ContextBuilder::new();
+                let cb = ContextBuilder::new();
                 let raw_context;
 
                 if el.is_wayland() {
@@ -65,9 +69,8 @@ mod this_example {
                 };
 
                 let hwnd = win.get_hwnd();
-                let raw_context = glutin::ContextBuilder::new()
-                    .build_raw_context(hwnd)
-                    .unwrap();
+                let raw_context =
+                    ContextBuilder::new().build_raw_context(hwnd).unwrap();
 
                 (raw_context, el, win)
             }
@@ -85,34 +88,29 @@ mod this_example {
         let mut raw_context = Takeable::new(raw_context);
         el.run(move |event, _, control_flow| {
             println!("el {:?}", event);
+            *control_flow = ControlFlow::Wait;
+
             match event {
-                glutin::event::Event::LoopDestroyed => {
+                Event::LoopDestroyed => {
                     Takeable::take(&mut raw_context); // Make sure it drops first
                     return;
                 }
-                glutin::event::Event::WindowEvent { ref event, .. } => {
-                    match event {
-                        glutin::event::WindowEvent::Resized(logical_size) => {
-                            let dpi_factor = win.get_hidpi_factor();
-                            raw_context
-                                .resize(logical_size.to_physical(dpi_factor));
-                        }
-                        glutin::event::WindowEvent::RedrawRequested => {
-                            gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
-                            raw_context.swap_buffers().unwrap();
-                        }
-                        _ => (),
+                Event::WindowEvent { ref event, .. } => match event {
+                    WindowEvent::Resized(logical_size) => {
+                        let dpi_factor = win.get_hidpi_factor();
+                        raw_context
+                            .resize(logical_size.to_physical(dpi_factor));
                     }
-                }
+                    WindowEvent::RedrawRequested => {
+                        gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
+                        raw_context.swap_buffers().unwrap();
+                    }
+                    WindowEvent::CloseRequested => {
+                        *control_flow = ControlFlow::Exit
+                    }
+                    _ => (),
+                },
                 _ => (),
-            }
-
-            match event {
-                glutin::event::Event::WindowEvent {
-                    event: glutin::event::WindowEvent::CloseRequested,
-                    ..
-                } => *control_flow = winit::event_loop::ControlFlow::Exit,
-                _ => *control_flow = winit::event_loop::ControlFlow::Wait,
             }
         });
     }

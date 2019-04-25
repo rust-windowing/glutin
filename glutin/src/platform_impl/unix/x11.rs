@@ -14,6 +14,8 @@ use crate::platform::unix::{
 use glutin_glx_sys as ffi;
 use winit;
 use winit::dpi;
+use winit::event_loop::EventLoop;
+use winit::window::{Window, WindowBuilder};
 
 use std::ops::{Deref, DerefMut};
 use std::os::raw;
@@ -99,7 +101,7 @@ impl Context {
 
     #[inline]
     pub fn new_headless<T>(
-        el: &winit::event_loop::EventLoop<T>,
+        el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: Option<dpi::PhysicalSize>,
@@ -116,7 +118,7 @@ impl Context {
     }
 
     fn new_headless_impl<T>(
-        el: &winit::event_loop::EventLoop<T>,
+        el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: Option<dpi::PhysicalSize>,
@@ -344,23 +346,23 @@ impl Context {
 
     #[inline]
     pub fn new<T>(
-        wb: winit::window::WindowBuilder,
-        el: &winit::event_loop::EventLoop<T>,
+        wb: WindowBuilder,
+        el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-    ) -> Result<(winit::window::Window, Self), CreationError> {
+    ) -> Result<(Window, Self), CreationError> {
         Self::try_then_fallback(|fallback| {
             Self::new_impl(wb.clone(), el, pf_reqs, gl_attr, fallback)
         })
     }
 
     fn new_impl<T>(
-        wb: winit::window::WindowBuilder,
-        el: &winit::event_loop::EventLoop<T>,
+        wb: WindowBuilder,
+        el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         fallback: bool,
-    ) -> Result<(winit::window::Window, Self), CreationError> {
+    ) -> Result<(Window, Self), CreationError> {
         let xconn = match el.get_xlib_xconnection() {
             Some(xconn) => xconn,
             None => {

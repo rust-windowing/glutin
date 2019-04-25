@@ -1,6 +1,10 @@
 mod support;
 
 use glutin::dpi::{LogicalSize, PhysicalSize};
+use glutin::event::{Event, WindowEvent};
+use glutin::event_loop::{ControlFlow, EventLoop};
+use glutin::window::WindowBuilder;
+use glutin::ContextBuilder;
 use support::{gl, ContextCurrentWrapper, ContextTracker, ContextWrapper};
 
 fn make_renderbuf(gl: &support::Gl, size: PhysicalSize) -> gl::types::GLuint {
@@ -20,19 +24,19 @@ fn make_renderbuf(gl: &support::Gl, size: PhysicalSize) -> gl::types::GLuint {
 }
 
 fn main() {
-    let el = glutin::event_loop::EventLoop::new();
+    let el = EventLoop::new();
     let mut size = PhysicalSize::new(768., 480.);
 
     let mut ct = ContextTracker::default();
 
-    let headless_context = glutin::ContextBuilder::new()
+    let headless_context = ContextBuilder::new()
         .build_headless(&el, PhysicalSize::new(1., 1.))
         .unwrap();
 
-    let wb = glutin::window::WindowBuilder::new()
+    let wb = WindowBuilder::new()
         .with_title("A fantastic window!")
         .with_dimensions(LogicalSize::from_physical(size, 1.0));
-    let windowed_context = glutin::ContextBuilder::new()
+    let windowed_context = ContextBuilder::new()
         .with_shared_lists(&headless_context)
         .build_windowed(wb, &el)
         .unwrap();
@@ -93,8 +97,10 @@ fn main() {
 
     el.run(move |event, _, control_flow| {
         println!("{:?}", event);
+        *control_flow = ControlFlow::Wait;
+
         match event {
-            glutin::event::Event::LoopDestroyed => {
+            Event::LoopDestroyed => {
                 unsafe {
                     let windowed_context = ct.get_current(windowed_id).unwrap();
                     glw.gl.DeleteFramebuffers(1, &window_fb);
@@ -105,77 +111,67 @@ fn main() {
                 }
                 return;
             }
-            glutin::event::Event::WindowEvent { ref event, .. } => {
-                match event {
-                    glutin::event::WindowEvent::Resized(logical_size) => {
-                        let windowed_context =
-                            ct.get_current(windowed_id).unwrap();
-                        let dpi_factor = windowed_context
-                            .windowed()
-                            .window()
-                            .get_hidpi_factor();
-                        size = logical_size.to_physical(dpi_factor);
-                        windowed_context.windowed().resize(size);
+            Event::WindowEvent { ref event, .. } => match event {
+                WindowEvent::Resized(logical_size) => {
+                    let windowed_context = ct.get_current(windowed_id).unwrap();
+                    let dpi_factor =
+                        windowed_context.windowed().window().get_hidpi_factor();
+                    size = logical_size.to_physical(dpi_factor);
+                    windowed_context.windowed().resize(size);
 
-                        unsafe {
-                            windowed_context.windowed().swap_buffers().unwrap();
-                            glw.gl.RenderbufferStorage(
-                                gl::RENDERBUFFER,
-                                gl::RGB8,
-                                size.width as _,
-                                size.height as _,
-                            );
-                            glw.gl.Viewport(
-                                0,
-                                0,
-                                size.width as _,
-                                size.height as _,
-                            );
-                            std::mem::drop(windowed_context);
-
-                            let _ = ct.get_current(headless_id).unwrap();
-                            glc.gl.Viewport(
-                                0,
-                                0,
-                                size.width as _,
-                                size.height as _,
-                            );
-                        }
-                    }
-                    glutin::event::WindowEvent::RedrawRequested => {
-                        let headless_context = ct.get_current(headless_id).unwrap();
-                        glc.draw_frame([1.0, 0.5, 0.7, 1.0]);
-                        std::mem::drop(headless_context);
-
-                        let windowed_context = ct.get_current(windowed_id).unwrap();
-                        unsafe {
-                            glw.gl.BlitFramebuffer(
-                                0,
-                                0,
-                                size.width as _,
-                                size.height as _,
-                                0,
-                                0,
-                                size.width as _,
-                                size.height as _,
-                                gl::COLOR_BUFFER_BIT,
-                                gl::NEAREST,
-                            );
-                        }
+                    unsafe {
                         windowed_context.windowed().swap_buffers().unwrap();
-                    }
-                    _ => (),
-                }
-            }
-            _ => (),
-        }
+                        glw.gl.RenderbufferStorage(
+                            gl::RENDERBUFFER,
+                            gl::RGB8,
+                            size.width as _,
+                            size.height as _,
+                        );
+                        glw.gl.Viewport(
+                            0,
+                            0,
+                            size.width as _,
+                            size.height as _,
+                        );
+                        std::mem::drop(windowed_context);
 
-        match event {
-            glutin::event::Event::WindowEvent {
-                event: glutin::event::WindowEvent::CloseRequested,
-                ..
-            } => *control_flow = winit::event_loop::ControlFlow::Exit,
-            _ => *control_flow = winit::event_loop::ControlFlow::Wait,
+                        let _ = ct.get_current(headless_id).unwrap();
+                        glc.gl.Viewport(
+                            0,
+                            0,
+                            size.width as _,
+                            size.height as _,
+                        );
+                    }
+                }
+                WindowEvent::RedrawRequested => {
+                    let headless_context = ct.get_current(headless_id).unwrap();
+                    glc.draw_frame([1.0, 0.5, 0.7, 1.0]);
+                    std::mem::drop(headless_context);
+
+                    let windowed_context = ct.get_current(windowed_id).unwrap();
+                    unsafe {
+                        glw.gl.BlitFramebuffer(
+                            0,
+                            0,
+                            size.width as _,
+                            size.height as _,
+                            0,
+                            0,
+                            size.width as _,
+                            size.height as _,
+                            gl::COLOR_BUFFER_BIT,
+                            gl::NEAREST,
+                        );
+                    }
+                    windowed_context.windowed().swap_buffers().unwrap();
+                }
+                WindowEvent::CloseRequested => {
+                    *control_flow = ControlFlow::Exit
+                }
+                _ => (),
+            },
+            _ => (),
         }
     });
 }
