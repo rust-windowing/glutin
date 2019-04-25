@@ -3,8 +3,8 @@ Alternative to GLFW in pure Rust.
 
 [![](https://meritbadge.herokuapp.com/glutin)](https://crates.io/crates/glutin)
 [![Docs.rs](https://docs.rs/glutin/badge.svg)](https://docs.rs/glutin)
-[![Build Status](https://travis-ci.org/tomaka/glutin.png?branch=master)](https://travis-ci.org/tomaka/glutin)
-[![Build status](https://ci.appveyor.com/api/projects/status/cv5xewg3uchb3854/branch/master?svg=true)](https://ci.appveyor.com/project/tomaka/glutin/branch/master)
+[![Build Status](https://travis-ci.org/rust-windowing/glutin.png?branch=master)](https://travis-ci.org/rust-windowing/glutin)
+[![Build status](https://ci.appveyor.com/api/projects/status/lexg1h4eyp7eg0nj/branch/master?svg=true)](https://ci.appveyor.com/project/Osspial/glutin/branch/master)
 
 ```toml
 [dependencies]
