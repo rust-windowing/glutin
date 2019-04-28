@@ -15,15 +15,27 @@ mod this_example {
     use glutin::event_loop::{ControlFlow, EventLoop};
     use glutin::window::WindowBuilder;
     use glutin::ContextBuilder;
+    use std::io::Write;
     use takeable_option::Takeable;
 
     pub fn main() {
+        print!("Do you want transparency? (true/false) (default: true): ");
+        std::io::stdout().flush().unwrap();
+
+        let mut transparency = String::new();
+        std::io::stdin().read_line(&mut transparency).unwrap();
+        let transparency = transparency.trim().parse().unwrap_or_else(|_| {
+            println!("Unknown input, assumming true.");
+            true
+        });
+
         let (raw_context, el, win) = {
             let el = EventLoop::new();
-            let win = WindowBuilder::new()
-                .with_title("A fantastic window!")
-                .build(&el)
-                .unwrap();
+            let mut wb = WindowBuilder::new().with_title("A fantastic window!");
+
+            if transparency {
+                wb = wb.with_decorations(false).with_transparency(true);
+            }
 
             #[cfg(target_os = "linux")]
             unsafe {
@@ -31,10 +43,8 @@ mod this_example {
                     EventLoopExtUnix, RawContextExt, WindowExtUnix,
                 };
 
-                let cb = ContextBuilder::new();
-                let raw_context;
-
                 if el.is_wayland() {
+                    let win = wb.build(&el).unwrap();
                     let dpi_factor = win.get_hidpi_factor();
                     let size =
                         win.get_inner_size().unwrap().to_physical(dpi_factor);
@@ -44,7 +54,7 @@ mod this_example {
                         win.get_wayland_display().unwrap() as *const _;
                     let surface = win.get_wayland_surface().unwrap();
 
-                    raw_context = cb
+                    let raw_context = ContextBuilder::new()
                         .build_raw_wayland_context(
                             display_ptr,
                             surface,
@@ -52,18 +62,27 @@ mod this_example {
                             height,
                         )
                         .unwrap();
+
+                    (raw_context, el, win)
                 } else {
+                    if transparency {
+                        unimplemented!("")
+                    }
+
+                    let win = wb.build(&el).unwrap();
                     let xconn = el.get_xlib_xconnection().unwrap();
                     let xwindow = win.get_xlib_window().unwrap();
-                    raw_context =
-                        cb.build_raw_x11_context(xconn, xwindow).unwrap();
-                }
+                    let raw_context = ContextBuilder::new()
+                        .build_raw_x11_context(xconn, xwindow)
+                        .unwrap();
 
-                (raw_context, el, win)
+                    (raw_context, el, win)
+                }
             }
 
             #[cfg(target_os = "windows")]
             unsafe {
+                let win = wb.build(&el).unwrap();
                 use glutin::platform::windows::{
                     RawContextExt, WindowExtWindows,
                 };
@@ -102,7 +121,11 @@ mod this_example {
                             .resize(logical_size.to_physical(dpi_factor));
                     }
                     WindowEvent::RedrawRequested => {
-                        gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
+                        gl.draw_frame(if transparency {
+                            [0.0; 4]
+                        } else {
+                            [1.0, 0.5, 0.7, 1.0]
+                        });
                         raw_context.swap_buffers().unwrap();
                     }
                     WindowEvent::CloseRequested => {

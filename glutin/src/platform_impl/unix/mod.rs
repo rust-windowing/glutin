@@ -15,6 +15,7 @@ use crate::{
     Api, ContextCurrentState, ContextError, CreationError, GlAttributes,
     NotCurrent, PixelFormat, PixelFormatRequirements,
 };
+pub use x11::utils as x11_utils;
 
 use crate::platform::unix::x11::XConnection;
 use crate::platform::unix::EventLoopExtUnix;

@@ -132,12 +132,90 @@ pub struct Context {
 
 #[cfg(target_os = "android")]
 #[inline]
-fn get_native_display(egl: &Egl, ndisp: NativeDisplay) -> *const raw::c_void {
+fn get_native_display(native_display: &NativeDisplay) -> *const raw::c_void {
+    let egl = EGL.as_ref().unwrap();
     unsafe { egl.GetDisplay(ffi::egl::DEFAULT_DISPLAY as *mut _) }
 }
 
+fn get_egl_version(
+    display: ffi::egl::types::EGLDisplay,
+) -> Result<(ffi::egl::types::EGLint, ffi::egl::types::EGLint), CreationError> {
+    unsafe {
+        let egl = EGL.as_ref().unwrap();
+        let mut major: ffi::egl::types::EGLint = std::mem::uninitialized();
+        let mut minor: ffi::egl::types::EGLint = std::mem::uninitialized();
+
+        if egl.Initialize(display, &mut major, &mut minor) == 0 {
+            return Err(CreationError::OsError(
+                "eglInitialize failed".to_string(),
+            ));
+        }
+
+        Ok((major, minor))
+    }
+}
+
+unsafe fn bind_and_get_api<'a>(
+    opengl: &'a GlAttributes<&'a Context>,
+    egl_version: (ffi::egl::types::EGLint, ffi::egl::types::EGLint),
+) -> Result<(Option<(u8, u8)>, Api), CreationError> {
+    let egl = EGL.as_ref().unwrap();
+    match opengl.version {
+        GlRequest::Latest => {
+            if egl_version >= (1, 4) {
+                if egl.BindAPI(ffi::egl::OPENGL_API) != 0 {
+                    Ok((None, Api::OpenGl))
+                } else if egl.BindAPI(ffi::egl::OPENGL_ES_API) != 0 {
+                    Ok((None, Api::OpenGlEs))
+                } else {
+                    Err(CreationError::OpenGlVersionNotSupported)
+                }
+            } else {
+                Ok((None, Api::OpenGlEs))
+            }
+        }
+        GlRequest::Specific(Api::OpenGlEs, version) => {
+            if egl_version >= (1, 2) {
+                if egl.BindAPI(ffi::egl::OPENGL_ES_API) == 0 {
+                    return Err(CreationError::OpenGlVersionNotSupported);
+                }
+            }
+            Ok((Some(version), Api::OpenGlEs))
+        }
+        GlRequest::Specific(Api::OpenGl, version) => {
+            if egl_version < (1, 4) {
+                return Err(CreationError::OpenGlVersionNotSupported);
+            }
+            if egl.BindAPI(ffi::egl::OPENGL_API) == 0 {
+                return Err(CreationError::OpenGlVersionNotSupported);
+            }
+            Ok((Some(version), Api::OpenGl))
+        }
+        GlRequest::Specific(_, _) => {
+            Err(CreationError::OpenGlVersionNotSupported)
+        }
+        GlRequest::GlThenGles {
+            opengles_version,
+            opengl_version,
+        } => {
+            if egl_version >= (1, 4) {
+                if egl.BindAPI(ffi::egl::OPENGL_API) != 0 {
+                    Ok((Some(opengl_version), Api::OpenGl))
+                } else if egl.BindAPI(ffi::egl::OPENGL_ES_API) != 0 {
+                    Ok((Some(opengles_version), Api::OpenGlEs))
+                } else {
+                    Err(CreationError::OpenGlVersionNotSupported)
+                }
+            } else {
+                Ok((Some(opengles_version), Api::OpenGlEs))
+            }
+        }
+    }
+}
+
 #[cfg(not(target_os = "android"))]
-fn get_native_display(egl: &Egl, ndisp: NativeDisplay) -> *const raw::c_void {
+fn get_native_display(native_display: &NativeDisplay) -> *const raw::c_void {
+    let egl = EGL.as_ref().unwrap();
     // the first step is to query the list of extensions without any display, if
     // supported
     let dp_extensions = unsafe {
@@ -160,7 +238,7 @@ fn get_native_display(egl: &Egl, ndisp: NativeDisplay) -> *const raw::c_void {
     let has_dp_extension =
         |e: &str| dp_extensions.iter().find(|s| s == &e).is_some();
 
-    match ndisp {
+    match *native_display {
         // Note: Some EGL implementations are missing the
         // `eglGetPlatformDisplay(EXT)` symbol       despite reporting
         // `EGL_EXT_platform_base`. I'm pretty sure this is a bug.
@@ -295,7 +373,8 @@ fn get_native_display(egl: &Egl, ndisp: NativeDisplay) -> *const raw::c_void {
     }
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[allow(dead_code)] // Not all platforms use all
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub enum SurfaceType {
     PBuffer,
     Window,
@@ -309,15 +388,22 @@ impl Context {
     ///
     /// To finish the process, you must call `.finish(window)` on the
     /// `ContextPrototype`.
-    pub fn new<'a>(
+    pub fn new<'a, F>(
         pf_reqs: &PixelFormatRequirements,
         opengl: &'a GlAttributes<&'a Context>,
-        ndisp: NativeDisplay,
+        native_display: NativeDisplay,
         surface_type: SurfaceType,
-    ) -> Result<ContextPrototype<'a>, CreationError> {
+        config_selector: F,
+    ) -> Result<ContextPrototype<'a>, CreationError>
+    where
+        F: FnMut(
+            Vec<ffi::egl::types::EGLConfig>,
+            ffi::egl::types::EGLDisplay,
+        ) -> ffi::egl::types::EGLConfig,
+    {
         let egl = EGL.as_ref().unwrap();
         // calling `eglGetDisplay` or equivalent
-        let display = get_native_display(egl, ndisp);
+        let display = get_native_display(&native_display);
 
         if display.is_null() {
             return Err(CreationError::OsError(
@@ -325,18 +411,7 @@ impl Context {
             ));
         }
 
-        let egl_version = unsafe {
-            let mut major: ffi::egl::types::EGLint = std::mem::uninitialized();
-            let mut minor: ffi::egl::types::EGLint = std::mem::uninitialized();
-
-            if egl.Initialize(display, &mut major, &mut minor) == 0 {
-                return Err(CreationError::OsError(
-                    "eglInitialize failed".to_string(),
-                ));
-            }
-
-            (major, minor)
-        };
+        let egl_version = get_egl_version(display)?;
 
         // the list of extensions supported by the client once initialized is
         // different from the list of extensions obtained earlier
@@ -354,75 +429,17 @@ impl Context {
         };
 
         // binding the right API and choosing the version
-        let (version, api) = unsafe {
-            match opengl.version {
-                GlRequest::Latest => {
-                    if egl_version >= (1, 4) {
-                        if egl.BindAPI(ffi::egl::OPENGL_API) != 0 {
-                            (None, Api::OpenGl)
-                        } else if egl.BindAPI(ffi::egl::OPENGL_ES_API) != 0 {
-                            (None, Api::OpenGlEs)
-                        } else {
-                            return Err(
-                                CreationError::OpenGlVersionNotSupported,
-                            );
-                        }
-                    } else {
-                        (None, Api::OpenGlEs)
-                    }
-                }
-                GlRequest::Specific(Api::OpenGlEs, version) => {
-                    if egl_version >= (1, 2) {
-                        if egl.BindAPI(ffi::egl::OPENGL_ES_API) == 0 {
-                            return Err(
-                                CreationError::OpenGlVersionNotSupported,
-                            );
-                        }
-                    }
-                    (Some(version), Api::OpenGlEs)
-                }
-                GlRequest::Specific(Api::OpenGl, version) => {
-                    if egl_version < (1, 4) {
-                        return Err(CreationError::OpenGlVersionNotSupported);
-                    }
-                    if egl.BindAPI(ffi::egl::OPENGL_API) == 0 {
-                        return Err(CreationError::OpenGlVersionNotSupported);
-                    }
-                    (Some(version), Api::OpenGl)
-                }
-                GlRequest::Specific(_, _) => {
-                    return Err(CreationError::OpenGlVersionNotSupported);
-                }
-                GlRequest::GlThenGles {
-                    opengles_version,
-                    opengl_version,
-                } => {
-                    if egl_version >= (1, 4) {
-                        if egl.BindAPI(ffi::egl::OPENGL_API) != 0 {
-                            (Some(opengl_version), Api::OpenGl)
-                        } else if egl.BindAPI(ffi::egl::OPENGL_ES_API) != 0 {
-                            (Some(opengles_version), Api::OpenGlEs)
-                        } else {
-                            return Err(
-                                CreationError::OpenGlVersionNotSupported,
-                            );
-                        }
-                    } else {
-                        (Some(opengles_version), Api::OpenGlEs)
-                    }
-                }
-            }
-        };
+        let (version, api) = unsafe { bind_and_get_api(&opengl, egl_version)? };
 
         let (config_id, pixel_format) = unsafe {
             choose_fbconfig(
-                egl,
                 display,
                 &egl_version,
                 api,
                 version,
                 pf_reqs,
                 surface_type,
+                config_selector,
             )?
         };
 
@@ -724,6 +741,36 @@ pub struct ContextPrototype<'a> {
     pixel_format: PixelFormat,
 }
 
+#[cfg(any(
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+))]
+pub fn get_native_visual_id(
+    display: ffi::egl::types::EGLDisplay,
+    config_id: ffi::egl::types::EGLConfig,
+) -> ffi::egl::types::EGLint {
+    let egl = EGL.as_ref().unwrap();
+    let mut value = unsafe { std::mem::uninitialized() };
+    let ret = unsafe {
+        egl.GetConfigAttrib(
+            display,
+            config_id,
+            ffi::egl::NATIVE_VISUAL_ID as ffi::egl::types::EGLint,
+            &mut value,
+        )
+    };
+    if ret == 0 {
+        panic!(
+            "get_native_visual_id: eglGetConfigAttrib failed with 0x{:x}",
+            unsafe { egl.GetError() }
+        )
+    };
+    value
+}
+
 impl<'a> ContextPrototype<'a> {
     #[cfg(any(
         target_os = "linux",
@@ -733,23 +780,7 @@ impl<'a> ContextPrototype<'a> {
         target_os = "openbsd",
     ))]
     pub fn get_native_visual_id(&self) -> ffi::egl::types::EGLint {
-        let egl = EGL.as_ref().unwrap();
-        let mut value = unsafe { std::mem::uninitialized() };
-        let ret = unsafe {
-            egl.GetConfigAttrib(
-                self.display,
-                self.config_id,
-                ffi::egl::NATIVE_VISUAL_ID as ffi::egl::types::EGLint,
-                &mut value,
-            )
-        };
-        if ret == 0 {
-            panic!(
-                "get_native_visual_id: eglGetConfigAttrib failed with 0x{:x}",
-                unsafe { egl.GetError() }
-            )
-        };
-        value
+        get_native_visual_id(self.display, self.config_id)
     }
 
     pub fn finish(
@@ -950,15 +981,23 @@ impl<'a> ContextPrototype<'a> {
     }
 }
 
-unsafe fn choose_fbconfig(
-    egl: &Egl,
+unsafe fn choose_fbconfig<F>(
     display: ffi::egl::types::EGLDisplay,
     egl_version: &(ffi::egl::types::EGLint, ffi::egl::types::EGLint),
     api: Api,
     version: Option<(u8, u8)>,
     reqs: &PixelFormatRequirements,
     surface_type: SurfaceType,
-) -> Result<(ffi::egl::types::EGLConfig, PixelFormat), CreationError> {
+    mut config_selector: F,
+) -> Result<(ffi::egl::types::EGLConfig, PixelFormat), CreationError>
+where
+    F: FnMut(
+        Vec<ffi::egl::types::EGLConfig>,
+        ffi::egl::types::EGLDisplay,
+    ) -> ffi::egl::types::EGLConfig,
+{
+    let egl = EGL.as_ref().unwrap();
+
     let descriptor = {
         let mut out: Vec<raw::c_int> = Vec::with_capacity(37);
 
@@ -967,15 +1006,13 @@ unsafe fn choose_fbconfig(
             out.push(ffi::egl::RGB_BUFFER as raw::c_int);
         }
 
-        if surface_type != SurfaceType::Surfaceless {
-            out.push(ffi::egl::SURFACE_TYPE as raw::c_int);
-            let surface_type = match surface_type {
-                SurfaceType::Window => ffi::egl::WINDOW_BIT,
-                SurfaceType::PBuffer => ffi::egl::PBUFFER_BIT,
-                _ => unreachable!(),
-            };
-            out.push(surface_type as raw::c_int);
-        }
+        out.push(ffi::egl::SURFACE_TYPE as raw::c_int);
+        let surface_type = match surface_type {
+            SurfaceType::Window => ffi::egl::WINDOW_BIT,
+            SurfaceType::PBuffer => ffi::egl::PBUFFER_BIT,
+            SurfaceType::Surfaceless => 0,
+        };
+        out.push(surface_type as raw::c_int);
 
         match (api, version) {
             (Api::OpenGlEs, Some((3, _))) => {
@@ -1087,13 +1124,12 @@ unsafe fn choose_fbconfig(
     };
 
     // calling `eglChooseConfig`
-    let mut config_id = std::mem::uninitialized();
     let mut num_configs = std::mem::uninitialized();
     if egl.ChooseConfig(
         display,
         descriptor.as_ptr(),
-        &mut config_id,
-        1,
+        std::ptr::null_mut(),
+        0,
         &mut num_configs,
     ) == 0
     {
@@ -1101,9 +1137,31 @@ unsafe fn choose_fbconfig(
             "eglChooseConfig failed".to_string(),
         ));
     }
+
     if num_configs == 0 {
         return Err(CreationError::NoAvailablePixelFormat);
     }
+
+    let mut config_ids = Vec::with_capacity(num_configs as usize);
+    config_ids.resize_with(num_configs as usize, || std::mem::zeroed());
+    if egl.ChooseConfig(
+        display,
+        descriptor.as_ptr(),
+        config_ids.as_mut_ptr(),
+        num_configs,
+        &mut num_configs,
+    ) == 0
+    {
+        return Err(CreationError::OsError(
+            "eglChooseConfig failed".to_string(),
+        ));
+    }
+
+    if num_configs == 0 {
+        return Err(CreationError::NoAvailablePixelFormat);
+    }
+
+    let config_id = config_selector(config_ids, display);
 
     // analyzing each config
     macro_rules! attrib {

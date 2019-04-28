@@ -6,7 +6,7 @@ use glutin::event::{
 use glutin::event_loop::{ControlFlow, EventLoop};
 use glutin::monitor::MonitorHandle;
 use glutin::window::WindowBuilder;
-use std::io::{self, Write};
+use std::io::Write;
 
 fn main() {
     let el = EventLoop::new();
@@ -21,10 +21,10 @@ fn main() {
             print!(
                 "Please choose the fullscreen mode: (1) native, (2) simple: "
             );
-            io::stdout().flush().unwrap();
+            std::io::stdout().flush().unwrap();
 
             let mut num = String::new();
-            io::stdin().read_line(&mut num).unwrap();
+            std::io::stdin().read_line(&mut num).unwrap();
             let num = num.trim().parse().ok().expect("Please enter a number");
             match num {
                 2 => macos_use_simple_fullscreen = true,
@@ -138,10 +138,10 @@ fn prompt_for_monitor(el: &EventLoop<()>) -> MonitorHandle {
     }
 
     print!("Please write the number of the monitor to use: ");
-    io::stdout().flush().unwrap();
+    std::io::stdout().flush().unwrap();
 
     let mut num = String::new();
-    io::stdin().read_line(&mut num).unwrap();
+    std::io::stdin().read_line(&mut num).unwrap();
     let num = num.trim().parse().ok().expect("Please enter a number");
     let monitor = el
         .get_available_monitors()

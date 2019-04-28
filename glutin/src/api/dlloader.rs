@@ -13,7 +13,7 @@ use std::ffi::CString;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SymWrapper<T> {
     inner: T,
     _lib: Arc<Library>,
