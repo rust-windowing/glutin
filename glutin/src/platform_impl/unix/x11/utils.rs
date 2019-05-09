@@ -71,4 +71,5 @@ pub fn examine_visual_info(
     return Ok(());
 }
 
+pub use super::select_config;
 pub use crate::api::egl::SurfaceType;

@@ -607,7 +607,7 @@ unsafe fn choose_fbconfig(
     extensions: &str,
     xconn: &Arc<XConnection>,
     screen_id: raw::c_int,
-    reqs: &PixelFormatRequirements,
+    pf_reqs: &PixelFormatRequirements,
     surface_type: SurfaceType,
     transparent: Option<bool>,
 ) -> Result<
@@ -622,7 +622,7 @@ unsafe fn choose_fbconfig(
         out.push(ffi::glx::X_RENDERABLE as raw::c_int);
         out.push(1);
 
-        if let Some(xid) = reqs.x11_visual_xid {
+        if let Some(xid) = pf_reqs.x11_visual_xid {
             // getting the visual infos
             let fvi = crate::platform_impl::x11_utils::get_visual_info_from_xid(
                 &xconn, xid,
@@ -649,7 +649,7 @@ unsafe fn choose_fbconfig(
         // TODO: Use RGB/RGB_FLOAT_BIT_ARB if they don't want alpha bits,
         // fallback to it if they don't care
         out.push(ffi::glx::RENDER_TYPE as raw::c_int);
-        if reqs.float_color_buffer {
+        if pf_reqs.float_color_buffer {
             if check_ext(extensions, "GLX_ARB_fbconfig_float") {
                 out.push(ffi::glx_extra::RGBA_FLOAT_BIT_ARB as raw::c_int);
             } else {
@@ -659,7 +659,7 @@ unsafe fn choose_fbconfig(
             out.push(ffi::glx::RGBA_BIT as raw::c_int);
         }
 
-        if let Some(color) = reqs.color_bits {
+        if let Some(color) = pf_reqs.color_bits {
             out.push(ffi::glx::RED_SIZE as raw::c_int);
             out.push((color / 3) as raw::c_int);
             out.push(ffi::glx::GREEN_SIZE as raw::c_int);
@@ -672,26 +672,26 @@ unsafe fn choose_fbconfig(
             );
         }
 
-        if let Some(alpha) = reqs.alpha_bits {
+        if let Some(alpha) = pf_reqs.alpha_bits {
             out.push(ffi::glx::ALPHA_SIZE as raw::c_int);
             out.push(alpha as raw::c_int);
         }
 
-        if let Some(depth) = reqs.depth_bits {
+        if let Some(depth) = pf_reqs.depth_bits {
             out.push(ffi::glx::DEPTH_SIZE as raw::c_int);
             out.push(depth as raw::c_int);
         }
 
-        if let Some(stencil) = reqs.stencil_bits {
+        if let Some(stencil) = pf_reqs.stencil_bits {
             out.push(ffi::glx::STENCIL_SIZE as raw::c_int);
             out.push(stencil as raw::c_int);
         }
 
-        let double_buffer = reqs.double_buffer.unwrap_or(true);
+        let double_buffer = pf_reqs.double_buffer.unwrap_or(true);
         out.push(ffi::glx::DOUBLEBUFFER as raw::c_int);
         out.push(if double_buffer { 1 } else { 0 });
 
-        if let Some(multisampling) = reqs.multisampling {
+        if let Some(multisampling) = pf_reqs.multisampling {
             if check_ext(extensions, "GLX_ARB_multisample") {
                 out.push(ffi::glx_extra::SAMPLE_BUFFERS_ARB as raw::c_int);
                 out.push(if multisampling == 0 { 0 } else { 1 });
@@ -703,9 +703,9 @@ unsafe fn choose_fbconfig(
         }
 
         out.push(ffi::glx::STEREO as raw::c_int);
-        out.push(if reqs.stereoscopy { 1 } else { 0 });
+        out.push(if pf_reqs.stereoscopy { 1 } else { 0 });
 
-        if reqs.srgb {
+        if pf_reqs.srgb {
             if check_ext(extensions, "GLX_ARB_framebuffer_sRGB") {
                 out.push(
                     ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as raw::c_int,
@@ -721,7 +721,7 @@ unsafe fn choose_fbconfig(
             }
         }
 
-        match reqs.release_behavior {
+        match pf_reqs.release_behavior {
             ReleaseBehavior::Flush => (),
             ReleaseBehavior::None => {
                 if check_ext(extensions, "GLX_ARB_context_flush_control") {
@@ -763,77 +763,39 @@ unsafe fn choose_fbconfig(
             return Err(CreationError::NoAvailablePixelFormat);
         }
 
-        use crate::platform_impl::x11_utils::{self, Lacks};
-        let configs = configs as *mut ffi::glx::types::GLXFBConfig;
+        match crate::platform_impl::x11_utils::select_config(
+            xconn,
+            transparent,
+            pf_reqs,
+            (0..num_configs).collect(),
+            |config_id| {
+                let visual_infos_raw = glx.GetVisualFromFBConfig(
+                    xconn.display as *mut _,
+                    *configs.offset(*config_id as isize),
+                );
 
-        let mut config = None;
-        let mut lacks_what = None;
+                if visual_infos_raw.is_null() {
+                    return None;
+                }
 
-        for i in 0..num_configs {
-            let visual_infos_raw = glx.GetVisualFromFBConfig(
-                xconn.display as *mut _,
-                *configs.offset(i as isize),
-            );
+                let visual_infos: ffi::XVisualInfo =
+                    std::ptr::read(visual_infos_raw as *const _);
+                (xconn.xlib.XFree)(visual_infos_raw as *mut _);
+                Some(visual_infos)
+            },
+        ) {
+            Ok((config_id, visual_infos)) => {
+                let config = *configs.offset(config_id as isize);
+                let config = config.clone();
 
-            if visual_infos_raw.is_null() {
-                continue;
+                (xconn.xlib.XFree)(configs as *mut _);
+                (config, visual_infos)
             }
-
-            let visual_infos: ffi::XVisualInfo =
-                std::ptr::read(visual_infos_raw as *const _);
-            (xconn.xlib.XFree)(visual_infos_raw as *mut _);
-
-            let this_lacks_what = x11_utils::examine_visual_info(
-                &xconn,
-                visual_infos,
-                transparent == Some(true),
-                reqs.x11_visual_xid,
-            );
-            match (lacks_what, &this_lacks_what) {
-                (Some(Ok(())), _) => unreachable!(),
-
-                // Found it.
-                (_, Ok(())) => {
-                    config = Some((&*configs.offset(i as isize), visual_infos));
-                    lacks_what = Some(this_lacks_what);
-                    break;
-                }
-
-                // Better have something than nothing.
-                (None, _) => {
-                    config = Some((&*configs.offset(i as isize), visual_infos));
-                    lacks_what = Some(this_lacks_what);
-                }
-
-                // Stick with the earlier.
-                (Some(Err(Lacks::Transparency)), Err(Lacks::Transparency)) => {
-                    ()
-                }
-                (Some(Err(_)), Err(Lacks::XID)) => (),
-
-                // Lacking transparency is better than lacking the xid.
-                (Some(Err(Lacks::XID)), Err(Lacks::Transparency)) => {
-                    config = Some((&*configs.offset(i as isize), visual_infos));
-                    lacks_what = Some(this_lacks_what);
-                }
+            Err(()) => {
+                (xconn.xlib.XFree)(configs as *mut _);
+                return Err(CreationError::NoAvailablePixelFormat);
             }
         }
-
-        match lacks_what {
-            Some(Ok(())) => (),
-            Some(Err(Lacks::Transparency)) => warn!("Glutin could not a find fb config with an alpha mask. Transparency may be broken."),
-            Some(Err(Lacks::XID)) => panic!(),
-            None => unreachable!(),
-        }
-
-        let res = if let Some((&conf, visual_infos)) = config {
-            Ok((conf, visual_infos))
-        } else {
-            Err(CreationError::NoAvailablePixelFormat)
-        };
-
-        (xconn.xlib.XFree)(configs as *mut _);
-        res?
     };
 
     let get_attrib = |attrib: raw::c_int| -> i32 {

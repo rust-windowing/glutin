@@ -66,7 +66,22 @@ mod this_example {
                     (raw_context, el, win)
                 } else {
                     if transparency {
-                        unimplemented!("")
+                        unimplemented!(
+                            r#"
+Users should make sure that the window gets built with an x11 visual that
+supports transparency. Winit does not currently do this by default for x11
+because it is not provided with enough details to make a good choice. Normally
+glutin decides this for winit, but this is not the case for raw contexts.
+
+Depending on the default order of the x11 visuals, transparency may by sheer
+luck work for you.
+
+Such a task of selecting the appropriate x11 visual is outside the limited
+scope of the glutin examples. Implementing it would likely require a lot of
+platform specific egl/glx/x11 calls or exposing a lot of glutin's internals.
+File a PR if you are interested in implementing the latter.
+                        "#
+                        )
                     }
 
                     let win = wb.build(&el).unwrap();

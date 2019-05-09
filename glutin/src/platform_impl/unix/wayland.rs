@@ -61,7 +61,7 @@ impl Context {
                 &gl_attr,
                 native_display,
                 EglSurfaceType::PBuffer,
-                |c, _| c[0],
+                |c, _| Ok(c[0]),
             )
             .and_then(|p| p.finish_pbuffer(size))?;
             let context = Context::PBuffer(context);
@@ -73,7 +73,7 @@ impl Context {
                 &gl_attr,
                 native_display,
                 EglSurfaceType::Surfaceless,
-                |c, _| c[0],
+                |c, _| Ok(c[0]),
             )
             .and_then(|p| p.finish_surfaceless())?;
             let context = Context::Surfaceless(context);
@@ -141,7 +141,7 @@ impl Context {
                 &gl_attr,
                 native_display,
                 EglSurfaceType::Window,
-                |c, _| c[0],
+                |c, _| Ok(c[0]),
             )
             .and_then(|p| p.finish(egl_surface.ptr() as *const _))?
         };

@@ -69,7 +69,7 @@ impl Context {
             &gl_attr,
             native_display,
             EglSurfaceType::Window,
-            |c, _| c[0],
+            |c, _| Ok(c[0]),
         )
         .and_then(|p| p.finish(nwin as *const _))?;
         let ctx = Arc::new(AndroidContext {
@@ -116,7 +116,7 @@ impl Context {
             &gl_attr,
             NativeDisplay::Android,
             EglSurfaceType::PBuffer,
-            |c, _| c[0],
+            |c, _| Ok(c[0]),
         )?;
         let egl_context = context.finish_pbuffer(size)?;
         let ctx = Arc::new(AndroidContext {

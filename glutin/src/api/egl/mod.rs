@@ -399,7 +399,7 @@ impl Context {
         F: FnMut(
             Vec<ffi::egl::types::EGLConfig>,
             ffi::egl::types::EGLDisplay,
-        ) -> ffi::egl::types::EGLConfig,
+        ) -> Result<ffi::egl::types::EGLConfig, ()>,
     {
         let egl = EGL.as_ref().unwrap();
         // calling `eglGetDisplay` or equivalent
@@ -986,7 +986,7 @@ unsafe fn choose_fbconfig<F>(
     egl_version: &(ffi::egl::types::EGLint, ffi::egl::types::EGLint),
     api: Api,
     version: Option<(u8, u8)>,
-    reqs: &PixelFormatRequirements,
+    pf_reqs: &PixelFormatRequirements,
     surface_type: SurfaceType,
     mut config_selector: F,
 ) -> Result<(ffi::egl::types::EGLConfig, PixelFormat), CreationError>
@@ -994,7 +994,7 @@ where
     F: FnMut(
         Vec<ffi::egl::types::EGLConfig>,
         ffi::egl::types::EGLDisplay,
-    ) -> ffi::egl::types::EGLConfig,
+    ) -> Result<ffi::egl::types::EGLConfig, ()>,
 {
     let egl = EGL.as_ref().unwrap();
 
@@ -1054,7 +1054,7 @@ where
             (_, _) => unimplemented!(),
         };
 
-        if let Some(hardware_accelerated) = reqs.hardware_accelerated {
+        if let Some(hardware_accelerated) = pf_reqs.hardware_accelerated {
             out.push(ffi::egl::CONFIG_CAVEAT as raw::c_int);
             out.push(if hardware_accelerated {
                 ffi::egl::NONE as raw::c_int
@@ -1063,7 +1063,7 @@ where
             });
         }
 
-        if let Some(color) = reqs.color_bits {
+        if let Some(color) = pf_reqs.color_bits {
             out.push(ffi::egl::RED_SIZE as raw::c_int);
             out.push((color / 3) as raw::c_int);
             out.push(ffi::egl::GREEN_SIZE as raw::c_int);
@@ -1076,42 +1076,42 @@ where
             );
         }
 
-        if let Some(alpha) = reqs.alpha_bits {
+        if let Some(alpha) = pf_reqs.alpha_bits {
             out.push(ffi::egl::ALPHA_SIZE as raw::c_int);
             out.push(alpha as raw::c_int);
         }
 
-        if let Some(depth) = reqs.depth_bits {
+        if let Some(depth) = pf_reqs.depth_bits {
             out.push(ffi::egl::DEPTH_SIZE as raw::c_int);
             out.push(depth as raw::c_int);
         }
 
-        if let Some(stencil) = reqs.stencil_bits {
+        if let Some(stencil) = pf_reqs.stencil_bits {
             out.push(ffi::egl::STENCIL_SIZE as raw::c_int);
             out.push(stencil as raw::c_int);
         }
 
-        if let Some(true) = reqs.double_buffer {
+        if let Some(true) = pf_reqs.double_buffer {
             return Err(CreationError::NoAvailablePixelFormat);
         }
 
-        if let Some(multisampling) = reqs.multisampling {
+        if let Some(multisampling) = pf_reqs.multisampling {
             out.push(ffi::egl::SAMPLES as raw::c_int);
             out.push(multisampling as raw::c_int);
         }
 
-        if reqs.stereoscopy {
+        if pf_reqs.stereoscopy {
             return Err(CreationError::NoAvailablePixelFormat);
         }
 
-        if let Some(xid) = reqs.x11_visual_xid {
+        if let Some(xid) = pf_reqs.x11_visual_xid {
             out.push(ffi::egl::NATIVE_VISUAL_ID as raw::c_int);
             out.push(xid as raw::c_int);
         }
 
         // FIXME: srgb is not taken into account
 
-        match reqs.release_behavior {
+        match pf_reqs.release_behavior {
             ReleaseBehavior::Flush => (),
             ReleaseBehavior::None => {
                 // TODO: with EGL you need to manually set the behavior
@@ -1161,7 +1161,8 @@ where
         return Err(CreationError::NoAvailablePixelFormat);
     }
 
-    let config_id = config_selector(config_ids, display);
+    let config_id = config_selector(config_ids, display)
+        .map_err(|_| CreationError::NoAvailablePixelFormat)?;
 
     // analyzing each config
     macro_rules! attrib {

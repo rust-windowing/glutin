@@ -3,16 +3,16 @@ use crate::api::egl::{
     EGL,
 };
 use crate::api::glx::{Context as GlxContext, GLX};
+use crate::platform::unix::x11::XConnection;
+use crate::platform::unix::{
+    EventLoopExtUnix, WindowBuilderExtUnix, WindowExtUnix,
+};
+use crate::platform_impl::x11_utils;
 use crate::{
     Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
     PixelFormatRequirements,
 };
 
-use crate::platform::unix::x11::XConnection;
-use crate::platform::unix::{
-    EventLoopExtUnix, WindowBuilderExtUnix, WindowExtUnix,
-};
-use glutin_egl_sys as egl_ffi;
 use glutin_glx_sys as ffi;
 use winit;
 use winit::dpi;
@@ -93,35 +93,27 @@ unsafe impl Sync for Context {}
 // When using egl, all the configs will not support transparency, even if
 // transparency does work with glx.
 //
-// Or atleast that's the case on my computer. I don't know why, I'm afraid.
-//
-// I tried using `eglGetConfigs` instead of `eglChooseConfig`, but none of them
-// did. I guess egl just has worse support.
-//
-// Anyways, the code in this function I'm like 99% percent is correct. We're
-// simply doing the same thing glfw does, and it does't work for them either.
-//
-// See: https://github.com/glfw/glfw/pull/715#issuecomment-187403199
-// I can reproduce this issue on my amd, so :/
-fn select_config(
+// https://bugs.freedesktop.org/show_bug.cgi?id=67676<Paste>
+// I'm on a patch.
+pub fn select_config<T, F>(
     xconn: &Arc<XConnection>,
     transparent: Option<bool>,
     pf_reqs: &PixelFormatRequirements,
-    config_ids: Vec<egl_ffi::egl::types::EGLConfig>,
-    display: egl_ffi::egl::types::EGLDisplay,
-) -> egl_ffi::egl::types::EGLConfig {
-    use crate::platform_impl::x11_utils::{self, Lacks};
+    config_ids: Vec<T>,
+    mut convert_to_xvisualinfo: F,
+) -> Result<(T, ffi::XVisualInfo), ()>
+where
+    F: FnMut(&T) -> Option<ffi::XVisualInfo>,
+{
+    use crate::platform_impl::x11_utils::Lacks;
     let mut chosen_config_id = None;
     let mut lacks_what = None;
 
     for config_id in config_ids {
-        let xid =
-            egl::get_native_visual_id(display, config_id) as ffi::VisualID;
-        if xid == 0 {
-            continue;
-        }
-
-        let visual_infos = x11_utils::get_visual_info_from_xid(xconn, xid);
+        let visual_infos = match convert_to_xvisualinfo(&config_id) {
+            Some(vi) => vi,
+            None => continue,
+        };
 
         let this_lacks_what = x11_utils::examine_visual_info(
             &xconn,
@@ -129,19 +121,30 @@ fn select_config(
             transparent == Some(true),
             pf_reqs.x11_visual_xid,
         );
+
+        let pict_format = unsafe {
+            (xconn.xrender.XRenderFindVisualFormat)(
+                xconn.display as *mut _,
+                visual_infos.visual,
+            )
+        };
+        if pict_format.is_null() {
+            continue;
+        }
+
         match (lacks_what, &this_lacks_what) {
             (Some(Ok(())), _) => unreachable!(),
 
             // Found it.
             (_, Ok(())) => {
-                chosen_config_id = Some(config_id);
+                chosen_config_id = Some((config_id, visual_infos));
                 lacks_what = Some(this_lacks_what);
                 break;
             }
 
             // Better have something than nothing.
             (None, _) => {
-                chosen_config_id = Some(config_id);
+                chosen_config_id = Some((config_id, visual_infos));
                 lacks_what = Some(this_lacks_what);
             }
 
@@ -151,7 +154,7 @@ fn select_config(
 
             // Lacking transparency is better than lacking the xid.
             (Some(Err(Lacks::XID)), Err(Lacks::Transparency)) => {
-                chosen_config_id = Some(config_id);
+                chosen_config_id = Some((config_id, visual_infos));
                 lacks_what = Some(this_lacks_what);
             }
         }
@@ -164,7 +167,7 @@ fn select_config(
         None => unreachable!(),
     }
 
-    chosen_config_id.unwrap()
+    chosen_config_id.ok_or(())
 }
 
 impl Context {
@@ -317,6 +320,18 @@ impl Context {
         force_prefer_unless_only: bool,
         transparent: Option<bool>,
     ) -> Result<Prototype<'a>, CreationError> {
+        let (_, prefer_egl) = (prefer_egl, true);
+        let select_config = |cs, display| {
+            select_config(&xconn, transparent, pf_reqs, cs, |config_id| {
+                let xid = egl::get_native_visual_id(display, *config_id)
+                    as ffi::VisualID;
+                if xid == 0 {
+                    return None;
+                }
+                Some(x11_utils::get_visual_info_from_xid(xconn, xid))
+            })
+            .map(|(c, _)| c)
+        };
         Ok(match gl_attr.version {
             GlRequest::Latest
             | GlRequest::Specific(Api::OpenGl, _)
@@ -357,9 +372,7 @@ impl Context {
                         builder_u.as_ref().unwrap(),
                         native_display,
                         surface_type,
-                        |c, d| {
-                            select_config(&xconn, transparent, pf_reqs, c, d)
-                        },
+                        select_config,
                     )?))
                 };
 
@@ -419,9 +432,7 @@ impl Context {
                         builder_egl_u.as_ref().unwrap(),
                         NativeDisplay::X11(Some(xconn.display as *const _)),
                         surface_type,
-                        |c, d| {
-                            select_config(&xconn, transparent, pf_reqs, c, d)
-                        },
+                        select_config,
                     )?)
                 } else {
                     return Err(CreationError::NotSupported(
