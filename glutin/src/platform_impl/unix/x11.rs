@@ -1,7 +1,13 @@
 use crate::api::egl::{
-    Context as EglContext, NativeDisplay, SurfaceType as EglSurfaceType, EGL,
+    self, Context as EglContext, NativeDisplay, SurfaceType as EglSurfaceType,
+    EGL,
 };
 use crate::api::glx::{Context as GlxContext, GLX};
+use crate::platform::unix::x11::XConnection;
+use crate::platform::unix::{
+    EventLoopExtUnix, WindowBuilderExtUnix, WindowExtUnix,
+};
+use crate::platform_impl::x11_utils;
 use crate::{
     Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
     PixelFormatRequirements,
@@ -10,12 +16,14 @@ use crate::{
 use glutin_glx_sys as ffi;
 use winit;
 use winit::dpi;
-pub use winit::os::unix::x11::{XConnection, XError, XNotSupported};
-use winit::os::unix::{EventsLoopExt, WindowBuilderExt, WindowExt};
+use winit::event_loop::EventLoop;
+use winit::window::{Window, WindowBuilder};
 
 use std::ops::{Deref, DerefMut};
 use std::os::raw;
 use std::sync::Arc;
+
+pub mod utils;
 
 #[derive(Debug)]
 struct NoX11Connection;
@@ -81,6 +89,87 @@ impl DerefMut for Context {
 unsafe impl Send for Context {}
 unsafe impl Sync for Context {}
 
+// FIXME:
+// When using egl, all the configs will not support transparency, even if
+// transparency does work with glx.
+//
+// https://bugs.freedesktop.org/show_bug.cgi?id=67676<Paste>
+// I'm on a patch.
+pub fn select_config<T, F>(
+    xconn: &Arc<XConnection>,
+    transparent: Option<bool>,
+    pf_reqs: &PixelFormatRequirements,
+    config_ids: Vec<T>,
+    mut convert_to_xvisualinfo: F,
+) -> Result<(T, ffi::XVisualInfo), ()>
+where
+    F: FnMut(&T) -> Option<ffi::XVisualInfo>,
+{
+    use crate::platform_impl::x11_utils::Lacks;
+    let mut chosen_config_id = None;
+    let mut lacks_what = None;
+
+    for config_id in config_ids {
+        let visual_infos = match convert_to_xvisualinfo(&config_id) {
+            Some(vi) => vi,
+            None => continue,
+        };
+
+        let this_lacks_what = x11_utils::examine_visual_info(
+            &xconn,
+            visual_infos,
+            transparent == Some(true),
+            pf_reqs.x11_visual_xid,
+        );
+
+        let pict_format = unsafe {
+            (xconn.xrender.XRenderFindVisualFormat)(
+                xconn.display as *mut _,
+                visual_infos.visual,
+            )
+        };
+        if pict_format.is_null() {
+            continue;
+        }
+
+        match (lacks_what, &this_lacks_what) {
+            (Some(Ok(())), _) => unreachable!(),
+
+            // Found it.
+            (_, Ok(())) => {
+                chosen_config_id = Some((config_id, visual_infos));
+                lacks_what = Some(this_lacks_what);
+                break;
+            }
+
+            // Better have something than nothing.
+            (None, _) => {
+                chosen_config_id = Some((config_id, visual_infos));
+                lacks_what = Some(this_lacks_what);
+            }
+
+            // Stick with the earlier.
+            (Some(Err(Lacks::Transparency)), Err(Lacks::Transparency)) => (),
+            (Some(Err(_)), Err(Lacks::XID)) => (),
+
+            // Lacking transparency is better than lacking the xid.
+            (Some(Err(Lacks::XID)), Err(Lacks::Transparency)) => {
+                chosen_config_id = Some((config_id, visual_infos));
+                lacks_what = Some(this_lacks_what);
+            }
+        }
+    }
+
+    match lacks_what {
+        Some(Ok(())) => (),
+        Some(Err(Lacks::Transparency)) => warn!("Glutin could not a find fb config with an alpha mask. Transparency may be broken."),
+        Some(Err(Lacks::XID)) => panic!(),
+        None => unreachable!(),
+    }
+
+    chosen_config_id.ok_or(())
+}
+
 impl Context {
     fn try_then_fallback<F, T>(mut f: F) -> Result<T, CreationError>
     where
@@ -96,8 +185,8 @@ impl Context {
     }
 
     #[inline]
-    pub fn new_headless(
-        el: &winit::EventsLoop,
+    pub fn new_headless<T>(
+        el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: Option<dpi::PhysicalSize>,
@@ -113,8 +202,8 @@ impl Context {
         })
     }
 
-    fn new_headless_impl(
-        el: &winit::EventsLoop,
+    fn new_headless_impl<T>(
+        el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: Option<dpi::PhysicalSize>,
@@ -147,6 +236,7 @@ impl Context {
                 EglSurfaceType::PBuffer,
                 fallback,
                 fallback,
+                Some(false),
             )?;
 
             // finish creating the OpenGL context
@@ -177,6 +267,7 @@ impl Context {
                 EglSurfaceType::Surfaceless,
                 !fallback,
                 fallback,
+                Some(false),
             )?;
 
             // finish creating the OpenGL context
@@ -227,7 +318,20 @@ impl Context {
         surface_type: EglSurfaceType,
         prefer_egl: bool,
         force_prefer_unless_only: bool,
+        transparent: Option<bool>,
     ) -> Result<Prototype<'a>, CreationError> {
+        let (_, prefer_egl) = (prefer_egl, true);
+        let select_config = |cs, display| {
+            select_config(&xconn, transparent, pf_reqs, cs, |config_id| {
+                let xid = egl::get_native_visual_id(display, *config_id)
+                    as ffi::VisualID;
+                if xid == 0 {
+                    return None;
+                }
+                Some(x11_utils::get_visual_info_from_xid(xconn, xid))
+            })
+            .map(|(c, _)| c)
+        };
         Ok(match gl_attr.version {
             GlRequest::Latest
             | GlRequest::Specific(Api::OpenGl, _)
@@ -249,6 +353,8 @@ impl Context {
                         pf_reqs,
                         builder_u.as_ref().unwrap(),
                         screen_id,
+                        surface_type,
+                        transparent,
                     )?))
                 };
 
@@ -266,6 +372,7 @@ impl Context {
                         builder_u.as_ref().unwrap(),
                         native_display,
                         surface_type,
+                        select_config,
                     )?))
                 };
 
@@ -325,6 +432,7 @@ impl Context {
                         builder_egl_u.as_ref().unwrap(),
                         NativeDisplay::X11(Some(xconn.display as *const _)),
                         surface_type,
+                        select_config,
                     )?)
                 } else {
                     return Err(CreationError::NotSupported(
@@ -341,24 +449,24 @@ impl Context {
     }
 
     #[inline]
-    pub fn new(
-        wb: winit::WindowBuilder,
-        el: &winit::EventsLoop,
+    pub fn new<T>(
+        wb: WindowBuilder,
+        el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-    ) -> Result<(winit::Window, Self), CreationError> {
+    ) -> Result<(Window, Self), CreationError> {
         Self::try_then_fallback(|fallback| {
             Self::new_impl(wb.clone(), el, pf_reqs, gl_attr, fallback)
         })
     }
 
-    fn new_impl(
-        wb: winit::WindowBuilder,
-        el: &winit::EventsLoop,
+    fn new_impl<T>(
+        wb: WindowBuilder,
+        el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         fallback: bool,
-    ) -> Result<(winit::Window, Self), CreationError> {
+    ) -> Result<(Window, Self), CreationError> {
         let xconn = match el.get_xlib_xconnection() {
             Some(xconn) => xconn,
             None => {
@@ -385,38 +493,17 @@ impl Context {
             EglSurfaceType::Window,
             fallback,
             fallback,
+            Some(wb.window.transparent),
         )?;
 
         // getting the `visual_infos` (a struct that contains information about
         // the visual to use)
         let visual_infos = match context {
             Prototype::Glx(ref p) => p.get_visual_infos().clone(),
-            Prototype::Egl(ref p) => {
-                let mut template: ffi::XVisualInfo =
-                    unsafe { std::mem::zeroed() };
-                template.visualid = p.get_native_visual_id() as ffi::VisualID;
-
-                let mut num_visuals = 0;
-                let vi = unsafe {
-                    (xconn.xlib.XGetVisualInfo)(
-                        xconn.display,
-                        ffi::VisualIDMask,
-                        &mut template,
-                        &mut num_visuals,
-                    )
-                };
-                xconn
-                    .check_errors()
-                    .expect("Failed to call `XGetVisualInfo`");
-                assert!(!vi.is_null());
-                assert!(num_visuals == 1);
-
-                let vi_copy = unsafe { std::ptr::read(vi as *const _) };
-                unsafe {
-                    (xconn.xlib.XFree)(vi as *mut _);
-                }
-                vi_copy
-            }
+            Prototype::Egl(ref p) => utils::get_visual_info_from_xid(
+                &xconn,
+                p.get_native_visual_id() as ffi::VisualID,
+            ),
         };
 
         let win = wb
@@ -506,6 +593,7 @@ impl Context {
             EglSurfaceType::Window,
             fallback,
             fallback,
+            None,
         )?;
 
         // finish creating the OpenGL context

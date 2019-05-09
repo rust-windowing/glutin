@@ -6,12 +6,14 @@ use crate::{
     PixelFormatRequirements,
 };
 
+use crate::platform::unix::{EventLoopExtUnix, WindowExtUnix};
 use glutin_egl_sys as ffi;
 use wayland_client::egl as wegl;
 pub use wayland_client::sys::client::wl_display;
 use winit;
 use winit::dpi;
-use winit::os::unix::{EventsLoopExt, WindowExt};
+use winit::event_loop::EventLoop;
+use winit::window::{Window, WindowBuilder};
 
 use std::ops::Deref;
 use std::os::raw;
@@ -43,8 +45,8 @@ impl Deref for Context {
 
 impl Context {
     #[inline]
-    pub fn new_headless(
-        el: &winit::EventsLoop,
+    pub fn new_headless<T>(
+        el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: Option<dpi::PhysicalSize>,
@@ -59,6 +61,7 @@ impl Context {
                 &gl_attr,
                 native_display,
                 EglSurfaceType::PBuffer,
+                |c, _| Ok(c[0]),
             )
             .and_then(|p| p.finish_pbuffer(size))?;
             let context = Context::PBuffer(context);
@@ -70,6 +73,7 @@ impl Context {
                 &gl_attr,
                 native_display,
                 EglSurfaceType::Surfaceless,
+                |c, _| Ok(c[0]),
             )
             .and_then(|p| p.finish_surfaceless())?;
             let context = Context::Surfaceless(context);
@@ -78,12 +82,12 @@ impl Context {
     }
 
     #[inline]
-    pub fn new(
-        wb: winit::WindowBuilder,
-        el: &winit::EventsLoop,
+    pub fn new<T>(
+        wb: WindowBuilder,
+        el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-    ) -> Result<(winit::Window, Self), CreationError> {
+    ) -> Result<(Window, Self), CreationError> {
         let win = wb.build(el)?;
 
         let dpi_factor = win.get_hidpi_factor();
@@ -137,6 +141,7 @@ impl Context {
                 &gl_attr,
                 native_display,
                 EglSurfaceType::Window,
+                |c, _| Ok(c[0]),
             )
             .and_then(|p| p.finish(egl_surface.ptr() as *const _))?
         };

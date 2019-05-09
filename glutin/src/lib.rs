@@ -12,8 +12,8 @@
 //!
 //! ```no_run
 //! # fn main() {
-//! let el = glutin::EventsLoop::new();
-//! let wb = glutin::WindowBuilder::new()
+//! let el = glutin::event_loop::EventLoop::new();
+//! let wb = glutin::window::WindowBuilder::new()
 //!     .with_title("Hello world!")
 //!     .with_dimensions(glutin::dpi::LogicalSize::new(1024.0, 768.0));
 //! let windowed_context = glutin::ContextBuilder::new()
@@ -25,7 +25,7 @@
 //! You can, of course, create a [`RawContext<T>`] separately from an existing
 //! window, however that may result in an suboptimal configuration of the window
 //! on some platforms. In that case use the unsafe platform-specific
-//! [`RawContextExt`] available on linux and windows.
+//! [`RawContextExt`] available on unix operating systems and Windows.
 //!
 //! You can also produce headless [`Context`]s via the
 //! [`ContextBuilder::build_headless`] function.
@@ -107,28 +107,27 @@ extern crate objc;
     target_os = "openbsd",
 ))]
 #[macro_use]
+extern crate log;
+#[cfg(any(
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+))]
+#[macro_use]
 extern crate derivative;
 
-pub mod os;
+pub mod platform;
 
 mod api;
 mod context;
-mod platform;
+mod platform_impl;
 mod windowed;
 
-pub use crate::context::{
-    Context, ContextCurrentState, NotCurrent, PossiblyCurrent,
-};
-pub use crate::windowed::{ContextWrapper, RawContext, WindowedContext};
-
-pub use winit::{
-    dpi, AvailableMonitorsIter, AxisId, ButtonId, ControlFlow,
-    CreationError as WindowCreationError, DeviceEvent, DeviceId, ElementState,
-    Event, EventsLoop, EventsLoopClosed, EventsLoopProxy, Icon, KeyboardInput,
-    ModifiersState, MonitorId, MouseButton, MouseCursor, MouseScrollDelta,
-    ScanCode, Touch, TouchPhase, VirtualKeyCode, Window, WindowAttributes,
-    WindowBuilder, WindowEvent, WindowId,
-};
+pub use crate::context::*;
+pub use crate::windowed::*;
+pub use winit::*;
 
 use std::io;
 
@@ -288,7 +287,7 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     /// This option will be taken into account on the following platforms:
     ///
     ///   * MacOS
-    ///   * Linux using GLX with X
+    ///   * Unix operating systems using GLX with X
     ///   * Windows using WGL
     #[inline]
     pub fn with_double_buffer(mut self, double_buffer: Option<bool>) -> Self {
@@ -305,7 +304,7 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     /// This option will be taken into account on the following platforms:
     ///
     ///   * MacOS
-    ///   * Linux using EGL with either X or Wayland
+    ///   * Unix operating systems using EGL with either X or Wayland
     ///   * Windows using EGL or WGL
     ///   * Android using EGL
     #[inline]
@@ -328,7 +327,7 @@ pub enum CreationError {
     OpenGlVersionNotSupported,
     NoAvailablePixelFormat,
     PlatformSpecific(String),
-    Window(WindowCreationError),
+    Window(window::CreationError),
     /// We received multiple errors, instead of one.
     CreationErrors(Vec<Box<CreationError>>),
 }
@@ -412,8 +411,8 @@ impl std::error::Error for CreationError {
     }
 }
 
-impl From<WindowCreationError> for CreationError {
-    fn from(err: WindowCreationError) -> Self {
+impl From<window::CreationError> for CreationError {
+    fn from(err: window::CreationError) -> Self {
         CreationError::Window(err)
     }
 }
@@ -458,9 +457,10 @@ impl std::error::Error for ContextError {
 /// All APIs related to OpenGL that you can possibly get while using glutin.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Api {
-    /// The classical OpenGL. Available on Windows, Linux, OS/X.
+    /// The classical OpenGL. Available on Windows, Unix operating systems,
+    /// OS/X.
     OpenGl,
-    /// OpenGL embedded system. Available on Linux, Android.
+    /// OpenGL embedded system. Available on Unix operating systems, Android.
     OpenGlEs,
     /// OpenGL for the web. Very similar to OpenGL ES.
     WebGl,

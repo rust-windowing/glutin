@@ -8,11 +8,11 @@ use crate::{
     Api, ContextError, GlAttributes, PixelFormat, PixelFormatRequirements,
 };
 
+use crate::platform::android::EventLoopExtAndroid;
 use glutin_egl_sys as ffi;
 use parking_lot::Mutex;
 use winit;
 use winit::dpi;
-use winit::os::android::EventsLoopExt;
 
 use std::sync::Arc;
 
@@ -51,12 +51,12 @@ impl android_glue::SyncEventHandler for AndroidSyncEventHandler {
 
 impl Context {
     #[inline]
-    pub fn new_windowed(
-        wb: winit::WindowBuilder,
-        el: &winit::EventsLoop,
+    pub fn new_windowed<T>(
+        wb: winit::window::WindowBuilder,
+        el: &winit::event_loop::EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Self>,
-    ) -> Result<(winit::Window, Self), CreationError> {
+    ) -> Result<(winit::window::Window, Self), CreationError> {
         let win = wb.build(el)?;
         let gl_attr = gl_attr.clone().map_sharing(|c| &c.0.egl_context);
         let nwin = unsafe { android_glue::get_native_window() };
@@ -69,6 +69,7 @@ impl Context {
             &gl_attr,
             native_display,
             EglSurfaceType::Window,
+            |c, _| Ok(c[0]),
         )
         .and_then(|p| p.finish(nwin as *const _))?;
         let ctx = Arc::new(AndroidContext {
@@ -103,8 +104,8 @@ impl Context {
     }
 
     #[inline]
-    pub fn new_headless(
-        _el: &winit::EventsLoop,
+    pub fn new_headless<T>(
+        _el: &winit::event_loop::EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: dpi::PhysicalSize,
@@ -115,6 +116,7 @@ impl Context {
             &gl_attr,
             NativeDisplay::Android,
             EglSurfaceType::PBuffer,
+            |c, _| Ok(c[0]),
         )?;
         let egl_context = context.finish_pbuffer(size)?;
         let ctx = Arc::new(AndroidContext {

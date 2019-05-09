@@ -11,15 +11,15 @@ documentation = "https://docs.rs/glutin"
 edition = "2018"
 
 [package.metadata.docs.rs]
-features = ["icon_loading", "serde"]
+features = ["serde"]
 
 [features]
-icon_loading = ["winit/icon_loading"]
 serde = ["winit/serde"]
 
 [dependencies]
 lazy_static = "1.3"
-winit = "^0.19.1"
+#winit = "^0.19.1"
+winit = { git = "https://github.com/rust-windowing/winit.git", branch = "eventloop-2.0"}
 
 [target.'cfg(target_os = "android")'.dependencies]
 android_glue = "0.2"
@@ -62,3 +62,4 @@ glutin_egl_sys = { version = "0.1.3", path = "../glutin_egl_sys" }
 glutin_glx_sys = { version = "0.1.5", path = "../glutin_glx_sys" }
 derivative = "1.0"
 parking_lot = "0.7"
+log = "0.4"

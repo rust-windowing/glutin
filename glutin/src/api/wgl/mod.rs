@@ -472,30 +472,30 @@ unsafe fn create_context(
 /// Gives less precise results than `enumerate_arb_pixel_formats`.
 unsafe fn choose_native_pixel_format_id(
     hdc: HDC,
-    reqs: &PixelFormatRequirements,
+    pf_reqs: &PixelFormatRequirements,
 ) -> Result<raw::c_int, ()> {
     // TODO: hardware acceleration is not handled
 
     // handling non-supported stuff
-    if reqs.float_color_buffer {
+    if pf_reqs.float_color_buffer {
         return Err(());
     }
 
-    match reqs.multisampling {
+    match pf_reqs.multisampling {
         Some(0) => (),
         None => (),
         Some(_) => return Err(()),
     };
 
-    if reqs.stereoscopy {
+    if pf_reqs.stereoscopy {
         return Err(());
     }
 
-    if reqs.srgb {
+    if pf_reqs.srgb {
         return Err(());
     }
 
-    if reqs.release_behavior != ReleaseBehavior::Flush {
+    if pf_reqs.release_behavior != ReleaseBehavior::Flush {
         return Err(());
     }
 
@@ -504,33 +504,33 @@ unsafe fn choose_native_pixel_format_id(
         nSize: std::mem::size_of::<PIXELFORMATDESCRIPTOR>() as u16,
         nVersion: 1,
         dwFlags: {
-            let f1 = match reqs.double_buffer {
+            let f1 = match pf_reqs.double_buffer {
                 None => PFD_DOUBLEBUFFER, /* Should be PFD_DOUBLEBUFFER_DONTCARE after you can choose */
                 Some(true) => PFD_DOUBLEBUFFER,
                 Some(false) => 0,
             };
 
-            let f2 = if reqs.stereoscopy { PFD_STEREO } else { 0 };
+            let f2 = if pf_reqs.stereoscopy { PFD_STEREO } else { 0 };
 
             PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | f1 | f2
         },
         iPixelType: PFD_TYPE_RGBA,
-        cColorBits: reqs.color_bits.unwrap_or(0),
+        cColorBits: pf_reqs.color_bits.unwrap_or(0),
         cRedBits: 0,
         cRedShift: 0,
         cGreenBits: 0,
         cGreenShift: 0,
         cBlueBits: 0,
         cBlueShift: 0,
-        cAlphaBits: reqs.alpha_bits.unwrap_or(0),
+        cAlphaBits: pf_reqs.alpha_bits.unwrap_or(0),
         cAlphaShift: 0,
         cAccumBits: 0,
         cAccumRedBits: 0,
         cAccumGreenBits: 0,
         cAccumBlueBits: 0,
         cAccumAlphaBits: 0,
-        cDepthBits: reqs.depth_bits.unwrap_or(0),
-        cStencilBits: reqs.stencil_bits.unwrap_or(0),
+        cDepthBits: pf_reqs.depth_bits.unwrap_or(0),
+        cStencilBits: pf_reqs.stencil_bits.unwrap_or(0),
         cAuxBuffers: 0,
         iLayerType: PFD_MAIN_PLANE,
         bReserved: 0,
@@ -550,7 +550,7 @@ unsafe fn choose_native_pixel_format_id(
 
 unsafe fn choose_native_pixel_format(
     hdc: HDC,
-    reqs: &PixelFormatRequirements,
+    pf_reqs: &PixelFormatRequirements,
     pf_id: raw::c_int,
 ) -> Result<PixelFormat, ()> {
     // querying back the capabilities of what windows told us
@@ -589,24 +589,24 @@ unsafe fn choose_native_pixel_format(
         srgb: false,
     };
 
-    if pf_desc.alpha_bits < reqs.alpha_bits.unwrap_or(0) {
+    if pf_desc.alpha_bits < pf_reqs.alpha_bits.unwrap_or(0) {
         return Err(());
     }
-    if pf_desc.depth_bits < reqs.depth_bits.unwrap_or(0) {
+    if pf_desc.depth_bits < pf_reqs.depth_bits.unwrap_or(0) {
         return Err(());
     }
-    if pf_desc.stencil_bits < reqs.stencil_bits.unwrap_or(0) {
+    if pf_desc.stencil_bits < pf_reqs.stencil_bits.unwrap_or(0) {
         return Err(());
     }
-    if pf_desc.color_bits < reqs.color_bits.unwrap_or(0) {
+    if pf_desc.color_bits < pf_reqs.color_bits.unwrap_or(0) {
         return Err(());
     }
-    if let Some(req) = reqs.hardware_accelerated {
+    if let Some(req) = pf_reqs.hardware_accelerated {
         if pf_desc.hardware_accelerated != req {
             return Err(());
         }
     }
-    if let Some(req) = reqs.double_buffer {
+    if let Some(req) = pf_reqs.double_buffer {
         if pf_desc.double_buffer != req {
             return Err(());
         }
@@ -622,7 +622,7 @@ unsafe fn choose_arb_pixel_format_id(
     extra: &gl::wgl_extra::Wgl,
     extensions: &str,
     hdc: HDC,
-    reqs: &PixelFormatRequirements,
+    pf_reqs: &PixelFormatRequirements,
 ) -> Result<raw::c_int, ()> {
     let descriptor = {
         let mut out: Vec<raw::c_int> = Vec::with_capacity(37);
@@ -634,7 +634,7 @@ unsafe fn choose_arb_pixel_format_id(
         out.push(1);
 
         out.push(gl::wgl_extra::PIXEL_TYPE_ARB as raw::c_int);
-        if reqs.float_color_buffer {
+        if pf_reqs.float_color_buffer {
             if extensions
                 .split(' ')
                 .find(|&i| i == "WGL_ARB_pixel_format_float")
@@ -648,7 +648,7 @@ unsafe fn choose_arb_pixel_format_id(
             out.push(gl::wgl_extra::TYPE_RGBA_ARB as raw::c_int);
         }
 
-        if let Some(hardware_accelerated) = reqs.hardware_accelerated {
+        if let Some(hardware_accelerated) = pf_reqs.hardware_accelerated {
             out.push(gl::wgl_extra::ACCELERATION_ARB as raw::c_int);
             out.push(if hardware_accelerated {
                 gl::wgl_extra::FULL_ACCELERATION_ARB as raw::c_int
@@ -657,33 +657,33 @@ unsafe fn choose_arb_pixel_format_id(
             });
         }
 
-        if let Some(color) = reqs.color_bits {
+        if let Some(color) = pf_reqs.color_bits {
             out.push(gl::wgl_extra::COLOR_BITS_ARB as raw::c_int);
             out.push(color as raw::c_int);
         }
 
-        if let Some(alpha) = reqs.alpha_bits {
+        if let Some(alpha) = pf_reqs.alpha_bits {
             out.push(gl::wgl_extra::ALPHA_BITS_ARB as raw::c_int);
             out.push(alpha as raw::c_int);
         }
 
-        if let Some(depth) = reqs.depth_bits {
+        if let Some(depth) = pf_reqs.depth_bits {
             out.push(gl::wgl_extra::DEPTH_BITS_ARB as raw::c_int);
             out.push(depth as raw::c_int);
         }
 
-        if let Some(stencil) = reqs.stencil_bits {
+        if let Some(stencil) = pf_reqs.stencil_bits {
             out.push(gl::wgl_extra::STENCIL_BITS_ARB as raw::c_int);
             out.push(stencil as raw::c_int);
         }
 
         // Prefer double buffering if unspecified (probably shouldn't once you
         // can choose)
-        let double_buffer = reqs.double_buffer.unwrap_or(true);
+        let double_buffer = pf_reqs.double_buffer.unwrap_or(true);
         out.push(gl::wgl_extra::DOUBLE_BUFFER_ARB as raw::c_int);
         out.push(if double_buffer { 1 } else { 0 });
 
-        if let Some(multisampling) = reqs.multisampling {
+        if let Some(multisampling) = pf_reqs.multisampling {
             if extensions
                 .split(' ')
                 .find(|&i| i == "WGL_ARB_multisample")
@@ -699,9 +699,9 @@ unsafe fn choose_arb_pixel_format_id(
         }
 
         out.push(gl::wgl_extra::STEREO_ARB as raw::c_int);
-        out.push(if reqs.stereoscopy { 1 } else { 0 });
+        out.push(if pf_reqs.stereoscopy { 1 } else { 0 });
 
-        if reqs.srgb {
+        if pf_reqs.srgb {
             if extensions
                 .split(' ')
                 .find(|&i| i == "WGL_ARB_framebuffer_sRGB")
@@ -725,7 +725,7 @@ unsafe fn choose_arb_pixel_format_id(
             }
         }
 
-        match reqs.release_behavior {
+        match pf_reqs.release_behavior {
             ReleaseBehavior::Flush => (),
             ReleaseBehavior::None => {
                 if extensions

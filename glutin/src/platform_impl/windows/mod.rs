@@ -9,12 +9,14 @@ use crate::api::egl::{
     Context as EglContext, NativeDisplay, SurfaceType as EglSurfaceType, EGL,
 };
 use crate::api::wgl::Context as WglContext;
-use crate::os::windows::WindowExt;
+use crate::platform::windows::WindowExtWindows;
 
 use glutin_egl_sys as ffi;
 use winapi::shared::windef::{HGLRC, HWND};
 use winit;
 use winit::dpi;
+use winit::event_loop::EventLoop;
+use winit::window::{Window, WindowBuilder};
 
 use std::marker::PhantomData;
 use std::os::raw;
@@ -32,8 +34,8 @@ pub enum Context {
     Egl(EglContext),
     Wgl(WglContext),
     /// A regular window, but invisible.
-    HiddenWindowEgl(winit::Window, EglContext),
-    HiddenWindowWgl(winit::Window, WglContext),
+    HiddenWindowEgl(Window, EglContext),
+    HiddenWindowWgl(Window, WglContext),
     /// An EGL pbuffer.
     EglPbuffer(EglContext),
 }
@@ -44,12 +46,12 @@ unsafe impl Sync for Context {}
 impl Context {
     /// See the docs in the crate root file.
     #[inline]
-    pub fn new_windowed(
-        wb: winit::WindowBuilder,
-        el: &winit::EventsLoop,
+    pub fn new_windowed<T>(
+        wb: WindowBuilder,
+        el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Self>,
-    ) -> Result<(winit::Window, Self), CreationError> {
+    ) -> Result<(Window, Self), CreationError> {
         let win = wb.build(el)?;
         let hwnd = win.get_hwnd() as HWND;
         let ctx = Self::new_raw_context(hwnd, pf_reqs, gl_attr)?;
@@ -96,6 +98,7 @@ impl Context {
                             &gl_attr_egl,
                             NativeDisplay::Other(Some(std::ptr::null())),
                             EglSurfaceType::Window,
+                            |c, _| Ok(c[0]),
                         )
                         .and_then(|p| p.finish(hwnd))
                         .map(|c| Context::Egl(c))
@@ -112,6 +115,7 @@ impl Context {
                             &gl_attr_egl,
                             NativeDisplay::Other(Some(std::ptr::null())),
                             EglSurfaceType::Window,
+                            |c, _| Ok(c[0]),
                         )
                         .and_then(|p| p.finish(hwnd))
                         {
@@ -142,8 +146,8 @@ impl Context {
     }
 
     #[inline]
-    pub fn new_headless(
-        el: &winit::EventsLoop,
+    pub fn new_headless<T>(
+        el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: dpi::PhysicalSize,
@@ -169,6 +173,7 @@ impl Context {
                     &gl_attr_egl,
                     native_display,
                     EglSurfaceType::PBuffer,
+                    |c, _| Ok(c[0]),
                 )
                 .and_then(|prototype| prototype.finish_pbuffer(size))
                 .map(|ctx| Context::EglPbuffer(ctx));
@@ -180,7 +185,7 @@ impl Context {
             _ => (),
         }
 
-        let wb = winit::WindowBuilder::new()
+        let wb = WindowBuilder::new()
             .with_visibility(false)
             .with_dimensions(size.to_logical(1.));
         Self::new_windowed(wb, &el, pf_reqs, gl_attr).map(|(win, context)| {

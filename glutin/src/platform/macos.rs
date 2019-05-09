@@ -1,14 +1,15 @@
-#![cfg(target_os = "ios")]
+#![cfg(target_os = "macos")]
 
-use crate::os::ContextTraitExt;
+use crate::platform::ContextTraitExt;
 use crate::{Context, ContextCurrentState};
 
-pub use winit::os::ios::{MonitorIdExt, WindowBuilderExt, WindowExt};
+pub use winit::platform::macos::*;
 
 use std::os::raw;
 
 impl<T: ContextCurrentState> ContextTraitExt for Context<T> {
     type Handle = *mut raw::c_void;
+
     #[inline]
     unsafe fn raw_handle(&self) -> Self::Handle {
         self.context.raw_handle()

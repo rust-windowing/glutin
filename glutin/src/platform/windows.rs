@@ -1,14 +1,12 @@
 #![cfg(target_os = "windows")]
 
-use crate::os::ContextTraitExt;
-pub use crate::platform::{RawContextExt, RawHandle};
+use crate::platform::ContextTraitExt;
+pub use crate::platform_impl::{RawContextExt, RawHandle};
 use crate::{Context, ContextCurrentState};
 pub use glutin_egl_sys::EGLContext;
 
 pub use winapi::shared::windef::HGLRC;
-pub use winit::os::windows::{
-    DeviceIdExt, MonitorIdExt, WindowBuilderExt, WindowExt,
-};
+pub use winit::platform::windows::*;
 
 use std::os::raw;
 

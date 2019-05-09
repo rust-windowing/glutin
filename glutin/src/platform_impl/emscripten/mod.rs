@@ -14,17 +14,20 @@ use std::ffi::CString;
 #[derive(Debug)]
 pub enum Context {
     Window(ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE),
-    WindowedContext(winit::Window, ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE),
+    WindowedContext(
+        winit::window::Window,
+        ffi::EMSCRIPTEN_WEBGL_CONTEXT_HANDLE,
+    ),
 }
 
 impl Context {
     #[inline]
-    pub fn new_windowed(
-        wb: winit::WindowBuilder,
-        el: &winit::EventsLoop,
+    pub fn new_windowed<T>(
+        wb: winit::window::WindowBuilder,
+        el: &winit::event_loop::EventLoop<T>,
         _pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-    ) -> Result<(winit::Window, Self), CreationError> {
+    ) -> Result<(winit::window::Window, Self), CreationError> {
         let win = wb.build(el)?;
 
         let gl_attr = gl_attr.clone().map_sharing(|_| {
@@ -68,13 +71,13 @@ impl Context {
     }
 
     #[inline]
-    pub fn new_headless(
-        el: &winit::EventsLoop,
+    pub fn new_headless<T>(
+        el: &winit::event_loop::EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
-        let wb = winit::WindowBuilder::new()
+        let wb = winit::window::WindowBuilder::new()
             .with_visibility(false)
             .with_dimensions(size.to_logical(1.));
 

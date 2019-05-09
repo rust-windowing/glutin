@@ -18,10 +18,11 @@ use core_foundation::bundle::{
 use core_foundation::string::CFString;
 use objc::runtime::{BOOL, NO};
 
+use crate::platform::macos::WindowExtMacOS;
 use winit;
 use winit::dpi;
-use winit::os::macos::WindowExt;
-pub use winit::MonitorId;
+use winit::event_loop::EventLoop;
+use winit::window::{Window, WindowBuilder};
 
 use std::ops::Deref;
 use std::os::raw;
@@ -49,12 +50,12 @@ pub struct HeadlessContext {
 
 impl Context {
     #[inline]
-    pub fn new_windowed(
-        wb: winit::WindowBuilder,
-        el: &winit::EventsLoop,
+    pub fn new_windowed<T>(
+        wb: WindowBuilder,
+        el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-    ) -> Result<(winit::Window, Self), CreationError> {
+    ) -> Result<(Window, Self), CreationError> {
         let transparent = wb.window.transparent;
         let win = wb.build(el)?;
 
@@ -163,8 +164,8 @@ impl Context {
     }
 
     #[inline]
-    pub fn new_headless(
-        _el: &winit::EventsLoop,
+    pub fn new_headless<T>(
+        _el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         _size: dpi::PhysicalSize,
