@@ -72,7 +72,7 @@ fn build_context<T1: ContextCurrentState>(
 #[cfg(not(target_os = "linux"))]
 fn build_context<T1: ContextCurrentState>(
     cb: ContextBuilder<T1>,
-) -> Result<(Context<NotCurrent>, EventLoop), CreationError> {
+) -> Result<(Context<NotCurrent>, EventLoop<()>), CreationError> {
     let el = EventLoop::new();
     build_context_headless(cb.clone(), &el).map(|ctx| (ctx, el))
 }

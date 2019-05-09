@@ -96,7 +96,7 @@ fn main() {
                             if macos_use_simple_fullscreen {
                                 use glutin::platform::macos::WindowExtMacOS;
                                 if WindowExtMacOS::set_simple_fullscreen(
-                                    &windowed_context.window(),
+                                    windowed_context.window(),
                                     !is_fullscreen,
                                 ) {
                                     is_fullscreen = !is_fullscreen;
