@@ -29,7 +29,7 @@ Warning: these are examples for master. For the latest released version, 0.21, v
 ### Try it!
 
 ```bash
-git clone https://github.com/tomaka/glutin
+git clone https://github.com/rust-windowing/glutin
 cd glutin
 cargo run --example window
 ```
@@ -38,7 +38,7 @@ cargo run --example window
 
 Glutin is an OpenGL context creation library and doesn't directly provide OpenGL bindings for you.
 
-For examples, please look [here.](https://github.com/tomaka/glutin/tree/master/glutin_examples)
+For examples, please look [here.](https://github.com/rust-windowing/glutin/tree/master/glutin_examples)
 
 Note that glutin aims at being a low-level brick in your rendering infrastructure. You are encouraged to write another layer of abstraction between glutin and your application.
 
@@ -50,7 +50,7 @@ Glutin is only officially supported on the latest stable version of the Rust com
 
 To compile the examples for android, you have to use the `cargo apk` utility.
 
-See [the `android-rs-glue` repository](https://github.com/tomaka/android-rs-glue) for instructions.
+See [the `android-rs-glue` repository](https://github.com/rust-windowing/android-rs-glue) for instructions.
 
 ### Emscripten with asmjs
 
@@ -89,5 +89,5 @@ In order to build in XCode, you must link both `UIKit.framework` and `OpenGLES.f
 
 Help! I'm receiving `NoAvailablePixelFormat`!
 
- - See: https://github.com/tomaka/glutin/issues/952#issuecomment-467228004
+ - See: https://github.com/rust-windowing/glutin/issues/952#issuecomment-467228004
 

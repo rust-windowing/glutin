@@ -6,7 +6,7 @@ description = "Cross-platform OpenGL context provider."
 keywords = ["windowing", "opengl"]
 license = "Apache-2.0"
 readme = "../README.md"
-repository = "https://github.com/tomaka/glutin"
+repository = "https://github.com/rust-windowing/glutin"
 documentation = "https://docs.rs/glutin"
 edition = "2018"
 
