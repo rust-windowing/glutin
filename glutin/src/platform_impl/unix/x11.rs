@@ -320,7 +320,6 @@ impl Context {
         force_prefer_unless_only: bool,
         transparent: Option<bool>,
     ) -> Result<Prototype<'a>, CreationError> {
-        let (_, prefer_egl) = (prefer_egl, true);
         let select_config = |cs, display| {
             select_config(&xconn, transparent, pf_reqs, cs, |config_id| {
                 let xid = egl::get_native_visual_id(display, *config_id)
