@@ -19,6 +19,10 @@ pub mod macos;
 pub mod unix;
 /// Platform-specific methods for Windows.
 pub mod windows;
+/// Platform-specific methods for desktop operating systems.
+pub mod desktop {
+    pub use winit::platform::desktop::*;
+}
 
 use std::os::raw;
 
