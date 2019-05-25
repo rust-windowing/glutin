@@ -24,7 +24,7 @@ winit = { git = "https://github.com/rust-windowing/winit.git", branch = "eventlo
 [target.'cfg(target_os = "android")'.dependencies]
 android_glue = "0.2"
 glutin_egl_sys = { version = "0.1.3", path = "../glutin_egl_sys" }
-parking_lot = "0.7"
+parking_lot = "0.8"
 
 [target.'cfg(target_os = "emscripten")'.dependencies]
 glutin_emscripten_sys = { version = "0.1.0", path = "../glutin_emscripten_sys" }
@@ -52,7 +52,7 @@ features = [
 libloading = "0.5"
 glutin_wgl_sys = { version = "0.1.3", path = "../glutin_wgl_sys" }
 glutin_egl_sys = { version = "0.1.3", path = "../glutin_egl_sys" }
-parking_lot = "0.7"
+parking_lot = "0.8"
 
 [target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "dragonfly", target_os = "netbsd", target_os = "openbsd"))'.dependencies]
 osmesa-sys = "0.1"
@@ -61,5 +61,5 @@ libloading = "0.5"
 glutin_egl_sys = { version = "0.1.3", path = "../glutin_egl_sys" }
 glutin_glx_sys = { version = "0.1.5", path = "../glutin_glx_sys" }
 derivative = "1.0"
-parking_lot = "0.7"
+parking_lot = "0.8"
 log = "0.4"
