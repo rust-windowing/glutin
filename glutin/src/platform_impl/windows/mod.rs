@@ -53,7 +53,7 @@ impl Context {
         gl_attr: &GlAttributes<&Self>,
     ) -> Result<(Window, Self), CreationError> {
         let win = wb.build(el)?;
-        let hwnd = win.get_hwnd() as HWND;
+        let hwnd = win.hwnd() as HWND;
         let ctx = Self::new_raw_context(hwnd, pf_reqs, gl_attr)?;
 
         Ok((win, ctx))
@@ -187,7 +187,7 @@ impl Context {
 
         let wb = WindowBuilder::new()
             .with_visibility(false)
-            .with_dimensions(size.to_logical(1.));
+            .with_inner_size(size.to_logical(1.));
         Self::new_windowed(wb, &el, pf_reqs, gl_attr).map(|(win, context)| {
             match context {
                 Context::Egl(context) => Context::HiddenWindowEgl(win, context),

@@ -35,7 +35,7 @@ fn main() {
 
     let wb = WindowBuilder::new()
         .with_title("A fantastic window!")
-        .with_dimensions(LogicalSize::from_physical(size, 1.0));
+        .with_inner_size(LogicalSize::from_physical(size, 1.0));
     let windowed_context = ContextBuilder::new()
         .with_shared_lists(&headless_context)
         .build_windowed(wb, &el)
@@ -115,7 +115,7 @@ fn main() {
                 WindowEvent::Resized(logical_size) => {
                     let windowed_context = ct.get_current(windowed_id).unwrap();
                     let dpi_factor =
-                        windowed_context.windowed().window().get_hidpi_factor();
+                        windowed_context.windowed().window().hidpi_factor();
                     size = logical_size.to_physical(dpi_factor);
                     windowed_context.windowed().resize(size);
 

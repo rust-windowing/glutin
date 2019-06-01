@@ -209,7 +209,7 @@ impl Context {
         size: Option<dpi::PhysicalSize>,
         fallback: bool,
     ) -> Result<Self, CreationError> {
-        let xconn = match el.get_xlib_xconnection() {
+        let xconn = match el.xlib_xconnection() {
             Some(xconn) => xconn,
             None => {
                 return Err(CreationError::NoBackendAvailable(Box::new(
@@ -466,7 +466,7 @@ impl Context {
         gl_attr: &GlAttributes<&Context>,
         fallback: bool,
     ) -> Result<(Window, Self), CreationError> {
-        let xconn = match el.get_xlib_xconnection() {
+        let xconn = match el.xlib_xconnection() {
             Some(xconn) => xconn,
             None => {
                 return Err(CreationError::NoBackendAvailable(Box::new(
@@ -510,7 +510,7 @@ impl Context {
             .with_x11_screen(screen_id)
             .build(el)?;
 
-        let xwin = win.get_xlib_window().unwrap();
+        let xwin = win.xlib_window().unwrap();
         // finish creating the OpenGL context
         let context = match context {
             Prototype::Glx(ctx) => X11Context::Glx(ctx.finish(xwin)?),

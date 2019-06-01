@@ -205,7 +205,7 @@ impl Context {
         let win = builder.build(el)?;
         let context = unsafe {
             let eagl_context = Context::create_context(version)?;
-            let view = win.get_uiview() as ffi::id;
+            let view = win.uiview() as ffi::id;
             let mut context = Context { eagl_context, view };
             context.init_context(&win);
             context
@@ -222,7 +222,7 @@ impl Context {
     ) -> Result<Self, CreationError> {
         let wb = winit::window::WindowBuilder::new()
             .with_visibility(false)
-            .with_dimensions(size.to_logical(1.));
+            .with_inner_size(size.to_logical(1.));
         Self::new_windowed(wb, el, pf_reqs, gl_attr)
             .map(|(_window, context)| context)
     }
@@ -270,7 +270,7 @@ impl Context {
         self.make_current().unwrap();
 
         let view = self.view;
-        let scale_factor = win.get_hidpi_factor() as ffi::CGFloat;
+        let scale_factor = win.hidpi_factor() as ffi::CGFloat;
         let _: () = msg_send![view, setContentScaleFactor: scale_factor];
         let layer: ffi::id = msg_send![view, layer];
         let _: () = msg_send![layer, setContentsScale: scale_factor];
