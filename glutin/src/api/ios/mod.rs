@@ -270,7 +270,7 @@ impl Context {
         self.make_current().unwrap();
 
         let view = self.view;
-        let scale_factor = win.get_hidpi_factor() as ffi::CGFloat;
+        let scale_factor = win.hidpi_factor() as ffi::CGFloat;
         let _: () = msg_send![view, setContentScaleFactor: scale_factor];
         let layer: ffi::id = msg_send![view, layer];
         let _: () = msg_send![layer, setContentsScale: scale_factor];

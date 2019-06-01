@@ -115,7 +115,7 @@ fn main() {
                 WindowEvent::Resized(logical_size) => {
                     let windowed_context = ct.get_current(windowed_id).unwrap();
                     let dpi_factor =
-                        windowed_context.windowed().window().get_hidpi_factor();
+                        windowed_context.windowed().window().hidpi_factor();
                     size = logical_size.to_physical(dpi_factor);
                     windowed_context.windowed().resize(size);
 

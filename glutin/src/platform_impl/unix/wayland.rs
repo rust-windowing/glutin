@@ -52,7 +52,7 @@ impl Context {
         size: Option<dpi::PhysicalSize>,
     ) -> Result<Self, CreationError> {
         let gl_attr = gl_attr.clone().map_sharing(|c| &**c);
-        let display_ptr = el.get_wayland_display().unwrap() as *const _;
+        let display_ptr = el.wayland_display().unwrap() as *const _;
         let native_display =
             NativeDisplay::Wayland(Some(display_ptr as *const _));
         if let Some(size) = size {
@@ -90,12 +90,12 @@ impl Context {
     ) -> Result<(Window, Self), CreationError> {
         let win = wb.build(el)?;
 
-        let dpi_factor = win.get_hidpi_factor();
-        let size = win.get_inner_size().unwrap().to_physical(dpi_factor);
+        let dpi_factor = win.hidpi_factor();
+        let size = win.inner_size().to_physical(dpi_factor);
         let (width, height): (u32, u32) = size.into();
 
-        let display_ptr = win.get_wayland_display().unwrap() as *const _;
-        let surface = win.get_wayland_surface();
+        let display_ptr = win.wayland_display().unwrap() as *const _;
+        let surface = win.wayland_surface();
         let surface = match surface {
             Some(s) => s,
             None => {

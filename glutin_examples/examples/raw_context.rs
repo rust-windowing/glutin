@@ -45,14 +45,14 @@ mod this_example {
 
                 if el.is_wayland() {
                     let win = wb.build(&el).unwrap();
-                    let dpi_factor = win.get_hidpi_factor();
+                    let dpi_factor = win.hidpi_factor();
                     let size =
-                        win.get_inner_size().unwrap().to_physical(dpi_factor);
+                        win.inner_size().to_physical(dpi_factor);
                     let (width, height): (u32, u32) = size.into();
 
                     let display_ptr =
-                        win.get_wayland_display().unwrap() as *const _;
-                    let surface = win.get_wayland_surface().unwrap();
+                        win.wayland_display().unwrap() as *const _;
+                    let surface = win.wayland_surface().unwrap();
 
                     let raw_context = ContextBuilder::new()
                         .build_raw_wayland_context(
@@ -85,8 +85,8 @@ File a PR if you are interested in implementing the latter.
                     }
 
                     let win = wb.build(&el).unwrap();
-                    let xconn = el.get_xlib_xconnection().unwrap();
-                    let xwindow = win.get_xlib_window().unwrap();
+                    let xconn = el.xlib_xconnection().unwrap();
+                    let xwindow = win.xlib_window().unwrap();
                     let raw_context = ContextBuilder::new()
                         .build_raw_x11_context(xconn, xwindow)
                         .unwrap();
@@ -131,7 +131,7 @@ File a PR if you are interested in implementing the latter.
                 }
                 Event::WindowEvent { ref event, .. } => match event {
                     WindowEvent::Resized(logical_size) => {
-                        let dpi_factor = win.get_hidpi_factor();
+                        let dpi_factor = win.hidpi_factor();
                         raw_context
                             .resize(logical_size.to_physical(dpi_factor));
                     }

@@ -129,6 +129,8 @@ pub use crate::context::*;
 pub use crate::windowed::*;
 pub use winit::*;
 
+use winit::error::OsError;
+
 use std::io;
 
 /// An object that allows you to build [`Context`]s, [`RawContext<T>`]s and
@@ -322,12 +324,12 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
 pub enum CreationError {
     OsError(String),
     NotSupported(String),
-    NoBackendAvailable(Box<std::error::Error + Send + Sync>),
+    NoBackendAvailable(Box<dyn std::error::Error + Send + Sync>),
     RobustnessNotSupported,
     OpenGlVersionNotSupported,
     NoAvailablePixelFormat,
     PlatformSpecific(String),
-    Window(window::CreationError),
+    Window(OsError),
     /// We received multiple errors, instead of one.
     CreationErrors(Vec<Box<CreationError>>),
 }
@@ -402,7 +404,7 @@ impl std::error::Error for CreationError {
         self.to_string()
     }
 
-    fn cause(&self) -> Option<&std::error::Error> {
+    fn cause(&self) -> Option<&dyn std::error::Error> {
         match *self {
             CreationError::NoBackendAvailable(ref err) => Some(&**err),
             CreationError::Window(ref err) => Some(err),
@@ -411,8 +413,8 @@ impl std::error::Error for CreationError {
     }
 }
 
-impl From<window::CreationError> for CreationError {
-    fn from(err: window::CreationError) -> Self {
+impl From<OsError> for CreationError {
+    fn from(err: OsError) -> Self {
         CreationError::Window(err)
     }
 }
