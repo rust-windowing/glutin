@@ -35,7 +35,7 @@ fn main() {
 
     let wb = WindowBuilder::new()
         .with_title("A fantastic window!")
-        .with_dimensions(LogicalSize::from_physical(size, 1.0));
+        .with_inner_size(LogicalSize::from_physical(size, 1.0));
     let windowed_context = ContextBuilder::new()
         .with_shared_lists(&headless_context)
         .build_windowed(wb, &el)

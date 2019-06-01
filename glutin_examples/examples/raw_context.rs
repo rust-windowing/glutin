@@ -102,7 +102,7 @@ File a PR if you are interested in implementing the latter.
                     RawContextExt, WindowExtWindows,
                 };
 
-                let hwnd = win.get_hwnd();
+                let hwnd = win.hwnd();
                 let raw_context =
                     ContextBuilder::new().build_raw_context(hwnd).unwrap();
 

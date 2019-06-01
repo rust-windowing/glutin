@@ -110,7 +110,7 @@ fn main() {
                             windowed_context.window().set_fullscreen(None);
                         } else {
                             windowed_context.window().set_fullscreen(Some(
-                                windowed_context.window().get_current_monitor(),
+                                windowed_context.window().current_monitor(),
                             ));
                         }
                     }
@@ -133,8 +133,8 @@ fn main() {
 
 // Enumerate monitors and prompt user to choose one
 fn prompt_for_monitor(el: &EventLoop<()>) -> MonitorHandle {
-    for (num, monitor) in el.get_available_monitors().enumerate() {
-        println!("Monitor #{}: {:?}", num, monitor.get_name());
+    for (num, monitor) in el.available_monitors().enumerate() {
+        println!("Monitor #{}: {:?}", num, monitor.name());
     }
 
     print!("Please write the number of the monitor to use: ");
@@ -144,11 +144,11 @@ fn prompt_for_monitor(el: &EventLoop<()>) -> MonitorHandle {
     std::io::stdin().read_line(&mut num).unwrap();
     let num = num.trim().parse().ok().expect("Please enter a number");
     let monitor = el
-        .get_available_monitors()
+        .available_monitors()
         .nth(num)
         .expect("Please enter a valid ID");
 
-    println!("Using {:?}", monitor.get_name());
+    println!("Using {:?}", monitor.name());
 
     monitor
 }
