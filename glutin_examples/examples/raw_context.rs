@@ -19,6 +19,7 @@ mod this_example {
     use takeable_option::Takeable;
 
     pub fn main() {
+        env_logger::init();
         print!("Do you want transparency? (true/false) (default: true): ");
         std::io::stdout().flush().unwrap();
 
@@ -121,7 +122,7 @@ File a PR if you are interested in implementing the latter.
 
         let mut raw_context = Takeable::new(raw_context);
         el.run(move |event, _, control_flow| {
-            println!("el {:?}", event);
+            println!("{:?}", event);
             *control_flow = ControlFlow::Wait;
 
             match event {

@@ -9,6 +9,7 @@ use glutin::window::WindowBuilder;
 use std::io::Write;
 
 fn main() {
+    env_logger::init();
     let el = EventLoop::new();
 
     #[cfg(target_os = "macos")]

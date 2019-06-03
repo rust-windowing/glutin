@@ -7,6 +7,7 @@ use glutin::ContextBuilder;
 use support::{ContextCurrentWrapper, ContextTracker, ContextWrapper};
 
 fn main() {
+    env_logger::init();
     let el = EventLoop::new();
     let mut ct = ContextTracker::default();
 

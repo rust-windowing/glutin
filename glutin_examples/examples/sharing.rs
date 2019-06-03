@@ -24,6 +24,7 @@ fn make_renderbuf(gl: &support::Gl, size: PhysicalSize) -> gl::types::GLuint {
 }
 
 fn main() {
+    env_logger::init();
     let el = EventLoop::new();
     let mut size = PhysicalSize::new(768., 480.);
 

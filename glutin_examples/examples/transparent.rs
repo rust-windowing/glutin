@@ -6,6 +6,7 @@ use glutin::window::WindowBuilder;
 use glutin::ContextBuilder;
 
 fn main() {
+    env_logger::init();
     let el = EventLoop::new();
     let wb = WindowBuilder::new()
         .with_title("A transparent window!")

@@ -45,7 +45,7 @@ pub type WindowedContext<T> = ContextWrapper<T, Window>;
 #[cfg_attr(
     target_os = "windows",
     doc = "\
-[`platform::windows::RawContextExt`]: os/windows/enum.RawHandle.html
+[`platform::windows::RawContextExt`]: os/windows/trait.RawContextExt.html
 "
 )]
 #[cfg_attr(
@@ -75,7 +75,7 @@ pub type WindowedContext<T> = ContextWrapper<T, Window>;
         target_os = "openbsd",
     ),
     doc = "\
-[`platform::unix::RawContextExt`]: os/unix/enum.RawHandle.html
+[`platform::unix::RawContextExt`]: os/unix/trait.RawContextExt.html
 "
 )]
 pub type RawContext<T> = ContextWrapper<T, ()>;

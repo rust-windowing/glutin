@@ -15,6 +15,7 @@ glutin = { path = "../glutin" }
 winit = "0.19"
 takeable-option = "0.4"
 image = "0.21"
+env_logger = "0.6"
 
 [build-dependencies]
 gl_generator = "0.11"

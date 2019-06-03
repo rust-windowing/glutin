@@ -78,6 +78,7 @@ fn build_context<T1: ContextCurrentState>(
 }
 
 fn main() {
+    env_logger::init();
     let cb = ContextBuilder::new()
         .with_gl_profile(GlProfile::Core)
         .with_gl(GlRequest::Latest);

@@ -796,9 +796,10 @@ impl<'a> ContextPrototype<'a> {
                 std::ptr::null(),
             );
             if surface.is_null() {
-                return Err(CreationError::OsError(
-                    "eglCreateWindowSurface failed".to_string(),
-                ));
+                return Err(CreationError::OsError(format!(
+                    "eglCreateWindowSurface failed with 0x{:x}",
+                    egl.GetError()
+                )));
             }
             surface
         };
