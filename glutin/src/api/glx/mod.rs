@@ -59,6 +59,7 @@ use crate::{
 
 use crate::platform::unix::x11::XConnection;
 use crate::platform_impl::x11_utils::SurfaceType;
+use crate::platform_impl::PlatformAttributes;
 use glutin_glx_sys as ffi;
 use winit::dpi;
 
@@ -83,7 +84,8 @@ impl Context {
     pub fn new<'a>(
         xconn: Arc<XConnection>,
         pf_reqs: &PixelFormatRequirements,
-        opengl: &'a GlAttributes<&'a Context>,
+        gl_attr: &'a GlAttributes<&'a Context>,
+        plat_attr: &PlatformAttributes,
         screen_id: raw::c_int,
         surface_type: SurfaceType,
         transparent: Option<bool>,
@@ -112,6 +114,7 @@ impl Context {
                 &xconn,
                 screen_id,
                 pf_reqs,
+                plat_attr,
                 surface_type,
                 transparent,
             )?
@@ -120,7 +123,7 @@ impl Context {
         Ok(ContextPrototype {
             extensions,
             xconn,
-            opengl,
+            gl_attr,
             fb_config,
             visual_infos: unsafe { std::mem::transmute(visual_infos) },
             pixel_format,
@@ -249,7 +252,7 @@ impl Drop for Context {
 pub struct ContextPrototype<'a> {
     extensions: String,
     xconn: Arc<XConnection>,
-    opengl: &'a GlAttributes<&'a Context>,
+    gl_attr: &'a GlAttributes<&'a Context>,
     fb_config: ffi::glx::types::GLXFBConfig,
     visual_infos: ffi::XVisualInfo,
     pixel_format: PixelFormat,
@@ -266,7 +269,7 @@ impl<'a> ContextPrototype<'a> {
         &self,
     ) -> Result<(ffi::glx_extra::Glx, ffi::GLXContext), CreationError> {
         let glx = GLX.as_ref().unwrap();
-        let share = match self.opengl.sharing {
+        let share = match self.gl_attr.sharing {
             Some(ctx) => ctx.context,
             None => std::ptr::null(),
         };
@@ -279,7 +282,7 @@ impl<'a> ContextPrototype<'a> {
             }
         });
 
-        let context = match self.opengl.version {
+        let context = match self.gl_attr.version {
             GlRequest::Latest => {
                 let opengl_versions = [
                     (4, 6),
@@ -304,9 +307,9 @@ impl<'a> ContextPrototype<'a> {
                             &self.extensions,
                             &self.xconn.xlib,
                             *opengl_version,
-                            self.opengl.profile,
-                            self.opengl.debug,
-                            self.opengl.robustness,
+                            self.gl_attr.profile,
+                            self.gl_attr.debug,
+                            self.gl_attr.robustness,
                             share,
                             self.xconn.display,
                             self.fb_config,
@@ -324,9 +327,9 @@ impl<'a> ContextPrototype<'a> {
                         &self.extensions,
                         &self.xconn.xlib,
                         (1, 0),
-                        self.opengl.profile,
-                        self.opengl.debug,
-                        self.opengl.robustness,
+                        self.gl_attr.profile,
+                        self.gl_attr.debug,
+                        self.gl_attr.robustness,
                         share,
                         self.xconn.display,
                         self.fb_config,
@@ -341,9 +344,9 @@ impl<'a> ContextPrototype<'a> {
                 &self.extensions,
                 &self.xconn.xlib,
                 (major, minor),
-                self.opengl.profile,
-                self.opengl.debug,
-                self.opengl.robustness,
+                self.gl_attr.profile,
+                self.gl_attr.debug,
+                self.gl_attr.robustness,
                 share,
                 self.xconn.display,
                 self.fb_config,
@@ -358,9 +361,9 @@ impl<'a> ContextPrototype<'a> {
                 &self.extensions,
                 &self.xconn.xlib,
                 (major, minor),
-                self.opengl.profile,
-                self.opengl.debug,
-                self.opengl.robustness,
+                self.gl_attr.profile,
+                self.gl_attr.debug,
+                self.gl_attr.robustness,
                 share,
                 self.xconn.display,
                 self.fb_config,
@@ -408,7 +411,7 @@ impl<'a> ContextPrototype<'a> {
         let (extra_functions, context) = self.create_context()?;
 
         // vsync
-        if self.opengl.vsync {
+        if self.gl_attr.vsync {
             let _guard = MakeCurrentGuard::new(&self.xconn, window, context)
                 .map_err(|err| CreationError::OsError(err))?;
 
@@ -608,6 +611,7 @@ unsafe fn choose_fbconfig(
     xconn: &Arc<XConnection>,
     screen_id: raw::c_int,
     pf_reqs: &PixelFormatRequirements,
+    plat_attr: &PlatformAttributes,
     surface_type: SurfaceType,
     transparent: Option<bool>,
 ) -> Result<
@@ -622,7 +626,7 @@ unsafe fn choose_fbconfig(
         out.push(ffi::glx::X_RENDERABLE as raw::c_int);
         out.push(1);
 
-        if let Some(xid) = pf_reqs.x11_visual_xid {
+        if let Some(xid) = plat_attr.x11_visual_xid {
             // getting the visual infos
             let fvi = crate::platform_impl::x11_utils::get_visual_info_from_xid(
                 &xconn, xid,
@@ -766,7 +770,7 @@ unsafe fn choose_fbconfig(
         match crate::platform_impl::x11_utils::select_config(
             xconn,
             transparent,
-            pf_reqs,
+            plat_attr,
             (0..num_configs).collect(),
             |config_id| {
                 let visual_infos_raw = glx.GetVisualFromFBConfig(

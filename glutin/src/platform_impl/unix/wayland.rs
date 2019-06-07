@@ -3,8 +3,9 @@ use crate::api::egl::{
 };
 use crate::{
     ContextError, CreationError, GlAttributes, PixelFormat,
-    PixelFormatRequirements,
+    PixelFormatRequirements
 };
+use crate::platform_impl::PlatformAttributes;
 
 use crate::platform::unix::{EventLoopExtUnix, WindowExtUnix};
 use glutin_egl_sys as ffi;
@@ -49,6 +50,7 @@ impl Context {
         el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
+        plat_attr: &PlatformAttributes,
         size: Option<dpi::PhysicalSize>,
     ) -> Result<Self, CreationError> {
         let gl_attr = gl_attr.clone().map_sharing(|c| &**c);
@@ -59,6 +61,7 @@ impl Context {
             let context = EglContext::new(
                 pf_reqs,
                 &gl_attr,
+                plat_attr,
                 native_display,
                 EglSurfaceType::PBuffer,
                 |c, _| Ok(c[0]),
@@ -71,6 +74,7 @@ impl Context {
             let context = EglContext::new(
                 pf_reqs,
                 &gl_attr,
+                plat_attr,
                 native_display,
                 EglSurfaceType::Surfaceless,
                 |c, _| Ok(c[0]),
@@ -87,6 +91,7 @@ impl Context {
         el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
+        plat_attr: &PlatformAttributes,
     ) -> Result<(Window, Self), CreationError> {
         let win = wb.build(el)?;
 
@@ -112,6 +117,7 @@ impl Context {
             height,
             pf_reqs,
             gl_attr,
+            plat_attr,
         )?;
         Ok((win, context))
     }
@@ -124,6 +130,7 @@ impl Context {
         height: u32,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
+        plat_attr: &PlatformAttributes,
     ) -> Result<Self, CreationError> {
         let egl_surface = unsafe {
             wegl::WlEglSurface::new_from_raw(
@@ -139,6 +146,7 @@ impl Context {
             EglContext::new(
                 pf_reqs,
                 &gl_attr,
+                plat_attr,
                 native_display,
                 EglSurfaceType::Window,
                 |c, _| Ok(c[0]),

@@ -6,17 +6,22 @@
     target_os = "openbsd",
 ))]
 
+mod osmesa;
+//mod rawext;
+
 use crate::platform::ContextTraitExt;
-pub use crate::platform_impl::{HeadlessContextExt, RawContextExt, RawHandle};
-use crate::{Context, ContextCurrentState};
+pub use crate::platform_impl::{RawHandle, PlatformAttributes};
+use crate::{SupportsPBuffersTrait, SupportsWindowSurfacesTrait, SupportsSurfacelessTrait, Context, ContextCurrentState};
 pub use glutin_egl_sys::EGLContext;
 pub use glutin_glx_sys::GLXContext;
 
 pub use winit::platform::unix::*;
+pub use self::osmesa::*;
+//pub use self::rawext::*;
 
 use std::os::raw;
 
-impl<T: ContextCurrentState> ContextTraitExt for Context<T> {
+impl<CS: ContextCurrentState, PBS: SupportsPBuffersTrait, WST: SupportsWindowSurfacesTrait, ST: SupportsSurfacelessTrait> ContextTraitExt for Context<CS, PBS, WST, ST> {
     type Handle = RawHandle;
 
     #[inline]
@@ -29,3 +34,4 @@ impl<T: ContextCurrentState> ContextTraitExt for Context<T> {
         self.context.get_egl_display()
     }
 }
+

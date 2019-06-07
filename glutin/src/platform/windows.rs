@@ -1,16 +1,18 @@
 #![cfg(target_os = "windows")]
 
+//mod rawext;
+
 use crate::platform::ContextTraitExt;
+use crate::{SupportsPBuffersTrait, SupportsWindowSurfacesTrait, SupportsSurfacelessTrait};
 pub use crate::platform_impl::{RawContextExt, RawHandle};
 use crate::{Context, ContextCurrentState};
 pub use glutin_egl_sys::EGLContext;
 
 pub use winapi::shared::windef::HGLRC;
 pub use winit::platform::windows::*;
+//pub use self::rawext::*;
 
-use std::os::raw;
-
-impl<T: ContextCurrentState> ContextTraitExt for Context<T> {
+impl<CS: ContextCurrentState, PBS: SupportsPBuffersTrait, WST: SupportsWindowSurfacesTrait, ST: SupportsSurfacelessTrait> ContextTraitExt for Context<CS, PBS, WST, ST> {
     type Handle = RawHandle;
 
     #[inline]

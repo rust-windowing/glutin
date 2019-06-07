@@ -14,6 +14,7 @@ use crate::{
     Api, ContextError, CreationError, GlAttributes, GlProfile, GlRequest,
     PixelFormatRequirements, Robustness,
 };
+use crate::platform_impl::PlatformAttributes;
 
 use winit::dpi;
 
@@ -71,6 +72,7 @@ impl OsMesaContext {
     pub fn new(
         _pf_reqs: &PixelFormatRequirements,
         opengl: &GlAttributes<&OsMesaContext>,
+        _: &PlatformAttributes,
         size: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
         osmesa_sys::OsMesa::try_loading()

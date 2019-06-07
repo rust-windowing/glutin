@@ -123,10 +123,10 @@ pub mod platform;
 mod api;
 mod context;
 mod platform_impl;
-mod windowed;
+mod surface;
 
 pub use crate::context::*;
-pub use crate::windowed::*;
+pub use crate::surface::*;
 pub use winit::*;
 
 use winit::error::OsError;
@@ -143,24 +143,44 @@ use std::io;
 /// [`WindowedContext<T>`]: type.WindowedContext.html
 /// [`RawContext<T>`]: type.RawContext.html
 #[derive(Debug, Clone)]
-pub struct ContextBuilder<'a, T: ContextCurrentState> {
+pub struct ContextBuilderWrapper<T> {
     /// The attributes to use to create the context.
-    pub gl_attr: GlAttributes<&'a Context<T>>,
+    pub gl_attr: GlAttributes<T>,
     /// The pixel format requirements
     pub pf_reqs: PixelFormatRequirements,
+    /// Platform specific attributes
+    pub plat_attr: platform_impl::PlatformAttributes,
 }
 
-impl<'a> ContextBuilder<'a, NotCurrent> {
+pub type ContextBuilder<'a, CS: ContextCurrentState, PBS: SupportsPBuffersTrait, WST: SupportsWindowSurfacesTrait, ST: SupportsSurfacelessTrait> = ContextBuilderWrapper<&'a Context<CS, PBS, WST, ST>>;
+
+impl<S> ContextBuilderWrapper<S> {
+    /// Turns the `sharing` parameter into another type by calling a closure.
+    #[inline]
+    pub fn map_sharing<F, T>(self, f: F) -> ContextBuilderWrapper<T>
+    where
+        F: FnOnce(S) -> T,
+    {
+        ContextBuilderWrapper {
+            gl_attr: self.gl_attr.map_sharing(f),
+            pf_reqs: self.pf_reqs,
+            plat_attr: self.plat_attr,
+        }
+    }
+}
+
+impl<'a> ContextBuilder<'a, NotCurrent, SupportsPBuffers::No, SupportsWindowSurfaces::No, SupportsSurfaceless::No> {
     /// Initializes a new `ContextBuilder` with default values.
     pub fn new() -> Self {
         ContextBuilder {
             pf_reqs: std::default::Default::default(),
             gl_attr: std::default::Default::default(),
+            plat_attr: std::default::Default::default(),
         }
     }
 }
 
-impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
+impl<'a, CS: ContextCurrentState, PBS: SupportsPBuffersTrait, WST: SupportsWindowSurfacesTrait, ST: SupportsSurfacelessTrait> ContextBuilder<'a, CS, PBS, WST, ST> {
     /// Sets how the backend should choose the OpenGL API and version.
     #[inline]
     pub fn with_gl(mut self, request: GlRequest) -> Self {
@@ -214,13 +234,14 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     ///
     /// [`Context`]: struct.Context.html
     #[inline]
-    pub fn with_shared_lists<T2: ContextCurrentState>(
+    pub fn with_shared_lists<CS2: ContextCurrentState, PBS2: SupportsPBuffersTrait, WST2: SupportsWindowSurfacesTrait, ST2: SupportsSurfacelessTrait>(
         self,
-        other: &'a Context<T2>,
-    ) -> ContextBuilder<'a, T2> {
+        other: &'a Context<CS2, PBS2, WST2, ST2>,
+    ) -> ContextBuilder<'a, CS2, PBS2, WST2, ST2> {
         ContextBuilder {
             gl_attr: self.gl_attr.set_sharing(Some(other)),
             pf_reqs: self.pf_reqs,
+            plat_attr: self.plat_attr,
         }
     }
 
@@ -655,10 +676,6 @@ pub struct PixelFormatRequirements {
 
     /// The behavior when changing the current context. Default is `Flush`.
     pub release_behavior: ReleaseBehavior,
-
-    /// X11 only: set internally to insure a certain visual xid is used when
-    /// choosing the fbconfig.
-    pub(crate) x11_visual_xid: Option<std::os::raw::c_ulong>,
 }
 
 impl Default for PixelFormatRequirements {
@@ -676,7 +693,6 @@ impl Default for PixelFormatRequirements {
             stereoscopy: false,
             srgb: false,
             release_behavior: ReleaseBehavior::Flush,
-            x11_visual_xid: None,
         }
     }
 }
@@ -774,3 +790,12 @@ impl<S> Default for GlAttributes<S> {
         }
     }
 }
+
+trait FailToCompileIfNotSendSync
+where
+    Self: Send + Sync,
+{}
+impl<PBT: SupportsPBuffersTrait, WST: SupportsWindowSurfacesTrait, ST: SupportsSurfacelessTrait> FailToCompileIfNotSendSync for Context<NotCurrent, PBT, WST, ST> {}
+impl FailToCompileIfNotSendSync for WindowSurface {}
+impl FailToCompileIfNotSendSync for RawWindowSurface {}
+impl FailToCompileIfNotSendSync for PBuffer {}

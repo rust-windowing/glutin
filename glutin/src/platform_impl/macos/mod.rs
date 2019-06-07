@@ -280,6 +280,8 @@ impl Context {
             match *self {
                 Context::WindowedContext(ref c) => {
                     let pool = NSAutoreleasePool::new(nil);
+                    // FIXME: Does not work if `NSOpenGLPFADoubleBuffer` is not
+                    // set?
                     c.context.flushBuffer();
                     let _: () = msg_send![pool, release];
                 }

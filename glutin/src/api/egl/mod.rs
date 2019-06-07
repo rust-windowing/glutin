@@ -64,6 +64,7 @@ use crate::{
     Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
     PixelFormatRequirements, ReleaseBehavior, Robustness,
 };
+use crate::platform_impl::PlatformAttributes;
 
 use glutin_egl_sys as ffi;
 use parking_lot::Mutex;
@@ -156,11 +157,11 @@ fn get_egl_version(
 }
 
 unsafe fn bind_and_get_api<'a>(
-    opengl: &'a GlAttributes<&'a Context>,
+    gl_attr: &'a GlAttributes<&'a Context>,
     egl_version: (ffi::egl::types::EGLint, ffi::egl::types::EGLint),
 ) -> Result<(Option<(u8, u8)>, Api), CreationError> {
     let egl = EGL.as_ref().unwrap();
-    match opengl.version {
+    match gl_attr.version {
         GlRequest::Latest => {
             if egl_version >= (1, 4) {
                 if egl.BindAPI(ffi::egl::OPENGL_API) != 0 {
@@ -390,7 +391,8 @@ impl Context {
     /// `ContextPrototype`.
     pub fn new<'a, F>(
         pf_reqs: &PixelFormatRequirements,
-        opengl: &'a GlAttributes<&'a Context>,
+        gl_attr: &'a GlAttributes<&'a Context>,
+        plat_attr: &PlatformAttributes,
         native_display: NativeDisplay,
         surface_type: SurfaceType,
         config_selector: F,
@@ -429,7 +431,7 @@ impl Context {
         };
 
         // binding the right API and choosing the version
-        let (version, api) = unsafe { bind_and_get_api(&opengl, egl_version)? };
+        let (version, api) = unsafe { bind_and_get_api(&gl_attr, egl_version)? };
 
         let (config_id, pixel_format) = unsafe {
             choose_fbconfig(
@@ -438,13 +440,14 @@ impl Context {
                 api,
                 version,
                 pf_reqs,
+                plat_attr,
                 surface_type,
                 config_selector,
             )?
         };
 
         Ok(ContextPrototype {
-            opengl,
+            gl_attr,
             display,
             egl_version,
             extensions,
@@ -475,6 +478,13 @@ impl Context {
 
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
         let egl = EGL.as_ref().unwrap();
+        // FIXME: Possible race condition: we lock the mutex, grab the surface,
+        // unlock it. Then the other thread on android destroys the surface,
+        // then we try to use the surface.
+        //
+        // Problem is rare enough, and can only possibly happen on android.
+        //
+        // Is it okay to use a drestroyed surface? I can't imagine so.
         let surface = self
             .surface
             .as_ref()
@@ -731,7 +741,7 @@ impl Drop for Context {
 
 #[derive(Debug)]
 pub struct ContextPrototype<'a> {
-    opengl: &'a GlAttributes<&'a Context>,
+    gl_attr: &'a GlAttributes<&'a Context>,
     display: ffi::egl::types::EGLDisplay,
     egl_version: (ffi::egl::types::EGLint, ffi::egl::types::EGLint),
     extensions: Vec<String>,
@@ -881,7 +891,7 @@ impl<'a> ContextPrototype<'a> {
         self,
         surface: Option<ffi::egl::types::EGLSurface>,
     ) -> Result<Context, CreationError> {
-        let share = match self.opengl.sharing {
+        let share = match self.gl_attr.sharing {
             Some(ctx) => ctx.context,
             None => std::ptr::null(),
         };
@@ -895,8 +905,8 @@ impl<'a> ContextPrototype<'a> {
                     self.api,
                     version,
                     self.config_id,
-                    self.opengl.debug,
-                    self.opengl.robustness,
+                    self.gl_attr.debug,
+                    self.gl_attr.robustness,
                     share,
                 )?
             } else if self.api == Api::OpenGlEs {
@@ -907,8 +917,8 @@ impl<'a> ContextPrototype<'a> {
                     self.api,
                     (2, 0),
                     self.config_id,
-                    self.opengl.debug,
-                    self.opengl.robustness,
+                    self.gl_attr.debug,
+                    self.gl_attr.robustness,
                     share,
                 ) {
                     ctx
@@ -919,8 +929,8 @@ impl<'a> ContextPrototype<'a> {
                     self.api,
                     (1, 0),
                     self.config_id,
-                    self.opengl.debug,
-                    self.opengl.robustness,
+                    self.gl_attr.debug,
+                    self.gl_attr.robustness,
                     share,
                 ) {
                     ctx
@@ -935,8 +945,8 @@ impl<'a> ContextPrototype<'a> {
                     self.api,
                     (3, 2),
                     self.config_id,
-                    self.opengl.debug,
-                    self.opengl.robustness,
+                    self.gl_attr.debug,
+                    self.gl_attr.robustness,
                     share,
                 ) {
                     ctx
@@ -947,8 +957,8 @@ impl<'a> ContextPrototype<'a> {
                     self.api,
                     (3, 1),
                     self.config_id,
-                    self.opengl.debug,
-                    self.opengl.robustness,
+                    self.gl_attr.debug,
+                    self.gl_attr.robustness,
                     share,
                 ) {
                     ctx
@@ -959,8 +969,8 @@ impl<'a> ContextPrototype<'a> {
                     self.api,
                     (1, 0),
                     self.config_id,
-                    self.opengl.debug,
-                    self.opengl.robustness,
+                    self.gl_attr.debug,
+                    self.gl_attr.robustness,
                     share,
                 ) {
                     ctx
@@ -988,6 +998,7 @@ unsafe fn choose_fbconfig<F>(
     api: Api,
     version: Option<(u8, u8)>,
     pf_reqs: &PixelFormatRequirements,
+    plat_attr: &PlatformAttributes,
     surface_type: SurfaceType,
     mut config_selector: F,
 ) -> Result<(ffi::egl::types::EGLConfig, PixelFormat), CreationError>
@@ -1105,7 +1116,7 @@ where
             return Err(CreationError::NoAvailablePixelFormat);
         }
 
-        if let Some(xid) = pf_reqs.x11_visual_xid {
+        if let Some(xid) = plat_attr.x11_visual_xid {
             out.push(ffi::egl::NATIVE_VISUAL_ID as raw::c_int);
             out.push(xid as raw::c_int);
         }

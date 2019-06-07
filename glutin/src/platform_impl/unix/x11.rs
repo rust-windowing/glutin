@@ -7,7 +7,7 @@ use crate::platform::unix::x11::XConnection;
 use crate::platform::unix::{
     EventLoopExtUnix, WindowBuilderExtUnix, WindowExtUnix,
 };
-use crate::platform_impl::x11_utils;
+use crate::platform_impl::{x11_utils, PlatformAttributes};
 use crate::{
     Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
     PixelFormatRequirements,
@@ -98,7 +98,7 @@ unsafe impl Sync for Context {}
 pub fn select_config<T, F>(
     xconn: &Arc<XConnection>,
     transparent: Option<bool>,
-    pf_reqs: &PixelFormatRequirements,
+    plat_attr: &PlatformAttributes,
     config_ids: Vec<T>,
     mut convert_to_xvisualinfo: F,
 ) -> Result<(T, ffi::XVisualInfo), ()>
@@ -119,7 +119,7 @@ where
             &xconn,
             visual_infos,
             transparent == Some(true),
-            pf_reqs.x11_visual_xid,
+            plat_attr.x11_visual_xid,
         );
 
         let pict_format = unsafe {
@@ -189,6 +189,7 @@ impl Context {
         el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
+        plat_attr: &PlatformAttributes,
         size: Option<dpi::PhysicalSize>,
     ) -> Result<Self, CreationError> {
         Self::try_then_fallback(|fallback| {
@@ -196,6 +197,7 @@ impl Context {
                 el,
                 pf_reqs,
                 gl_attr,
+                plat_attr,
                 size.clone(),
                 fallback,
             )
@@ -206,6 +208,7 @@ impl Context {
         el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
+        plat_attr: &PlatformAttributes,
         size: Option<dpi::PhysicalSize>,
         fallback: bool,
     ) -> Result<Self, CreationError> {
@@ -230,6 +233,7 @@ impl Context {
                 &xconn,
                 pf_reqs,
                 gl_attr,
+                plat_attr,
                 screen_id,
                 &mut builder_glx_u,
                 &mut builder_egl_u,
@@ -261,6 +265,7 @@ impl Context {
                 &xconn,
                 pf_reqs,
                 gl_attr,
+                plat_attr,
                 screen_id,
                 &mut builder_glx_u,
                 &mut builder_egl_u,
@@ -312,6 +317,7 @@ impl Context {
         xconn: &Arc<XConnection>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &'a GlAttributes<&'a Context>,
+        plat_attr: &'a PlatformAttributes,
         screen_id: raw::c_int,
         builder_glx_u: &'a mut Option<GlAttributes<&'a GlxContext>>,
         builder_egl_u: &'a mut Option<GlAttributes<&'a EglContext>>,
@@ -321,7 +327,7 @@ impl Context {
         transparent: Option<bool>,
     ) -> Result<Prototype<'a>, CreationError> {
         let select_config = |cs, display| {
-            select_config(&xconn, transparent, pf_reqs, cs, |config_id| {
+            select_config(&xconn, transparent, plat_attr, cs, |config_id| {
                 let xid = egl::get_native_visual_id(display, *config_id)
                     as ffi::VisualID;
                 if xid == 0 {
@@ -351,6 +357,7 @@ impl Context {
                         Arc::clone(&xconn),
                         pf_reqs,
                         builder_u.as_ref().unwrap(),
+                        plat_attr,
                         screen_id,
                         surface_type,
                         transparent,
@@ -369,6 +376,7 @@ impl Context {
                     Ok(Prototype::Egl(EglContext::new(
                         pf_reqs,
                         builder_u.as_ref().unwrap(),
+                        plat_attr,
                         native_display,
                         surface_type,
                         select_config,
@@ -429,6 +437,7 @@ impl Context {
                     Prototype::Egl(EglContext::new(
                         pf_reqs,
                         builder_egl_u.as_ref().unwrap(),
+                        plat_attr,
                         NativeDisplay::X11(Some(xconn.display as *const _)),
                         surface_type,
                         select_config,
@@ -453,9 +462,10 @@ impl Context {
         el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
+        plat_attr: &PlatformAttributes,
     ) -> Result<(Window, Self), CreationError> {
         Self::try_then_fallback(|fallback| {
-            Self::new_impl(wb.clone(), el, pf_reqs, gl_attr, fallback)
+            Self::new_impl(wb.clone(), el, pf_reqs, gl_attr, plat_attr, fallback)
         })
     }
 
@@ -464,6 +474,7 @@ impl Context {
         el: &EventLoop<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
+        plat_attr: &PlatformAttributes,
         fallback: bool,
     ) -> Result<(Window, Self), CreationError> {
         let xconn = match el.xlib_xconnection() {
@@ -486,6 +497,7 @@ impl Context {
             &xconn,
             pf_reqs,
             gl_attr,
+            plat_attr,
             screen_id,
             &mut builder_glx_u,
             &mut builder_egl_u,
@@ -531,9 +543,10 @@ impl Context {
         xwin: raw::c_ulong,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
+        plat_attr: &PlatformAttributes,
     ) -> Result<Self, CreationError> {
         Self::try_then_fallback(|fallback| {
-            Self::new_raw_context_impl(&xconn, xwin, pf_reqs, gl_attr, fallback)
+            Self::new_raw_context_impl(&xconn, xwin, pf_reqs, gl_attr, plat_attr, fallback)
         })
     }
 
@@ -542,6 +555,7 @@ impl Context {
         xwin: raw::c_ulong,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
+        plat_attr: &PlatformAttributes,
         fallback: bool,
     ) -> Result<Self, CreationError> {
         let attrs = unsafe {
@@ -575,7 +589,8 @@ impl Context {
         let visual_xid =
             unsafe { (xconn.xlib.XVisualIDFromVisual)(attrs.visual) };
         let mut pf_reqs = pf_reqs.clone();
-        pf_reqs.x11_visual_xid = Some(visual_xid);
+        let mut plat_attr = plat_attr.clone();
+        plat_attr.x11_visual_xid = Some(visual_xid);
         pf_reqs.depth_bits = Some(attrs.depth as _);
 
         let mut builder_glx_u = None;
@@ -586,6 +601,7 @@ impl Context {
             &xconn,
             &pf_reqs,
             gl_attr,
+            &plat_attr,
             screen_id,
             &mut builder_glx_u,
             &mut builder_egl_u,
