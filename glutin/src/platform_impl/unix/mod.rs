@@ -39,14 +39,12 @@ pub enum RawHandle {
 pub enum ContextType {
     X11,
     Wayland,
-    OsMesa,
 }
 
 #[derive(Debug)]
 pub enum Context {
     X11(x11::Context),
     Wayland(wayland::Context),
-    OsMesa(osmesa::OsMesaContext),
 }
 
 impl Context {
@@ -56,15 +54,6 @@ impl Context {
     ) -> Result<(), CreationError> {
         if let Some(c) = *c {
             match ct {
-                ContextType::OsMesa => match *c {
-                    Context::OsMesa(_) => Ok(()),
-                    _ => {
-                        let msg = "Cannot share an OSMesa context with a non-OSMesa context";
-                        return Err(CreationError::PlatformSpecific(
-                            msg.into(),
-                        ));
-                    }
-                },
                 ContextType::X11 => match *c {
                     Context::X11(_) => Ok(()),
                     _ => {
@@ -159,7 +148,6 @@ impl Context {
         match *self {
             Context::X11(ref ctx) => ctx.make_current(),
             Context::Wayland(ref ctx) => ctx.make_current(),
-            Context::OsMesa(ref ctx) => ctx.make_current(),
         }
     }
 
@@ -168,7 +156,6 @@ impl Context {
         match *self {
             Context::X11(ref ctx) => ctx.make_not_current(),
             Context::Wayland(ref ctx) => ctx.make_not_current(),
-            Context::OsMesa(ref ctx) => ctx.make_not_current(),
         }
     }
 
@@ -177,7 +164,6 @@ impl Context {
         match *self {
             Context::X11(ref ctx) => ctx.is_current(),
             Context::Wayland(ref ctx) => ctx.is_current(),
-            Context::OsMesa(ref ctx) => ctx.is_current(),
         }
     }
 
@@ -186,7 +172,6 @@ impl Context {
         match *self {
             Context::X11(ref ctx) => ctx.get_api(),
             Context::Wayland(ref ctx) => ctx.get_api(),
-            Context::OsMesa(ref ctx) => ctx.get_api(),
         }
     }
 
@@ -198,7 +183,6 @@ impl Context {
                 X11Context::Egl(ref ctx) => RawHandle::Egl(ctx.raw_handle()),
             },
             Context::Wayland(ref ctx) => RawHandle::Egl(ctx.raw_handle()),
-            Context::OsMesa(ref ctx) => RawHandle::Egl(ctx.raw_handle()),
         }
     }
 
@@ -212,10 +196,10 @@ impl Context {
     }
 
     #[inline]
-    pub fn resize(&self, width: u32, height: u32) {
+    pub fn resize(&self, size: dpi::PhysicalSize) {
         match *self {
             Context::X11(_) => (),
-            Context::Wayland(ref ctx) => ctx.resize(width, height),
+            Context::Wayland(ref ctx) => ctx.resize(size),
             _ => unreachable!(),
         }
     }
@@ -225,7 +209,6 @@ impl Context {
         match *self {
             Context::X11(ref ctx) => ctx.get_proc_address(addr),
             Context::Wayland(ref ctx) => ctx.get_proc_address(addr),
-            Context::OsMesa(ref ctx) => ctx.get_proc_address(addr),
         }
     }
 

@@ -6,7 +6,7 @@
     target_os = "openbsd",
 ))]
 
-mod osmesa;
+pub mod osmesa;
 //mod rawext;
 
 use crate::platform::ContextTraitExt;
@@ -16,7 +16,6 @@ pub use glutin_egl_sys::EGLContext;
 pub use glutin_glx_sys::GLXContext;
 
 pub use winit::platform::unix::*;
-pub use self::osmesa::*;
 //pub use self::rawext::*;
 
 use std::os::raw;

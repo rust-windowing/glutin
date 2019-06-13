@@ -19,7 +19,6 @@ pub trait OsMesaContextExt {
     /// [`Context`]: struct.Context.html
     fn build_osmesa(
         self,
-        size: dpi::PhysicalSize,
     ) -> Result<OsMesaContext<NotCurrent>, CreationError>
     where
         Self: Sized;
@@ -31,24 +30,17 @@ impl<'a, T: ContextCurrentState> OsMesaContextExt
     #[inline]
     fn build_osmesa(
         self,
-        size: dpi::PhysicalSize,
     ) -> Result<OsMesaContext<NotCurrent>, CreationError>
     where
         Self: Sized,
     {
         let cb = self.map_sharing(|ctx| &ctx.context);
-        osmesa::OsMesaContext::new(cb, size).map(
+        osmesa::OsMesaContext::new(cb).map(
             |context| OsMesaContext {
                 context,
                 phantom: PhantomData,
             }
         )
-        //osmesa::OsMesaContext::new(&pf_reqs, &gl_attr, &plat_attr, size)
-        //    .map(|context| Context::OsMesa(context))
-        //    .map(|context| crate::Context {
-        //        context,
-        //        phantom: PhantomData,
-        //    })
     }
 }
 
@@ -130,12 +122,16 @@ impl Surface for OsMesaBuffer {
     fn get_pixel_format(&self) -> PixelFormat {
         self.surface.get_pixel_format()
     }
+
+    fn is_current(&self) -> bool {
+        self.surface.is_current()
+    }
 }
 
 impl OsMesaBuffer {
     pub fn new<CS: ContextCurrentState>(ctx: &OsMesaContext<CS>, size: dpi::PhysicalSize) -> Result<Self, CreationError> {
         let ctx = ctx.inner();
-        osmesa::OsMesaContext::new(ctx, size)
+        osmesa::OsMesaBuffer::new(ctx, size)
             .map(|surface| OsMesaBuffer {
                 surface,
             })

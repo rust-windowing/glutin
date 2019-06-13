@@ -189,10 +189,10 @@ impl Context {
     }
 
     #[inline]
-    pub fn resize(&self, width: u32, height: u32) {
+    pub fn resize(&self, size: dpi::PhysicalSize) {
         match self {
             Context::Windowed(_, surface) => {
-                surface.0.resize(width as i32, height as i32, 0, 0)
+                surface.0.resize(size.width as i32, size.height as i32, 0, 0)
             }
             _ => unreachable!(),
         }

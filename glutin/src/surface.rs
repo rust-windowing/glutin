@@ -10,6 +10,8 @@ pub trait Surface {
     fn inner_mut(&mut self) -> &mut Self::Inner;
     /// Returns the pixel format of the main framebuffer of the context.
     fn get_pixel_format(&self) -> PixelFormat;
+
+    fn is_current(&self) -> bool;
 }
 
 pub trait IsPBuffer {}
@@ -31,6 +33,10 @@ impl<W> Surface for WindowSurfaceWrapper<W> {
 
     fn get_pixel_format(&self) -> PixelFormat {
         self.surface.get_pixel_format()
+    }
+
+    fn is_current(&self) -> bool {
+        self.surface.is_current()
     }
 }
 
@@ -63,6 +69,10 @@ impl Surface for PBuffer {
 
     fn get_pixel_format(&self) -> PixelFormat {
         self.surface.get_pixel_format()
+    }
+
+    fn is_current(&self) -> bool {
+        self.surface.is_current()
     }
 }
 

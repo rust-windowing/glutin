@@ -78,7 +78,7 @@
     target_os = "emscripten",
 ))]
 #![deny(
-    warnings,
+    //warnings,
     missing_debug_implementations,
     //missing_docs,
 )]
