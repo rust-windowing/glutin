@@ -34,7 +34,7 @@ mod this_example {
             let mut wb = WindowBuilder::new().with_title("A fantastic window!");
 
             if transparency {
-                wb = wb.with_decorations(false).with_transparency(true);
+                wb = wb.with_decorations(false).with_transparent(true);
             }
 
             #[cfg(target_os = "linux")]

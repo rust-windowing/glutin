@@ -69,7 +69,7 @@ impl Context {
             _ => (),
         }
 
-        let view = win.nsview() as id;
+        let view = win.ns_view() as id;
 
         let gl_profile = helpers::get_gl_profile(gl_attr, pf_reqs)?;
         let attributes = helpers::build_nsattributes(pf_reqs, gl_profile)?;
