@@ -8,7 +8,7 @@ A low-level library for OpenGL context creation, written in pure Rust.
 
 ```toml
 [dependencies]
-glutin = "0.21"
+glutin = "0.22.0-alpha1"
 ```
 
 ## [Documentation](https://docs.rs/glutin)
