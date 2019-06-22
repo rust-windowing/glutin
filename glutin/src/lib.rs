@@ -99,13 +99,6 @@ extern crate lazy_static;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 #[macro_use]
 extern crate objc;
-#[cfg(any(
-    target_os = "linux",
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-))]
 #[macro_use]
 extern crate log;
 #[cfg(any(

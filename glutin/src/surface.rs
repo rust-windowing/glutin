@@ -87,3 +87,19 @@ impl PBuffer {
 }
 
 impl IsPBuffer for PBuffer {}
+
+impl Drop for PBuffer {
+    fn drop(&mut self) {
+        if self.is_current() {
+            warn!("User dropped PBuffer that is still current. Future operations that modify and/or depend on the pbuffer will cause UB.");
+        }
+    }
+}
+
+impl<T> Drop for WindowSurfaceWrapper<T> {
+    fn drop(&mut self) {
+        if self.is_current() {
+            warn!("User dropped WindowSurfaceWrapper that is still current. Future operations that modify and/or depend on the surface will cause UB.");
+        }
+    }
+}

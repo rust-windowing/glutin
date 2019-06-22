@@ -12,7 +12,7 @@ mod x11;
 use self::x11::X11Context;
 use crate::{
     Api, ContextCurrentState, ContextError, CreationError, GlAttributes,
-    NotCurrent, PixelFormat, PixelFormatRequirements,
+    NotCurrent, PixelFormat, PixelFormatRequirements, ContextBuilderWrapper,
 };
 pub use x11::utils as x11_utils;
 
@@ -79,6 +79,36 @@ impl Context {
     }
 
     #[inline]
+    pub fn new<T>(
+        el: &EventLoop<T>,
+        cb: ContextBuilderWrapper<&'_ Context>,
+        pbuffer_support: bool,
+        window_surface_support: bool,
+        surfaceless_support: bool,
+    ) -> Result<Self, CreationError> {
+        if el.is_wayland() {
+            unimplemented!()
+            /*Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
+
+            let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
+                Context::Wayland(ref ctx) => ctx,
+                _ => unreachable!(),
+            });
+            wayland::Context::new(wb, el, pf_reqs, &gl_attr, plat_attr)
+                .map(|(win, context)| (win, Context::Wayland(context)))*/
+        } else {
+            Context::is_compatible(&cb.gl_attr.sharing, ContextType::X11)?;
+            let cb = cb.map_sharing(|ctx| match *ctx {
+                Context::X11(ref ctx) => ctx,
+                _ => unreachable!(),
+            });
+            x11::Context::new(el, cb, pbuffer_support, window_surface_support, surfaceless_support)
+                .map(|context| Context::X11(context))
+        }
+    }
+
+    /*
+    #[inline]
     pub fn new_windowed<T>(
         wb: WindowBuilder,
         el: &EventLoop<T>,
@@ -141,7 +171,7 @@ impl Context {
             x11::Context::new_headless(&el, pf_reqs, &gl_attr, plat_attr, size)
                 .map(|ctx| Context::X11(ctx))
         }
-    }
+    }*/
 
     #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
@@ -231,9 +261,29 @@ impl Context {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum BackingApi {
+    GlxThenEgl,
+    EglThenGlx,
+    Egl,
+    Glx,
+}
+
+impl Default for BackingApi {
+    fn default() -> Self {
+        BackingApi::GlxThenEgl
+    }
+}
+
 #[derive(Default, Debug, Clone)]
 pub struct PlatformAttributes {
     /// X11 only: set internally to insure a certain visual xid is used when
     /// choosing the fbconfig.
     pub(crate) x11_visual_xid: Option<std::os::raw::c_ulong>,
+
+    /// GLX only: Whether the context will have transparency support.
+    pub glx_transparency: Option<bool>,
+
+    /// Ignored by surfaceless.
+    pub backing_api: BackingApi,
 }
