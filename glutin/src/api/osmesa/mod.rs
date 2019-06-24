@@ -74,7 +74,7 @@ impl std::error::Error for LoadingError {
 
 impl OsMesaContext {
     pub fn new(
-        cb: ContextBuilderWrapper<&'_ OsMesaContext>,
+        cb: ContextBuilderWrapper<&OsMesaContext>,
     ) -> Result<Self, CreationError> {
         osmesa_sys::OsMesa::try_loading()
             .map_err(LoadingError::new)

@@ -14,8 +14,8 @@ pub trait Surface {
     fn is_current(&self) -> bool;
 }
 
-pub trait IsPBuffer {}
-pub trait IsWindowSurface {}
+pub trait IsPBuffer: Surface {}
+pub trait IsWindowSurface: Surface {}
 
 pub type WindowSurface = WindowSurfaceWrapper<Window>;
 pub type RawWindowSurface = WindowSurfaceWrapper<()>;
@@ -74,6 +74,33 @@ impl WindowSurface {
             },
             self.window,
         )
+    }
+
+    /// Update the context after the underlying surface resizes.
+    ///
+    /// Wayland requires updating the context when the underlying surface
+    /// resizes.
+    ///
+    /// The easiest way of doing this is to take every [`Resized`] window event
+    /// that is received with a [`LogicalSize`] and convert it to a
+    /// [`PhysicalSize`] and pass it into this function.
+    ///
+    /// Note: You still have to call the [`Context`]'s
+    /// [`update_after_resize`] function for MacOS.
+    ///
+    /// [`LogicalSize`]: dpi/struct.LogicalSize.html
+    /// [`PhysicalSize`]: dpi/struct.PhysicalSize.html
+    /// [`Resized`]: event/enum.WindowEvent.html#variant.Resized
+    /// FIXME: links
+    pub fn update_after_resize(&self, size: dpi::PhysicalSize) {
+        #![cfg(any(
+            target_os = "linux",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd",
+        ))]
+        self.surface.update_after_resize(size);
     }
 }
 

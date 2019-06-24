@@ -374,11 +374,8 @@ impl<
     }
 }
 
-impl<
-        PBS: SupportsPBuffersTrait,
-        WST: SupportsWindowSurfacesTrait,
-        ST: SupportsSurfacelessTrait,
-    > Context<PossiblyCurrentSurfaceBound, PBS, WST, ST>
+impl<PBS: SupportsPBuffersTrait, ST: SupportsSurfacelessTrait>
+    Context<PossiblyCurrentSurfaceBound, PBS, SupportsWindowSurfaces::Yes, ST>
 {
     /// Swaps the buffers in case of double or triple buffering.
     ///
@@ -393,20 +390,21 @@ impl<
         self.context.swap_buffers()
     }
 
-    /// Resize the context.
+    /// Update the context after the underlying surface resizes.
     ///
-    /// Some platforms (macOS, Wayland) require being manually updated when
-    /// their window or surface is resized.
+    /// Macos requires updating the context when the underlying surface resizes.
     ///
     /// The easiest way of doing this is to take every [`Resized`] window event
-    /// that is received with a [`LogicalSize`] and convert it to a
-    /// [`PhysicalSize`] and pass it into this function.
+    /// that is received and call this function.
     ///
-    /// [`LogicalSize`]: dpi/struct.LogicalSize.html
-    /// [`PhysicalSize`]: dpi/struct.PhysicalSize.html
+    /// Note: You still have to call the [`WindowSurface`]'s
+    /// [`update_after_resize`] function for Wayland.
+    ///
     /// [`Resized`]: event/enum.WindowEvent.html#variant.Resized
-    pub fn resize(&self, size: dpi::PhysicalSize) {
-        self.context.resize(size);
+    /// FIXME: Links
+    pub fn update_after_resize(&self) {
+        #[cfg(target_os = "macos")]
+        self.context.update_after_resize()
     }
 }
 
