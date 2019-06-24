@@ -36,8 +36,7 @@ fn main() {
                     let windowed_context =
                         ct.get_current(windows[&window_id].0).unwrap();
                     let windowed_context = windowed_context.windowed();
-                    let dpi_factor =
-                        windowed_context.window().hidpi_factor();
+                    let dpi_factor = windowed_context.window().hidpi_factor();
                     windowed_context
                         .resize(logical_size.to_physical(dpi_factor));
                 }

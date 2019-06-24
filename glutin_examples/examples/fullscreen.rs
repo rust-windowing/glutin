@@ -67,8 +67,7 @@ fn main() {
             Event::LoopDestroyed => return,
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::Resized(logical_size) => {
-                    let dpi_factor =
-                        windowed_context.window().hidpi_factor();
+                    let dpi_factor = windowed_context.window().hidpi_factor();
                     windowed_context
                         .resize(logical_size.to_physical(dpi_factor));
                 }

@@ -2,49 +2,79 @@ use super::*;
 
 pub mod SupportsPBuffers {
     use std::fmt::Debug;
-    pub trait SupportsPBuffersTrait: Debug + Clone + Send + Sync { fn supported() -> bool; }
+    pub trait SupportsPBuffersTrait: Debug + Clone + Send + Sync {
+        fn supported() -> bool;
+    }
 
     #[derive(Debug, Clone, Copy)]
     pub struct Yes {}
     #[derive(Debug, Clone, Copy)]
     pub struct No {}
 
-    impl SupportsPBuffersTrait for Yes { fn supported() -> bool { true } }
-    impl SupportsPBuffersTrait for No { fn supported() -> bool { false } }
+    impl SupportsPBuffersTrait for Yes {
+        fn supported() -> bool {
+            true
+        }
+    }
+    impl SupportsPBuffersTrait for No {
+        fn supported() -> bool {
+            false
+        }
+    }
 }
 
 pub mod SupportsWindowSurfaces {
     use std::fmt::Debug;
-    pub trait SupportsWindowSurfacesTrait: Debug + Clone + Send + Sync {fn supported() -> bool;}
+    pub trait SupportsWindowSurfacesTrait: Debug + Clone + Send + Sync {
+        fn supported() -> bool;
+    }
 
     #[derive(Debug, Clone, Copy)]
     pub struct Yes {}
     #[derive(Debug, Clone, Copy)]
     pub struct No {}
 
-    impl SupportsWindowSurfacesTrait for Yes { fn supported() -> bool { true } }
-    impl SupportsWindowSurfacesTrait for No { fn supported() -> bool { false } }
+    impl SupportsWindowSurfacesTrait for Yes {
+        fn supported() -> bool {
+            true
+        }
+    }
+    impl SupportsWindowSurfacesTrait for No {
+        fn supported() -> bool {
+            false
+        }
+    }
 }
 
 pub mod SupportsSurfaceless {
     use std::fmt::Debug;
-    pub trait SupportsSurfacelessTrait: Debug + Clone + Send + Sync {fn supported() -> bool;}
+    pub trait SupportsSurfacelessTrait: Debug + Clone + Send + Sync {
+        fn supported() -> bool;
+    }
 
     #[derive(Debug, Clone, Copy)]
     pub struct Yes {}
     #[derive(Debug, Clone, Copy)]
     pub struct No {}
 
-    impl SupportsSurfacelessTrait for Yes { fn supported() -> bool { true } }
-    impl SupportsSurfacelessTrait for No { fn supported() -> bool { false } }
+    impl SupportsSurfacelessTrait for Yes {
+        fn supported() -> bool {
+            true
+        }
+    }
+    impl SupportsSurfacelessTrait for No {
+        fn supported() -> bool {
+            false
+        }
+    }
 }
 
 use std::fmt::Debug;
 use std::marker::PhantomData;
-pub use SupportsPBuffers::SupportsPBuffersTrait;
-pub use SupportsWindowSurfaces::SupportsWindowSurfacesTrait;
-pub use SupportsSurfaceless::SupportsSurfacelessTrait;
 use winit::event_loop::EventLoop;
+pub use SupportsPBuffers::SupportsPBuffersTrait;
+pub use SupportsSurfaceless::SupportsSurfacelessTrait;
+pub use SupportsWindowSurfaces::SupportsWindowSurfacesTrait;
 
 /// A trait implemented on both [`NotCurrent`] and
 /// [`PossiblyCurrent`].
@@ -62,7 +92,6 @@ pub trait PossiblyCurrentContextCurrentState: ContextCurrentState {}
 /// [`Context::make_current_window`]:
 /// struct.Context.html#method.make_current_window
 /// [`Context`]: struct.Context.html
-//
 // This is nightly only:
 // impl !Send for Context<PossiblyCurrent> {}
 // impl !Sync for Context<PossiblyCurrent> {}
@@ -102,17 +131,37 @@ impl PossiblyCurrentContextCurrentState for PossiblyCurrent {}
 impl PossiblyCurrentContextCurrentState for PossiblyCurrentSurfaceBound {}
 
 #[derive(Debug)]
-pub struct Context<CS: ContextCurrentState, PBS: SupportsPBuffersTrait, WST: SupportsWindowSurfacesTrait, ST: SupportsSurfacelessTrait> {
+pub struct Context<
+    CS: ContextCurrentState,
+    PBS: SupportsPBuffersTrait,
+    WST: SupportsWindowSurfacesTrait,
+    ST: SupportsSurfacelessTrait,
+> {
     pub(crate) context: platform_impl::Context,
     pub(crate) phantom: PhantomData<(CS, PBS, WST, ST)>,
 }
 
-impl<CS: ContextCurrentState, PBS: SupportsPBuffersTrait, WST: SupportsWindowSurfacesTrait, ST: SupportsSurfacelessTrait> Context<CS, PBS, WST, ST> {
-    pub(crate) fn inner(&self) -> &platform_impl::Context { &self.context }
-    pub(crate) fn inner_mut(&mut self) -> &mut platform_impl::Context { &mut self.context }
+impl<
+        CS: ContextCurrentState,
+        PBS: SupportsPBuffersTrait,
+        WST: SupportsWindowSurfacesTrait,
+        ST: SupportsSurfacelessTrait,
+    > Context<CS, PBS, WST, ST>
+{
+    pub(crate) fn inner(&self) -> &platform_impl::Context {
+        &self.context
+    }
+    pub(crate) fn inner_mut(&mut self) -> &mut platform_impl::Context {
+        &mut self.context
+    }
 }
 
-impl<CS: ContextCurrentState, PBS: SupportsPBuffersTrait, ST: SupportsSurfacelessTrait> Context<CS, PBS, SupportsWindowSurfaces::Yes, ST> {
+impl<
+        CS: ContextCurrentState,
+        PBS: SupportsPBuffersTrait,
+        ST: SupportsSurfacelessTrait,
+    > Context<CS, PBS, SupportsWindowSurfaces::Yes, ST>
+{
     /// Sets this context as the current context. The previously current context
     /// (if any) is no longer current.
     ///
@@ -170,51 +219,90 @@ impl<CS: ContextCurrentState, PBS: SupportsPBuffersTrait, ST: SupportsSurfaceles
     pub unsafe fn make_current_window<W>(
         self,
         surface: &mut WindowSurfaceWrapper<W>,
-    ) -> Result<Context<PossiblyCurrentSurfaceBound, PBS, SupportsWindowSurfaces::Yes, ST>, (Self, ContextError)> {
+    ) -> Result<
+        Context<
+            PossiblyCurrentSurfaceBound,
+            PBS,
+            SupportsWindowSurfaces::Yes,
+            ST,
+        >,
+        (Self, ContextError),
+    > {
         match self.context.make_current_window(surface.inner_mut()) {
-            Ok(()) => Ok(Context { context: self.context, phantom: PhantomData }),
-            Err(err) => {
-                Err((self, err))
-            }
+            Ok(()) => Ok(Context {
+                context: self.context,
+                phantom: PhantomData,
+            }),
+            Err(err) => Err((self, err)),
         }
     }
 }
 
-impl<CS: ContextCurrentState, WST: SupportsWindowSurfacesTrait, ST: SupportsSurfacelessTrait> Context<CS, SupportsPBuffers::Yes, WST, ST> {
+impl<
+        CS: ContextCurrentState,
+        WST: SupportsWindowSurfacesTrait,
+        ST: SupportsSurfacelessTrait,
+    > Context<CS, SupportsPBuffers::Yes, WST, ST>
+{
     pub unsafe fn make_current_pbuffer(
         self,
         pbuffer: &mut PBuffer,
-    ) -> Result<Context<PossiblyCurrent, SupportsPBuffers::Yes, WST, ST>, (Self, ContextError)> {
+    ) -> Result<
+        Context<PossiblyCurrent, SupportsPBuffers::Yes, WST, ST>,
+        (Self, ContextError),
+    > {
         match self.context.make_current_pbuffer(pbuffer.inner_mut()) {
-            Ok(()) => Ok(Context { context: self.context, phantom: PhantomData }),
-            Err(err) => {
-                Err((self, err))
-            }
+            Ok(()) => Ok(Context {
+                context: self.context,
+                phantom: PhantomData,
+            }),
+            Err(err) => Err((self, err)),
         }
     }
 }
 
-impl<CS: ContextCurrentState, PBT: SupportsPBuffersTrait, WST: SupportsWindowSurfacesTrait> Context<CS, PBT, WST, SupportsSurfaceless::Yes> {
+impl<
+        CS: ContextCurrentState,
+        PBT: SupportsPBuffersTrait,
+        WST: SupportsWindowSurfacesTrait,
+    > Context<CS, PBT, WST, SupportsSurfaceless::Yes>
+{
     pub unsafe fn make_current_surfaceless(
         self,
-    ) -> Result<Context<PossiblyCurrent, PBT, WST, SupportsSurfaceless::Yes>, (Self, ContextError)> {
+    ) -> Result<
+        Context<PossiblyCurrent, PBT, WST, SupportsSurfaceless::Yes>,
+        (Self, ContextError),
+    > {
         match self.context.make_current_surfaceless() {
-            Ok(()) => Ok(Context { context: self.context, phantom: PhantomData }),
-            Err(err) => {
-                Err((self, err))
-            }
+            Ok(()) => Ok(Context {
+                context: self.context,
+                phantom: PhantomData,
+            }),
+            Err(err) => Err((self, err)),
         }
     }
 }
 
-impl<CS: PossiblyCurrentContextCurrentState, PBS: SupportsPBuffersTrait, WST: SupportsWindowSurfacesTrait, ST: SupportsSurfacelessTrait> Context<CS, PBS, WST, ST> {
+impl<
+        CS: PossiblyCurrentContextCurrentState,
+        PBS: SupportsPBuffersTrait,
+        WST: SupportsWindowSurfacesTrait,
+        ST: SupportsSurfacelessTrait,
+    > Context<CS, PBS, WST, ST>
+{
     /// Returns the address of an OpenGL function.
     pub fn get_proc_address(&self, addr: &str) -> *const () {
         self.context.get_proc_address(addr)
     }
 }
 
-impl<CS: ContextCurrentState, PBS: SupportsPBuffersTrait, WST: SupportsWindowSurfacesTrait, ST: SupportsSurfacelessTrait> Context<CS, PBS, WST, ST> {
+impl<
+        CS: ContextCurrentState,
+        PBS: SupportsPBuffersTrait,
+        WST: SupportsWindowSurfacesTrait,
+        ST: SupportsSurfacelessTrait,
+    > Context<CS, PBS, WST, ST>
+{
     /// Returns true if this context is the current one in this thread.
     pub fn is_current(&self) -> bool {
         self.context.is_current()
@@ -254,7 +342,9 @@ impl<CS: ContextCurrentState, PBS: SupportsPBuffersTrait, WST: SupportsWindowSur
     ///
     /// [`make_not_current`]: struct.Context.html#method.make_not_current
     /// [`make_current_window`]: struct.Context.html#method.make_current_window
-    pub unsafe fn treat_as_not_current(self) -> Context<NotCurrent, PBS, WST, ST> {
+    pub unsafe fn treat_as_not_current(
+        self,
+    ) -> Context<NotCurrent, PBS, WST, ST> {
         Context {
             context: self.context,
             phantom: PhantomData,
@@ -268,13 +358,15 @@ impl<CS: ContextCurrentState, PBS: SupportsPBuffersTrait, WST: SupportsWindowSur
     /// currency without the limited aid of glutin, and you wish to store
     /// all the [`Context`]s as [`NotCurrent`].
     ///
-    /// Please see [`make_current_window`] for the prefered method of handling context
-    /// currency.
+    /// Please see [`make_current_window`] for the prefered method of handling
+    /// context currency.
     ///
     /// [`make_current_window`]: struct.Context.html#method.make_current_window
     /// [`NotCurrent`]: enum.NotCurrent.html
     /// [`Context`]: struct.Context.html
-    pub unsafe fn treat_as_current<CS2: PossiblyCurrentContextCurrentState>(self) -> Context<CS2, PBS, WST, ST> {
+    pub unsafe fn treat_as_current<CS2: PossiblyCurrentContextCurrentState>(
+        self,
+    ) -> Context<CS2, PBS, WST, ST> {
         Context {
             context: self.context,
             phantom: PhantomData,
@@ -282,7 +374,12 @@ impl<CS: ContextCurrentState, PBS: SupportsPBuffersTrait, WST: SupportsWindowSur
     }
 }
 
-impl<PBS: SupportsPBuffersTrait, WST: SupportsWindowSurfacesTrait, ST: SupportsSurfacelessTrait> Context<PossiblyCurrentSurfaceBound, PBS, WST, ST> {
+impl<
+        PBS: SupportsPBuffersTrait,
+        WST: SupportsWindowSurfacesTrait,
+        ST: SupportsSurfacelessTrait,
+    > Context<PossiblyCurrentSurfaceBound, PBS, WST, ST>
+{
     /// Swaps the buffers in case of double or triple buffering.
     ///
     /// You should call this function every time you have finished rendering, or
@@ -313,7 +410,14 @@ impl<PBS: SupportsPBuffersTrait, WST: SupportsWindowSurfacesTrait, ST: SupportsS
     }
 }
 
-impl<'a, CS: ContextCurrentState, PBS: SupportsPBuffersTrait, WST: SupportsWindowSurfacesTrait, ST: SupportsSurfacelessTrait> ContextBuilder<'a, CS, PBS, WST, ST> {
+impl<
+        'a,
+        CS: ContextCurrentState,
+        PBS: SupportsPBuffersTrait,
+        WST: SupportsWindowSurfacesTrait,
+        ST: SupportsSurfacelessTrait,
+    > ContextBuilder<'a, CS, PBS, WST, ST>
+{
     /// FIXME UPDATE DOCS:
     ///
     /// Errors can occur in two scenarios:
@@ -368,7 +472,12 @@ impl<'a, CS: ContextCurrentState, PBS: SupportsPBuffersTrait, WST: SupportsWindo
     [`build_osmesa`]: os/unix/trait.HeadlessContextExt.html#tymethod.build_osmesa
     "
     )]
-    pub fn build<TE, PBS2: SupportsPBuffersTrait, WST2: SupportsWindowSurfacesTrait, ST2: SupportsSurfacelessTrait>(
+    pub fn build<
+        TE,
+        PBS2: SupportsPBuffersTrait,
+        WST2: SupportsWindowSurfacesTrait,
+        ST2: SupportsSurfacelessTrait,
+    >(
         self,
         el: &EventLoop<TE>,
         _pbuffer_support: PBS2,
@@ -377,11 +486,16 @@ impl<'a, CS: ContextCurrentState, PBS: SupportsPBuffersTrait, WST: SupportsWindo
     ) -> Result<Context<NotCurrent, PBS2, WST2, ST2>, CreationError> {
         assert!(PBS2::supported() || WST2::supported() || ST2::supported(), "Context created by users most support at least one type of backing.");
         let cb = self.map_sharing(|ctx| &ctx.context);
-        platform_impl::Context::new(el, cb, PBS2::supported(), WST2::supported(), ST2::supported()).map(
-            |context| Context {
-                context,
-                phantom: PhantomData,
-            }
+        platform_impl::Context::new(
+            el,
+            cb,
+            PBS2::supported(),
+            WST2::supported(),
+            ST2::supported(),
         )
+        .map(|context| Context {
+            context,
+            phantom: PhantomData,
+        })
     }
 }

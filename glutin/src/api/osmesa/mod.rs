@@ -10,11 +10,11 @@ pub mod ffi {
     pub use osmesa_sys::OSMesaContext;
 }
 
-use crate::{
-    Api, ContextError, CreationError, GlAttributes, GlProfile, GlRequest,
-    PixelFormatRequirements, Robustness, ContextBuilderWrapper, PixelFormat
-};
 use crate::platform_impl::PlatformAttributes;
+use crate::{
+    Api, ContextBuilderWrapper, ContextError, CreationError, GlAttributes,
+    GlProfile, GlRequest, PixelFormat, PixelFormatRequirements, Robustness,
+};
 
 use winit::dpi;
 
@@ -154,7 +154,10 @@ impl OsMesaContext {
     }
 
     #[inline]
-    pub unsafe fn make_current_osmesa_buffer(&self, buffer: &mut OsMesaBuffer) -> Result<(), ContextError> {
+    pub unsafe fn make_current_osmesa_buffer(
+        &self,
+        buffer: &mut OsMesaBuffer,
+    ) -> Result<(), ContextError> {
         let ret = osmesa_sys::OSMesaMakeCurrent(
             self.context,
             buffer.buffer.as_ptr() as *mut _,
@@ -244,7 +247,10 @@ unsafe impl Send for OsMesaContext {}
 unsafe impl Sync for OsMesaContext {}
 
 impl OsMesaBuffer {
-    pub fn new(ctx: &OsMesaContext, size: dpi::PhysicalSize) -> Result<Self, CreationError> {
+    pub fn new(
+        ctx: &OsMesaContext,
+        size: dpi::PhysicalSize,
+    ) -> Result<Self, CreationError> {
         let size: (u32, u32) = size.into();
         Ok(OsMesaBuffer {
             width: size.0,

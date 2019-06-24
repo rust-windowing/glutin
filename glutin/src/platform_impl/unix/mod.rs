@@ -11,8 +11,9 @@ mod x11;
 
 use self::x11::X11Context;
 use crate::{
-    Api, ContextCurrentState, ContextError, CreationError, GlAttributes,
-    NotCurrent, PixelFormat, PixelFormatRequirements, ContextBuilderWrapper,
+    Api, ContextBuilderWrapper, ContextCurrentState, ContextError,
+    CreationError, GlAttributes, NotCurrent, PixelFormat,
+    PixelFormatRequirements,
 };
 pub use x11::utils as x11_utils;
 
@@ -107,71 +108,70 @@ impl Context {
         }
     }
 
-    /*
-    #[inline]
-    pub fn new_windowed<T>(
-        wb: WindowBuilder,
-        el: &EventLoop<T>,
-        pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context>,
-        plat_attr: &PlatformAttributes,
-    ) -> Result<(Window, Self), CreationError> {
-        if el.is_wayland() {
-            Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
-
-            let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
-                Context::Wayland(ref ctx) => ctx,
-                _ => unreachable!(),
-            });
-            wayland::Context::new(wb, el, pf_reqs, &gl_attr, plat_attr)
-                .map(|(win, context)| (win, Context::Wayland(context)))
-        } else {
-            Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
-            let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
-                Context::X11(ref ctx) => ctx,
-                _ => unreachable!(),
-            });
-            x11::Context::new(wb, el, pf_reqs, &gl_attr, plat_attr)
-                .map(|(win, context)| (win, Context::X11(context)))
-        }
-    }
-
-    #[inline]
-    pub fn new_headless<T>(
-        el: &EventLoop<T>,
-        pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context>,
-        plat_attr: &PlatformAttributes,
-        size: dpi::PhysicalSize,
-    ) -> Result<Self, CreationError> {
-        Self::new_headless_impl(el, pf_reqs, gl_attr, plat_attr, Some(size))
-    }
-
-    pub fn new_headless_impl<T>(
-        el: &EventLoop<T>,
-        pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context>,
-        plat_attr: &PlatformAttributes,
-        size: Option<dpi::PhysicalSize>,
-    ) -> Result<Self, CreationError> {
-        if el.is_wayland() {
-            Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
-            let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
-                Context::Wayland(ref ctx) => ctx,
-                _ => unreachable!(),
-            });
-            wayland::Context::new_headless(&el, pf_reqs, &gl_attr, plat_attr, size)
-                .map(|ctx| Context::Wayland(ctx))
-        } else {
-            Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
-            let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
-                Context::X11(ref ctx) => ctx,
-                _ => unreachable!(),
-            });
-            x11::Context::new_headless(&el, pf_reqs, &gl_attr, plat_attr, size)
-                .map(|ctx| Context::X11(ctx))
-        }
-    }*/
+    // #[inline]
+    // pub fn new_windowed<T>(
+    // wb: WindowBuilder,
+    // el: &EventLoop<T>,
+    // pf_reqs: &PixelFormatRequirements,
+    // gl_attr: &GlAttributes<&Context>,
+    // plat_attr: &PlatformAttributes,
+    // ) -> Result<(Window, Self), CreationError> {
+    // if el.is_wayland() {
+    // Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
+    //
+    // let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
+    // Context::Wayland(ref ctx) => ctx,
+    // _ => unreachable!(),
+    // });
+    // wayland::Context::new(wb, el, pf_reqs, &gl_attr, plat_attr)
+    // .map(|(win, context)| (win, Context::Wayland(context)))
+    // } else {
+    // Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
+    // let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
+    // Context::X11(ref ctx) => ctx,
+    // _ => unreachable!(),
+    // });
+    // x11::Context::new(wb, el, pf_reqs, &gl_attr, plat_attr)
+    // .map(|(win, context)| (win, Context::X11(context)))
+    // }
+    // }
+    //
+    // #[inline]
+    // pub fn new_headless<T>(
+    // el: &EventLoop<T>,
+    // pf_reqs: &PixelFormatRequirements,
+    // gl_attr: &GlAttributes<&Context>,
+    // plat_attr: &PlatformAttributes,
+    // size: dpi::PhysicalSize,
+    // ) -> Result<Self, CreationError> {
+    // Self::new_headless_impl(el, pf_reqs, gl_attr, plat_attr, Some(size))
+    // }
+    //
+    // pub fn new_headless_impl<T>(
+    // el: &EventLoop<T>,
+    // pf_reqs: &PixelFormatRequirements,
+    // gl_attr: &GlAttributes<&Context>,
+    // plat_attr: &PlatformAttributes,
+    // size: Option<dpi::PhysicalSize>,
+    // ) -> Result<Self, CreationError> {
+    // if el.is_wayland() {
+    // Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
+    // let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
+    // Context::Wayland(ref ctx) => ctx,
+    // _ => unreachable!(),
+    // });
+    // wayland::Context::new_headless(&el, pf_reqs, &gl_attr, plat_attr, size)
+    // .map(|ctx| Context::Wayland(ctx))
+    // } else {
+    // Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
+    // let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
+    // Context::X11(ref ctx) => ctx,
+    // _ => unreachable!(),
+    // });
+    // x11::Context::new_headless(&el, pf_reqs, &gl_attr, plat_attr, size)
+    // .map(|ctx| Context::X11(ctx))
+    // }
+    // }
 
     #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {

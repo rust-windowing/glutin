@@ -58,11 +58,13 @@ env:
 install:
   - rustup self update
   - rustup target add $TARGET; true
+  - rustup component add rustfmt
 
 script:
   - cargo build --target $TARGET --verbose
     # Running iOS apps on OSX requires the simulator so we skip that for now
   - if [ "$TARGET" != "x86_64-apple-ios" ]; then cargo test --target $TARGET --verbose; fi
+  - cargo fmt --all -- --check
 
 after_success:
   - |

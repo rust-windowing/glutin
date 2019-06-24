@@ -60,11 +60,12 @@ mod make_current_guard;
 
 pub use self::egl::Egl;
 use self::make_current_guard::MakeCurrentGuard;
-use crate::{
-    Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
-    PixelFormatRequirements, ReleaseBehavior, Robustness,
-};
 use crate::platform_impl::PlatformAttributes;
+use crate::{
+    Api, ContextBuilderWrapper, ContextError, CreationError, GlAttributes,
+    GlRequest, PixelFormat, PixelFormatRequirements, ReleaseBehavior,
+    Robustness,
+};
 
 use glutin_egl_sys as ffi;
 use parking_lot::Mutex;
@@ -390,9 +391,7 @@ impl Context {
     /// To finish the process, you must call `.finish(window)` on the
     /// `ContextPrototype`.
     pub fn new<'a, F>(
-        pf_reqs: &PixelFormatRequirements,
-        gl_attr: &'a GlAttributes<&'a Context>,
-        plat_attr: &PlatformAttributes,
+        cb: &'a ContextBuilderWrapper<&'a Context>,
         native_display: NativeDisplay,
         surface_type: SurfaceType,
         config_selector: F,
@@ -431,7 +430,8 @@ impl Context {
         };
 
         // binding the right API and choosing the version
-        let (version, api) = unsafe { bind_and_get_api(&gl_attr, egl_version)? };
+        let (version, api) =
+            unsafe { bind_and_get_api(&cb.gl_attr, egl_version)? };
 
         let (config_id, pixel_format) = unsafe {
             choose_fbconfig(
@@ -439,15 +439,14 @@ impl Context {
                 &egl_version,
                 api,
                 version,
-                pf_reqs,
-                plat_attr,
+                cb,
                 surface_type,
                 config_selector,
             )?
         };
 
         Ok(ContextPrototype {
-            gl_attr,
+            gl_attr: &cb.gl_attr,
             display,
             egl_version,
             extensions,
@@ -997,8 +996,7 @@ unsafe fn choose_fbconfig<F>(
     egl_version: &(ffi::egl::types::EGLint, ffi::egl::types::EGLint),
     api: Api,
     version: Option<(u8, u8)>,
-    pf_reqs: &PixelFormatRequirements,
-    plat_attr: &PlatformAttributes,
+    cb: &ContextBuilderWrapper<&Context>,
     surface_type: SurfaceType,
     mut config_selector: F,
 ) -> Result<(ffi::egl::types::EGLConfig, PixelFormat), CreationError>
@@ -1066,7 +1064,7 @@ where
             (_, _) => unimplemented!(),
         };
 
-        if let Some(hardware_accelerated) = pf_reqs.hardware_accelerated {
+        if let Some(hardware_accelerated) = cb.pf_reqs.hardware_accelerated {
             out.push(ffi::egl::CONFIG_CAVEAT as raw::c_int);
             out.push(if hardware_accelerated {
                 ffi::egl::NONE as raw::c_int
@@ -1075,7 +1073,7 @@ where
             });
         }
 
-        if let Some(color) = pf_reqs.color_bits {
+        if let Some(color) = cb.pf_reqs.color_bits {
             out.push(ffi::egl::RED_SIZE as raw::c_int);
             out.push((color / 3) as raw::c_int);
             out.push(ffi::egl::GREEN_SIZE as raw::c_int);
@@ -1088,42 +1086,42 @@ where
             );
         }
 
-        if let Some(alpha) = pf_reqs.alpha_bits {
+        if let Some(alpha) = cb.pf_reqs.alpha_bits {
             out.push(ffi::egl::ALPHA_SIZE as raw::c_int);
             out.push(alpha as raw::c_int);
         }
 
-        if let Some(depth) = pf_reqs.depth_bits {
+        if let Some(depth) = cb.pf_reqs.depth_bits {
             out.push(ffi::egl::DEPTH_SIZE as raw::c_int);
             out.push(depth as raw::c_int);
         }
 
-        if let Some(stencil) = pf_reqs.stencil_bits {
+        if let Some(stencil) = cb.pf_reqs.stencil_bits {
             out.push(ffi::egl::STENCIL_SIZE as raw::c_int);
             out.push(stencil as raw::c_int);
         }
 
-        if let Some(true) = pf_reqs.double_buffer {
+        if let Some(true) = cb.pf_reqs.double_buffer {
             return Err(CreationError::NoAvailablePixelFormat);
         }
 
-        if let Some(multisampling) = pf_reqs.multisampling {
+        if let Some(multisampling) = cb.pf_reqs.multisampling {
             out.push(ffi::egl::SAMPLES as raw::c_int);
             out.push(multisampling as raw::c_int);
         }
 
-        if pf_reqs.stereoscopy {
+        if cb.pf_reqs.stereoscopy {
             return Err(CreationError::NoAvailablePixelFormat);
         }
 
-        if let Some(xid) = plat_attr.x11_visual_xid {
+        if let Some(xid) = cb.plat_attr.x11_visual_xid {
             out.push(ffi::egl::NATIVE_VISUAL_ID as raw::c_int);
             out.push(xid as raw::c_int);
         }
 
         // FIXME: srgb is not taken into account
 
-        match pf_reqs.release_behavior {
+        match cb.pf_reqs.release_behavior {
             ReleaseBehavior::Flush => (),
             ReleaseBehavior::None => {
                 // TODO: with EGL you need to manually set the behavior

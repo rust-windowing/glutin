@@ -7,20 +7,29 @@
 ))]
 
 pub mod osmesa;
-//mod rawext;
+// mod rawext;
 
 use crate::platform::ContextTraitExt;
-pub use crate::platform_impl::{RawHandle, PlatformAttributes};
-use crate::{SupportsPBuffersTrait, SupportsWindowSurfacesTrait, SupportsSurfacelessTrait, Context, ContextCurrentState};
+pub use crate::platform_impl::{PlatformAttributes, RawHandle};
+use crate::{
+    Context, ContextCurrentState, SupportsPBuffersTrait,
+    SupportsSurfacelessTrait, SupportsWindowSurfacesTrait,
+};
 pub use glutin_egl_sys::EGLContext;
 pub use glutin_glx_sys::GLXContext;
 
 pub use winit::platform::unix::*;
-//pub use self::rawext::*;
+// pub use self::rawext::*;
 
 use std::os::raw;
 
-impl<CS: ContextCurrentState, PBS: SupportsPBuffersTrait, WST: SupportsWindowSurfacesTrait, ST: SupportsSurfacelessTrait> ContextTraitExt for Context<CS, PBS, WST, ST> {
+impl<
+        CS: ContextCurrentState,
+        PBS: SupportsPBuffersTrait,
+        WST: SupportsWindowSurfacesTrait,
+        ST: SupportsSurfacelessTrait,
+    > ContextTraitExt for Context<CS, PBS, WST, ST>
+{
     type Handle = RawHandle;
 
     #[inline]
@@ -33,4 +42,3 @@ impl<CS: ContextCurrentState, PBS: SupportsPBuffersTrait, WST: SupportsWindowSur
         self.context.get_egl_display()
     }
 }
-

@@ -28,8 +28,12 @@ pub struct WindowSurfaceWrapper<W> {
 impl<W> Surface for WindowSurfaceWrapper<W> {
     type Inner = platform_impl::WindowSurface;
 
-    fn inner(&self) -> &Self::Inner { &self.surface }
-    fn inner_mut(&mut self) -> &mut Self::Inner { &mut self.surface }
+    fn inner(&self) -> &Self::Inner {
+        &self.surface
+    }
+    fn inner_mut(&mut self) -> &mut Self::Inner {
+        &mut self.surface
+    }
 
     fn get_pixel_format(&self) -> PixelFormat {
         self.surface.get_pixel_format()
@@ -41,18 +45,36 @@ impl<W> Surface for WindowSurfaceWrapper<W> {
 }
 
 impl WindowSurface {
-    pub fn new<TE, CS: ContextCurrentState, PBT: SupportsPBuffersTrait, ST: SupportsSurfacelessTrait>(el: &EventLoop<TE>, ctx: &Context<CS, PBT, SupportsWindowSurfaces::Yes, ST>, wb: WindowBuilder) -> Result<Self, CreationError> {
+    pub fn new<
+        TE,
+        CS: ContextCurrentState,
+        PBT: SupportsPBuffersTrait,
+        ST: SupportsSurfacelessTrait,
+    >(
+        el: &EventLoop<TE>,
+        ctx: &Context<CS, PBT, SupportsWindowSurfaces::Yes, ST>,
+        wb: WindowBuilder,
+    ) -> Result<Self, CreationError> {
         let ctx = ctx.inner();
         platform_impl::WindowSurface::new(el, ctx, wb)
-            .map(|(surface, window)| WindowSurface {
-                surface,
-                window,
-            })
+            .map(|(surface, window)| WindowSurface { surface, window })
     }
 
-    pub fn window(&self) -> &Window { &self.window }
-    pub fn window_mut(&mut self) -> &mut Window { &mut self.window }
-    pub unsafe fn split(self) -> (RawWindowSurface, Window) { (WindowSurfaceWrapper {surface: self.surface, window: ()}, self.window) }
+    pub fn window(&self) -> &Window {
+        &self.window
+    }
+    pub fn window_mut(&mut self) -> &mut Window {
+        &mut self.window
+    }
+    pub unsafe fn split(self) -> (RawWindowSurface, Window) {
+        (
+            WindowSurfaceWrapper {
+                surface: self.surface,
+                window: (),
+            },
+            self.window,
+        )
+    }
 }
 
 impl<W> IsWindowSurface for WindowSurfaceWrapper<W> {}
@@ -64,8 +86,12 @@ pub struct PBuffer {
 impl Surface for PBuffer {
     type Inner = platform_impl::PBuffer;
 
-    fn inner(&self) -> &Self::Inner { &self.surface }
-    fn inner_mut(&mut self) -> &mut Self::Inner { &mut self.surface }
+    fn inner(&self) -> &Self::Inner {
+        &self.surface
+    }
+    fn inner_mut(&mut self) -> &mut Self::Inner {
+        &mut self.surface
+    }
 
     fn get_pixel_format(&self) -> PixelFormat {
         self.surface.get_pixel_format()
@@ -77,12 +103,19 @@ impl Surface for PBuffer {
 }
 
 impl PBuffer {
-    pub fn new<TE, CS: ContextCurrentState, WST: SupportsWindowSurfacesTrait, ST: SupportsSurfacelessTrait>(el: &EventLoop<TE>, ctx: &Context<CS, SupportsPBuffers::Yes, WST, ST>, size: dpi::PhysicalSize) -> Result<Self, CreationError> {
+    pub fn new<
+        TE,
+        CS: ContextCurrentState,
+        WST: SupportsWindowSurfacesTrait,
+        ST: SupportsSurfacelessTrait,
+    >(
+        el: &EventLoop<TE>,
+        ctx: &Context<CS, SupportsPBuffers::Yes, WST, ST>,
+        size: dpi::PhysicalSize,
+    ) -> Result<Self, CreationError> {
         let ctx = ctx.inner();
         platform_impl::PBuffer::new(el, ctx, size)
-            .map(|surface| PBuffer {
-                surface,
-            })
+            .map(|surface| PBuffer { surface })
     }
 }
 

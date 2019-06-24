@@ -145,7 +145,13 @@ pub struct ContextBuilderWrapper<T> {
     pub plat_attr: platform_impl::PlatformAttributes,
 }
 
-pub type ContextBuilder<'a, CS: ContextCurrentState, PBS: SupportsPBuffersTrait, WST: SupportsWindowSurfacesTrait, ST: SupportsSurfacelessTrait> = ContextBuilderWrapper<&'a Context<CS, PBS, WST, ST>>;
+pub type ContextBuilder<
+    'a,
+    CS: ContextCurrentState,
+    PBS: SupportsPBuffersTrait,
+    WST: SupportsWindowSurfacesTrait,
+    ST: SupportsSurfacelessTrait,
+> = ContextBuilderWrapper<&'a Context<CS, PBS, WST, ST>>;
 
 impl<S> ContextBuilderWrapper<S> {
     /// Turns the `sharing` parameter into another type by calling a closure.
@@ -162,7 +168,15 @@ impl<S> ContextBuilderWrapper<S> {
     }
 }
 
-impl<'a> ContextBuilder<'a, NotCurrent, SupportsPBuffers::No, SupportsWindowSurfaces::No, SupportsSurfaceless::No> {
+impl<'a>
+    ContextBuilder<
+        'a,
+        NotCurrent,
+        SupportsPBuffers::No,
+        SupportsWindowSurfaces::No,
+        SupportsSurfaceless::No,
+    >
+{
     /// Initializes a new `ContextBuilder` with default values.
     pub fn new() -> Self {
         ContextBuilder {
@@ -173,7 +187,14 @@ impl<'a> ContextBuilder<'a, NotCurrent, SupportsPBuffers::No, SupportsWindowSurf
     }
 }
 
-impl<'a, CS: ContextCurrentState, PBS: SupportsPBuffersTrait, WST: SupportsWindowSurfacesTrait, ST: SupportsSurfacelessTrait> ContextBuilder<'a, CS, PBS, WST, ST> {
+impl<
+        'a,
+        CS: ContextCurrentState,
+        PBS: SupportsPBuffersTrait,
+        WST: SupportsWindowSurfacesTrait,
+        ST: SupportsSurfacelessTrait,
+    > ContextBuilder<'a, CS, PBS, WST, ST>
+{
     /// Sets how the backend should choose the OpenGL API and version.
     #[inline]
     pub fn with_gl(mut self, request: GlRequest) -> Self {
@@ -227,7 +248,12 @@ impl<'a, CS: ContextCurrentState, PBS: SupportsPBuffersTrait, WST: SupportsWindo
     ///
     /// [`Context`]: struct.Context.html
     #[inline]
-    pub fn with_shared_lists<CS2: ContextCurrentState, PBS2: SupportsPBuffersTrait, WST2: SupportsWindowSurfacesTrait, ST2: SupportsSurfacelessTrait>(
+    pub fn with_shared_lists<
+        CS2: ContextCurrentState,
+        PBS2: SupportsPBuffersTrait,
+        WST2: SupportsWindowSurfacesTrait,
+        ST2: SupportsSurfacelessTrait,
+    >(
         self,
         other: &'a Context<CS2, PBS2, WST2, ST2>,
     ) -> ContextBuilder<'a, CS2, PBS2, WST2, ST2> {
@@ -787,8 +813,15 @@ impl<S> Default for GlAttributes<S> {
 trait FailToCompileIfNotSendSync
 where
     Self: Send + Sync,
-{}
-impl<PBT: SupportsPBuffersTrait, WST: SupportsWindowSurfacesTrait, ST: SupportsSurfacelessTrait> FailToCompileIfNotSendSync for Context<NotCurrent, PBT, WST, ST> {}
+{
+}
+impl<
+        PBT: SupportsPBuffersTrait,
+        WST: SupportsWindowSurfacesTrait,
+        ST: SupportsSurfacelessTrait,
+    > FailToCompileIfNotSendSync for Context<NotCurrent, PBT, WST, ST>
+{
+}
 impl FailToCompileIfNotSendSync for WindowSurface {}
 impl FailToCompileIfNotSendSync for RawWindowSurface {}
 impl FailToCompileIfNotSendSync for PBuffer {}

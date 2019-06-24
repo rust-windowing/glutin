@@ -1,11 +1,11 @@
 use crate::api::egl::{
     Context as EglContext, NativeDisplay, SurfaceType as EglSurfaceType,
 };
-use crate::{
-    ContextError, CreationError, GlAttributes, PixelFormat,
-    PixelFormatRequirements
-};
 use crate::platform_impl::PlatformAttributes;
+use crate::{
+    ContextBuilderWrapper, ContextError, CreationError, GlAttributes,
+    PixelFormat, PixelFormatRequirements,
+};
 
 use crate::platform::unix::{EventLoopExtUnix, WindowExtUnix};
 use glutin_egl_sys as ffi;
@@ -48,20 +48,16 @@ impl Context {
     #[inline]
     pub fn new_headless<T>(
         el: &EventLoop<T>,
-        pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context>,
-        plat_attr: &PlatformAttributes,
+        cb: ContextBuilderWrapper<&Context>,
         size: Option<dpi::PhysicalSize>,
     ) -> Result<Self, CreationError> {
-        let gl_attr = gl_attr.clone().map_sharing(|c| &**c);
+        let cb = cb.map_sharing(|c| &**c);
         let display_ptr = el.wayland_display().unwrap() as *const _;
         let native_display =
             NativeDisplay::Wayland(Some(display_ptr as *const _));
         if let Some(size) = size {
             let context = EglContext::new(
-                pf_reqs,
-                &gl_attr,
-                plat_attr,
+                &cb,
                 native_display,
                 EglSurfaceType::PBuffer,
                 |c, _| Ok(c[0]),
@@ -72,9 +68,7 @@ impl Context {
         } else {
             // Surfaceless
             let context = EglContext::new(
-                pf_reqs,
-                &gl_attr,
-                plat_attr,
+                &cb,
                 native_display,
                 EglSurfaceType::Surfaceless,
                 |c, _| Ok(c[0]),
@@ -89,9 +83,7 @@ impl Context {
     pub fn new<T>(
         wb: WindowBuilder,
         el: &EventLoop<T>,
-        pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context>,
-        plat_attr: &PlatformAttributes,
+        cb: ContextBuilderWrapper<&Context>,
     ) -> Result<(Window, Self), CreationError> {
         let win = wb.build(el)?;
 
@@ -110,15 +102,8 @@ impl Context {
             }
         };
 
-        let context = Self::new_raw_context(
-            display_ptr,
-            surface,
-            width,
-            height,
-            pf_reqs,
-            gl_attr,
-            plat_attr,
-        )?;
+        let context =
+            Self::new_raw_context(display_ptr, surface, width, height, cb)?;
         Ok((win, context))
     }
 
@@ -128,9 +113,7 @@ impl Context {
         surface: *mut raw::c_void,
         width: u32,
         height: u32,
-        pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context>,
-        plat_attr: &PlatformAttributes,
+        cb: ContextBuilderWrapper<&Context>,
     ) -> Result<Self, CreationError> {
         let egl_surface = unsafe {
             wegl::WlEglSurface::new_from_raw(
@@ -140,13 +123,11 @@ impl Context {
             )
         };
         let context = {
-            let gl_attr = gl_attr.clone().map_sharing(|c| &**c);
+            let cb = cb.map_sharing(|c| &**c);
             let native_display =
                 NativeDisplay::Wayland(Some(display_ptr as *const _));
             EglContext::new(
-                pf_reqs,
-                &gl_attr,
-                plat_attr,
+                &cb,
                 native_display,
                 EglSurfaceType::Window,
                 |c, _| Ok(c[0]),
@@ -192,7 +173,9 @@ impl Context {
     pub fn resize(&self, size: dpi::PhysicalSize) {
         match self {
             Context::Windowed(_, surface) => {
-                surface.0.resize(size.width as i32, size.height as i32, 0, 0)
+                surface
+                    .0
+                    .resize(size.width as i32, size.height as i32, 0, 0)
             }
             _ => unreachable!(),
         }

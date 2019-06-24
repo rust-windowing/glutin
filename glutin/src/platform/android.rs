@@ -2,14 +2,23 @@
 
 use crate::platform::ContextTraitExt;
 use crate::{Context, ContextCurrentState};
-use crate::{SupportsPBuffersTrait, SupportsWindowSurfacesTrait, SupportsSurfacelessTrait};
+use crate::{
+    SupportsPBuffersTrait, SupportsSurfacelessTrait,
+    SupportsWindowSurfacesTrait,
+};
 pub use glutin_egl_sys::EGLContext;
 
 pub use winit::platform::android::*;
 
 use std::os::raw;
 
-impl<CS: ContextCurrentState, PBS: SupportsPBuffersTrait, WST: SupportsWindowSurfacesTrait, ST: SupportsSurfacelessTrait> ContextTraitExt for Context<CS, PBS, WST, ST> {
+impl<
+        CS: ContextCurrentState,
+        PBS: SupportsPBuffersTrait,
+        WST: SupportsWindowSurfacesTrait,
+        ST: SupportsSurfacelessTrait,
+    > ContextTraitExt for Context<CS, PBS, WST, ST>
+{
     type Handle = EGLContext;
 
     #[inline]
