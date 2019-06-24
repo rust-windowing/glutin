@@ -11,7 +11,7 @@ fn main() {
     let wb = WindowBuilder::new()
         .with_title("A transparent window!")
         .with_decorations(false)
-        .with_transparency(true);
+        .with_transparent(true);
 
     let windowed_context =
         ContextBuilder::new().build_windowed(wb, &el).unwrap();

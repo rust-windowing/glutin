@@ -186,7 +186,7 @@ impl Context {
         }
 
         let wb = WindowBuilder::new()
-            .with_visibility(false)
+            .with_visible(false)
             .with_inner_size(size.to_logical(1.));
         Self::new_windowed(wb, &el, pf_reqs, gl_attr).map(|(win, context)| {
             match context {
