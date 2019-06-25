@@ -1,5 +1,6 @@
 use crate::api::egl::{
-    Context as EglContext, NativeDisplay, SurfaceType as EglSurfaceType,
+    self,
+    NativeDisplay,
 };
 use crate::platform_impl::PlatformAttributes;
 use crate::{
@@ -22,26 +23,102 @@ use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct Context {
-    context: EglContext,
+    context: egl::Context,
 }
 
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct WindowSurface {
     #[derivative(Debug = "ignore")]
-    surface: Arc<wegl::WlEglSurface>,
+    wsurface: wegl::WlEglSurface,
+    surface: egl::WindowSurface,
 }
 
 impl WindowSurface {
     #[inline]
+    pub fn new<T>(
+        el: &EventLoop<T>,
+        ctx: &Context,
+        wb: WindowBuilder,
+    ) -> Result<(Self, Window), CreationError> {
+        let win = wb.build(el)?;
+
+        let dpi_factor = win.hidpi_factor();
+        let size = win.inner_size().to_physical(dpi_factor);
+        let (width, height): (u32, u32) = size.into();
+
+        let surface = win.wayland_surface();
+        let surface = match surface {
+            Some(s) => s,
+            None => {
+                return Err(CreationError::NotSupported(
+                    "Wayland not found".to_string(),
+                ));
+            }
+        };
+
+        let wsurface = unsafe {
+            wegl::WlEglSurface::new_from_raw(
+                surface as *mut _,
+                width as i32,
+                height as i32,
+            )
+        };
+
+        egl::WindowSurface::new(el, &ctx.context, wb, wsurface.ptr() as *const _)
+            .map(|(surface, win)| {
+                (WindowSurface { wsurface, surface }, win)
+            })
+    }
+
+    #[inline]
     pub fn update_after_resize(&self, size: dpi::PhysicalSize) {
         let (width, height): (u32, u32) = size.into();
-        self.surface.resize(width as i32, height as i32, 0, 0)
+        self.wsurface.resize(width as i32, height as i32, 0, 0)
+    }
+
+    #[inline]
+    pub fn swap_buffers(&self) -> Result<(), ContextError> {
+        self.surface.swap_buffers()
+    }
+
+    #[inline]
+    pub fn get_pixel_format(&self) -> PixelFormat {
+        self.surface.get_pixel_format()
+    }
+
+    #[inline]
+    pub fn is_current(&self) -> bool {
+        self.surface.is_current()
     }
 }
 
 #[derive(Debug)]
-pub struct PBuffer {}
+pub struct PBuffer {
+    surface: egl::PBuffer,
+}
+
+impl PBuffer {
+    #[inline]
+    pub fn new<T>(
+        el: &EventLoop<T>,
+        ctx: &Context,
+        size: dpi::PhysicalSize,
+    ) -> Result<Self, CreationError> {
+        egl::PBuffer::new(el, &ctx.context, size)
+            .map(|surface| PBuffer { surface })
+    }
+
+    #[inline]
+    pub fn get_pixel_format(&self) -> PixelFormat {
+        self.surface.get_pixel_format()
+    }
+
+    #[inline]
+    pub fn is_current(&self) -> bool {
+        self.surface.is_current()
+    }
+}
 
 impl Context {
     // #[inline]
@@ -55,10 +132,10 @@ impl Context {
     // let native_display =
     // NativeDisplay::Wayland(Some(display_ptr as *const _));
     // if let Some(size) = size {
-    // let context = EglContext::new(
+    // let context = egl::Context::new(
     // &cb,
     // native_display,
-    // EglSurfaceType::PBuffer,
+    // egl::SurfaceType::PBuffer,
     // |c, _| Ok(c[0]),
     // )
     // .and_then(|p| p.finish_pbuffer(size))?;
@@ -66,10 +143,10 @@ impl Context {
     // Ok(context)
     // } else {
     // Surfaceless
-    // let context = EglContext::new(
+    // let context = egl::Context::new(
     // &cb,
     // native_display,
-    // EglSurfaceType::Surfaceless,
+    // egl::SurfaceType::Surfaceless,
     // |c, _| Ok(c[0]),
     // )
     // .and_then(|p| p.finish_surfaceless())?;
@@ -87,58 +164,20 @@ impl Context {
         window_surface_support: bool,
         surfaceless_support: bool,
     ) -> Result<Self, CreationError> {
-        let win = wb.build(el)?;
-
-        let dpi_factor = win.hidpi_factor();
-        let size = win.inner_size().to_physical(dpi_factor);
-        let (width, height): (u32, u32) = size.into();
-
-        let display_ptr = win.wayland_display().unwrap() as *const _;
-        let surface = win.wayland_surface();
-        let surface = match surface {
-            Some(s) => s,
-            None => {
-                return Err(CreationError::NotSupported(
-                    "Wayland not found".to_string(),
-                ));
-            }
+        let display_ptr = el.wayland_display().unwrap() as *const _;
+        let context = {
+            let cb = cb.map_sharing(|c| &c.context);
+            let native_display =
+                NativeDisplay::Wayland(Some(display_ptr as *const _));
+            egl::Context::new(
+                &cb,
+                native_display,
+                // FIXME, surfacetype
+                egl::SurfaceType::Window,
+                |c, _| Ok(c[0]),
+            )?
         };
-
-        let context =
-            Self::new_raw_context(display_ptr, surface, width, height, cb)?;
-        Ok((win, context))
-    }
-
-    #[inline]
-    pub fn new_raw_context(
-        display_ptr: *const wl_display,
-        surface: *mut raw::c_void,
-        width: u32,
-        height: u32,
-        cb: ContextBuilderWrapper<&Context>,
-    ) -> Result<Self, CreationError> {
-        // let egl_surface = unsafe {
-        // wegl::WlEglSurface::new_from_raw(
-        // surface as *mut _,
-        // width as i32,
-        // height as i32,
-        // )
-        // };
-        // let context = {
-        // let cb = cb.map_sharing(|c| &c.context);
-        // let native_display =
-        // NativeDisplay::Wayland(Some(display_ptr as *const _));
-        // EglContext::new(
-        // &cb,
-        // native_display,
-        // EglSurfaceType::Window,
-        // |c, _| Ok(c[0]),
-        // )
-        // .and_then(|p| p.finish(egl_surface.ptr() as *const _))?
-        // };
-        // let context =
-        // Context::Windowed(context, EglSurface(Arc::new(egl_surface)));
-        // Ok(context)
+        Ok(Context { context })
     }
 
     #[inline]
@@ -174,11 +213,6 @@ impl Context {
     #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const () {
         self.context.get_proc_address(addr)
-    }
-
-    #[inline]
-    pub fn swap_buffers(&self) -> Result<(), ContextError> {
-        self.context.swap_buffers()
     }
 
     #[inline]

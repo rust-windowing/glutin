@@ -177,15 +177,6 @@ impl Context {
             Context::Wayland(ref ctx) => ctx.get_proc_address(addr),
         }
     }
-
-    #[inline]
-    pub fn swap_buffers(&self) -> Result<(), ContextError> {
-        match *self {
-            Context::X11(ref ctx) => ctx.swap_buffers(),
-            Context::Wayland(ref ctx) => ctx.swap_buffers(),
-            _ => unreachable!(),
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -230,10 +221,10 @@ impl WindowSurface {
     ) -> Result<(Self, Window), CreationError> {
         match ctx {
             Context::X11(ref ctx) => x11::WindowSurface::new(el, ctx, wb)
-                .map(|ws| WindowSurface::X11(ws)),
+                .map(|(ws, win)| (WindowSurface::X11(ws), win)),
             Context::Wayland(ref ctx) => {
                 wayland::WindowSurface::new(el, ctx, wb)
-                    .map(|ws| WindowSurface::Wayland(ws))
+                    .map(|(ws, win)| (WindowSurface::Wayland(ws), win))
             }
         }
     }
@@ -257,8 +248,17 @@ impl WindowSurface {
     #[inline]
     pub fn update_after_resize(&self, size: dpi::PhysicalSize) {
         match self {
-            Context::Wayland(ref ctx) => ctx.update_after_resize(size),
+            WindowSurface::Wayland(ref ws) => ws.update_after_resize(size),
             _ => (),
+        }
+    }
+
+    #[inline]
+    pub fn swap_buffers(&self) -> Result<(), ContextError> {
+        match *self {
+            WindowSurface::X11(ref ws) => ws.swap_buffers(),
+            WindowSurface::Wayland(ref ws) => ws.swap_buffers(),
+            _ => unreachable!(),
         }
     }
 }

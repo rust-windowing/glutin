@@ -83,6 +83,7 @@ use winit::dpi;
 use std::ffi::{CStr, CString};
 use std::ops::{Deref, DerefMut};
 use std::os::raw;
+use std::sync::Arc;
 
 impl Deref for Egl {
     type Target = ffi::egl::Egl;
@@ -122,13 +123,22 @@ pub enum NativeDisplay {
 }
 
 #[derive(Debug)]
+pub struct EGLDisplay(ffi::egl::types::EGLDisplay);
+
+impl Deref for EGLDisplay {
+    type Target = ffi::egl::types::EGLDisplay;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Debug)]
 pub struct Context {
-    display: ffi::egl::types::EGLDisplay,
+    display: Arc<EGLDisplay>,
     context: ffi::egl::types::EGLContext,
-    surface: Option<Mutex<ffi::egl::types::EGLSurface>>,
     api: Api,
     pixel_format: PixelFormat,
-    #[cfg(target_os = "android")]
     config_id: ffi::egl::types::EGLConfig,
 }
 
@@ -395,7 +405,7 @@ impl Context {
         native_display: NativeDisplay,
         surface_type: SurfaceType,
         config_selector: F,
-    ) -> Result<ContextPrototype<'a>, CreationError>
+    ) -> Result<Context, CreationError>
     where
         F: FnMut(
             Vec<ffi::egl::types::EGLConfig>,
@@ -445,15 +455,101 @@ impl Context {
             )?
         };
 
-        Ok(ContextPrototype {
-            gl_attr: &cb.gl_attr,
-            display,
-            egl_version,
-            extensions,
+        let share = match cb.gl_attr.sharing {
+            Some(ctx) => ctx.context,
+            None => std::ptr::null(),
+        };
+
+        let context = unsafe {
+            if let Some(version) = version {
+                create_context(
+                    display,
+                    &egl_version,
+                    &extensions,
+                    api,
+                    version,
+                    config_id,
+                    cb.gl_attr.debug,
+                    cb.gl_attr.robustness,
+                    share,
+                )?
+            } else if api == Api::OpenGlEs {
+                if let Ok(ctx) = create_context(
+                    display,
+                    &egl_version,
+                    &extensions,
+                    api,
+                    (2, 0),
+                    config_id,
+                    cb.gl_attr.debug,
+                    cb.gl_attr.robustness,
+                    share,
+                ) {
+                    ctx
+                } else if let Ok(ctx) = create_context(
+                    display,
+                    &egl_version,
+                    &extensions,
+                    api,
+                    (1, 0),
+                    config_id,
+                    cb.gl_attr.debug,
+                    cb.gl_attr.robustness,
+                    share,
+                ) {
+                    ctx
+                } else {
+                    return Err(CreationError::OpenGlVersionNotSupported);
+                }
+            } else {
+                if let Ok(ctx) = create_context(
+                    display,
+                    &egl_version,
+                    &extensions,
+                    api,
+                    (3, 2),
+                    config_id,
+                    cb.gl_attr.debug,
+                    cb.gl_attr.robustness,
+                    share,
+                ) {
+                    ctx
+                } else if let Ok(ctx) = create_context(
+                    display,
+                    &egl_version,
+                    &extensions,
+                    api,
+                    (3, 1),
+                    config_id,
+                    cb.gl_attr.debug,
+                    cb.gl_attr.robustness,
+                    share,
+                ) {
+                    ctx
+                } else if let Ok(ctx) = create_context(
+                    display,
+                    &egl_version,
+                    &extensions,
+                    api,
+                    (1, 0),
+                    config_id,
+                    cb.gl_attr.debug,
+                    cb.gl_attr.robustness,
+                    share,
+                ) {
+                    ctx
+                } else {
+                    return Err(CreationError::OpenGlVersionNotSupported);
+                }
+            }
+        };
+
+        Ok(Context {
+            display: Arc::new(EGLDisplay(display)),
+            context,
             api,
-            version,
-            config_id,
             pixel_format,
+            config_id,
         })
     }
 
@@ -489,7 +585,7 @@ impl Context {
             .as_ref()
             .map(|s| *s.lock())
             .unwrap_or(ffi::egl::NO_SURFACE);
-        let ret = egl.MakeCurrent(self.display, surface, surface, self.context);
+        let ret = egl.MakeCurrent(**self.display, surface, surface, self.context);
 
         self.check_make_current(Some(ret))
     }
@@ -507,7 +603,7 @@ impl Context {
 
         if surface_eq || egl.GetCurrentContext() == self.context {
             let ret = egl.MakeCurrent(
-                self.display,
+                **self.display,
                 ffi::egl::NO_SURFACE,
                 ffi::egl::NO_SURFACE,
                 ffi::egl::NO_CONTEXT,
@@ -537,7 +633,7 @@ impl Context {
 
     #[inline]
     pub unsafe fn get_egl_display(&self) -> ffi::egl::types::EGLDisplay {
-        self.display
+        **self.display
     }
 
     // Handle Android Life Cycle.
@@ -552,7 +648,7 @@ impl Context {
             return;
         }
         *surface = egl.CreateWindowSurface(
-            self.display,
+            **self.display,
             self.config_id,
             nwin,
             std::ptr::null(),
@@ -564,7 +660,7 @@ impl Context {
             )
         }
         let ret =
-            egl.MakeCurrent(self.display, *surface, *surface, self.context);
+            egl.MakeCurrent(**self.display, *surface, *surface, self.context);
         if ret == 0 {
             panic!(
                 "on_surface_created: eglMakeCurrent failed with 0x{:x}",
@@ -585,7 +681,7 @@ impl Context {
             return;
         }
         let ret = egl.MakeCurrent(
-            self.display,
+            **self.display,
             ffi::egl::NO_SURFACE,
             ffi::egl::NO_SURFACE,
             ffi::egl::NO_CONTEXT,
@@ -597,7 +693,7 @@ impl Context {
             )
         }
 
-        egl.DestroySurface(self.display, *surface);
+        egl.DestroySurface(**self.display, *surface);
         *surface = ffi::egl::NO_SURFACE;
     }
 
@@ -610,77 +706,28 @@ impl Context {
     }
 
     #[inline]
-    pub fn swap_buffers(&self) -> Result<(), ContextError> {
-        let egl = EGL.as_ref().unwrap();
-        let surface = self.surface.as_ref().unwrap().lock();
-        if *surface == ffi::egl::NO_SURFACE {
-            return Err(ContextError::ContextLost);
-        }
-
-        let ret = unsafe { egl.SwapBuffers(self.display, *surface) };
-
-        if ret == 0 {
-            match unsafe { egl.GetError() } as u32 {
-                ffi::egl::CONTEXT_LOST => {
-                    return Err(ContextError::ContextLost)
-                }
-                err => panic!(
-                    "swap_buffers: eglSwapBuffers failed (eglGetError returned 0x{:x})",
-                    err
-                ),
-            }
-        } else {
-            Ok(())
-        }
+    pub fn get_pixel_format(&self) -> PixelFormat {
+        self.pixel_format.clone()
     }
 
     #[inline]
-    pub fn get_pixel_format(&self) -> PixelFormat {
-        self.pixel_format.clone()
+    pub fn get_native_visual_id(&self) -> ffi::egl::types::EGLint {
+        get_native_visual_id(**self.display, self.config_id)
     }
 }
 
 unsafe impl Send for Context {}
 unsafe impl Sync for Context {}
 
-impl Drop for Context {
+unsafe impl Send for WindowSurface {}
+unsafe impl Sync for WindowSurface {}
+
+unsafe impl Send for PBuffer {}
+unsafe impl Sync for PBuffer {}
+
+impl Drop for EGLDisplay {
     fn drop(&mut self) {
         unsafe {
-            // https://stackoverflow.com/questions/54402688/recreate-eglcreatewindowsurface-with-same-native-window
-            let egl = EGL.as_ref().unwrap();
-            let surface = self
-                .surface
-                .as_ref()
-                .map(|s| *s.lock())
-                .unwrap_or(ffi::egl::NO_SURFACE);
-            // Ok, so we got to call `glFinish` before destroying the context
-            // to ensure it actually gets destroyed. This requires making the
-            // this context current.
-            let mut guard = MakeCurrentGuard::new(
-                self.display,
-                surface,
-                surface,
-                self.context,
-            )
-            .map_err(|err| ContextError::OsError(err))
-            .unwrap();
-
-            guard.if_any_same_then_invalidate(surface, surface, self.context);
-
-            let gl_finish_fn = self.get_proc_address("glFinish");
-            assert!(gl_finish_fn != std::ptr::null());
-            let gl_finish_fn =
-                std::mem::transmute::<_, extern "system" fn()>(gl_finish_fn);
-            gl_finish_fn();
-
-            egl.DestroyContext(self.display, self.context);
-            self.context = ffi::egl::NO_CONTEXT;
-            egl.DestroySurface(self.display, surface);
-            if let Some(ref surface) = self.surface {
-                let mut surface = surface.lock();
-                *surface = ffi::egl::NO_SURFACE;
-            }
-
             // In a reasonable world, we could uncomment the line bellow.
             //
             // This is no such world. Lets talk about something.
@@ -733,30 +780,54 @@ impl Drop for Context {
             //      library?
             //      C) Who the hell is going to maintain that?
             //
-            // egl.Terminate(self.display);
+            // egl.Terminate(**self.display);
         }
     }
 }
 
-#[derive(Debug)]
-pub struct ContextPrototype<'a> {
-    gl_attr: &'a GlAttributes<&'a Context>,
-    display: ffi::egl::types::EGLDisplay,
-    egl_version: (ffi::egl::types::EGLint, ffi::egl::types::EGLint),
-    extensions: Vec<String>,
-    api: Api,
-    version: Option<(u8, u8)>,
-    config_id: ffi::egl::types::EGLConfig,
-    pixel_format: PixelFormat,
+impl Drop for Context {
+    fn drop(&mut self) {
+        unsafe {
+            // https://stackoverflow.com/questions/54402688/recreate-eglcreatewindowsurface-with-same-native-window
+            let egl = EGL.as_ref().unwrap();
+            let surface = self
+                .surface
+                .as_ref()
+                .map(|s| *s.lock())
+                .unwrap_or(ffi::egl::NO_SURFACE);
+            // Ok, so we got to call `glFinish` before destroying the context
+            // to ensure it actually gets destroyed. This requires making the
+            // this context current.
+            let mut guard = MakeCurrentGuard::new(
+                **self.display,
+                surface,
+                surface,
+                self.context,
+            )
+            .map_err(|err| ContextError::OsError(err))
+            .unwrap();
+
+            guard.if_any_same_then_invalidate(surface, surface, self.context);
+
+            let gl_finish_fn = self.get_proc_address("glFinish");
+            assert!(gl_finish_fn != std::ptr::null());
+            let gl_finish_fn =
+                std::mem::transmute::<_, extern "system" fn()>(gl_finish_fn);
+            gl_finish_fn();
+
+            egl.DestroyContext(**self.display, self.context);
+            self.context = ffi::egl::NO_CONTEXT;
+            egl.DestroySurface(**self.display, surface);
+            if let Some(ref surface) = self.surface {
+                let mut surface = surface.lock();
+                *surface = ffi::egl::NO_SURFACE;
+            }
+        }
+    }
 }
 
-#[cfg(any(
-    target_os = "linux",
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-))]
+
+#[inline]
 pub fn get_native_visual_id(
     display: ffi::egl::types::EGLDisplay,
     config_id: ffi::egl::types::EGLConfig,
@@ -780,18 +851,8 @@ pub fn get_native_visual_id(
     value
 }
 
+/*
 impl<'a> ContextPrototype<'a> {
-    #[cfg(any(
-        target_os = "linux",
-        target_os = "dragonfly",
-        target_os = "freebsd",
-        target_os = "netbsd",
-        target_os = "openbsd",
-    ))]
-    pub fn get_native_visual_id(&self) -> ffi::egl::types::EGLint {
-        get_native_visual_id(self.display, self.config_id)
-    }
-
     pub fn finish(
         self,
         nwin: ffi::EGLNativeWindowType,
@@ -799,7 +860,7 @@ impl<'a> ContextPrototype<'a> {
         let egl = EGL.as_ref().unwrap();
         let surface = unsafe {
             let surface = egl.CreateWindowSurface(
-                self.display,
+                **self.display,
                 self.config_id,
                 nwin,
                 std::ptr::null(),
@@ -871,7 +932,7 @@ impl<'a> ContextPrototype<'a> {
 
         let surface = unsafe {
             let surface = egl.CreatePbufferSurface(
-                self.display,
+                **self.display,
                 self.config_id,
                 attrs.as_ptr(),
             );
@@ -885,110 +946,46 @@ impl<'a> ContextPrototype<'a> {
 
         self.finish_impl(Some(surface))
     }
+}
+*/
 
-    fn finish_impl(
-        self,
-        surface: Option<ffi::egl::types::EGLSurface>,
-    ) -> Result<Context, CreationError> {
-        let share = match self.gl_attr.sharing {
-            Some(ctx) => ctx.context,
-            None => std::ptr::null(),
-        };
+#[derive(Debug)]
+pub struct WindowSurface {
+    display: Arc<EGLDisplay>,
+    surface: Mutex<ffi::egl::types::EGLSurface>,
+}
 
-        let context = unsafe {
-            if let Some(version) = self.version {
-                create_context(
-                    self.display,
-                    &self.egl_version,
-                    &self.extensions,
-                    self.api,
-                    version,
-                    self.config_id,
-                    self.gl_attr.debug,
-                    self.gl_attr.robustness,
-                    share,
-                )?
-            } else if self.api == Api::OpenGlEs {
-                if let Ok(ctx) = create_context(
-                    self.display,
-                    &self.egl_version,
-                    &self.extensions,
-                    self.api,
-                    (2, 0),
-                    self.config_id,
-                    self.gl_attr.debug,
-                    self.gl_attr.robustness,
-                    share,
-                ) {
-                    ctx
-                } else if let Ok(ctx) = create_context(
-                    self.display,
-                    &self.egl_version,
-                    &self.extensions,
-                    self.api,
-                    (1, 0),
-                    self.config_id,
-                    self.gl_attr.debug,
-                    self.gl_attr.robustness,
-                    share,
-                ) {
-                    ctx
-                } else {
-                    return Err(CreationError::OpenGlVersionNotSupported);
+impl WindowSurface {
+    #[inline]
+    pub fn swap_buffers(&self) -> Result<(), ContextError> {
+        let egl = EGL.as_ref().unwrap();
+        let surface = self.surface.as_ref().unwrap().lock();
+        if *surface == ffi::egl::NO_SURFACE {
+            return Err(ContextError::ContextLost);
+        }
+
+        let ret = unsafe { egl.SwapBuffers(**self.display, *surface) };
+
+        if ret == 0 {
+            match unsafe { egl.GetError() } as u32 {
+                ffi::egl::CONTEXT_LOST => {
+                    return Err(ContextError::ContextLost)
                 }
-            } else {
-                if let Ok(ctx) = create_context(
-                    self.display,
-                    &self.egl_version,
-                    &self.extensions,
-                    self.api,
-                    (3, 2),
-                    self.config_id,
-                    self.gl_attr.debug,
-                    self.gl_attr.robustness,
-                    share,
-                ) {
-                    ctx
-                } else if let Ok(ctx) = create_context(
-                    self.display,
-                    &self.egl_version,
-                    &self.extensions,
-                    self.api,
-                    (3, 1),
-                    self.config_id,
-                    self.gl_attr.debug,
-                    self.gl_attr.robustness,
-                    share,
-                ) {
-                    ctx
-                } else if let Ok(ctx) = create_context(
-                    self.display,
-                    &self.egl_version,
-                    &self.extensions,
-                    self.api,
-                    (1, 0),
-                    self.config_id,
-                    self.gl_attr.debug,
-                    self.gl_attr.robustness,
-                    share,
-                ) {
-                    ctx
-                } else {
-                    return Err(CreationError::OpenGlVersionNotSupported);
-                }
+                err => panic!(
+                    "swap_buffers: eglSwapBuffers failed (eglGetError returned 0x{:x})",
+                    err
+                ),
             }
-        };
-
-        Ok(Context {
-            display: self.display,
-            context,
-            surface: surface.map(|s| Mutex::new(s)),
-            api: self.api,
-            pixel_format: self.pixel_format,
-            #[cfg(target_os = "android")]
-            config_id: self.config_id,
-        })
+        } else {
+            Ok(())
+        }
     }
+}
+
+#[derive(Debug)]
+pub struct PBuffer {
+    display: Arc<EGLDisplay>,
+    surface: Mutex<ffi::egl::types::EGLSurface>,
 }
 
 unsafe fn choose_fbconfig<F>(
