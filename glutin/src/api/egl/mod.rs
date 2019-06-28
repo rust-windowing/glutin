@@ -79,8 +79,10 @@ use parking_lot::Mutex;
     target_os = "openbsd",
 ))]
 use winit::dpi;
+use winit::event_loop::EventLoop;
 
 use std::ffi::{CStr, CString};
+use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::os::raw;
 use std::sync::Arc;
@@ -573,19 +575,13 @@ impl Context {
 
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
         let egl = EGL.as_ref().unwrap();
-        // FIXME: Possible race condition: we lock the mutex, grab the surface,
-        // unlock it. Then the other thread on android destroys the surface,
-        // then we try to use the surface.
-        //
-        // Problem is rare enough, and can only possibly happen on android.
-        //
-        // Is it okay to use a drestroyed surface? I can't imagine so.
-        let surface = self
-            .surface
-            .as_ref()
-            .map(|s| *s.lock())
-            .unwrap_or(ffi::egl::NO_SURFACE);
-        let ret = egl.MakeCurrent(**self.display, surface, surface, self.context);
+        let surface = if self.surface.is_null() {
+            ffi::egl::NO_SURFACE
+        } else {
+            self.surface
+        };
+        let ret =
+            egl.MakeCurrent(**self.display, surface, surface, self.context);
 
         self.check_make_current(Some(ret))
     }
@@ -593,13 +589,12 @@ impl Context {
     pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
         let egl = EGL.as_ref().unwrap();
 
-        let surface_eq =
-            if let Some(surface) = self.surface.as_ref().map(|s| *s.lock()) {
-                egl.GetCurrentSurface(ffi::egl::DRAW as i32) == surface
-                    || egl.GetCurrentSurface(ffi::egl::READ as i32) == surface
-            } else {
-                false
-            };
+        let surface_eq = if let Some(surface) = self.surface {
+            egl.GetCurrentSurface(ffi::egl::DRAW as i32) == surface
+                || egl.GetCurrentSurface(ffi::egl::READ as i32) == surface
+        } else {
+            false
+        };
 
         if surface_eq || egl.GetCurrentContext() == self.context {
             let ret = egl.MakeCurrent(
@@ -636,66 +631,69 @@ impl Context {
         **self.display
     }
 
-    // Handle Android Life Cycle.
-    // Android has started the activity or sent it to foreground.
-    // Create a new surface and attach it to the recreated ANativeWindow.
-    // Restore the EGLContext.
-    #[cfg(target_os = "android")]
-    pub unsafe fn on_surface_created(&self, nwin: ffi::EGLNativeWindowType) {
-        let egl = EGL.as_ref().unwrap();
-        let mut surface = self.surface.as_ref().unwrap().lock();
-        if *surface != ffi::egl::NO_SURFACE {
-            return;
-        }
-        *surface = egl.CreateWindowSurface(
-            **self.display,
-            self.config_id,
-            nwin,
-            std::ptr::null(),
-        );
-        if surface.is_null() {
-            panic!(
-                "on_surface_created: eglCreateWindowSurface failed with 0x{:x}",
-                egl.GetError()
-            )
-        }
-        let ret =
-            egl.MakeCurrent(**self.display, *surface, *surface, self.context);
-        if ret == 0 {
-            panic!(
-                "on_surface_created: eglMakeCurrent failed with 0x{:x}",
-                egl.GetError()
-            )
-        }
-    }
-
-    // Handle Android Life Cycle.
-    // Android has stopped the activity or sent it to background.
-    // Release the surface attached to the destroyed ANativeWindow.
-    // The EGLContext is not destroyed so it can be restored later.
-    #[cfg(target_os = "android")]
-    pub unsafe fn on_surface_destroyed(&self) {
-        let egl = EGL.as_ref().unwrap();
-        let mut surface = self.surface.as_ref().unwrap().lock();
-        if *surface == ffi::egl::NO_SURFACE {
-            return;
-        }
-        let ret = egl.MakeCurrent(
-            **self.display,
-            ffi::egl::NO_SURFACE,
-            ffi::egl::NO_SURFACE,
-            ffi::egl::NO_CONTEXT,
-        );
-        if ret == 0 {
-            panic!(
-                "on_surface_destroyed: eglMakeCurrent failed with 0x{:x}",
-                egl.GetError()
-            )
-        }
-
-        egl.DestroySurface(**self.display, *surface);
-        *surface = ffi::egl::NO_SURFACE;
-    }
+    // FIXME: Needed for android support.
+    // winit doesn't have it, I'll add this back in when it does.
+    //
+    // // Handle Android Life Cycle.
+    // // Android has started the activity or sent it to foreground.
+    // // Create a new surface and attach it to the recreated ANativeWindow.
+    // // Restore the EGLContext.
+    // #[cfg(target_os = "android")]
+    // pub unsafe fn on_surface_created(&self, nwin: ffi::EGLNativeWindowType) {
+    //     let egl = EGL.as_ref().unwrap();
+    //     let mut surface = self.surface.as_ref().unwrap().lock();
+    //     if *surface != ffi::egl::NO_SURFACE {
+    //         return;
+    //     }
+    //     *surface = egl.CreateWindowSurface(
+    //         **self.display,
+    //         self.config_id,
+    //         nwin,
+    //         std::ptr::null(),
+    //     );
+    //     if surface.is_null() {
+    //         panic!(
+    //             "on_surface_created: eglCreateWindowSurface failed with
+    // 0x{:x}",             egl.GetError()
+    //         )
+    //     }
+    //     let ret =
+    //         egl.MakeCurrent(**self.display, *surface, *surface,
+    // self.context);     if ret == 0 {
+    //         panic!(
+    //             "on_surface_created: eglMakeCurrent failed with 0x{:x}",
+    //             egl.GetError()
+    //         )
+    //     }
+    // }
+    //
+    // // Handle Android Life Cycle.
+    // // Android has stopped the activity or sent it to background.
+    // // Release the surface attached to the destroyed ANativeWindow.
+    // // The EGLContext is not destroyed so it can be restored later.
+    // #[cfg(target_os = "android")]
+    // pub unsafe fn on_surface_destroyed(&self) {
+    //     let egl = EGL.as_ref().unwrap();
+    //     let mut surface = self.surface.as_ref().unwrap().lock();
+    //     if *surface == ffi::egl::NO_SURFACE {
+    //         return;
+    //     }
+    //     let ret = egl.MakeCurrent(
+    //         **self.display,
+    //         ffi::egl::NO_SURFACE,
+    //         ffi::egl::NO_SURFACE,
+    //         ffi::egl::NO_CONTEXT,
+    //     );
+    //     if ret == 0 {
+    //         panic!(
+    //             "on_surface_destroyed: eglMakeCurrent failed with 0x{:x}",
+    //             egl.GetError()
+    //         )
+    //     }
+    //
+    //     egl.DestroySurface(**self.display, *surface);
+    //     *surface = ffi::egl::NO_SURFACE;
+    // }
 
     #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const () {
@@ -703,11 +701,6 @@ impl Context {
         let addr = CString::new(addr.as_bytes()).unwrap();
         let addr = addr.as_ptr();
         unsafe { egl.GetProcAddress(addr) as *const _ }
-    }
-
-    #[inline]
-    pub fn get_pixel_format(&self) -> PixelFormat {
-        self.pixel_format.clone()
     }
 
     #[inline]
@@ -788,44 +781,21 @@ impl Drop for EGLDisplay {
 impl Drop for Context {
     fn drop(&mut self) {
         unsafe {
-            // https://stackoverflow.com/questions/54402688/recreate-eglcreatewindowsurface-with-same-native-window
             let egl = EGL.as_ref().unwrap();
-            let surface = self
-                .surface
-                .as_ref()
-                .map(|s| *s.lock())
-                .unwrap_or(ffi::egl::NO_SURFACE);
-            // Ok, so we got to call `glFinish` before destroying the context
-            // to ensure it actually gets destroyed. This requires making the
-            // this context current.
-            let mut guard = MakeCurrentGuard::new(
-                **self.display,
-                surface,
-                surface,
+
+            let mut guard = MakeCurrentGuard::new_keep(**self.display);
+            guard.if_any_same_then_invalidate(
+                ffi::egl::NO_SURFACE,
+                ffi::egl::NO_SURFACE,
                 self.context,
-            )
-            .map_err(|err| ContextError::OsError(err))
-            .unwrap();
-
-            guard.if_any_same_then_invalidate(surface, surface, self.context);
-
-            let gl_finish_fn = self.get_proc_address("glFinish");
-            assert!(gl_finish_fn != std::ptr::null());
-            let gl_finish_fn =
-                std::mem::transmute::<_, extern "system" fn()>(gl_finish_fn);
-            gl_finish_fn();
+            );
+            std::mem::drop(guard);
 
             egl.DestroyContext(**self.display, self.context);
             self.context = ffi::egl::NO_CONTEXT;
-            egl.DestroySurface(**self.display, surface);
-            if let Some(ref surface) = self.surface {
-                let mut surface = surface.lock();
-                *surface = ffi::egl::NO_SURFACE;
-            }
         }
     }
 }
-
 
 #[inline]
 pub fn get_native_visual_id(
@@ -851,17 +821,75 @@ pub fn get_native_visual_id(
     value
 }
 
-/*
-impl<'a> ContextPrototype<'a> {
-    pub fn finish(
-        self,
+// impl<'a> ContextPrototype<'a> {
+// #[cfg(any(
+// target_os = "linux",
+// target_os = "dragonfly",
+// target_os = "freebsd",
+// target_os = "netbsd",
+// target_os = "openbsd",
+// ))]
+// pub fn finish_surfaceless(self) -> Result<Context, CreationError> {
+// FIXME: Also check for the GL_OES_surfaceless_context *CONTEXT*
+// extension
+// if self
+// .extensions
+// .iter()
+// .find(|s| s == &"EGL_KHR_surfaceless_context")
+// .is_none()
+// {
+// Err(CreationError::NotSupported(
+// "EGL surfaceless not supported".to_string(),
+// ))
+// } else {
+// self.finish_impl(None)
+// }
+// }
+//
+// #[cfg(any(
+// target_os = "android",
+// target_os = "windows",
+// target_os = "linux",
+// target_os = "dragonfly",
+// target_os = "freebsd",
+// target_os = "netbsd",
+// target_os = "openbsd",
+// ))]
+// }
+
+trait SurfaceTypeTrait {}
+
+#[derive(Debug)]
+enum WindowSurfaceType {}
+#[derive(Debug)]
+enum PBufferSurfaceType {}
+
+impl SurfaceTypeTrait for WindowSurfaceType {}
+impl SurfaceTypeTrait for PBufferSurfaceType {}
+
+pub type WindowSurface = EGLSurface<WindowSurfaceType>;
+pub type PBuffer = EGLSurface<PBufferSurfaceType>;
+
+#[derive(Debug)]
+pub struct EGLSurface<T: SurfaceTypeTrait> {
+    display: Arc<EGLDisplay>,
+    surface: ffi::egl::types::EGLSurface,
+    pixel_format: PixelFormat,
+    phantom: PhantomData<T>,
+}
+
+impl WindowSurface {
+    #[inline]
+    pub fn new_window_surface<T>(
+        el: &EventLoop<T>,
+        ctx: &Context,
         nwin: ffi::EGLNativeWindowType,
-    ) -> Result<Context, CreationError> {
+    ) -> Result<Self, CreationError> {
         let egl = EGL.as_ref().unwrap();
         let surface = unsafe {
             let surface = egl.CreateWindowSurface(
-                **self.display,
-                self.config_id,
+                **ctx.display,
+                ctx.config_id,
                 nwin,
                 std::ptr::null(),
             );
@@ -874,97 +902,22 @@ impl<'a> ContextPrototype<'a> {
             surface
         };
 
-        self.finish_impl(Some(surface))
+        Ok(WindowSurface {
+            display: Arc::clone(&ctx.display),
+            pixel_format: ctx.pixel_format.clone(),
+            surface,
+            phantom: PhantomData,
+        })
     }
 
-    #[cfg(any(
-        target_os = "linux",
-        target_os = "dragonfly",
-        target_os = "freebsd",
-        target_os = "netbsd",
-        target_os = "openbsd",
-    ))]
-    pub fn finish_surfaceless(self) -> Result<Context, CreationError> {
-        // FIXME: Also check for the GL_OES_surfaceless_context *CONTEXT*
-        // extension
-        if self
-            .extensions
-            .iter()
-            .find(|s| s == &"EGL_KHR_surfaceless_context")
-            .is_none()
-        {
-            Err(CreationError::NotSupported(
-                "EGL surfaceless not supported".to_string(),
-            ))
-        } else {
-            self.finish_impl(None)
-        }
-    }
-
-    #[cfg(any(
-        target_os = "android",
-        target_os = "windows",
-        target_os = "linux",
-        target_os = "dragonfly",
-        target_os = "freebsd",
-        target_os = "netbsd",
-        target_os = "openbsd",
-    ))]
-    pub fn finish_pbuffer(
-        self,
-        size: dpi::PhysicalSize,
-    ) -> Result<Context, CreationError> {
-        let size: (u32, u32) = size.into();
-
-        let egl = EGL.as_ref().unwrap();
-        let tex_fmt = if self.pixel_format.alpha_bits > 0 {
-            ffi::egl::TEXTURE_RGBA
-        } else {
-            ffi::egl::TEXTURE_RGB
-        };
-        let attrs = &[
-            ffi::egl::WIDTH as raw::c_int,
-            size.0 as raw::c_int,
-            ffi::egl::HEIGHT as raw::c_int,
-            size.1 as raw::c_int,
-            ffi::egl::NONE as raw::c_int,
-        ];
-
-        let surface = unsafe {
-            let surface = egl.CreatePbufferSurface(
-                **self.display,
-                self.config_id,
-                attrs.as_ptr(),
-            );
-            if surface.is_null() || surface == ffi::egl::NO_SURFACE {
-                return Err(CreationError::OsError(
-                    "eglCreatePbufferSurface failed".to_string(),
-                ));
-            }
-            surface
-        };
-
-        self.finish_impl(Some(surface))
-    }
-}
-*/
-
-#[derive(Debug)]
-pub struct WindowSurface {
-    display: Arc<EGLDisplay>,
-    surface: Mutex<ffi::egl::types::EGLSurface>,
-}
-
-impl WindowSurface {
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
         let egl = EGL.as_ref().unwrap();
-        let surface = self.surface.as_ref().unwrap().lock();
-        if *surface == ffi::egl::NO_SURFACE {
+        if self.surface == ffi::egl::NO_SURFACE {
             return Err(ContextError::ContextLost);
         }
 
-        let ret = unsafe { egl.SwapBuffers(**self.display, *surface) };
+        let ret = unsafe { egl.SwapBuffers(**self.display, self.surface) };
 
         if ret == 0 {
             match unsafe { egl.GetError() } as u32 {
@@ -982,10 +935,87 @@ impl WindowSurface {
     }
 }
 
-#[derive(Debug)]
-pub struct PBuffer {
-    display: Arc<EGLDisplay>,
-    surface: Mutex<ffi::egl::types::EGLSurface>,
+impl PBuffer {
+    #[inline]
+    pub fn new_pbuffer<T>(
+        _el: &EventLoop<T>,
+        ctx: &Context,
+        size: dpi::PhysicalSize,
+    ) -> Result<Self, CreationError> {
+        let size: (u32, u32) = size.into();
+
+        let egl = EGL.as_ref().unwrap();
+
+        let tex_fmt = if ctx.pixel_format.alpha_bits > 0 {
+            ffi::egl::TEXTURE_RGBA
+        } else {
+            ffi::egl::TEXTURE_RGB
+        };
+
+        let attrs = &[
+            ffi::egl::WIDTH as raw::c_int,
+            size.0 as raw::c_int,
+            ffi::egl::HEIGHT as raw::c_int,
+            size.1 as raw::c_int,
+            ffi::egl::NONE as raw::c_int,
+        ];
+
+        let surface = unsafe {
+            let surface = egl.CreatePbufferSurface(
+                **ctx.display,
+                ctx.config_id,
+                attrs.as_ptr(),
+            );
+            if surface.is_null() || surface == ffi::egl::NO_SURFACE {
+                return Err(CreationError::OsError(
+                    "eglCreatePbufferSurface failed".to_string(),
+                ));
+            }
+            surface
+        };
+
+        Ok(PBuffer {
+            display: Arc::clone(&ctx.display),
+            pixel_format: ctx.pixel_format.clone(),
+            surface,
+            phantom: PhantomData,
+        })
+    }
+}
+
+impl<T: SurfaceTypeTrait> EGLSurface<T> {
+    #[inline]
+    pub fn is_current(&self) -> bool {
+        let egl = EGL.as_ref().unwrap();
+        unsafe {
+            egl.GetCurrentSurface(ffi::egl::DRAW as i32) == self.surface
+                || egl.GetCurrentSurface(ffi::egl::READ as i32) == self.surface
+        }
+    }
+
+    #[inline]
+    pub fn get_pixel_format(&self) -> PixelFormat {
+        self.pixel_format.clone()
+    }
+}
+
+impl<T: SurfaceTypeTrait> Drop for EGLSurface<T> {
+    fn drop(&mut self) {
+        unsafe {
+            let egl = EGL.as_ref().unwrap();
+
+            let mut guard = MakeCurrentGuard::new_keep(**self.display);
+            guard.if_any_same_then_invalidate(
+                self.surface,
+                self.surface,
+                ffi::egl::NO_CONTEXT,
+            );
+            std::mem::drop(guard);
+
+            egl.DestroySurface(**self.display, self.surface);
+            self.surface = ffi::egl::NO_SURFACE;
+        }
+    }
 }
 
 unsafe fn choose_fbconfig<F>(

@@ -7,6 +7,7 @@ pub struct MakeCurrentGuard {
     display: ffi::egl::types::EGLDisplay,
     old_display: ffi::egl::types::EGLDisplay,
     possibly_invalid: Option<MakeCurrentGuardInner>,
+    keep: bool,
 }
 
 #[derive(Debug, PartialEq)]
@@ -36,6 +37,7 @@ impl MakeCurrentGuard {
                         .GetCurrentSurface(ffi::egl::READ as i32),
                     old_context: egl.GetCurrentContext(),
                 }),
+                keep: false,
             };
 
             if ret.old_display == ffi::egl::NO_DISPLAY {
@@ -54,6 +56,31 @@ impl MakeCurrentGuard {
         }
     }
 
+    pub fn new_keep(display: ffi::egl::types::EGLDisplay) -> Self {
+        unsafe {
+            let egl = super::EGL.as_ref().unwrap();
+
+            let mut ret = MakeCurrentGuard {
+                display,
+                old_display: egl.GetCurrentDisplay(),
+                possibly_invalid: Some(MakeCurrentGuardInner {
+                    old_draw_surface: egl
+                        .GetCurrentSurface(ffi::egl::DRAW as i32),
+                    old_read_surface: egl
+                        .GetCurrentSurface(ffi::egl::READ as i32),
+                    old_context: egl.GetCurrentContext(),
+                }),
+                keep: true,
+            };
+
+            if ret.old_display == ffi::egl::NO_DISPLAY {
+                ret.invalidate();
+            }
+
+            ret
+        }
+    }
+
     pub fn if_any_same_then_invalidate(
         &mut self,
         draw_surface: ffi::egl::types::EGLSurface,
@@ -67,6 +94,7 @@ impl MakeCurrentGuard {
                 || pi.old_read_surface == read_surface
                     && read_surface != ffi::egl::NO_SURFACE
                 || pi.old_context == context
+                    && pi.old_context != ffi::egl::NO_CONTEXT
             {
                 self.invalidate();
             }
@@ -83,11 +111,17 @@ impl Drop for MakeCurrentGuard {
         let egl = super::EGL.as_ref().unwrap();
         let (draw_surface, read_surface, context) =
             match self.possibly_invalid.take() {
-                Some(inner) => (
-                    inner.old_draw_surface,
-                    inner.old_read_surface,
-                    inner.old_context,
-                ),
+                Some(inner) => {
+                    if self.keep {
+                        return;
+                    } else {
+                        (
+                            inner.old_draw_surface,
+                            inner.old_read_surface,
+                            inner.old_context,
+                        )
+                    }
+                }
                 None => (
                     ffi::egl::NO_SURFACE,
                     ffi::egl::NO_SURFACE,

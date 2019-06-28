@@ -115,7 +115,6 @@ impl WindowSurface {
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
         self.surface.swap_buffers()
     }
-
 }
 
 impl<W> IsWindowSurface for WindowSurfaceWrapper<W> {}

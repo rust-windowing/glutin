@@ -1,7 +1,4 @@
-use crate::api::egl::{
-    self,
-    NativeDisplay,
-};
+use crate::api::egl::{self, NativeDisplay};
 use crate::platform_impl::PlatformAttributes;
 use crate::{
     ContextBuilderWrapper, ContextError, CreationError, GlAttributes,
@@ -65,10 +62,12 @@ impl WindowSurface {
             )
         };
 
-        egl::WindowSurface::new(el, &ctx.context, wb, wsurface.ptr() as *const _)
-            .map(|(surface, win)| {
-                (WindowSurface { wsurface, surface }, win)
-            })
+        egl::WindowSurface::new_window_surface(
+            el,
+            &ctx.context,
+            wsurface.ptr() as *const _,
+        )
+        .map(|surface| (WindowSurface { wsurface, surface }, win))
     }
 
     #[inline]
@@ -105,7 +104,7 @@ impl PBuffer {
         ctx: &Context,
         size: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
-        egl::PBuffer::new(el, &ctx.context, size)
+        egl::PBuffer::new_pbuffer(el, &ctx.context, size)
             .map(|surface| PBuffer { surface })
     }
 
@@ -213,10 +212,5 @@ impl Context {
     #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const () {
         self.context.get_proc_address(addr)
-    }
-
-    #[inline]
-    pub fn get_pixel_format(&self) -> PixelFormat {
-        self.context.get_pixel_format().clone()
     }
 }

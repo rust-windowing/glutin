@@ -761,7 +761,7 @@ pub struct GlAttributes<S> {
     /// block until the screen refreshes. This is typically used to prevent
     /// screen tearing.
     ///
-    /// The default is `false`.
+    /// The default is `None`.
     pub vsync: bool,
 }
 
