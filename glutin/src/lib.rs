@@ -146,12 +146,8 @@ pub struct ContextBuilderWrapper<T> {
 }
 
 pub type ContextBuilder<
-    'a,
-    CS: ContextCurrentState,
-    PBS: SupportsPBuffersTrait,
-    WST: SupportsWindowSurfacesTrait,
-    ST: SupportsSurfacelessTrait,
-> = ContextBuilderWrapper<&'a Context<CS, PBS, WST, ST>>;
+    'a, IC, PBS, WST, ST
+> = ContextBuilderWrapper<&'a Context<IC, PBS, WST, ST>>;
 
 impl<S> ContextBuilderWrapper<S> {
     /// Turns the `sharing` parameter into another type by calling a closure.
@@ -171,7 +167,7 @@ impl<S> ContextBuilderWrapper<S> {
 impl<'a>
     ContextBuilder<
         'a,
-        NotCurrent,
+        ContextIsCurrent::No,
         SupportsPBuffers::No,
         SupportsWindowSurfaces::No,
         SupportsSurfaceless::No,
@@ -189,11 +185,11 @@ impl<'a>
 
 impl<
         'a,
-        CS: ContextCurrentState,
+        IC: ContextIsCurrentTrait,
         PBS: SupportsPBuffersTrait,
         WST: SupportsWindowSurfacesTrait,
         ST: SupportsSurfacelessTrait,
-    > ContextBuilder<'a, CS, PBS, WST, ST>
+    > ContextBuilder<'a, IC, PBS, WST, ST>
 {
     /// Sets how the backend should choose the OpenGL API and version.
     #[inline]
@@ -249,14 +245,14 @@ impl<
     /// [`Context`]: struct.Context.html
     #[inline]
     pub fn with_shared_lists<
-        CS2: ContextCurrentState,
+        IC2: ContextIsCurrentTrait,
         PBS2: SupportsPBuffersTrait,
         WST2: SupportsWindowSurfacesTrait,
         ST2: SupportsSurfacelessTrait,
     >(
         self,
-        other: &'a Context<CS2, PBS2, WST2, ST2>,
-    ) -> ContextBuilder<'a, CS2, PBS2, WST2, ST2> {
+        other: &'a Context<IC2, PBS2, WST2, ST2>,
+    ) -> ContextBuilder<'a, IC2, PBS2, WST2, ST2> {
         ContextBuilder {
             gl_attr: self.gl_attr.set_sharing(Some(other)),
             pf_reqs: self.pf_reqs,
@@ -819,9 +815,9 @@ impl<
         PBT: SupportsPBuffersTrait,
         WST: SupportsWindowSurfacesTrait,
         ST: SupportsSurfacelessTrait,
-    > FailToCompileIfNotSendSync for Context<NotCurrent, PBT, WST, ST>
+    > FailToCompileIfNotSendSync for Context<ContextIsCurrent::No, PBT, WST, ST>
 {
 }
-impl FailToCompileIfNotSendSync for WindowSurface {}
-impl FailToCompileIfNotSendSync for RawWindowSurface {}
-impl FailToCompileIfNotSendSync for PBuffer {}
+impl FailToCompileIfNotSendSync for WindowSurface<SurfaceInUse::No> {}
+impl FailToCompileIfNotSendSync for RawWindowSurface<SurfaceInUse::No> {}
+impl FailToCompileIfNotSendSync for PBuffer<SurfaceInUse::No> {}

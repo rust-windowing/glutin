@@ -1,5 +1,9 @@
 use super::*;
+use std::fmt::Debug;
+use std::marker::PhantomData;
+use winit::event_loop::EventLoop;
 
+#[allow(non_snake_case)]
 pub mod SupportsPBuffers {
     use std::fmt::Debug;
     pub trait SupportsPBuffersTrait: Debug + Clone + Send + Sync {
@@ -7,9 +11,9 @@ pub mod SupportsPBuffers {
     }
 
     #[derive(Debug, Clone, Copy)]
-    pub struct Yes {}
+    pub enum Yes {}
     #[derive(Debug, Clone, Copy)]
-    pub struct No {}
+    pub enum No {}
 
     impl SupportsPBuffersTrait for Yes {
         fn supported() -> bool {
@@ -22,7 +26,9 @@ pub mod SupportsPBuffers {
         }
     }
 }
+pub use SupportsPBuffers::SupportsPBuffersTrait;
 
+#[allow(non_snake_case)]
 pub mod SupportsWindowSurfaces {
     use std::fmt::Debug;
     pub trait SupportsWindowSurfacesTrait: Debug + Clone + Send + Sync {
@@ -30,9 +36,9 @@ pub mod SupportsWindowSurfaces {
     }
 
     #[derive(Debug, Clone, Copy)]
-    pub struct Yes {}
+    pub enum Yes {}
     #[derive(Debug, Clone, Copy)]
-    pub struct No {}
+    pub enum No {}
 
     impl SupportsWindowSurfacesTrait for Yes {
         fn supported() -> bool {
@@ -45,7 +51,9 @@ pub mod SupportsWindowSurfaces {
         }
     }
 }
+pub use SupportsWindowSurfaces::SupportsWindowSurfacesTrait;
 
+#[allow(non_snake_case)]
 pub mod SupportsSurfaceless {
     use std::fmt::Debug;
     pub trait SupportsSurfacelessTrait: Debug + Clone + Send + Sync {
@@ -53,9 +61,9 @@ pub mod SupportsSurfaceless {
     }
 
     #[derive(Debug, Clone, Copy)]
-    pub struct Yes {}
+    pub enum Yes {}
     #[derive(Debug, Clone, Copy)]
-    pub struct No {}
+    pub enum No {}
 
     impl SupportsSurfacelessTrait for Yes {
         fn supported() -> bool {
@@ -68,85 +76,81 @@ pub mod SupportsSurfaceless {
         }
     }
 }
-
-use std::fmt::Debug;
-use std::marker::PhantomData;
-use winit::event_loop::EventLoop;
-pub use SupportsPBuffers::SupportsPBuffersTrait;
 pub use SupportsSurfaceless::SupportsSurfacelessTrait;
-pub use SupportsWindowSurfaces::SupportsWindowSurfacesTrait;
 
-/// A trait implemented on both [`NotCurrent`] and
-/// [`PossiblyCurrent`].
-///
-/// [`NotCurrent`]: enum.NotCurrent.html
-/// [`PossiblyCurrent`]: struct.PossiblyCurrent.html
-pub trait ContextCurrentState: Debug + Clone {}
-pub trait PossiblyCurrentContextCurrentState: ContextCurrentState {}
+#[allow(non_snake_case)]
+pub mod ContextIsCurrent {
+    use std::fmt::Debug;
+    use std::marker::PhantomData;
 
-/// A type that [`Context`]s which might possibly be currently current on some
-/// thread take as a generic.
-///
-/// See [`Context::make_current_window`] for more details.
-///
-/// [`Context::make_current_window`]:
-/// struct.Context.html#method.make_current_window
-/// [`Context`]: struct.Context.html
-// This is nightly only:
-// impl !Send for Context<PossiblyCurrent> {}
-// impl !Sync for Context<PossiblyCurrent> {}
-//
-// Instead we add a phantom type
-#[derive(Debug, Clone, Copy)]
-pub struct PossiblyCurrent {
-    phantom: PhantomData<*mut ()>,
+    /// A trait implemented on both [`NotCurrent`] and
+    /// [`PossiblyCurrent`].
+    ///
+    /// [`NotCurrent`]: enum.NotCurrent.html
+    /// [`PossiblyCurrent`]: struct.PossiblyCurrent.html
+    ///
+    /// FIXME: Docs outdated
+    pub trait ContextIsCurrentTrait: Debug + Clone + Copy {}
+    pub trait ContextIsCurrentYesTrait: ContextIsCurrentTrait + Debug + Clone + Copy {}
+
+    // This is nightly only:
+    // impl !Send for Context<PossiblyCurrent> {}
+    // impl !Sync for Context<PossiblyCurrent> {}
+    //
+    // Instead we add a phantom type
+    /// A type that [`Context`]s which might possibly be currently current on
+    /// some thread take as a generic.
+    ///
+    /// See [`Context::make_current_window`] for more details.
+    ///
+    /// [`Context::make_current_window`]:
+    /// struct.Context.html#method.make_current_window
+    /// [`Context`]: struct.Context.html
+    #[derive(Debug, Clone, Copy)]
+    pub struct Possibly {
+        phantom: PhantomData<*mut ()>,
+    }
+    #[derive(Debug, Clone, Copy)]
+    pub struct PossiblyAndSurfaceBound {
+        phantom: PhantomData<*mut ()>,
+    }
+    /// A type that [`Context`]s which are not currently current on any thread
+    /// take as a generic.
+    ///
+    /// See [`Context::make_current_window`] for more details.
+    ///
+    /// [`Context::make_current_window`]:
+    /// struct.Context.html#method.make_current_window
+    /// [`Context`]: struct.Context.html
+    #[derive(Debug, Clone, Copy)]
+    pub enum No {}
+
+    impl ContextIsCurrentTrait for Possibly {}
+    impl ContextIsCurrentTrait for PossiblyAndSurfaceBound {}
+    impl ContextIsCurrentTrait for No {}
+
+    impl ContextIsCurrentYesTrait for Possibly {}
+    impl ContextIsCurrentYesTrait for PossiblyAndSurfaceBound {}
 }
-
-// This is nightly only:
-// impl !Send for Context<PossiblyCurrentSurfaceBound> {}
-// impl !Sync for Context<PossiblyCurrentSurfaceBound> {}
-//
-// Instead we add a phantom type
-#[derive(Debug, Clone, Copy)]
-pub struct PossiblyCurrentSurfaceBound {
-    phantom: PhantomData<*mut ()>,
-}
-
-/// A type that [`Context`]s which are not currently current on any thread take
-/// as a generic.
-///
-/// See [`Context::make_current_window`] for more details.
-///
-/// [`Context::make_current_window`]:
-/// struct.Context.html#method.make_current_window
-/// [`Context`]: struct.Context.html
-#[derive(Debug, Clone, Copy)]
-pub enum NotCurrent {}
-
-impl ContextCurrentState for PossiblyCurrent {}
-impl ContextCurrentState for PossiblyCurrentSurfaceBound {}
-impl ContextCurrentState for NotCurrent {}
-
-impl PossiblyCurrentContextCurrentState for PossiblyCurrent {}
-impl PossiblyCurrentContextCurrentState for PossiblyCurrentSurfaceBound {}
+pub use ContextIsCurrent::{ContextIsCurrentTrait, ContextIsCurrentYesTrait};
 
 #[derive(Debug)]
 pub struct Context<
-    CS: ContextCurrentState,
+    IC: ContextIsCurrentTrait,
     PBS: SupportsPBuffersTrait,
     WST: SupportsWindowSurfacesTrait,
     ST: SupportsSurfacelessTrait,
 > {
     pub(crate) context: platform_impl::Context,
-    pub(crate) phantom: PhantomData<(CS, PBS, WST, ST)>,
+    pub(crate) phantom: PhantomData<(IC, PBS, WST, ST)>,
 }
 
 impl<
-        CS: ContextCurrentState,
+        IC: ContextIsCurrentTrait,
         PBS: SupportsPBuffersTrait,
         WST: SupportsWindowSurfacesTrait,
         ST: SupportsSurfacelessTrait,
-    > Context<CS, PBS, WST, ST>
+    > Context<IC, PBS, WST, ST>
 {
     pub(crate) fn inner(&self) -> &platform_impl::Context {
         &self.context
@@ -157,10 +161,10 @@ impl<
 }
 
 impl<
-        CS: ContextCurrentState,
+        IC: ContextIsCurrentTrait,
         PBS: SupportsPBuffersTrait,
         ST: SupportsSurfacelessTrait,
-    > Context<CS, PBS, SupportsWindowSurfaces::Yes, ST>
+    > Context<IC, PBS, SupportsWindowSurfaces::Yes, ST>
 {
     /// Sets this context as the current context. The previously current context
     /// (if any) is no longer current.
@@ -218,59 +222,69 @@ impl<
     /// [`is_current`]: struct.Context.html#method.is_current
     pub unsafe fn make_current_window<W>(
         self,
-        surface: &mut WindowSurfaceWrapper<W>,
+        mut surface: WindowSurfaceWrapper<W, SurfaceInUse::No>,
     ) -> Result<
-        Context<
-            PossiblyCurrentSurfaceBound,
-            PBS,
-            SupportsWindowSurfaces::Yes,
-            ST,
-        >,
-        (Self, ContextError),
+        (
+            Context<
+                ContextIsCurrent::PossiblyAndSurfaceBound,
+                PBS,
+                SupportsWindowSurfaces::Yes,
+                ST,
+            >,
+            WindowSurfaceWrapper<W, SurfaceInUse::Possibly>,
+        ),
+        (
+            Self,
+            WindowSurfaceWrapper<W, SurfaceInUse::No>,
+            ContextError,
+        ),
     > {
         match self.context.make_current_window(surface.inner_mut()) {
-            Ok(()) => Ok(Context {
-                context: self.context,
-                phantom: PhantomData,
-            }),
-            Err(err) => Err((self, err)),
+            Ok(()) => Ok((
+                Context {
+                    context: self.context,
+                    phantom: PhantomData,
+                },
+                surface.treat_as_current(),
+            )),
+            Err(err) => Err((self, surface, err)),
         }
     }
 }
 
 impl<
-        CS: ContextCurrentState,
+        IC: ContextIsCurrentTrait,
         WST: SupportsWindowSurfacesTrait,
         ST: SupportsSurfacelessTrait,
-    > Context<CS, SupportsPBuffers::Yes, WST, ST>
+    > Context<IC, SupportsPBuffers::Yes, WST, ST>
 {
     pub unsafe fn make_current_pbuffer(
         self,
-        pbuffer: &mut PBuffer,
+        mut pbuffer: PBuffer<SurfaceInUse::No>,
     ) -> Result<
-        Context<PossiblyCurrent, SupportsPBuffers::Yes, WST, ST>,
-        (Self, ContextError),
+        (Context<ContextIsCurrent::Possibly, SupportsPBuffers::Yes, WST, ST>, PBuffer<SurfaceInUse::Possibly>),
+        (Self, PBuffer<SurfaceInUse::No>, ContextError),
     > {
         match self.context.make_current_pbuffer(pbuffer.inner_mut()) {
-            Ok(()) => Ok(Context {
+            Ok(()) => Ok((Context {
                 context: self.context,
                 phantom: PhantomData,
-            }),
-            Err(err) => Err((self, err)),
+            }, pbuffer.treat_as_current())),
+            Err(err) => Err((self, pbuffer, err)),
         }
     }
 }
 
 impl<
-        CS: ContextCurrentState,
+        IC: ContextIsCurrentTrait,
         PBT: SupportsPBuffersTrait,
         WST: SupportsWindowSurfacesTrait,
-    > Context<CS, PBT, WST, SupportsSurfaceless::Yes>
+    > Context<IC, PBT, WST, SupportsSurfaceless::Yes>
 {
     pub unsafe fn make_current_surfaceless(
         self,
     ) -> Result<
-        Context<PossiblyCurrent, PBT, WST, SupportsSurfaceless::Yes>,
+        Context<ContextIsCurrent::Possibly, PBT, WST, SupportsSurfaceless::Yes>,
         (Self, ContextError),
     > {
         match self.context.make_current_surfaceless() {
@@ -284,11 +298,11 @@ impl<
 }
 
 impl<
-        CS: PossiblyCurrentContextCurrentState,
+        IC: ContextIsCurrentYesTrait,
         PBS: SupportsPBuffersTrait,
         WST: SupportsWindowSurfacesTrait,
         ST: SupportsSurfacelessTrait,
-    > Context<CS, PBS, WST, ST>
+    > Context<IC, PBS, WST, ST>
 {
     /// Returns the address of an OpenGL function.
     pub fn get_proc_address(&self, addr: &str) -> *const () {
@@ -297,11 +311,11 @@ impl<
 }
 
 impl<
-        CS: ContextCurrentState,
+        IC: ContextIsCurrentTrait,
         PBS: SupportsPBuffersTrait,
         WST: SupportsWindowSurfacesTrait,
         ST: SupportsSurfacelessTrait,
-    > Context<CS, PBS, WST, ST>
+    > Context<IC, PBS, WST, ST>
 {
     /// Returns true if this context is the current one in this thread.
     pub fn is_current(&self) -> bool {
@@ -321,7 +335,8 @@ impl<
     /// [`make_current_window`]: struct.Context.html#method.make_current_window
     pub unsafe fn make_not_current(
         self,
-    ) -> Result<Context<NotCurrent, PBS, WST, ST>, (Self, ContextError)> {
+    ) -> Result<Context<ContextIsCurrent::No, PBS, WST, ST>, (Self, ContextError)>
+    {
         match self.context.make_not_current() {
             Ok(()) => Ok(Context {
                 context: self.context,
@@ -344,7 +359,7 @@ impl<
     /// [`make_current_window`]: struct.Context.html#method.make_current_window
     pub unsafe fn treat_as_not_current(
         self,
-    ) -> Context<NotCurrent, PBS, WST, ST> {
+    ) -> Context<ContextIsCurrent::No, PBS, WST, ST> {
         Context {
             context: self.context,
             phantom: PhantomData,
@@ -364,9 +379,11 @@ impl<
     /// [`make_current_window`]: struct.Context.html#method.make_current_window
     /// [`NotCurrent`]: enum.NotCurrent.html
     /// [`Context`]: struct.Context.html
-    pub unsafe fn treat_as_current<CS2: PossiblyCurrentContextCurrentState>(
+    ///
+    /// FIXME: docs
+    pub unsafe fn treat_as_current<IC2: ContextIsCurrentYesTrait>(
         self,
-    ) -> Context<CS2, PBS, WST, ST> {
+    ) -> Context<IC2, PBS, WST, ST> {
         Context {
             context: self.context,
             phantom: PhantomData,
@@ -375,7 +392,12 @@ impl<
 }
 
 impl<PBS: SupportsPBuffersTrait, ST: SupportsSurfacelessTrait>
-    Context<PossiblyCurrentSurfaceBound, PBS, SupportsWindowSurfaces::Yes, ST>
+    Context<
+        ContextIsCurrent::PossiblyAndSurfaceBound,
+        PBS,
+        SupportsWindowSurfaces::Yes,
+        ST,
+    >
 {
     /// Update the context after the underlying surface resizes.
     ///
@@ -397,13 +419,13 @@ impl<PBS: SupportsPBuffersTrait, ST: SupportsSurfacelessTrait>
 
 impl<
         'a,
-        CS: ContextCurrentState,
+        IC: ContextIsCurrentTrait,
         PBS: SupportsPBuffersTrait,
         WST: SupportsWindowSurfacesTrait,
         ST: SupportsSurfacelessTrait,
-    > ContextBuilder<'a, CS, PBS, WST, ST>
+    > ContextBuilder<'a, IC, PBS, WST, ST>
 {
-    /// FIXME UPDATE DOCS:
+    /// FIXME UPDATE DOIC:
     ///
     /// Errors can occur in two scenarios:
     ///  - If the window could not be created (via permission denied,
@@ -468,7 +490,8 @@ impl<
         _pbuffer_support: PBS2,
         _window_surface_support: WST2,
         _surfaceless_support: ST2,
-    ) -> Result<Context<NotCurrent, PBS2, WST2, ST2>, CreationError> {
+    ) -> Result<Context<ContextIsCurrent::No, PBS2, WST2, ST2>, CreationError>
+    {
         assert!(PBS2::supported() || WST2::supported() || ST2::supported(), "Context created by users most support at least one type of backing.");
         let cb = self.map_sharing(|ctx| &ctx.context);
         platform_impl::Context::new(

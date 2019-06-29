@@ -1,8 +1,8 @@
 use crate::api::osmesa;
 use crate::{
-    Api, Context, ContextBuilderWrapper, ContextCurrentState, ContextError,
-    CreationError, NotCurrent, PixelFormat, PossiblyCurrent,
-    PossiblyCurrentContextCurrentState, Surface,
+    Api, Context, ContextBuilderWrapper, ContextError, ContextIsCurrent,
+    ContextIsCurrentTrait, ContextIsCurrentYesTrait, CreationError,
+    PixelFormat, Surface,
 };
 use std::marker::PhantomData;
 use winit::dpi;
@@ -19,16 +19,20 @@ pub trait OsMesaContextExt {
     /// requested feature.
     ///
     /// [`Context`]: struct.Context.html
-    fn build_osmesa(self) -> Result<OsMesaContext<NotCurrent>, CreationError>
+    fn build_osmesa(
+        self,
+    ) -> Result<OsMesaContext<ContextIsCurrent::No>, CreationError>
     where
         Self: Sized;
 }
 
-impl<'a, T: ContextCurrentState> OsMesaContextExt
+impl<'a, T: ContextIsCurrentTrait> OsMesaContextExt
     for OsMesaContextBuilder<'a, T>
 {
     #[inline]
-    fn build_osmesa(self) -> Result<OsMesaContext<NotCurrent>, CreationError>
+    fn build_osmesa(
+        self,
+    ) -> Result<OsMesaContext<ContextIsCurrent::No>, CreationError>
     where
         Self: Sized,
     {
@@ -40,22 +44,23 @@ impl<'a, T: ContextCurrentState> OsMesaContextExt
     }
 }
 
-pub type OsMesaContextBuilder<'a, CS: ContextCurrentState> =
-    ContextBuilderWrapper<&'a OsMesaContext<CS>>;
+pub type OsMesaContextBuilder<'a, IC> =
+    ContextBuilderWrapper<&'a OsMesaContext<IC>>;
 
-pub struct OsMesaContext<CS: ContextCurrentState> {
+#[derive(Debug)]
+pub struct OsMesaContext<IC: ContextIsCurrentTrait> {
     pub(crate) context: osmesa::OsMesaContext,
-    pub(crate) phantom: PhantomData<CS>,
+    pub(crate) phantom: PhantomData<IC>,
 }
 
-impl<CS: PossiblyCurrentContextCurrentState> OsMesaContext<CS> {
+impl<IC: ContextIsCurrentYesTrait> OsMesaContext<IC> {
     /// Returns the address of an OpenGL function.
     pub fn get_proc_address(&self, addr: &str) -> *const () {
         self.context.get_proc_address(addr)
     }
 }
 
-impl<CS: ContextCurrentState> OsMesaContext<CS> {
+impl<IC: ContextIsCurrentTrait> OsMesaContext<IC> {
     pub fn is_current(&self) -> bool {
         self.context.is_current()
     }
@@ -67,7 +72,8 @@ impl<CS: ContextCurrentState> OsMesaContext<CS> {
     pub unsafe fn make_current_osmesa_buffer(
         self,
         buffer: &mut OsMesaBuffer,
-    ) -> Result<OsMesaContext<PossiblyCurrent>, (Self, ContextError)> {
+    ) -> Result<OsMesaContext<ContextIsCurrent::Possibly>, (Self, ContextError)>
+    {
         match self.context.make_current_osmesa_buffer(buffer.inner_mut()) {
             Ok(()) => Ok(OsMesaContext {
                 context: self.context,
@@ -79,7 +85,7 @@ impl<CS: ContextCurrentState> OsMesaContext<CS> {
 
     pub unsafe fn make_not_current(
         self,
-    ) -> Result<OsMesaContext<NotCurrent>, (Self, ContextError)> {
+    ) -> Result<OsMesaContext<ContextIsCurrent::No>, (Self, ContextError)> {
         match self.context.make_not_current() {
             Ok(()) => Ok(OsMesaContext {
                 context: self.context,
@@ -89,16 +95,18 @@ impl<CS: ContextCurrentState> OsMesaContext<CS> {
         }
     }
 
-    pub unsafe fn treat_as_current<CS2: PossiblyCurrentContextCurrentState>(
+    pub unsafe fn treat_as_current<IC2: ContextIsCurrentYesTrait>(
         self,
-    ) -> OsMesaContext<CS2> {
+    ) -> OsMesaContext<IC2> {
         OsMesaContext {
             context: self.context,
             phantom: PhantomData,
         }
     }
 
-    pub unsafe fn treat_as_not_current(self) -> OsMesaContext<NotCurrent> {
+    pub unsafe fn treat_as_not_current(
+        self,
+    ) -> OsMesaContext<ContextIsCurrent::No> {
         OsMesaContext {
             context: self.context,
             phantom: PhantomData,
@@ -113,36 +121,37 @@ impl<CS: ContextCurrentState> OsMesaContext<CS> {
     }
 }
 
+#[derive(Debug)]
 pub struct OsMesaBuffer {
-    pub(crate) surface: osmesa::OsMesaBuffer,
+    pub(crate) buffer: osmesa::OsMesaBuffer,
 }
 
 impl Surface for OsMesaBuffer {
     type Inner = osmesa::OsMesaBuffer;
 
     fn inner(&self) -> &Self::Inner {
-        &self.surface
+        &self.buffer
     }
     fn inner_mut(&mut self) -> &mut Self::Inner {
-        &mut self.surface
+        &mut self.buffer
     }
 
     fn get_pixel_format(&self) -> PixelFormat {
-        self.surface.get_pixel_format()
+        self.buffer.get_pixel_format()
     }
 
     fn is_current(&self) -> bool {
-        self.surface.is_current()
+        self.buffer.is_current()
     }
 }
 
 impl OsMesaBuffer {
-    pub fn new<CS: ContextCurrentState>(
-        ctx: &OsMesaContext<CS>,
+    pub fn new<IC: ContextIsCurrentTrait>(
+        ctx: &OsMesaContext<IC>,
         size: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
         let ctx = ctx.inner();
         osmesa::OsMesaBuffer::new(ctx, size)
-            .map(|surface| OsMesaBuffer { surface })
+            .map(|buffer| OsMesaBuffer { buffer })
     }
 }

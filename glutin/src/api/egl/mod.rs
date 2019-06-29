@@ -555,48 +555,51 @@ impl Context {
         })
     }
 
-    unsafe fn check_make_current(
+    unsafe fn make_current(
         &self,
-        ret: Option<u32>,
+        surface: ffi::egl::types::EGLSurface,
     ) -> Result<(), ContextError> {
         let egl = EGL.as_ref().unwrap();
-        if ret == Some(0) {
-            match egl.GetError() as u32 {
-                ffi::egl::CONTEXT_LOST => Err(ContextError::ContextLost),
-                err => panic!(
-                    "make_current: eglMakeCurrent failed (eglGetError returned 0x{:x})",
-                    err
-                ),
-            }
-        } else {
-            Ok(())
-        }
-    }
-
-    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        let egl = EGL.as_ref().unwrap();
-        let surface = if self.surface.is_null() {
-            ffi::egl::NO_SURFACE
-        } else {
-            self.surface
-        };
         let ret =
             egl.MakeCurrent(**self.display, surface, surface, self.context);
 
-        self.check_make_current(Some(ret))
+        check_make_current(Some(ret))
     }
 
+    #[inline]
+    pub unsafe fn make_current_surfaceless(&self) -> Result<(), ContextError> {
+        let egl = EGL.as_ref().unwrap();
+        let ret = egl.MakeCurrent(
+            **self.display,
+            ffi::egl::NO_SURFACE,
+            ffi::egl::NO_SURFACE,
+            self.context,
+        );
+
+        check_make_current(Some(ret))
+    }
+
+    #[inline]
+    pub unsafe fn make_current_window(
+        &self,
+        surface: &WindowSurface,
+    ) -> Result<(), ContextError> {
+        self.make_current(surface.surface)
+    }
+
+    #[inline]
+    pub unsafe fn make_current_pbuffer(
+        &self,
+        pbuffer: &PBuffer,
+    ) -> Result<(), ContextError> {
+        self.make_current(pbuffer.surface)
+    }
+
+    #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
         let egl = EGL.as_ref().unwrap();
 
-        let surface_eq = if let Some(surface) = self.surface {
-            egl.GetCurrentSurface(ffi::egl::DRAW as i32) == surface
-                || egl.GetCurrentSurface(ffi::egl::READ as i32) == surface
-        } else {
-            false
-        };
-
-        if surface_eq || egl.GetCurrentContext() == self.context {
+        if egl.GetCurrentContext() == self.context {
             let ret = egl.MakeCurrent(
                 **self.display,
                 ffi::egl::NO_SURFACE,
@@ -604,9 +607,9 @@ impl Context {
                 ffi::egl::NO_CONTEXT,
             );
 
-            self.check_make_current(Some(ret))
+            check_make_current(Some(ret))
         } else {
-            self.check_make_current(None)
+            check_make_current(None)
         }
     }
 
@@ -706,6 +709,23 @@ impl Context {
     #[inline]
     pub fn get_native_visual_id(&self) -> ffi::egl::types::EGLint {
         get_native_visual_id(**self.display, self.config_id)
+    }
+}
+
+unsafe fn check_make_current(
+    ret: Option<u32>,
+) -> Result<(), ContextError> {
+    let egl = EGL.as_ref().unwrap();
+    if ret == Some(0) {
+        match egl.GetError() as u32 {
+            ffi::egl::CONTEXT_LOST => Err(ContextError::ContextLost),
+            err => panic!(
+                "make_current: eglMakeCurrent failed (eglGetError returned 0x{:x})",
+                err
+            ),
+        }
+    } else {
+        Ok(())
     }
 }
 
@@ -857,12 +877,12 @@ pub fn get_native_visual_id(
 // ))]
 // }
 
-trait SurfaceTypeTrait {}
+pub trait SurfaceTypeTrait {}
 
 #[derive(Debug)]
-enum WindowSurfaceType {}
+pub enum WindowSurfaceType {}
 #[derive(Debug)]
-enum PBufferSurfaceType {}
+pub enum PBufferSurfaceType {}
 
 impl SurfaceTypeTrait for WindowSurfaceType {}
 impl SurfaceTypeTrait for PBufferSurfaceType {}
@@ -933,6 +953,27 @@ impl WindowSurface {
             Ok(())
         }
     }
+
+    #[inline]
+    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+        let egl = EGL.as_ref().unwrap();
+
+        if
+            egl.GetCurrentSurface(ffi::egl::DRAW as i32) == self.surface
+                || egl.GetCurrentSurface(ffi::egl::READ as i32) == self.surface {
+            let ret = egl.MakeCurrent(
+                **self.display,
+                ffi::egl::NO_SURFACE,
+                ffi::egl::NO_SURFACE,
+                ffi::egl::NO_CONTEXT,
+            );
+
+            check_make_current(Some(ret))
+        } else {
+            check_make_current(None)
+        }
+    }
+
 }
 
 impl PBuffer {
@@ -961,17 +1002,17 @@ impl PBuffer {
         ];
 
         let surface = unsafe {
-            let surface = egl.CreatePbufferSurface(
+            let pbuffer = egl.CreatePbufferSurface(
                 **ctx.display,
                 ctx.config_id,
                 attrs.as_ptr(),
             );
-            if surface.is_null() || surface == ffi::egl::NO_SURFACE {
+            if pbuffer.is_null() || pbuffer == ffi::egl::NO_SURFACE {
                 return Err(CreationError::OsError(
                     "eglCreatePbufferSurface failed".to_string(),
                 ));
             }
-            surface
+            pbuffer
         };
 
         Ok(PBuffer {
@@ -981,6 +1022,27 @@ impl PBuffer {
             phantom: PhantomData,
         })
     }
+
+    #[inline]
+    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+        let egl = EGL.as_ref().unwrap();
+
+        if
+            egl.GetCurrentSurface(ffi::egl::DRAW as i32) == self.surface
+                || egl.GetCurrentSurface(ffi::egl::READ as i32) == self.surface {
+            let ret = egl.MakeCurrent(
+                **self.display,
+                ffi::egl::NO_SURFACE,
+                ffi::egl::NO_SURFACE,
+                ffi::egl::NO_CONTEXT,
+            );
+
+            check_make_current(Some(ret))
+        } else {
+            check_make_current(None)
+        }
+    }
+
 }
 
 impl<T: SurfaceTypeTrait> EGLSurface<T> {

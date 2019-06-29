@@ -13,11 +13,11 @@ pub use winit::platform::android::*;
 use std::os::raw;
 
 impl<
-        CS: ContextCurrentState,
+        IC: ContextCurrentState,
         PBS: SupportsPBuffersTrait,
         WST: SupportsWindowSurfacesTrait,
         ST: SupportsSurfacelessTrait,
-    > ContextTraitExt for Context<CS, PBS, WST, ST>
+    > ContextTraitExt for Context<IC, PBS, WST, ST>
 {
     type Handle = EGLContext;
 

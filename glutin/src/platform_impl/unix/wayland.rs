@@ -90,11 +90,16 @@ impl WindowSurface {
     pub fn is_current(&self) -> bool {
         self.surface.is_current()
     }
+
+    #[inline]
+    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+        self.surface.make_not_current()
+    }
 }
 
 #[derive(Debug)]
 pub struct PBuffer {
-    surface: egl::PBuffer,
+    pbuffer: egl::PBuffer,
 }
 
 impl PBuffer {
@@ -105,17 +110,22 @@ impl PBuffer {
         size: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
         egl::PBuffer::new_pbuffer(el, &ctx.context, size)
-            .map(|surface| PBuffer { surface })
+            .map(|pbuffer| PBuffer { pbuffer })
     }
 
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
-        self.surface.get_pixel_format()
+        self.pbuffer.get_pixel_format()
     }
 
     #[inline]
     pub fn is_current(&self) -> bool {
-        self.surface.is_current()
+        self.pbuffer.is_current()
+    }
+
+    #[inline]
+    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+        self.pbuffer.make_not_current()
     }
 }
 
@@ -180,8 +190,24 @@ impl Context {
     }
 
     #[inline]
-    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        self.context.make_current()
+    pub unsafe fn make_current_surfaceless(&self) -> Result<(), ContextError> {
+        self.context.make_current_surfaceless()
+    }
+
+    #[inline]
+    pub unsafe fn make_current_window(
+        &self,
+        surface: &WindowSurface,
+    ) -> Result<(), ContextError> {
+        self.context.make_current_window(&surface.surface)
+    }
+
+    #[inline]
+    pub unsafe fn make_current_pbuffer(
+        &self,
+        pbuffer: &PBuffer,
+    ) -> Result<(), ContextError> {
+        self.context.make_current_pbuffer(&pbuffer.pbuffer)
     }
 
     #[inline]

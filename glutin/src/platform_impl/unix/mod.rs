@@ -11,9 +11,8 @@ mod wayland;
 
 // use self::x11::X11Context;
 use crate::{
-    Api, ContextBuilderWrapper, ContextCurrentState, ContextError,
-    CreationError, GlAttributes, NotCurrent, PixelFormat,
-    PixelFormatRequirements,
+    Api, ContextBuilderWrapper, ContextError, CreationError, GlAttributes,
+    PixelFormat, PixelFormatRequirements,
 };
 // pub use self::x11::utils as x11_utils;
 
@@ -38,7 +37,7 @@ pub enum RawHandle {
 
 #[derive(Debug)]
 pub enum ContextType {
-    X11,
+    //X11,
     Wayland,
 }
 
@@ -121,16 +120,40 @@ impl Context {
     }
 
     #[inline]
-    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        match *self {
-            // Context::X11(ref ctx) => ctx.make_current(),
-            Context::Wayland(ref ctx) => ctx.make_current(),
+    pub unsafe fn make_current_surfaceless(&self) -> Result<(), ContextError> {
+        match self {
+            // Context::X11(ref ctx) => ctx.make_current_surfaceless(),
+            Context::Wayland(ref ctx) => ctx.make_current_surfaceless(),
+        }
+    }
+
+    #[inline]
+    pub unsafe fn make_current_window(
+        &self,
+        surface: &WindowSurface,
+    ) -> Result<(), ContextError> {
+        match (self, surface) {
+            (Context::Wayland(ref ctx), WindowSurface::Wayland(ref surface)) => {
+                ctx.make_current_window(surface)
+            }
+        }
+    }
+
+    #[inline]
+    pub unsafe fn make_current_pbuffer(
+        &self,
+        pbuffer: &PBuffer,
+    ) -> Result<(), ContextError> {
+        match (self, pbuffer) {
+            (Context::Wayland(ref ctx), PBuffer::Wayland(ref pbuffer)) => {
+                ctx.make_current_pbuffer(pbuffer)
+            }
         }
     }
 
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
-        match *self {
+        match self {
             // Context::X11(ref ctx) => ctx.make_not_current(),
             Context::Wayland(ref ctx) => ctx.make_not_current(),
         }
@@ -138,7 +161,7 @@ impl Context {
 
     #[inline]
     pub fn is_current(&self) -> bool {
-        match *self {
+        match self {
             // Context::X11(ref ctx) => ctx.is_current(),
             Context::Wayland(ref ctx) => ctx.is_current(),
         }
@@ -146,7 +169,7 @@ impl Context {
 
     #[inline]
     pub fn get_api(&self) -> Api {
-        match *self {
+        match self {
             // Context::X11(ref ctx) => ctx.get_api(),
             Context::Wayland(ref ctx) => ctx.get_api(),
         }
@@ -154,7 +177,7 @@ impl Context {
 
     #[inline]
     pub unsafe fn raw_handle(&self) -> RawHandle {
-        match *self {
+        match self {
             // Context::X11(ref ctx) => match *ctx.raw_handle() {
             //    X11Context::Glx(ref ctx) => RawHandle::Glx(ctx.raw_handle()),
             //    X11Context::Egl(ref ctx) => RawHandle::Egl(ctx.raw_handle()),
@@ -165,7 +188,7 @@ impl Context {
 
     #[inline]
     pub unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
-        match *self {
+        match self {
             // Context::X11(ref ctx) => ctx.get_egl_display(),
             Context::Wayland(ref ctx) => ctx.get_egl_display(),
             _ => None,
@@ -174,7 +197,7 @@ impl Context {
 
     #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const () {
-        match *self {
+        match self {
             // Context::X11(ref ctx) => ctx.get_proc_address(addr),
             Context::Wayland(ref ctx) => ctx.get_proc_address(addr),
         }
@@ -223,10 +246,10 @@ impl WindowSurface {
     ) -> Result<(Self, Window), CreationError> {
         match ctx {
             // Context::X11(ref ctx) => x11::WindowSurface::new(el, ctx, wb)
-            //    .map(|(ws, win)| (WindowSurface::X11(ws), win)),
+            //    .map(|(surface, win)| (WindowSurface::X11(surface), win)),
             Context::Wayland(ref ctx) => {
                 wayland::WindowSurface::new(el, ctx, wb)
-                    .map(|(ws, win)| (WindowSurface::Wayland(ws), win))
+                    .map(|(surface, win)| (WindowSurface::Wayland(surface), win))
             }
         }
     }
@@ -234,32 +257,40 @@ impl WindowSurface {
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         match self {
-            // WindowSurface::X11(ws) => ws.get_pixel_format(),
-            WindowSurface::Wayland(ws) => ws.get_pixel_format(),
+            // WindowSurface::X11(surface) => surface.get_pixel_format(),
+            WindowSurface::Wayland(surface) => surface.get_pixel_format(),
         }
     }
 
     #[inline]
     pub fn is_current(&self) -> bool {
         match self {
-            // WindowSurface::X11(ws) => ws.is_current(),
-            WindowSurface::Wayland(ws) => ws.is_current(),
+            // WindowSurface::X11(surface) => surface.is_current(),
+            WindowSurface::Wayland(surface) => surface.is_current(),
         }
     }
 
     #[inline]
     pub fn update_after_resize(&self, size: dpi::PhysicalSize) {
         match self {
-            WindowSurface::Wayland(ref ws) => ws.update_after_resize(size),
+            WindowSurface::Wayland(ref surface) => surface.update_after_resize(size),
             _ => (),
         }
     }
 
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
-        match *self {
-            // WindowSurface::X11(ref ws) => ws.swap_buffers(),
-            WindowSurface::Wayland(ref ws) => ws.swap_buffers(),
+        match self {
+            // WindowSurface::X11(ref surface) => surface.swap_buffers(),
+            WindowSurface::Wayland(ref surface) => surface.swap_buffers(),
+        }
+    }
+
+    #[inline]
+    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+        match self {
+            // WindowSurface::X11(ref ctx) => ctx.make_not_current(),
+            WindowSurface::Wayland(ref ctx) => ctx.make_not_current(),
         }
     }
 }
@@ -279,26 +310,34 @@ impl PBuffer {
     ) -> Result<Self, CreationError> {
         match ctx {
             // Context::X11(ref ctx) => {
-            //    x11::PBuffer::new(el, ctx, size).map(|pb| PBuffer::X11(pb))
+            //    x11::PBuffer::new(el, ctx, size).map(|pbuffer| PBuffer::X11(pbuffer))
             //}
             Context::Wayland(ref ctx) => wayland::PBuffer::new(el, ctx, size)
-                .map(|pb| PBuffer::Wayland(pb)),
+                .map(|pbuffer| PBuffer::Wayland(pbuffer)),
         }
     }
 
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         match self {
-            // PBuffer::X11(pb) => pb.get_pixel_format(),
-            PBuffer::Wayland(pb) => pb.get_pixel_format(),
+            // PBuffer::X11(pbuffer) => pbuffer.get_pixel_format(),
+            PBuffer::Wayland(pbuffer) => pbuffer.get_pixel_format(),
         }
     }
 
     #[inline]
     pub fn is_current(&self) -> bool {
         match self {
-            // PBuffer::X11(pb) => pb.is_current(),
-            PBuffer::Wayland(pb) => pb.is_current(),
+            // PBuffer::X11(pbuffer) => pbuffer.is_current(),
+            PBuffer::Wayland(pbuffer) => pbuffer.is_current(),
+        }
+    }
+
+    #[inline]
+    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+        match self {
+            // PBuffer::X11(ref ctx) => ctx.make_not_current(),
+            PBuffer::Wayland(ref ctx) => ctx.make_not_current(),
         }
     }
 }

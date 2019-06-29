@@ -12,7 +12,7 @@ pub mod osmesa;
 use crate::platform::ContextTraitExt;
 pub use crate::platform_impl::{PlatformAttributes, RawHandle};
 use crate::{
-    Context, ContextCurrentState, SupportsPBuffersTrait,
+    Context, ContextIsCurrentTrait, SupportsPBuffersTrait,
     SupportsSurfacelessTrait, SupportsWindowSurfacesTrait,
 };
 pub use glutin_egl_sys::EGLContext;
@@ -24,11 +24,11 @@ pub use winit::platform::unix::*;
 use std::os::raw;
 
 impl<
-        CS: ContextCurrentState,
+        IC: ContextIsCurrentTrait,
         PBS: SupportsPBuffersTrait,
         WST: SupportsWindowSurfacesTrait,
         ST: SupportsSurfacelessTrait,
-    > ContextTraitExt for Context<CS, PBS, WST, ST>
+    > ContextTraitExt for Context<IC, PBS, WST, ST>
 {
     type Handle = RawHandle;
 
