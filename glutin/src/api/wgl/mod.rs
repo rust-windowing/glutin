@@ -721,10 +721,8 @@ unsafe fn choose_arb_pixel_format_id(
                 gl::wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as raw::c_int,
             );
             out.push(pf_reqs.srgb as raw::c_int);
-        } else {
-            if pf_reqs.srgb {
-                return Err(());
-            }
+        } else if pf_reqs.srgb {
+            return Err(());
         }
 
         match pf_reqs.release_behavior {
