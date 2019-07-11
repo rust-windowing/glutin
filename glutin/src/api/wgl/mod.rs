@@ -701,28 +701,28 @@ unsafe fn choose_arb_pixel_format_id(
         out.push(gl::wgl_extra::STEREO_ARB as raw::c_int);
         out.push(if pf_reqs.stereoscopy { 1 } else { 0 });
 
-        if pf_reqs.srgb {
-            if extensions
-                .split(' ')
-                .find(|&i| i == "WGL_ARB_framebuffer_sRGB")
-                .is_some()
-            {
-                out.push(
-                    gl::wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as raw::c_int,
-                );
-                out.push(1);
-            } else if extensions
-                .split(' ')
-                .find(|&i| i == "WGL_EXT_framebuffer_sRGB")
-                .is_some()
-            {
-                out.push(
-                    gl::wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as raw::c_int,
-                );
-                out.push(1);
-            } else {
-                return Err(());
-            }
+        // WGL_*_FRAMEBUFFER_SRGB might be assumed to be true if not listed;
+        // so it's best to list it out and set its value as necessary.
+        if extensions
+            .split(' ')
+            .find(|&i| i == "WGL_ARB_framebuffer_sRGB")
+            .is_some()
+        {
+            out.push(
+                gl::wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as raw::c_int,
+            );
+            out.push(pf_reqs.srgb as raw::c_int);
+        } else if extensions
+            .split(' ')
+            .find(|&i| i == "WGL_EXT_framebuffer_sRGB")
+            .is_some()
+        {
+            out.push(
+                gl::wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as raw::c_int,
+            );
+            out.push(pf_reqs.srgb as raw::c_int);
+        } else if pf_reqs.srgb {
+            return Err(());
         }
 
         match pf_reqs.release_behavior {

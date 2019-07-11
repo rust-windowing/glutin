@@ -1,8 +1,18 @@
 # Unreleased
 
+- Fixed attribute handling for sRGB in WGL.
+
 # Version 0.22.0-alpha1 (2019-06-21)
 
 - Update winit dependency to 0.20.0-alpha1. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/blob/master/CHANGELOG.md#0200-alpha-1) for more info.
+
+# Version 0.21.0 (2019-04-20)
+
+ - Bumped dependencies, fixed docs.
+
+# Version 0.21.0-rc3 (2019-04-13)
+
+ - Bumped dependencies.
 
 # Version 0.21.0-rc2 (2019-04-08)
 
