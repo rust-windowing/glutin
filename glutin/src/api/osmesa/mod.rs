@@ -262,11 +262,6 @@ impl OsMesaBuffer {
     }
 
     #[inline]
-    pub fn is_current(&self) -> bool {
-        panic!("This cannot be implemented with OsMesa.")
-    }
-
-    #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         unimplemented!()
     }

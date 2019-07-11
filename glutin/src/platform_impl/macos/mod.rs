@@ -21,7 +21,7 @@ use objc::runtime::{BOOL, NO};
 use crate::platform::macos::WindowExtMacOS;
 use winit;
 use winit::dpi;
-use winit::event_loop::EventLoop;
+use winit::event_loop::EventLoopWindowTarget;
 use winit::window::{Window, WindowBuilder};
 
 use std::ops::Deref;
@@ -52,7 +52,7 @@ impl Context {
     #[inline]
     pub fn new_windowed<T>(
         wb: WindowBuilder,
-        el: &EventLoop<T>,
+        el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<(Window, Self), CreationError> {
@@ -165,7 +165,7 @@ impl Context {
 
     #[inline]
     pub fn new_headless<T>(
-        _el: &EventLoop<T>,
+        _el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         _size: dpi::PhysicalSize,

@@ -1,7 +1,8 @@
 use super::*;
 
+use std::convert::AsRef;
 use std::marker::PhantomData;
-use winit::event_loop::EventLoop;
+use winit::event_loop::EventLoopWindowTarget;
 use winit::window::{Window, WindowBuilder};
 
 #[allow(non_snake_case)]
@@ -29,6 +30,8 @@ pub use SurfaceInUse::SurfaceInUseTrait;
 
 pub trait Surface {
     type Inner;
+    type NotInUseType: Surface;
+    type PossiblyInUseType: Surface;
 
     fn inner(&self) -> &Self::Inner;
     fn inner_mut(&mut self) -> &mut Self::Inner;
@@ -36,6 +39,12 @@ pub trait Surface {
     fn get_pixel_format(&self) -> PixelFormat;
 
     fn is_current(&self) -> bool;
+
+    unsafe fn treat_as_not_current(self) -> Self::NotInUseType;
+
+    unsafe fn treat_as_current(self) -> Self::PossiblyInUseType;
+
+    unsafe fn make_not_current(self) -> Result<Self::NotInUseType, (Self::PossiblyInUseType, ContextError)>;
 }
 
 pub type WindowSurface<IU> = WindowSurfaceWrapper<Window, IU>;
@@ -50,6 +59,8 @@ pub struct WindowSurfaceWrapper<W, IU: SurfaceInUseTrait> {
 
 impl<W, IU: SurfaceInUseTrait> Surface for WindowSurfaceWrapper<W, IU> {
     type Inner = platform_impl::WindowSurface;
+    type NotInUseType = WindowSurfaceWrapper<W, SurfaceInUse::No>;
+    type PossiblyInUseType = WindowSurfaceWrapper<W, SurfaceInUse::Possibly>;
 
     fn inner(&self) -> &Self::Inner {
         &self.surface
@@ -65,21 +76,49 @@ impl<W, IU: SurfaceInUseTrait> Surface for WindowSurfaceWrapper<W, IU> {
     fn is_current(&self) -> bool {
         self.surface.is_current()
     }
+
+    unsafe fn treat_as_not_current(self) -> Self::NotInUseType {
+        WindowSurfaceWrapper {
+            surface: self.surface,
+            window: self.window,
+            phantom: PhantomData,
+        }
+    }
+
+    unsafe fn treat_as_current(self) -> Self::PossiblyInUseType {
+        WindowSurfaceWrapper {
+            surface: self.surface,
+            window: self.window,
+            phantom: PhantomData,
+        }
+    }
+
+    unsafe fn make_not_current(self) -> Result<Self::NotInUseType, (Self::PossiblyInUseType, ContextError)> {
+        match self.surface.make_not_current() {
+            Ok(()) => Ok(WindowSurfaceWrapper {
+                surface: self.surface,
+                window: self.window,
+                phantom: PhantomData,
+            }),
+            Err(err) => Err((Surface::treat_as_current(self), err)),
+        }
+    }
 }
 
 impl<IU: SurfaceInUseTrait> WindowSurface<IU> {
     pub fn new<
+        'a,
         TE,
-        IC: ContextIsCurrentTrait,
-        PBT: SupportsPBuffersTrait,
-        ST: SupportsSurfacelessTrait,
+        IC: ContextIsCurrentTrait + 'a,
+        PBT: SupportsPBuffersTrait + 'a,
+        ST: SupportsSurfacelessTrait + 'a,
+        CTX: Into<&'a SplitContext<IC, PBT, SupportsWindowSurfaces::Yes, ST>>,
     >(
-        el: &EventLoop<TE>,
-        ctx: &Context<IC, PBT, SupportsWindowSurfaces::Yes, ST>,
+        el: &EventLoopWindowTarget<TE>,
+        ctx: CTX,
         wb: WindowBuilder,
     ) -> Result<WindowSurface<SurfaceInUse::No>, CreationError> {
-        let ctx = ctx.inner();
-        platform_impl::WindowSurface::new(el, ctx, wb).map(
+        platform_impl::WindowSurface::new(el, ctx.into().inner(), wb).map(
             |(surface, window)| WindowSurface {
                 surface,
                 window,
@@ -147,44 +186,6 @@ impl<IU: SurfaceInUseTrait> WindowSurface<IU> {
     }
 }
 
-impl<W, IU: SurfaceInUseTrait> WindowSurfaceWrapper<W, IU> {
-    pub unsafe fn make_not_current(
-        self,
-    ) -> Result<WindowSurfaceWrapper<W, SurfaceInUse::No>, (Self, ContextError)>
-    {
-        match self.surface.make_not_current() {
-            Ok(()) => Ok(WindowSurfaceWrapper {
-                surface: self.surface,
-                window: self.window,
-                phantom: PhantomData,
-            }),
-            Err(err) => Err((self, err)),
-        }
-    }
-
-    pub unsafe fn treat_as_current(
-        self,
-    ) -> WindowSurfaceWrapper<W, SurfaceInUse::Possibly>
-    {
-        WindowSurfaceWrapper {
-            surface: self.surface,
-            window: self.window,
-            phantom: PhantomData,
-        }
-    }
-
-    pub unsafe fn treat_as_not_current(
-        self,
-    ) -> WindowSurfaceWrapper<W, SurfaceInUse::No>
-    {
-        WindowSurfaceWrapper {
-            surface: self.surface,
-            window: self.window,
-            phantom: PhantomData,
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct PBuffer<IU: SurfaceInUseTrait> {
     pub(crate) pbuffer: platform_impl::PBuffer,
@@ -193,6 +194,8 @@ pub struct PBuffer<IU: SurfaceInUseTrait> {
 
 impl<IU: SurfaceInUseTrait> Surface for PBuffer<IU> {
     type Inner = platform_impl::PBuffer;
+    type NotInUseType = PBuffer<SurfaceInUse::No>;
+    type PossiblyInUseType = PBuffer<SurfaceInUse::Possibly>;
 
     fn inner(&self) -> &Self::Inner {
         &self.pbuffer
@@ -208,56 +211,51 @@ impl<IU: SurfaceInUseTrait> Surface for PBuffer<IU> {
     fn is_current(&self) -> bool {
         self.pbuffer.is_current()
     }
-}
 
-impl<IU: SurfaceInUseTrait> PBuffer<IU> {
-    pub fn new<
-        TE,
-        IC: ContextIsCurrentTrait,
-        WST: SupportsWindowSurfacesTrait,
-        ST: SupportsSurfacelessTrait,
-    >(
-        el: &EventLoop<TE>,
-        ctx: &Context<IC, SupportsPBuffers::Yes, WST, ST>,
-        size: dpi::PhysicalSize,
-    ) -> Result<PBuffer<SurfaceInUse::No>, CreationError> {
-        let ctx = ctx.inner();
-        platform_impl::PBuffer::new(el, ctx, size).map(|pbuffer| PBuffer {
-            pbuffer,
+    unsafe fn treat_as_not_current(self) -> Self::NotInUseType {
+        PBuffer {
+            pbuffer: self.pbuffer,
             phantom: PhantomData,
-        })
+        }
     }
 
-    pub unsafe fn make_not_current(
-        self,
-    ) -> Result<PBuffer<SurfaceInUse::No>, (Self, ContextError)> {
+    unsafe fn treat_as_current(self) -> Self::PossiblyInUseType {
+        PBuffer {
+            pbuffer: self.pbuffer,
+            phantom: PhantomData,
+        }
+    }
+
+    unsafe fn make_not_current(self) -> Result<Self::NotInUseType, (Self::PossiblyInUseType, ContextError)> {
         match self.pbuffer.make_not_current() {
             Ok(()) => Ok(PBuffer {
                 pbuffer: self.pbuffer,
                 phantom: PhantomData,
             }),
-            Err(err) => Err((self, err)),
+            Err(err) => Err((Surface::treat_as_current(self), err)),
         }
     }
+}
 
-    pub unsafe fn treat_as_current(
-        self,
-    ) -> PBuffer<SurfaceInUse::Possibly>
-    {
-        PBuffer {
-            pbuffer: self.pbuffer,
-            phantom: PhantomData,
-        }
-    }
-
-    pub unsafe fn treat_as_not_current(
-        self,
-    ) -> PBuffer<SurfaceInUse::No>
-    {
-        PBuffer {
-            pbuffer: self.pbuffer,
-            phantom: PhantomData,
-        }
+impl<IU: SurfaceInUseTrait> PBuffer<IU> {
+    pub fn new<
+        'a,
+        TE,
+        IC: ContextIsCurrentTrait + 'a,
+        WST: SupportsWindowSurfacesTrait + 'a,
+        ST: SupportsSurfacelessTrait + 'a,
+        CTX: Into<&'a SplitContext<IC, SupportsPBuffers::Yes, WST, ST>>,
+    >(
+        el: &EventLoopWindowTarget<TE>,
+        ctx: CTX,
+        size: dpi::PhysicalSize,
+    ) -> Result<PBuffer<SurfaceInUse::No>, CreationError> {
+        platform_impl::PBuffer::new(el, ctx.into().inner(), size).map(
+            |pbuffer| PBuffer {
+                pbuffer,
+                phantom: PhantomData,
+            },
+        )
     }
 }
 

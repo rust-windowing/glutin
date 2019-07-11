@@ -15,7 +15,7 @@ use glutin_egl_sys as ffi;
 use winapi::shared::windef::{HGLRC, HWND};
 use winit;
 use winit::dpi;
-use winit::event_loop::EventLoop;
+use winit::event_loop::EventLoopWindowTarget;
 use winit::window::{Window, WindowBuilder};
 
 use std::marker::PhantomData;
@@ -48,7 +48,7 @@ impl Context {
     #[inline]
     pub fn new_windowed<T>(
         wb: WindowBuilder,
-        el: &EventLoop<T>,
+        el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Self>,
     ) -> Result<(Window, Self), CreationError> {
@@ -147,7 +147,7 @@ impl Context {
 
     #[inline]
     pub fn new_headless<T>(
-        el: &EventLoop<T>,
+        el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: dpi::PhysicalSize,

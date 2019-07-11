@@ -9,19 +9,18 @@
 //! Due to some operating-system-specific quirks, glutin prefers control over
 //! the order of creation of the [`Context`] and [`Window`]. Here is an example
 //! of building a [`WindowedContext<T>`]:
-//!
-//! ```no_run
-//! # fn main() {
-//! let el = glutin::event_loop::EventLoop::new();
-//! let wb = glutin::window::WindowBuilder::new()
-//!     .with_title("Hello world!")
-//!     .with_inner_size(glutin::dpi::LogicalSize::new(1024.0, 768.0));
-//! let windowed_context = glutin::ContextBuilder::new()
-//!     .build_windowed(wb, &el)
-//!     .unwrap();
-//! # }
-//! ```
-//!
+// //! ```no_run
+// //! # fn main() {
+// //! let el = glutin::event_loop::EventLoop::new();
+// //! let wb = glutin::window::WindowBuilder::new()
+// //!     .with_title("Hello world!")
+// //!     .with_inner_size(glutin::dpi::LogicalSize::new(1024.0, 768.0));
+// //! let windowed_context = glutin::ContextBuilder::new()
+// //!     .build_windowed(wb, &el)
+// //!     .unwrap();
+// //! # }
+// //! ```
+// FIXME update
 //! You can, of course, create a [`RawContext<T>`] separately from an existing
 //! window, however that may result in an suboptimal configuration of the window
 //! on some platforms. In that case use the unsafe platform-specific
@@ -110,15 +109,19 @@ extern crate log;
 ))]
 #[macro_use]
 extern crate derivative;
+#[macro_use]
+extern crate bitflags;
 
 pub mod platform;
 
 mod api;
 mod context;
 mod platform_impl;
+mod split_context;
 mod surface;
 
 pub use crate::context::*;
+pub use crate::split_context::*;
 pub use crate::surface::*;
 pub use winit::*;
 
@@ -145,9 +148,8 @@ pub struct ContextBuilderWrapper<T> {
     pub plat_attr: platform_impl::PlatformAttributes,
 }
 
-pub type ContextBuilder<
-    'a, IC, PBS, WST, ST
-> = ContextBuilderWrapper<&'a Context<IC, PBS, WST, ST>>;
+pub type ContextBuilder<'a, IC, PBT, WST, ST> =
+    ContextBuilderWrapper<&'a SplitContext<IC, PBT, WST, ST>>;
 
 impl<S> ContextBuilderWrapper<S> {
     /// Turns the `sharing` parameter into another type by calling a closure.
@@ -186,10 +188,10 @@ impl<'a>
 impl<
         'a,
         IC: ContextIsCurrentTrait,
-        PBS: SupportsPBuffersTrait,
+        PBT: SupportsPBuffersTrait,
         WST: SupportsWindowSurfacesTrait,
         ST: SupportsSurfacelessTrait,
-    > ContextBuilder<'a, IC, PBS, WST, ST>
+    > ContextBuilder<'a, IC, PBT, WST, ST>
 {
     /// Sets how the backend should choose the OpenGL API and version.
     #[inline]
@@ -246,15 +248,16 @@ impl<
     #[inline]
     pub fn with_shared_lists<
         IC2: ContextIsCurrentTrait,
-        PBS2: SupportsPBuffersTrait,
+        PBT2: SupportsPBuffersTrait,
         WST2: SupportsWindowSurfacesTrait,
         ST2: SupportsSurfacelessTrait,
+        OTHER: Into<&'a SplitContext<IC2, PBT2, WST2, ST2>>,
     >(
         self,
-        other: &'a Context<IC2, PBS2, WST2, ST2>,
-    ) -> ContextBuilder<'a, IC2, PBS2, WST2, ST2> {
+        other: OTHER,
+    ) -> ContextBuilder<'a, IC2, PBT2, WST2, ST2> {
         ContextBuilder {
-            gl_attr: self.gl_attr.set_sharing(Some(other)),
+            gl_attr: self.gl_attr.set_sharing(Some(other.into())),
             pf_reqs: self.pf_reqs,
             plat_attr: self.plat_attr,
         }
@@ -805,19 +808,3 @@ impl<S> Default for GlAttributes<S> {
         }
     }
 }
-
-trait FailToCompileIfNotSendSync
-where
-    Self: Send + Sync,
-{
-}
-impl<
-        PBT: SupportsPBuffersTrait,
-        WST: SupportsWindowSurfacesTrait,
-        ST: SupportsSurfacelessTrait,
-    > FailToCompileIfNotSendSync for Context<ContextIsCurrent::No, PBT, WST, ST>
-{
-}
-impl FailToCompileIfNotSendSync for WindowSurface<SurfaceInUse::No> {}
-impl FailToCompileIfNotSendSync for RawWindowSurface<SurfaceInUse::No> {}
-impl FailToCompileIfNotSendSync for PBuffer<SurfaceInUse::No> {}

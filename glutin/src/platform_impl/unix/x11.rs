@@ -16,7 +16,7 @@ use crate::{
 use glutin_glx_sys as ffi;
 use winit;
 use winit::dpi;
-use winit::event_loop::EventLoop;
+use winit::event_loop::EventLoopWindowTarget;
 use winit::window::{Window, WindowBuilder};
 
 use std::ops::{Deref, DerefMut};
@@ -186,7 +186,7 @@ impl Context {
 
     // #[inline]
     // pub fn new_headless<T>(
-    // el: &EventLoop<T>,
+    // el: &EventLoopWindowTarget<T>,
     // pf_reqs: &PixelFormatRequirements,
     // gl_attr: &GlAttributes<&Context>,
     // plat_attr: &PlatformAttributes,
@@ -205,7 +205,7 @@ impl Context {
     // }
     //
     // fn new_headless_impl<T>(
-    // el: &EventLoop<T>,
+    // el: &EventLoopWindowTarget<T>,
     // pf_reqs: &PixelFormatRequirements,
     // gl_attr: &GlAttributes<&Context>,
     // plat_attr: &PlatformAttributes,
@@ -450,7 +450,7 @@ impl Context {
 
     #[inline]
     pub fn new<T>(
-        el: &EventLoop<T>,
+        el: &EventLoopWindowTarget<T>,
         cb: ContextBuilderWrapper<&Context>,
         pbuffer_support: bool,
         window_surface_support: bool,
@@ -469,7 +469,7 @@ impl Context {
     }
 
     fn new_impl<T>(
-        el: &EventLoop<T>,
+        el: &EventLoopWindowTarget<T>,
         cb: &ContextBuilderWrapper<&Context>,
         pbuffer_support: bool,
         window_surface_support: bool,

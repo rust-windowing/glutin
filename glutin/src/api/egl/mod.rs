@@ -62,9 +62,9 @@ pub use self::egl::Egl;
 use self::make_current_guard::MakeCurrentGuard;
 use crate::platform_impl::PlatformAttributes;
 use crate::{
-    Api, ContextBuilderWrapper, ContextError, CreationError, GlAttributes,
-    GlRequest, PixelFormat, PixelFormatRequirements, ReleaseBehavior,
-    Robustness,
+    Api, ContextBuilderWrapper, ContextError, ContextSupports, CreationError,
+    GlAttributes, GlRequest, PixelFormat, PixelFormatRequirements,
+    ReleaseBehavior, Robustness,
 };
 
 use glutin_egl_sys as ffi;
@@ -79,7 +79,7 @@ use parking_lot::Mutex;
     target_os = "openbsd",
 ))]
 use winit::dpi;
-use winit::event_loop::EventLoop;
+use winit::event_loop::EventLoopWindowTarget;
 
 use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
@@ -387,14 +387,6 @@ fn get_native_display(native_display: &NativeDisplay) -> *const raw::c_void {
     }
 }
 
-#[allow(dead_code)] // Not all platforms use all
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub enum SurfaceType {
-    PBuffer,
-    Window,
-    Surfaceless,
-}
-
 impl Context {
     /// Start building an EGL context.
     ///
@@ -402,10 +394,10 @@ impl Context {
     ///
     /// To finish the process, you must call `.finish(window)` on the
     /// `ContextPrototype`.
-    pub fn new<'a, F>(
+    pub(crate) fn new<'a, F>(
         cb: &'a ContextBuilderWrapper<&'a Context>,
         native_display: NativeDisplay,
-        surface_type: SurfaceType,
+        ctx_supports: ContextSupports,
         config_selector: F,
     ) -> Result<Context, CreationError>
     where
@@ -441,6 +433,19 @@ impl Context {
             vec![]
         };
 
+        // FIXME: Also check for the GL_OES_surfaceless_context *CONTEXT*
+        // extension
+        if ctx_supports.contains(ContextSupports::SURFACELESS)
+            && extensions
+                .iter()
+                .find(|s| s == &"EGL_KHR_surfaceless_context")
+                .is_none()
+        {
+            return Err(CreationError::NotSupported(
+                "EGL surfaceless not supported".to_string(),
+            ));
+        }
+
         // binding the right API and choosing the version
         let (version, api) =
             unsafe { bind_and_get_api(&cb.gl_attr, egl_version)? };
@@ -452,7 +457,7 @@ impl Context {
                 api,
                 version,
                 cb,
-                surface_type,
+                ctx_supports,
                 config_selector,
             )?
         };
@@ -712,9 +717,7 @@ impl Context {
     }
 }
 
-unsafe fn check_make_current(
-    ret: Option<u32>,
-) -> Result<(), ContextError> {
+unsafe fn check_make_current(ret: Option<u32>) -> Result<(), ContextError> {
     let egl = EGL.as_ref().unwrap();
     if ret == Some(0) {
         match egl.GetError() as u32 {
@@ -841,42 +844,6 @@ pub fn get_native_visual_id(
     value
 }
 
-// impl<'a> ContextPrototype<'a> {
-// #[cfg(any(
-// target_os = "linux",
-// target_os = "dragonfly",
-// target_os = "freebsd",
-// target_os = "netbsd",
-// target_os = "openbsd",
-// ))]
-// pub fn finish_surfaceless(self) -> Result<Context, CreationError> {
-// FIXME: Also check for the GL_OES_surfaceless_context *CONTEXT*
-// extension
-// if self
-// .extensions
-// .iter()
-// .find(|s| s == &"EGL_KHR_surfaceless_context")
-// .is_none()
-// {
-// Err(CreationError::NotSupported(
-// "EGL surfaceless not supported".to_string(),
-// ))
-// } else {
-// self.finish_impl(None)
-// }
-// }
-//
-// #[cfg(any(
-// target_os = "android",
-// target_os = "windows",
-// target_os = "linux",
-// target_os = "dragonfly",
-// target_os = "freebsd",
-// target_os = "netbsd",
-// target_os = "openbsd",
-// ))]
-// }
-
 pub trait SurfaceTypeTrait {}
 
 #[derive(Debug)]
@@ -901,7 +868,7 @@ pub struct EGLSurface<T: SurfaceTypeTrait> {
 impl WindowSurface {
     #[inline]
     pub fn new_window_surface<T>(
-        el: &EventLoop<T>,
+        el: &EventLoopWindowTarget<T>,
         ctx: &Context,
         nwin: ffi::EGLNativeWindowType,
     ) -> Result<Self, CreationError> {
@@ -953,33 +920,12 @@ impl WindowSurface {
             Ok(())
         }
     }
-
-    #[inline]
-    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
-        let egl = EGL.as_ref().unwrap();
-
-        if
-            egl.GetCurrentSurface(ffi::egl::DRAW as i32) == self.surface
-                || egl.GetCurrentSurface(ffi::egl::READ as i32) == self.surface {
-            let ret = egl.MakeCurrent(
-                **self.display,
-                ffi::egl::NO_SURFACE,
-                ffi::egl::NO_SURFACE,
-                ffi::egl::NO_CONTEXT,
-            );
-
-            check_make_current(Some(ret))
-        } else {
-            check_make_current(None)
-        }
-    }
-
 }
 
 impl PBuffer {
     #[inline]
     pub fn new_pbuffer<T>(
-        _el: &EventLoop<T>,
+        _el: &EventLoopWindowTarget<T>,
         ctx: &Context,
         size: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
@@ -1022,27 +968,6 @@ impl PBuffer {
             phantom: PhantomData,
         })
     }
-
-    #[inline]
-    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
-        let egl = EGL.as_ref().unwrap();
-
-        if
-            egl.GetCurrentSurface(ffi::egl::DRAW as i32) == self.surface
-                || egl.GetCurrentSurface(ffi::egl::READ as i32) == self.surface {
-            let ret = egl.MakeCurrent(
-                **self.display,
-                ffi::egl::NO_SURFACE,
-                ffi::egl::NO_SURFACE,
-                ffi::egl::NO_CONTEXT,
-            );
-
-            check_make_current(Some(ret))
-        } else {
-            check_make_current(None)
-        }
-    }
-
 }
 
 impl<T: SurfaceTypeTrait> EGLSurface<T> {
@@ -1058,6 +983,26 @@ impl<T: SurfaceTypeTrait> EGLSurface<T> {
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         self.pixel_format.clone()
+    }
+
+    #[inline]
+    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+        let egl = EGL.as_ref().unwrap();
+
+        if egl.GetCurrentSurface(ffi::egl::DRAW as i32) == self.surface
+            || egl.GetCurrentSurface(ffi::egl::READ as i32) == self.surface
+        {
+            let ret = egl.MakeCurrent(
+                **self.display,
+                ffi::egl::NO_SURFACE,
+                ffi::egl::NO_SURFACE,
+                ffi::egl::NO_CONTEXT,
+            );
+
+            check_make_current(Some(ret))
+        } else {
+            check_make_current(None)
+        }
     }
 }
 
@@ -1086,7 +1031,7 @@ unsafe fn choose_fbconfig<F>(
     api: Api,
     version: Option<(u8, u8)>,
     cb: &ContextBuilderWrapper<&Context>,
-    surface_type: SurfaceType,
+    ctx_supports: ContextSupports,
     mut config_selector: F,
 ) -> Result<(ffi::egl::types::EGLConfig, PixelFormat), CreationError>
 where
@@ -1106,11 +1051,15 @@ where
         }
 
         out.push(ffi::egl::SURFACE_TYPE as raw::c_int);
-        let surface_type = match surface_type {
-            SurfaceType::Window => ffi::egl::WINDOW_BIT,
-            SurfaceType::PBuffer => ffi::egl::PBUFFER_BIT,
-            SurfaceType::Surfaceless => 0,
-        };
+        let mut surface_type =
+            if ctx_supports.contains(ContextSupports::WINDOW_SURFACES) {
+                ffi::egl::WINDOW_BIT
+            } else {
+                0
+            };
+        if ctx_supports.contains(ContextSupports::PBUFFERS) {
+            surface_type = surface_type | ffi::egl::PBUFFER_BIT
+        }
         out.push(surface_type as raw::c_int);
 
         match (api, version) {
@@ -1424,12 +1373,12 @@ unsafe fn create_context(
                 context_attributes.push(ffi::egl::TRUE as i32);
             }
 
-            // TODO: using this flag sometimes generates an error
-            //       there was a change in the specs that added this flag, so it
-            // may not be       supported everywhere ; however it is
-            // not possible to know whether it is       supported or
-            // not flags = flags |
-            // ffi::egl::CONTEXT_OPENGL_DEBUG_BIT_KHR as i32;
+            // TODO: using this flag sometimes generates an error there was a
+            // change in the specs that added this flag, so it may not be
+            // supported everywhere; however it is not possible to know whether
+            // it is supported or not
+            //
+            // flags = flags | ffi::egl::CONTEXT_OPENGL_DEBUG_BIT_KHR as i32;
         }
 
         // In at least some configurations, the Android emulator’s GL

@@ -70,6 +70,8 @@ use glutin_gles2_sys as ffi;
 use objc::declare::ClassDecl;
 use objc::runtime::{Class, Object, Sel, BOOL, NO, YES};
 use winit::dpi;
+use winit::window::WindowBuilder;
+use winit::event_loop::EventLoopWindowTarget;
 
 use std::ffi::CString;
 use std::os::raw;
@@ -172,8 +174,8 @@ fn validate_version(version: u8) -> Result<ffi::NSUInteger, CreationError> {
 impl Context {
     #[inline]
     pub fn new_windowed<T>(
-        builder: winit::window::WindowBuilder,
-        el: &winit::event_loop::EventLoop<T>,
+        builder: WindowBuilder,
+        el: &EventLoopWindowTarget<T>,
         _: &PixelFormatRequirements,
         gl_attrs: &GlAttributes<&Context>,
     ) -> Result<(winit::window::Window, Self), CreationError> {
@@ -215,12 +217,12 @@ impl Context {
 
     #[inline]
     pub fn new_headless<T>(
-        el: &winit::event_loop::EventLoop<T>,
+        el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
-        let wb = winit::window::WindowBuilder::new()
+        let wb = WindowBuilder::new()
             .with_visibility(false)
             .with_inner_size(size.to_logical(1.));
         Self::new_windowed(wb, el, pf_reqs, gl_attr)

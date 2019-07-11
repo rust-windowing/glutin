@@ -35,7 +35,7 @@ pub trait RawContextExt {
         Self: Sized;
 }
 
-impl<'a, IC: ContextCurrentState, PBS: SupportsPBuffersTrait, WST: SupportsWindowSurfacesTrait, ST: SupportsSurfacelessTrait> RawContextExt for ContextBuilder<'a, IC, PBS, WST, ST> {
+impl<'a, IC: ContextCurrentState, PBT: SupportsPBuffersTrait, WST: SupportsWindowSurfacesTrait, ST: SupportsSurfacelessTrait> RawContextExt for ContextBuilder<'a, IC, PBT, WST, ST> {
 {
     #[inline]
     unsafe fn build_raw_wayland_context(

@@ -11,15 +11,15 @@ mod wayland;
 
 // use self::x11::X11Context;
 use crate::{
-    Api, ContextBuilderWrapper, ContextError, CreationError, GlAttributes,
-    PixelFormat, PixelFormatRequirements,
+    Api, ContextBuilderWrapper, ContextError, ContextSupports, CreationError,
+    GlAttributes, PixelFormat, PixelFormatRequirements,
 };
 // pub use self::x11::utils as x11_utils;
 
 use crate::platform::unix::x11::XConnection;
-use crate::platform::unix::EventLoopExtUnix;
+use crate::platform::unix::{EventLoopExtUnix, EventLoopWindowTargetExtUnix};
 use winit::dpi;
-use winit::event_loop::EventLoop;
+use winit::event_loop::EventLoopWindowTarget;
 use winit::window::{Window, WindowBuilder};
 
 use std::marker::PhantomData;
@@ -37,7 +37,7 @@ pub enum RawHandle {
 
 #[derive(Debug)]
 pub enum ContextType {
-    //X11,
+    // X11,
     Wayland,
 }
 
@@ -80,12 +80,10 @@ impl Context {
     }
 
     #[inline]
-    pub fn new<T>(
-        el: &EventLoop<T>,
+    pub(crate) fn new<T>(
+        el: &EventLoopWindowTarget<T>,
         cb: ContextBuilderWrapper<&Context>,
-        pbuffer_support: bool,
-        window_surface_support: bool,
-        surfaceless_support: bool,
+        ctx_supports: ContextSupports,
     ) -> Result<Self, CreationError> {
         if el.is_wayland() {
             Context::is_compatible(&cb.gl_attr.sharing, ContextType::Wayland)?;
@@ -93,14 +91,8 @@ impl Context {
                 Context::Wayland(ref ctx) => ctx,
                 _ => unreachable!(),
             });
-            wayland::Context::new(
-                el,
-                cb,
-                pbuffer_support,
-                window_surface_support,
-                surfaceless_support,
-            )
-            .map(|context| Context::Wayland(context))
+            wayland::Context::new(el, cb, ctx_supports)
+                .map(|context| Context::Wayland(context))
         } else {
             unimplemented!()
             // Context::is_compatible(&cb.gl_attr.sharing, ContextType::X11)?;
@@ -111,9 +103,7 @@ impl Context {
             // x11::Context::new(
             //    el,
             //    cb,
-            //    pbuffer_support,
-            //    window_surface_support,
-            //    surfaceless_support,
+            //    supports,
             //)
             //.map(|context| Context::X11(context))
         }
@@ -133,9 +123,10 @@ impl Context {
         surface: &WindowSurface,
     ) -> Result<(), ContextError> {
         match (self, surface) {
-            (Context::Wayland(ref ctx), WindowSurface::Wayland(ref surface)) => {
-                ctx.make_current_window(surface)
-            }
+            (
+                Context::Wayland(ref ctx),
+                WindowSurface::Wayland(ref surface),
+            ) => ctx.make_current_window(surface),
         }
     }
 
@@ -240,17 +231,17 @@ pub enum WindowSurface {
 impl WindowSurface {
     #[inline]
     pub fn new<T>(
-        el: &EventLoop<T>,
+        el: &EventLoopWindowTarget<T>,
         ctx: &Context,
         wb: WindowBuilder,
     ) -> Result<(Self, Window), CreationError> {
         match ctx {
             // Context::X11(ref ctx) => x11::WindowSurface::new(el, ctx, wb)
             //    .map(|(surface, win)| (WindowSurface::X11(surface), win)),
-            Context::Wayland(ref ctx) => {
-                wayland::WindowSurface::new(el, ctx, wb)
-                    .map(|(surface, win)| (WindowSurface::Wayland(surface), win))
-            }
+            Context::Wayland(ref ctx) => wayland::WindowSurface::new(
+                el, ctx, wb,
+            )
+            .map(|(surface, win)| (WindowSurface::Wayland(surface), win)),
         }
     }
 
@@ -273,7 +264,9 @@ impl WindowSurface {
     #[inline]
     pub fn update_after_resize(&self, size: dpi::PhysicalSize) {
         match self {
-            WindowSurface::Wayland(ref surface) => surface.update_after_resize(size),
+            WindowSurface::Wayland(ref surface) => {
+                surface.update_after_resize(size)
+            }
             _ => (),
         }
     }
@@ -304,13 +297,14 @@ pub enum PBuffer {
 impl PBuffer {
     #[inline]
     pub fn new<T>(
-        el: &EventLoop<T>,
+        el: &EventLoopWindowTarget<T>,
         ctx: &Context,
         size: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
         match ctx {
             // Context::X11(ref ctx) => {
-            //    x11::PBuffer::new(el, ctx, size).map(|pbuffer| PBuffer::X11(pbuffer))
+            //    x11::PBuffer::new(el, ctx, size).map(|pbuffer|
+            // PBuffer::X11(pbuffer))
             //}
             Context::Wayland(ref ctx) => wayland::PBuffer::new(el, ctx, size)
                 .map(|pbuffer| PBuffer::Wayland(pbuffer)),

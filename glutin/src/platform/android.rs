@@ -14,10 +14,10 @@ use std::os::raw;
 
 impl<
         IC: ContextCurrentState,
-        PBS: SupportsPBuffersTrait,
+        PBT: SupportsPBuffersTrait,
         WST: SupportsWindowSurfacesTrait,
         ST: SupportsSurfacelessTrait,
-    > ContextTraitExt for Context<IC, PBS, WST, ST>
+    > ContextTraitExt for Context<IC, PBT, WST, ST>
 {
     type Handle = EGLContext;
 

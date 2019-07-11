@@ -1,17 +1,17 @@
 use crate::api::egl::{self, NativeDisplay};
 use crate::platform_impl::PlatformAttributes;
 use crate::{
-    ContextBuilderWrapper, ContextError, CreationError, GlAttributes,
-    PixelFormat, PixelFormatRequirements,
+    ContextBuilderWrapper, ContextError, ContextSupports, CreationError,
+    GlAttributes, PixelFormat, PixelFormatRequirements,
 };
 
-use crate::platform::unix::{EventLoopExtUnix, WindowExtUnix};
+use crate::platform::unix::{EventLoopExtUnix, EventLoopWindowTargetExtUnix, WindowExtUnix};
 use glutin_egl_sys as ffi;
 use wayland_client::egl as wegl;
 pub use wayland_client::sys::client::wl_display;
 use winit;
 use winit::dpi;
-use winit::event_loop::EventLoop;
+use winit::event_loop::EventLoopWindowTarget;
 use winit::window::{Window, WindowBuilder};
 
 use std::ops::Deref;
@@ -34,7 +34,7 @@ pub struct WindowSurface {
 impl WindowSurface {
     #[inline]
     pub fn new<T>(
-        el: &EventLoop<T>,
+        el: &EventLoopWindowTarget<T>,
         ctx: &Context,
         wb: WindowBuilder,
     ) -> Result<(Self, Window), CreationError> {
@@ -105,7 +105,7 @@ pub struct PBuffer {
 impl PBuffer {
     #[inline]
     pub fn new<T>(
-        el: &EventLoop<T>,
+        el: &EventLoopWindowTarget<T>,
         ctx: &Context,
         size: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
@@ -132,7 +132,7 @@ impl PBuffer {
 impl Context {
     // #[inline]
     // pub fn new_headless<T>(
-    // el: &EventLoop<T>,
+    // el: &EventLoopWindowTarget<T>,
     // cb: ContextBuilderWrapper<&Context>,
     // size: Option<dpi::PhysicalSize>,
     // ) -> Result<Self, CreationError> {
@@ -165,26 +165,19 @@ impl Context {
     // }
 
     #[inline]
-    pub fn new<T>(
-        // wb: WindowBuilder,
-        el: &EventLoop<T>,
+    pub(crate) fn new<T>(
+        el: &EventLoopWindowTarget<T>,
         cb: ContextBuilderWrapper<&Context>,
-        pbuffer_support: bool,
-        window_surface_support: bool,
-        surfaceless_support: bool,
+        ctx_supports: ContextSupports,
     ) -> Result<Self, CreationError> {
         let display_ptr = el.wayland_display().unwrap() as *const _;
         let context = {
             let cb = cb.map_sharing(|c| &c.context);
             let native_display =
                 NativeDisplay::Wayland(Some(display_ptr as *const _));
-            egl::Context::new(
-                &cb,
-                native_display,
-                // FIXME, surfacetype
-                egl::SurfaceType::Window,
-                |c, _| Ok(c[0]),
-            )?
+            egl::Context::new(&cb, native_display, ctx_supports, |c, _| {
+                Ok(c[0])
+            })?
         };
         Ok(Context { context })
     }
