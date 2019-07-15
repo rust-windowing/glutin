@@ -159,6 +159,14 @@ impl Context {
     }
 
     #[inline]
+    pub fn get_pixel_format(&self) -> PixelFormat {
+        match self {
+            // Context::X11(ref ctx) => ctx.get_pixel_format(),
+            Context::Wayland(ref ctx) => ctx.get_pixel_format(),
+        }
+    }
+
+    #[inline]
     pub fn get_api(&self) -> Api {
         match self {
             // Context::X11(ref ctx) => ctx.get_api(),

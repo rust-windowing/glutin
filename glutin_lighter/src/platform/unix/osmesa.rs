@@ -1,11 +1,13 @@
-use crate::api::osmesa;
-use crate::{
+pub use glutin::platform::unix::osmesa::*;
+
+use glutin::api::osmesa;
+use glutin::{
     Api, ContextBuilderWrapper, ContextError, ContextIsCurrent,
     ContextIsCurrentTrait, ContextIsCurrentYesTrait, CreationError,
     PixelFormat, Surface, SurfaceInUse, SurfaceInUseTrait,
 };
 use std::marker::PhantomData;
-use winit::dpi;
+use glutin::dpi;
 
 /// A unix-specific extension to the [`ContextBuilder`] which allows building
 /// unix-specific osmesa contexts.
@@ -83,7 +85,7 @@ impl<IC: ContextIsCurrentTrait> SplitOsMesaContext<IC> {
             ContextError,
         ),
     > {
-        match self.context.make_current_osmesa_buffer(buffer.inner_mut()) {
+        match self.context.make_current_osmesa_buffer(buffer.inner()) {
             Ok(()) => Ok((self.treat_as_current(), buffer.treat_as_current())),
             Err(err) => {
                 Err((self.treat_as_current(), buffer.treat_as_current(), err))
@@ -125,9 +127,6 @@ impl<IC: ContextIsCurrentTrait> SplitOsMesaContext<IC> {
     pub(crate) fn inner(&self) -> &osmesa::OsMesaContext {
         &self.context
     }
-    pub(crate) fn inner_mut(&mut self) -> &mut osmesa::OsMesaContext {
-        &mut self.context
-    }
 
     pub fn unify_with<IU: SurfaceInUseTrait>(
         self,
@@ -153,9 +152,6 @@ impl<IU: SurfaceInUseTrait> Surface for OsMesaBuffer<IU> {
 
     fn inner(&self) -> &Self::Inner {
         &self.buffer
-    }
-    fn inner_mut(&mut self) -> &mut Self::Inner {
-        &mut self.buffer
     }
 
     fn get_pixel_format(&self) -> PixelFormat {

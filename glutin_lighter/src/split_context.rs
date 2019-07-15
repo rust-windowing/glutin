@@ -1,7 +1,7 @@
 use super::*;
-use std::fmt::Debug;
+use glutin::event_loop::EventLoopWindowTarget;
+use glutin::{Context, ContextSupports};
 use std::marker::PhantomData;
-use winit::event_loop::EventLoopWindowTarget;
 
 #[allow(non_snake_case)]
 pub mod SupportsPBuffers {
@@ -16,11 +16,13 @@ pub mod SupportsPBuffers {
     pub enum No {}
 
     impl SupportsPBuffersTrait for Yes {
+        #[inline]
         fn supported() -> bool {
             true
         }
     }
     impl SupportsPBuffersTrait for No {
+        #[inline]
         fn supported() -> bool {
             false
         }
@@ -41,11 +43,13 @@ pub mod SupportsWindowSurfaces {
     pub enum No {}
 
     impl SupportsWindowSurfacesTrait for Yes {
+        #[inline]
         fn supported() -> bool {
             true
         }
     }
     impl SupportsWindowSurfacesTrait for No {
+        #[inline]
         fn supported() -> bool {
             false
         }
@@ -66,11 +70,13 @@ pub mod SupportsSurfaceless {
     pub enum No {}
 
     impl SupportsSurfacelessTrait for Yes {
+        #[inline]
         fn supported() -> bool {
             true
         }
     }
     impl SupportsSurfacelessTrait for No {
+        #[inline]
         fn supported() -> bool {
             false
         }
@@ -144,7 +150,7 @@ pub struct SplitContext<
     WST: SupportsWindowSurfacesTrait,
     ST: SupportsSurfacelessTrait,
 > {
-    pub(crate) context: platform_impl::Context,
+    pub(crate) context: Context,
     pub(crate) phantom: PhantomData<(IC, PBT, WST, ST)>,
 }
 
@@ -155,11 +161,9 @@ impl<
         ST: SupportsSurfacelessTrait,
     > SplitContext<IC, PBT, WST, ST>
 {
-    pub(crate) fn inner(&self) -> &platform_impl::Context {
+    #[inline]
+    pub(crate) fn inner(&self) -> &Context {
         &self.context
-    }
-    pub(crate) fn inner_mut(&mut self) -> &mut platform_impl::Context {
-        &mut self.context
     }
 }
 
@@ -223,9 +227,10 @@ impl<
     /// [`treat_as_not_current`]:
     /// struct.Context.html#method.treat_as_not_current
     /// [`is_current`]: struct.Context.html#method.is_current
+    #[inline]
     pub unsafe fn make_current_window<W, IU: SurfaceInUseTrait>(
         self,
-        mut surface: WindowSurfaceWrapper<W, IU>,
+        surface: LighterWindowSurfaceWrapper<W, IU>,
     ) -> Result<
         (
             SplitContext<
@@ -234,7 +239,7 @@ impl<
                 SupportsWindowSurfaces::Yes,
                 ST,
             >,
-            WindowSurfaceWrapper<W, SurfaceInUse::Possibly>,
+            LighterWindowSurfaceWrapper<W, SurfaceInUse::Possibly>,
         ),
         (
             SplitContext<
@@ -243,28 +248,35 @@ impl<
                 SupportsWindowSurfaces::Yes,
                 ST,
             >,
-            WindowSurfaceWrapper<W, SurfaceInUse::Possibly>,
+            LighterWindowSurfaceWrapper<W, SurfaceInUse::Possibly>,
             ContextError,
         ),
     > {
-        match self.context.make_current_window(surface.inner_mut()) {
+        match self.context.make_current_window(surface.inner()) {
             Ok(()) => Ok((
                 self.treat_as_current(),
-                Surface::treat_as_current(surface),
+                LighterSurface::treat_as_current(surface),
             )),
             Err(err) => Err((
                 self.treat_as_current(),
-                Surface::treat_as_current(surface),
+                LighterSurface::treat_as_current(surface),
                 err,
             )),
         }
     }
 
+    #[inline]
     pub fn unify_with_window<W, IU: SurfaceInUseTrait>(
         self,
-        surface: WindowSurfaceWrapper<W, IU>,
-    ) -> Context<IC, PBT, SupportsWindowSurfaces::Yes, ST, WindowSurfaceWrapper<W, IU>> {
-        Context {
+        surface: LighterWindowSurfaceWrapper<W, IU>,
+    ) -> UnifiedContext<
+        IC,
+        PBT,
+        SupportsWindowSurfaces::Yes,
+        ST,
+        LighterWindowSurfaceWrapper<W, IU>,
+    > {
+        UnifiedContext {
             context: self,
             surface,
         }
@@ -277,9 +289,10 @@ impl<
         ST: SupportsSurfacelessTrait,
     > SplitContext<IC, SupportsPBuffers::Yes, WST, ST>
 {
+    #[inline]
     pub unsafe fn make_current_pbuffer<IU: SurfaceInUseTrait>(
         self,
-        mut pbuffer: PBuffer<IU>,
+        pbuffer: LighterPBuffer<IU>,
     ) -> Result<
         (
             SplitContext<
@@ -288,7 +301,7 @@ impl<
                 WST,
                 ST,
             >,
-            PBuffer<SurfaceInUse::Possibly>,
+            LighterPBuffer<SurfaceInUse::Possibly>,
         ),
         (
             SplitContext<
@@ -297,28 +310,30 @@ impl<
                 WST,
                 ST,
             >,
-            PBuffer<SurfaceInUse::Possibly>,
+            LighterPBuffer<SurfaceInUse::Possibly>,
             ContextError,
         ),
     > {
-        match self.context.make_current_pbuffer(pbuffer.inner_mut()) {
+        match self.context.make_current_pbuffer(pbuffer.inner()) {
             Ok(()) => Ok((
                 self.treat_as_current(),
-                Surface::treat_as_current(pbuffer),
+                LighterSurface::treat_as_current(pbuffer),
             )),
             Err(err) => Err((
                 self.treat_as_current(),
-                Surface::treat_as_current(pbuffer),
+                LighterSurface::treat_as_current(pbuffer),
                 err,
             )),
         }
     }
 
+    #[inline]
     pub fn unify_with_pbuffer<IU: SurfaceInUseTrait>(
         self,
-        pbuffer: PBuffer<IU>,
-    ) -> Context<IC, SupportsPBuffers::Yes, WST, ST, PBuffer<IU>> {
-        Context {
+        pbuffer: LighterPBuffer<IU>,
+    ) -> UnifiedContext<IC, SupportsPBuffers::Yes, WST, ST, LighterPBuffer<IU>>
+    {
+        UnifiedContext {
             context: self,
             surface: pbuffer,
         }
@@ -331,6 +346,7 @@ impl<
         WST: SupportsWindowSurfacesTrait,
     > SplitContext<IC, PBT, WST, SupportsSurfaceless::Yes>
 {
+    #[inline]
     pub unsafe fn make_current_surfaceless(
         self,
     ) -> Result<
@@ -356,10 +372,11 @@ impl<
         }
     }
 
+    #[inline]
     pub fn unify<IU: SurfaceInUseTrait>(
         self,
-    ) -> Context<IC, PBT, WST, SupportsSurfaceless::Yes, ()> {
-        Context {
+    ) -> UnifiedContext<IC, PBT, WST, SupportsSurfaceless::Yes, ()> {
+        UnifiedContext {
             context: self,
             surface: (),
         }
@@ -374,6 +391,7 @@ impl<
     > SplitContext<IC, PBT, WST, ST>
 {
     /// Returns the address of an OpenGL function.
+    #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const () {
         self.context.get_proc_address(addr)
     }
@@ -387,11 +405,18 @@ impl<
     > SplitContext<IC, PBT, WST, ST>
 {
     /// Returns true if this context is the current one in this thread.
+    #[inline]
     pub fn is_current(&self) -> bool {
         self.context.is_current()
     }
 
+    #[inline]
+    pub fn get_pixel_format(&self) -> PixelFormat {
+        self.context.get_pixel_format()
+    }
+
     /// Returns the OpenGL API being used.
+    #[inline]
     pub fn get_api(&self) -> Api {
         self.context.get_api()
     }
@@ -402,11 +427,20 @@ impl<
     /// Please see [`make_current_window`].
     ///
     /// [`make_current_window`]: struct.Context.html#method.make_current_window
+    #[inline]
     pub unsafe fn make_not_current(
         self,
     ) -> Result<
         SplitContext<ContextIsCurrent::No, PBT, WST, ST>,
-        (SplitContext<ContextIsCurrent::PossiblyAndSurfaceBound, PBT, WST, ST>, ContextError),
+        (
+            SplitContext<
+                ContextIsCurrent::PossiblyAndSurfaceBound,
+                PBT,
+                WST,
+                ST,
+            >,
+            ContextError,
+        ),
     > {
         match self.context.make_not_current() {
             Ok(()) => Ok(SplitContext {
@@ -428,6 +462,7 @@ impl<
     ///
     /// [`make_not_current`]: struct.Context.html#method.make_not_current
     /// [`make_current_window`]: struct.Context.html#method.make_current_window
+    #[inline]
     pub unsafe fn treat_as_not_current(
         self,
     ) -> SplitContext<ContextIsCurrent::No, PBT, WST, ST> {
@@ -452,6 +487,7 @@ impl<
     /// [`Context`]: struct.Context.html
     ///
     /// FIXME: docs
+    #[inline]
     pub unsafe fn treat_as_current<IC2: ContextIsCurrentYesTrait>(
         self,
     ) -> SplitContext<IC2, PBT, WST, ST> {
@@ -482,20 +518,13 @@ impl<PBT: SupportsPBuffersTrait, ST: SupportsSurfacelessTrait>
     ///
     /// [`Resized`]: event/enum.WindowEvent.html#variant.Resized
     /// FIXME: Links
+    #[inline]
     pub fn update_after_resize(&self) {
-        #[cfg(target_os = "macos")]
         self.context.update_after_resize()
     }
 }
 
-impl<
-        'a,
-        IC: ContextIsCurrentTrait,
-        PBT: SupportsPBuffersTrait,
-        WST: SupportsWindowSurfacesTrait,
-        ST: SupportsSurfacelessTrait,
-    > ContextBuilder<'a, IC, PBT, WST, ST>
-{
+pub trait LighterContextBuilderTrait {
     /// FIXME UPDATE DOIC:
     ///
     /// Errors can occur in two scenarios:
@@ -550,7 +579,35 @@ impl<
     [`build_osmesa`]: os/unix/trait.HeadlessContextExt.html#tymethod.build_osmesa
     "
     )]
-    pub fn build<
+    #[inline]
+    fn build_lighter<
+        TE,
+        PBT2: SupportsPBuffersTrait,
+        WST2: SupportsWindowSurfacesTrait,
+        ST2: SupportsSurfacelessTrait,
+    >(
+        self,
+        el: &EventLoopWindowTarget<TE>,
+        _pbuffer_support: PBT2,
+        _window_surface_support: WST2,
+        _surfaceless_support: ST2,
+    ) -> Result<
+        SplitContext<ContextIsCurrent::No, PBT2, WST2, ST2>,
+        CreationError,
+    >;
+}
+
+impl<
+        'a,
+        IC: ContextIsCurrentTrait,
+        PBT: SupportsPBuffersTrait,
+        WST: SupportsWindowSurfacesTrait,
+        ST: SupportsSurfacelessTrait,
+    > LighterContextBuilderTrait
+    for LighterContextBuilder<'a, IC, PBT, WST, ST>
+{
+    #[inline]
+    fn build_lighter<
         TE,
         PBT2: SupportsPBuffersTrait,
         WST2: SupportsWindowSurfacesTrait,
@@ -576,22 +633,11 @@ impl<
             ctx_supports = ctx_supports | ContextSupports::SURFACELESS
         }
 
-        assert!(!ctx_supports.is_empty(), "Context created by users most support at least one type of backing.");
-        let cb = self.map_sharing(|ctx| &ctx.context);
-        platform_impl::Context::new(el, cb, ctx_supports).map(|context| {
-            SplitContext {
+        self.map_sharing(|ctx| &ctx.context)
+            .build(el, ctx_supports)
+            .map(|context| SplitContext {
                 context,
                 phantom: PhantomData,
-            }
-        })
-    }
-}
-
-bitflags! {
-    #[derive(Default)]
-    pub(crate) struct ContextSupports: u8 {
-        const PBUFFERS = 1 << 0;
-        const WINDOW_SURFACES = 1 << 1;
-        const SURFACELESS = 1 << 2;
+            })
     }
 }

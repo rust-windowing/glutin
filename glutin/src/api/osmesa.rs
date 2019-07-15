@@ -20,15 +20,18 @@ use winit::dpi;
 
 use std::ffi::CString;
 use std::os::raw;
+use std::mem::MaybeUninit;
 
 #[derive(Debug)]
 pub struct OsMesaContext {
     context: osmesa_sys::OSMesaContext,
 }
 
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct OsMesaBuffer {
-    buffer: Vec<u32>,
+    #[derivative(Debug = "ignore")]
+    buffer: Vec<MaybeUninit<u8>>,
     width: u32,
     height: u32,
 }
@@ -161,7 +164,7 @@ impl OsMesaContext {
         let ret = osmesa_sys::OSMesaMakeCurrent(
             self.context,
             buffer.buffer.as_ptr() as *mut _,
-            0x1401,
+            0x1401, // GL_UNSIGNED_BYTE
             buffer.width as raw::c_int,
             buffer.height as raw::c_int,
         );
@@ -255,8 +258,8 @@ impl OsMesaBuffer {
         Ok(OsMesaBuffer {
             width: size.0,
             height: size.1,
-            buffer: std::iter::repeat(unsafe { std::mem::uninitialized() })
-                .take((size.0 * size.1) as usize)
+            buffer: std::iter::repeat(MaybeUninit::uninit())
+                .take(size.0 as usize * size.1 as usize * 4)
                 .collect(),
         })
     }

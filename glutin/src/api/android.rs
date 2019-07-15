@@ -8,13 +8,13 @@ use crate::{
     Api, ContextError, GlAttributes, PixelFormat, PixelFormatRequirements,
 };
 
-use winit::window::WindowBuilder;
-use winit::event_loop::EventLoopWindowTarget;
 use crate::platform::android::EventLoopExtAndroid;
 use glutin_egl_sys as ffi;
 use parking_lot::Mutex;
 use winit;
 use winit::dpi;
+use winit::event_loop::EventLoopWindowTarget;
+use winit::window::WindowBuilder;
 
 use std::sync::Arc;
 

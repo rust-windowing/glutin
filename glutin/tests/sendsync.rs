@@ -33,7 +33,10 @@ impl<
     target_os = "netbsd",
     target_os = "openbsd",
 ))]
-impl FailToCompileIfNotSendSync for glutin::platform::unix::osmesa::OsMesaBuffer<SurfaceInUse::No> {}
+impl FailToCompileIfNotSendSync
+    for glutin::platform::unix::osmesa::OsMesaBuffer<SurfaceInUse::No>
+{
+}
 
 #[cfg(any(
     target_os = "linux",
@@ -42,7 +45,13 @@ impl FailToCompileIfNotSendSync for glutin::platform::unix::osmesa::OsMesaBuffer
     target_os = "netbsd",
     target_os = "openbsd",
 ))]
-impl FailToCompileIfNotSendSync for glutin::platform::unix::osmesa::OsMesaContext<ContextIsCurrent::No, SurfaceInUse::No> {}
+impl FailToCompileIfNotSendSync
+    for glutin::platform::unix::osmesa::OsMesaContext<
+        ContextIsCurrent::No,
+        SurfaceInUse::No,
+    >
+{
+}
 
 #[cfg(any(
     target_os = "linux",
@@ -51,4 +60,7 @@ impl FailToCompileIfNotSendSync for glutin::platform::unix::osmesa::OsMesaContex
     target_os = "netbsd",
     target_os = "openbsd",
 ))]
-impl FailToCompileIfNotSendSync for glutin::platform::unix::osmesa::SplitOsMesaContext<ContextIsCurrent::No> {}
+impl FailToCompileIfNotSendSync
+    for glutin::platform::unix::osmesa::SplitOsMesaContext<ContextIsCurrent::No>
+{
+}

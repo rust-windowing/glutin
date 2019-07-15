@@ -5,7 +5,9 @@ use crate::{
     GlAttributes, PixelFormat, PixelFormatRequirements,
 };
 
-use crate::platform::unix::{EventLoopExtUnix, EventLoopWindowTargetExtUnix, WindowExtUnix};
+use crate::platform::unix::{
+    EventLoopExtUnix, EventLoopWindowTargetExtUnix, WindowExtUnix,
+};
 use glutin_egl_sys as ffi;
 use wayland_client::egl as wegl;
 pub use wayland_client::sys::client::wl_display;
@@ -130,40 +132,6 @@ impl PBuffer {
 }
 
 impl Context {
-    // #[inline]
-    // pub fn new_headless<T>(
-    // el: &EventLoopWindowTarget<T>,
-    // cb: ContextBuilderWrapper<&Context>,
-    // size: Option<dpi::PhysicalSize>,
-    // ) -> Result<Self, CreationError> {
-    // let cb = cb.map_sharing(|c| &c.context);
-    // let display_ptr = el.wayland_display().unwrap() as *const _;
-    // let native_display =
-    // NativeDisplay::Wayland(Some(display_ptr as *const _));
-    // if let Some(size) = size {
-    // let context = egl::Context::new(
-    // &cb,
-    // native_display,
-    // egl::SurfaceType::PBuffer,
-    // |c, _| Ok(c[0]),
-    // )
-    // .and_then(|p| p.finish_pbuffer(size))?;
-    // let context = Context::PBuffer(context);
-    // Ok(context)
-    // } else {
-    // Surfaceless
-    // let context = egl::Context::new(
-    // &cb,
-    // native_display,
-    // egl::SurfaceType::Surfaceless,
-    // |c, _| Ok(c[0]),
-    // )
-    // .and_then(|p| p.finish_surfaceless())?;
-    // let context = Context::Surfaceless(context);
-    // Ok(context)
-    // }
-    // }
-
     #[inline]
     pub(crate) fn new<T>(
         el: &EventLoopWindowTarget<T>,
@@ -211,6 +179,11 @@ impl Context {
     #[inline]
     pub fn is_current(&self) -> bool {
         self.context.is_current()
+    }
+
+    #[inline]
+    pub fn get_pixel_format(&self) -> PixelFormat {
+        self.context.get_pixel_format()
     }
 
     #[inline]

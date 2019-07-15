@@ -156,8 +156,8 @@ fn get_egl_version(
 ) -> Result<(ffi::egl::types::EGLint, ffi::egl::types::EGLint), CreationError> {
     unsafe {
         let egl = EGL.as_ref().unwrap();
-        let mut major: ffi::egl::types::EGLint = std::mem::uninitialized();
-        let mut minor: ffi::egl::types::EGLint = std::mem::uninitialized();
+        let mut major: ffi::egl::types::EGLint = 0;
+        let mut minor: ffi::egl::types::EGLint = 0;
 
         if egl.Initialize(display, &mut major, &mut minor) == 0 {
             return Err(CreationError::OsError(
@@ -625,6 +625,11 @@ impl Context {
     }
 
     #[inline]
+    pub fn get_pixel_format(&self) -> PixelFormat {
+        self.pixel_format.clone()
+    }
+
+    #[inline]
     pub fn get_api(&self) -> Api {
         self.api
     }
@@ -826,7 +831,7 @@ pub fn get_native_visual_id(
     config_id: ffi::egl::types::EGLConfig,
 ) -> ffi::egl::types::EGLint {
     let egl = EGL.as_ref().unwrap();
-    let mut value = unsafe { std::mem::uninitialized() };
+    let mut value = 0;
     let ret = unsafe {
         egl.GetConfigAttrib(
             display,
@@ -1172,7 +1177,7 @@ where
     };
 
     // calling `eglChooseConfig`
-    let mut num_configs = std::mem::uninitialized();
+    let mut num_configs = 0;
     if egl.ChooseConfig(
         display,
         descriptor.as_ptr(),
@@ -1215,7 +1220,7 @@ where
     // analyzing each config
     macro_rules! attrib {
         ($egl:expr, $display:expr, $config:expr, $attr:expr) => {{
-            let mut value = std::mem::uninitialized();
+            let mut value = 0;
             let res = $egl.GetConfigAttrib(
                 $display,
                 $config,

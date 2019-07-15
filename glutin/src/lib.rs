@@ -64,25 +64,10 @@
 [`RawContextExt`]: os/unix/trait.RawContextExt.html
 "
 )]
-#![cfg(any(
-    target_os = "linux",
-    target_os = "ios",
-    target_os = "windows",
-    target_os = "macos",
-    target_os = "android",
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "emscripten",
-))]
 #![deny(
-    //warnings,
     missing_debug_implementations,
     //missing_docs,
 )]
-// Docs for subcrates are borked.
-#![allow(intra_doc_link_resolution_failure)]
 
 #[cfg(any(
     target_os = "windows",
@@ -117,11 +102,9 @@ pub mod platform;
 mod api;
 mod context;
 mod platform_impl;
-mod split_context;
 mod surface;
 
 pub use crate::context::*;
-pub use crate::split_context::*;
 pub use crate::surface::*;
 pub use winit::*;
 
@@ -148,15 +131,14 @@ pub struct ContextBuilderWrapper<T> {
     pub plat_attr: platform_impl::PlatformAttributes,
 }
 
-pub type ContextBuilder<'a, IC, PBT, WST, ST> =
-    ContextBuilderWrapper<&'a SplitContext<IC, PBT, WST, ST>>;
+pub type ContextBuilder<'a> = ContextBuilderWrapper<&'a Context>;
 
-impl<S> ContextBuilderWrapper<S> {
+impl<T> ContextBuilderWrapper<T> {
     /// Turns the `sharing` parameter into another type by calling a closure.
     #[inline]
-    pub fn map_sharing<F, T>(self, f: F) -> ContextBuilderWrapper<T>
+    pub fn map_sharing<F, T2>(self, f: F) -> ContextBuilderWrapper<T2>
     where
-        F: FnOnce(S) -> T,
+        F: FnOnce(T) -> T2,
     {
         ContextBuilderWrapper {
             gl_attr: self.gl_attr.map_sharing(f),
@@ -166,18 +148,10 @@ impl<S> ContextBuilderWrapper<S> {
     }
 }
 
-impl<'a>
-    ContextBuilder<
-        'a,
-        ContextIsCurrent::No,
-        SupportsPBuffers::No,
-        SupportsWindowSurfaces::No,
-        SupportsSurfaceless::No,
-    >
-{
+impl<T> ContextBuilderWrapper<T> {
     /// Initializes a new `ContextBuilder` with default values.
     pub fn new() -> Self {
-        ContextBuilder {
+        ContextBuilderWrapper {
             pf_reqs: std::default::Default::default(),
             gl_attr: std::default::Default::default(),
             plat_attr: std::default::Default::default(),
@@ -185,14 +159,7 @@ impl<'a>
     }
 }
 
-impl<
-        'a,
-        IC: ContextIsCurrentTrait,
-        PBT: SupportsPBuffersTrait,
-        WST: SupportsWindowSurfacesTrait,
-        ST: SupportsSurfacelessTrait,
-    > ContextBuilder<'a, IC, PBT, WST, ST>
-{
+impl<T> ContextBuilderWrapper<T> {
     /// Sets how the backend should choose the OpenGL API and version.
     #[inline]
     pub fn with_gl(mut self, request: GlRequest) -> Self {
@@ -246,17 +213,8 @@ impl<
     ///
     /// [`Context`]: struct.Context.html
     #[inline]
-    pub fn with_shared_lists<
-        IC2: ContextIsCurrentTrait,
-        PBT2: SupportsPBuffersTrait,
-        WST2: SupportsWindowSurfacesTrait,
-        ST2: SupportsSurfacelessTrait,
-        OTHER: Into<&'a SplitContext<IC2, PBT2, WST2, ST2>>,
-    >(
-        self,
-        other: OTHER,
-    ) -> ContextBuilder<'a, IC2, PBT2, WST2, ST2> {
-        ContextBuilder {
+    pub fn with_shared_lists<T2>(self, other: T2) -> ContextBuilderWrapper<T2> {
+        ContextBuilderWrapper {
             gl_attr: self.gl_attr.set_sharing(Some(other.into())),
             pf_reqs: self.pf_reqs,
             plat_attr: self.plat_attr,
@@ -719,11 +677,11 @@ impl Default for PixelFormatRequirements {
 ///
 /// [`Context`]: struct.Context.html
 #[derive(Clone, Debug)]
-pub struct GlAttributes<S> {
+pub struct GlAttributes<T> {
     /// An existing context with which some OpenGL objects get shared.
     ///
     /// The default is `None`.
-    pub sharing: Option<S>,
+    pub sharing: Option<T>,
 
     /// Version to try create. See [`GlRequest`] for more infos.
     ///
@@ -764,12 +722,12 @@ pub struct GlAttributes<S> {
     pub vsync: bool,
 }
 
-impl<S> GlAttributes<S> {
+impl<T> GlAttributes<T> {
     /// Turns the `sharing` parameter into another type by calling a closure.
     #[inline]
-    pub fn map_sharing<F, T>(self, f: F) -> GlAttributes<T>
+    pub fn map_sharing<F, T2>(self, f: F) -> GlAttributes<T2>
     where
-        F: FnOnce(S) -> T,
+        F: FnOnce(T) -> T2,
     {
         GlAttributes {
             sharing: self.sharing.map(f),
@@ -783,7 +741,7 @@ impl<S> GlAttributes<S> {
 
     /// Turns the `sharing` parameter into another type.
     #[inline]
-    fn set_sharing<T>(self, sharing: Option<T>) -> GlAttributes<T> {
+    fn set_sharing<T2>(self, sharing: Option<T2>) -> GlAttributes<T2> {
         GlAttributes {
             sharing,
             version: self.version,
@@ -795,9 +753,9 @@ impl<S> GlAttributes<S> {
     }
 }
 
-impl<S> Default for GlAttributes<S> {
+impl<T> Default for GlAttributes<T> {
     #[inline]
-    fn default() -> GlAttributes<S> {
+    fn default() -> GlAttributes<T> {
         GlAttributes {
             sharing: None,
             version: GlRequest::Latest,

@@ -708,18 +708,14 @@ unsafe fn choose_arb_pixel_format_id(
             .find(|&i| i == "WGL_ARB_framebuffer_sRGB")
             .is_some()
         {
-            out.push(
-                gl::wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as raw::c_int,
-            );
+            out.push(gl::wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as raw::c_int);
             out.push(pf_reqs.srgb as raw::c_int);
         } else if extensions
             .split(' ')
             .find(|&i| i == "WGL_EXT_framebuffer_sRGB")
             .is_some()
         {
-            out.push(
-                gl::wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as raw::c_int,
-            );
+            out.push(gl::wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as raw::c_int);
             out.push(pf_reqs.srgb as raw::c_int);
         } else if pf_reqs.srgb {
             return Err(());
@@ -749,8 +745,8 @@ unsafe fn choose_arb_pixel_format_id(
         out
     };
 
-    let mut format_id = std::mem::uninitialized();
-    let mut num_formats = std::mem::uninitialized();
+    let mut format_id = 0;
+    let mut num_formats = 0;
     if extra.ChoosePixelFormatARB(
         hdc as *const _,
         descriptor.as_ptr(),
@@ -777,7 +773,7 @@ unsafe fn choose_arb_pixel_format(
     format_id: raw::c_int,
 ) -> Result<PixelFormat, ()> {
     let get_info = |attrib: u32| {
-        let mut value = std::mem::uninitialized();
+        let mut value = 0;
         extra.GetPixelFormatAttribivARB(
             hdc as *const _,
             format_id as raw::c_int,

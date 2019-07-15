@@ -70,8 +70,8 @@ use glutin_gles2_sys as ffi;
 use objc::declare::ClassDecl;
 use objc::runtime::{Class, Object, Sel, BOOL, NO, YES};
 use winit::dpi;
-use winit::window::WindowBuilder;
 use winit::event_loop::EventLoopWindowTarget;
+use winit::window::WindowBuilder;
 
 use std::ffi::CString;
 use std::os::raw;

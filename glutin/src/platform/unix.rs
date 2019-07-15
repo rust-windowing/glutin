@@ -6,15 +6,11 @@
     target_os = "openbsd",
 ))]
 
-pub mod osmesa;
 // mod rawext;
 
 use crate::platform::ContextTraitExt;
 pub use crate::platform_impl::{PlatformAttributes, RawHandle};
-use crate::{
-    ContextIsCurrentTrait, SplitContext, SupportsPBuffersTrait,
-    SupportsSurfacelessTrait, SupportsWindowSurfacesTrait,
-};
+use crate::Context;
 pub use glutin_egl_sys::EGLContext;
 pub use glutin_glx_sys::GLXContext;
 
@@ -23,13 +19,7 @@ pub use winit::platform::unix::*;
 
 use std::os::raw;
 
-impl<
-        IC: ContextIsCurrentTrait,
-        PBT: SupportsPBuffersTrait,
-        WST: SupportsWindowSurfacesTrait,
-        ST: SupportsSurfacelessTrait,
-    > ContextTraitExt for SplitContext<IC, PBT, WST, ST>
-{
+impl ContextTraitExt for Context {
     type Handle = RawHandle;
 
     #[inline]

@@ -95,10 +95,10 @@ unsafe impl Sync for Context {}
 //
 // https://bugs.freedesktop.org/show_bug.cgi?id=67676<Paste>
 // I'm on a patch.
-pub fn select_config<T, F, CTX>(
+pub fn select_config<'a, T, F, CTX>(
     xconn: &Arc<XConnection>,
     transparent: Option<bool>,
-    cb: &ContextBuilderWrapper<&CTX>,
+    cb: &'a ContextBuilderWrapper<&'a CTX>,
     config_ids: Vec<T>,
     mut convert_to_xvisualinfo: F,
 ) -> Result<(T, ffi::XVisualInfo), ()>
@@ -556,7 +556,7 @@ impl Context {
     // fallback: bool,
     // ) -> Result<Self, CreationError> {
     // let attrs = unsafe {
-    // let mut attrs = ::std::mem::uninitialized();
+    // let mut attrs = 0;
     // (xconn.xlib.XGetWindowAttributes)(xconn.display, xwin, &mut attrs);
     // attrs
     // };
@@ -572,7 +572,7 @@ impl Context {
     // }
     //
     // let attrs = {
-    // let mut attrs = unsafe { std::mem::uninitialized() };
+    // let mut attrs = 0;
     // unsafe {
     // (xconn.xlib.XGetWindowAttributes)(
     // xconn.display,

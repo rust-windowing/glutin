@@ -1,7 +1,7 @@
 pub use self::platform_impl::*;
 
 #[cfg(target_os = "windows")]
-#[path = "windows/mod.rs"]
+#[path = "platform_impl/windows/windows.rs"]
 mod platform_impl;
 #[cfg(any(
     target_os = "linux",
@@ -10,17 +10,14 @@ mod platform_impl;
     target_os = "netbsd",
     target_os = "openbsd",
 ))]
-#[path = "unix/mod.rs"]
+#[path = "platform_impl/unix/unix.rs"]
 mod platform_impl;
 #[cfg(target_os = "macos")]
-#[path = "macos/mod.rs"]
+#[path = "platform_impl/macos/macos.rs"]
 mod platform_impl;
 #[cfg(target_os = "android")]
-#[path = "android/mod.rs"]
+#[path = "platform_impl/android/android.rs"]
 mod platform_impl;
 #[cfg(target_os = "ios")]
-#[path = "ios/mod.rs"]
-mod platform_impl;
-#[cfg(target_os = "emscripten")]
-#[path = "emscripten/mod.rs"]
+#[path = "platform_impl/ios/ios.rs"]
 mod platform_impl;
