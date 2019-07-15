@@ -65,25 +65,10 @@
 [`RawContextExt`]: os/unix/trait.RawContextExt.html
 "
 )]
-#![cfg(any(
-    target_os = "linux",
-    target_os = "ios",
-    target_os = "windows",
-    target_os = "macos",
-    target_os = "android",
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "emscripten",
-))]
 #![deny(
-    warnings,
     missing_debug_implementations,
     //missing_docs,
 )]
-// Docs for subcrates are borked.
-#![allow(intra_doc_link_resolution_failure)]
 
 #[cfg(any(
     target_os = "windows",
