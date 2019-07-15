@@ -19,8 +19,8 @@ use crate::{
 use winit::dpi;
 
 use std::ffi::CString;
-use std::os::raw;
 use std::mem::MaybeUninit;
+use std::os::raw;
 
 #[derive(Debug)]
 pub struct OsMesaContext {
@@ -159,7 +159,7 @@ impl OsMesaContext {
     #[inline]
     pub unsafe fn make_current_osmesa_buffer(
         &self,
-        buffer: &mut OsMesaBuffer,
+        buffer: &OsMesaBuffer,
     ) -> Result<(), ContextError> {
         let ret = osmesa_sys::OSMesaMakeCurrent(
             self.context,

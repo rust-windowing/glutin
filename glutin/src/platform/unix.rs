@@ -6,6 +6,7 @@
     target_os = "openbsd",
 ))]
 
+pub mod osmesa;
 // mod rawext;
 
 use crate::platform::ContextTraitExt;

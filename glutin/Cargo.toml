@@ -19,7 +19,6 @@ serde = ["winit/serde"]
 [dependencies]
 lazy_static = "1.3"
 winit = "0.20.0-alpha1"
-log = "0.4"
 bitflags = "1.1"
 
 [target.'cfg(target_os = "android")'.dependencies]
@@ -60,3 +59,4 @@ glutin_egl_sys = { version = "0.1.3", path = "../glutin_egl_sys" }
 glutin_glx_sys = { version = "0.1.5", path = "../glutin_glx_sys" }
 derivative = "1.0"
 parking_lot = "0.8"
+log = "0.4"
