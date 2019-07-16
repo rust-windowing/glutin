@@ -21,6 +21,15 @@ pub mod unix;
 pub mod windows;
 /// Platform-specific methods for desktop operating systems.
 pub mod desktop {
+    #![cfg(any(
+        target_os = "windows",
+        target_os = "macos",
+        target_os = "linux",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd",
+    ))]
     pub use winit::platform::desktop::*;
 }
 
