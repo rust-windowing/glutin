@@ -36,13 +36,13 @@ matrix:
       os: osx
       rust: stable
 
-    # # iOS
-    # - env: TARGET=x86_64-apple-ios
-    #   os: osx
-    #   rust: nightly
-    # - env: TARGET=x86_64-apple-ios
-    #   os: osx
-    #   rust: stable
+    # iOS
+    - env: TARGET=x86_64-apple-ios
+      os: osx
+      rust: nightly
+    - env: TARGET=x86_64-apple-ios
+      os: osx
+      rust: stable
 
 addons:
   apt:

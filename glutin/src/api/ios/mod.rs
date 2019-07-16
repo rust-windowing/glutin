@@ -205,7 +205,7 @@ impl Context {
         let win = builder.build(el)?;
         let context = unsafe {
             let eagl_context = Context::create_context(version)?;
-            let view = win.uiview() as ffi::id;
+            let view = win.ui_view() as ffi::id;
             let mut context = Context { eagl_context, view };
             context.init_context(&win);
             context
@@ -221,7 +221,7 @@ impl Context {
         size: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
         let wb = winit::window::WindowBuilder::new()
-            .with_visibility(false)
+            .with_visible(false)
             .with_inner_size(size.to_logical(1.));
         Self::new_windowed(wb, el, pf_reqs, gl_attr)
             .map(|(_window, context)| context)
