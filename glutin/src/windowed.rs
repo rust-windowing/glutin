@@ -102,7 +102,7 @@ impl<T: ContextCurrentState> WindowedContext<T> {
     }
 
     /// Split the [`Window`] apart from the OpenGL [`Context`]. Should only be
-    /// used when intending to transfer the [`RawContext<T>`] to an other
+    /// used when intending to transfer the [`RawContext<T>`] to another
     /// thread.
     ///
     /// Unsaftey:
@@ -193,7 +193,7 @@ impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
     /// If you wish to move a currently current context to a different thread,
     /// you should do one of two options:
     ///
-    ///  * Call `make_current` on an other context, then call
+    ///  * Call `make_current` on another context, then call
     ///  [`treat_as_not_current`] on this context.
     ///  * Call [`make_not_current`] on this context.
     ///
@@ -203,11 +203,11 @@ impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
     ///
     /// If you are not aware of what context you intend to make current next,
     /// consider waiting until you do. If you need this context not current
-    /// immediately (e.g. to transfer it to an other thread), then call
+    /// immediately (e.g. to transfer it to another thread), then call
     /// [`make_not_current`] on this context.
     ///
     /// Please avoid calling [`make_not_current`] on one context only to call
-    /// `make_current` on an other context before and/or after. This hurts
+    /// `make_current` on another context before and/or after. This hurts
     /// performance by requiring glutin to:
     ///
     ///  * Check if this context is current; then
