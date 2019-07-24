@@ -18,11 +18,11 @@ impl Context {
     }
 
     #[inline]
-    pub unsafe fn make_current_window(
+    pub unsafe fn make_current_surface(
         &self,
         surface: &WindowSurface,
     ) -> Result<(), ContextError> {
-        self.context.make_current_window(surface.inner())
+        self.context.make_current_surface(surface.inner())
     }
 
     #[inline]

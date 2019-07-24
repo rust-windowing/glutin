@@ -9,7 +9,7 @@ pub struct PBuffer {
 
 impl PBuffer {
     #[inline]
-    pub fn new<TE>(
+    pub unsafe fn new<TE>(
         el: &EventLoopWindowTarget<TE>,
         ctx: &Context,
         size: dpi::PhysicalSize,
@@ -46,13 +46,13 @@ pub struct WindowSurface {
 
 impl WindowSurface {
     #[inline]
-    pub fn new<TE>(
+    pub unsafe fn new<TE>(
         el: &EventLoopWindowTarget<TE>,
         ctx: &Context,
         wb: WindowBuilder,
-    ) -> Result<(WindowSurface, Window), CreationError> {
+    ) -> Result<(Window, WindowSurface), CreationError> {
         platform_impl::WindowSurface::new(el, ctx.inner(), wb)
-            .map(|(surface, window)| (WindowSurface { surface }, window))
+            .map(|(window, surface)| (window, WindowSurface { surface }))
     }
 
     #[inline]

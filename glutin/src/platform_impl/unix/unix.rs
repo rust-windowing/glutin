@@ -118,7 +118,7 @@ impl Context {
     }
 
     #[inline]
-    pub unsafe fn make_current_window(
+    pub unsafe fn make_current_surface(
         &self,
         surface: &WindowSurface,
     ) -> Result<(), ContextError> {
@@ -126,7 +126,7 @@ impl Context {
             (
                 Context::Wayland(ref ctx),
                 WindowSurface::Wayland(ref surface),
-            ) => ctx.make_current_window(surface),
+            ) => ctx.make_current_surface(surface),
         }
     }
 
@@ -242,14 +242,14 @@ impl WindowSurface {
         el: &EventLoopWindowTarget<T>,
         ctx: &Context,
         wb: WindowBuilder,
-    ) -> Result<(Self, Window), CreationError> {
+    ) -> Result<(Window, Self), CreationError> {
         match ctx {
             // Context::X11(ref ctx) => x11::WindowSurface::new(el, ctx, wb)
             //    .map(|(surface, win)| (WindowSurface::X11(surface), win)),
             Context::Wayland(ref ctx) => wayland::WindowSurface::new(
                 el, ctx, wb,
             )
-            .map(|(surface, win)| (WindowSurface::Wayland(surface), win)),
+            .map(|(win, surface)| (win, WindowSurface::Wayland(surface))),
         }
     }
 

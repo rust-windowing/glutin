@@ -585,7 +585,7 @@ impl Context {
     }
 
     #[inline]
-    pub unsafe fn make_current_window(
+    pub unsafe fn make_current_surface(
         &self,
         surface: &WindowSurface,
     ) -> Result<(), ContextError> {

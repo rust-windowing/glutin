@@ -131,7 +131,7 @@ impl<IU: SurfaceInUseTrait> LighterWindowSurface<IU> {
         wb: WindowBuilder,
     ) -> Result<LighterWindowSurface<SurfaceInUse::No>, CreationError> {
         WindowSurface::new(el, ctx.into().inner(), wb).map(
-            |(surface, window)| LighterWindowSurface {
+            |(window, surface)| LighterWindowSurface {
                 surface: Takeable::new(surface),
                 window: Takeable::new(window),
                 phantom: PhantomData,

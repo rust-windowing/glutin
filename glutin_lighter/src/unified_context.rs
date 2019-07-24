@@ -1,4 +1,5 @@
 use super::*;
+use std::ops::{Deref, DerefMut};
 
 pub trait LighterSurfaceOrNothing {
     type NotInUseType: LighterSurfaceOrNothing;
@@ -75,6 +76,34 @@ impl<
         WST: SupportsWindowSurfacesTrait,
         ST: SupportsSurfacelessTrait,
         SURFACE: LighterSurfaceOrNothing,
+    > Deref for UnifiedContext<IC, PBT, WST, ST, SURFACE>
+{
+    type Target = SplitContext<IC, PBT, WST, ST>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.context
+    }
+}
+
+impl<
+        IC: ContextIsCurrentTrait,
+        PBT: SupportsPBuffersTrait,
+        WST: SupportsWindowSurfacesTrait,
+        ST: SupportsSurfacelessTrait,
+        SURFACE: LighterSurfaceOrNothing,
+    > DerefMut for UnifiedContext<IC, PBT, WST, ST, SURFACE>
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.context
+    }
+}
+
+impl<
+        IC: ContextIsCurrentTrait,
+        PBT: SupportsPBuffersTrait,
+        WST: SupportsWindowSurfacesTrait,
+        ST: SupportsSurfacelessTrait,
+        SURFACE: LighterSurfaceOrNothing,
     > UnifiedContext<IC, PBT, WST, ST, SURFACE>
 {
     #[inline]
@@ -120,6 +149,14 @@ impl<
                 err,
             )),
         }
+    }
+
+    pub fn surface(&self) -> &SURFACE {
+        &self.surface
+    }
+
+    pub fn surface_mut(&mut self) -> &mut SURFACE {
+        &mut self.surface
     }
 
     #[inline]
@@ -203,7 +240,7 @@ impl<
             ContextError,
         ),
     > {
-        match self.context.make_current_window(self.surface) {
+        match self.context.make_current_surface(self.surface) {
             Ok((context, surface)) => Ok(UnifiedContext { context, surface }),
             Err((context, surface, err)) => {
                 Err((UnifiedContext { context, surface }, err))
@@ -309,7 +346,7 @@ impl<
     > UnifiedContext<IC, PBT, SupportsWindowSurfaces::Yes, ST, SURFACE>
 {
     #[inline]
-    pub unsafe fn make_current_window<W, IU: SurfaceInUseTrait>(
+    pub unsafe fn make_current_surface<W, IU: SurfaceInUseTrait>(
         self,
         surface: LighterWindowSurfaceWrapper<W, IU>,
     ) -> Result<
@@ -335,7 +372,7 @@ impl<
             ContextError,
         ),
     > {
-        match self.context.make_current_window(surface) {
+        match self.context.make_current_surface(surface) {
             Ok((context, nsurface)) => Ok((
                 UnifiedContext {
                     context,

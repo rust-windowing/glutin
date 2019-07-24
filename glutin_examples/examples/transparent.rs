@@ -3,7 +3,7 @@ mod support;
 use glutin::event::{Event, WindowEvent};
 use glutin::event_loop::{ControlFlow, EventLoop};
 use glutin::window::WindowBuilder;
-use glutin::ContextBuilder;
+use glutin::{ContextBuilder, ContextSupports, WindowSurface};
 
 fn main() {
     env_logger::init();
@@ -13,17 +13,18 @@ fn main() {
         .with_decorations(false)
         .with_transparent(true);
 
-    let windowed_context =
-        ContextBuilder::new().build_windowed(wb, &el).unwrap();
+    let ctx =
+        ContextBuilder::new().build(&el, ContextSupports::WINDOW_SURFACES).unwrap();
+    let (win, surface) = WindowSurface::new(&el, &ctx, wb).unwrap();
 
-    let windowed_context = unsafe { windowed_context.make_current().unwrap() };
+    unsafe { ctx.make_current_surface(&surface).unwrap() }
 
     println!(
         "Pixel format of the window's GL context: {:?}",
-        windowed_context.get_pixel_format()
+        ctx.get_pixel_format()
     );
 
-    let gl = support::load(&windowed_context.context());
+    let gl = support::load(|s| ctx.get_proc_address(s) as *const _);
 
     el.run(move |event, _, control_flow| {
         println!("{:?}", event);
@@ -33,13 +34,14 @@ fn main() {
             Event::LoopDestroyed => return,
             Event::WindowEvent { ref event, .. } => match event {
                 WindowEvent::Resized(logical_size) => {
-                    let dpi_factor = windowed_context.window().hidpi_factor();
-                    windowed_context
-                        .resize(logical_size.to_physical(dpi_factor));
+                    let dpi_factor = win.hidpi_factor();
+                    ctx.update_after_resize();
+                    surface
+                        .update_after_resize(logical_size.to_physical(dpi_factor));
                 }
                 WindowEvent::RedrawRequested => {
                     gl.draw_frame([0.0; 4]);
-                    windowed_context.swap_buffers().unwrap();
+                    surface.swap_buffers().unwrap();
                 }
                 WindowEvent::CloseRequested => {
                     *control_flow = ControlFlow::Exit

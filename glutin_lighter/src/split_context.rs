@@ -110,10 +110,10 @@ pub mod ContextIsCurrent {
     /// A type that [`Context`]s which might possibly be currently current on
     /// some thread take as a generic.
     ///
-    /// See [`Context::make_current_window`] for more details.
+    /// See [`Context::make_current_surface`] for more details.
     ///
-    /// [`Context::make_current_window`]:
-    /// struct.Context.html#method.make_current_window
+    /// [`Context::make_current_surface`]:
+    /// struct.Context.html#method.make_current_surface
     /// [`Context`]: struct.Context.html
     #[derive(Debug, Clone, Copy)]
     pub struct Possibly {
@@ -126,10 +126,10 @@ pub mod ContextIsCurrent {
     /// A type that [`Context`]s which are not currently current on any thread
     /// take as a generic.
     ///
-    /// See [`Context::make_current_window`] for more details.
+    /// See [`Context::make_current_surface`] for more details.
     ///
-    /// [`Context::make_current_window`]:
-    /// struct.Context.html#method.make_current_window
+    /// [`Context::make_current_surface`]:
+    /// struct.Context.html#method.make_current_surface
     /// [`Context`]: struct.Context.html
     #[derive(Debug, Clone, Copy)]
     pub enum No {}
@@ -228,7 +228,7 @@ impl<
     /// struct.Context.html#method.treat_as_not_current
     /// [`is_current`]: struct.Context.html#method.is_current
     #[inline]
-    pub unsafe fn make_current_window<W, IU: SurfaceInUseTrait>(
+    pub unsafe fn make_current_surface<W, IU: SurfaceInUseTrait>(
         self,
         surface: LighterWindowSurfaceWrapper<W, IU>,
     ) -> Result<
@@ -252,7 +252,7 @@ impl<
             ContextError,
         ),
     > {
-        match self.context.make_current_window(surface.inner()) {
+        match self.context.make_current_surface(surface.inner()) {
             Ok(()) => Ok((
                 self.treat_as_current(),
                 LighterSurface::treat_as_current(surface),
@@ -424,9 +424,9 @@ impl<
     /// If this context is current, makes this context not current. If this
     /// context is not current however, this function does nothing.
     ///
-    /// Please see [`make_current_window`].
+    /// Please see [`make_current_surface`].
     ///
-    /// [`make_current_window`]: struct.Context.html#method.make_current_window
+    /// [`make_current_surface`]: struct.Context.html#method.make_current_surface
     #[inline]
     pub unsafe fn make_not_current(
         self,
@@ -458,10 +458,10 @@ impl<
     /// [`make_not_current`] which will do nothing if this context is not
     /// current.
     ///
-    /// Please see [`make_current_window`].
+    /// Please see [`make_current_surface`].
     ///
     /// [`make_not_current`]: struct.Context.html#method.make_not_current
-    /// [`make_current_window`]: struct.Context.html#method.make_current_window
+    /// [`make_current_surface`]: struct.Context.html#method.make_current_surface
     #[inline]
     pub unsafe fn treat_as_not_current(
         self,
@@ -479,10 +479,10 @@ impl<
     /// currency without the limited aid of glutin, and you wish to store
     /// all the [`Context`]s as [`NotCurrent`].
     ///
-    /// Please see [`make_current_window`] for the prefered method of handling
+    /// Please see [`make_current_surface`] for the prefered method of handling
     /// context currency.
     ///
-    /// [`make_current_window`]: struct.Context.html#method.make_current_window
+    /// [`make_current_surface`]: struct.Context.html#method.make_current_surface
     /// [`NotCurrent`]: enum.NotCurrent.html
     /// [`Context`]: struct.Context.html
     ///

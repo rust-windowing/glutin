@@ -39,7 +39,7 @@ impl WindowSurface {
         el: &EventLoopWindowTarget<T>,
         ctx: &Context,
         wb: WindowBuilder,
-    ) -> Result<(Self, Window), CreationError> {
+    ) -> Result<(Window, Self), CreationError> {
         let win = wb.build(el)?;
 
         let dpi_factor = win.hidpi_factor();
@@ -69,7 +69,7 @@ impl WindowSurface {
             &ctx.context,
             wsurface.ptr() as *const _,
         )
-        .map(|surface| (WindowSurface { wsurface, surface }, win))
+        .map(|surface| (win, WindowSurface { wsurface, surface }))
     }
 
     #[inline]
@@ -156,11 +156,11 @@ impl Context {
     }
 
     #[inline]
-    pub unsafe fn make_current_window(
+    pub unsafe fn make_current_surface(
         &self,
         surface: &WindowSurface,
     ) -> Result<(), ContextError> {
-        self.context.make_current_window(&surface.surface)
+        self.context.make_current_surface(&surface.surface)
     }
 
     #[inline]
