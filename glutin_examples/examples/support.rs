@@ -1,4 +1,4 @@
-use std::ffi::{CStr, c_void};
+use std::ffi::{c_void, CStr};
 
 pub mod gl {
     pub use self::Gles2 as Gl;
@@ -115,7 +115,7 @@ where
         gl.EnableVertexAttribArray(color_attrib as gl::types::GLuint);
     }
 
-    Gl { gl: gl }
+    Gl { gl }
 }
 
 impl Gl {

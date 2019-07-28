@@ -1,4 +1,5 @@
 #![cfg(target_os = "macos")]
+use crate::platform::macos::WindowExtMacOS;
 use crate::{
     ContextError, CreationError, GlAttributes, PixelFormat,
     PixelFormatRequirements, Robustness,
@@ -17,8 +18,6 @@ use core_foundation::bundle::{
 };
 use core_foundation::string::CFString;
 use objc::runtime::{BOOL, NO};
-
-use crate::platform::macos::WindowExtMacOS;
 use winit;
 use winit::dpi;
 use winit::event_loop::EventLoopWindowTarget;
@@ -157,7 +156,7 @@ impl Context {
 
             let context = WindowedContext {
                 context: gl_context,
-                pixel_format: pixel_format,
+                pixel_format,
             };
             Ok((win, Context::WindowedContext(context)))
         }

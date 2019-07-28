@@ -22,6 +22,7 @@ use winit::dpi;
 use winit::event_loop::EventLoopWindowTarget;
 use winit::window::{Window, WindowBuilder};
 
+use std::ffi::c_void;
 use std::marker::PhantomData;
 use std::os::raw;
 use std::sync::Arc;
@@ -195,7 +196,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const () {
+    pub fn get_proc_address(&self, addr: &str) -> *const c_void {
         match self {
             // Context::X11(ref ctx) => ctx.get_proc_address(addr),
             Context::Wayland(ref ctx) => ctx.get_proc_address(addr),

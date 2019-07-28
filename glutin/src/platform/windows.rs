@@ -2,6 +2,8 @@
 
 // mod rawext;
 
+// pub use self::rawext::*;
+
 use crate::platform::ContextTraitExt;
 pub use crate::platform_impl::{RawContextExt, RawHandle};
 use crate::{Context, ContextCurrentState};
@@ -9,11 +11,10 @@ use crate::{
     SupportsPBuffersTrait, SupportsSurfacelessTrait,
     SupportsWindowSurfacesTrait,
 };
-pub use glutin_egl_sys::EGLContext;
 
+pub use glutin_egl_sys::EGLContext;
 pub use winapi::shared::windef::HGLRC;
 pub use winit::platform::windows::*;
-// pub use self::rawext::*;
 
 impl<
         IC: ContextCurrentState,

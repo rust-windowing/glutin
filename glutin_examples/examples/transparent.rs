@@ -13,8 +13,9 @@ fn main() {
         .with_decorations(false)
         .with_transparent(true);
 
-    let ctx =
-        ContextBuilder::new().build(&el, ContextSupports::WINDOW_SURFACES).unwrap();
+    let ctx = ContextBuilder::new()
+        .build(&el, ContextSupports::WINDOW_SURFACES)
+        .unwrap();
     let (win, surface) = WindowSurface::new(&el, &ctx, wb).unwrap();
 
     unsafe { ctx.make_current_surface(&surface).unwrap() }
@@ -24,7 +25,7 @@ fn main() {
         ctx.get_pixel_format()
     );
 
-    let gl = support::load(|s| ctx.get_proc_address(s) as *const _);
+    let gl = support::load(|s| ctx.get_proc_address(s));
 
     el.run(move |event, _, control_flow| {
         println!("{:?}", event);
@@ -36,8 +37,9 @@ fn main() {
                 WindowEvent::Resized(logical_size) => {
                     let dpi_factor = win.hidpi_factor();
                     ctx.update_after_resize();
-                    surface
-                        .update_after_resize(logical_size.to_physical(dpi_factor));
+                    surface.update_after_resize(
+                        logical_size.to_physical(dpi_factor),
+                    );
                 }
                 WindowEvent::RedrawRequested => {
                     gl.draw_frame([0.0; 4]);

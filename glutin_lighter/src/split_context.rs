@@ -1,6 +1,9 @@
 use super::*;
+
 use glutin::event_loop::EventLoopWindowTarget;
 use glutin::{Context, ContextSupports};
+
+use std::ffi::c_void;
 use std::marker::PhantomData;
 
 #[allow(non_snake_case)]
@@ -392,7 +395,7 @@ impl<
 {
     /// Returns the address of an OpenGL function.
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const () {
+    pub fn get_proc_address(&self, addr: &str) -> *const c_void {
         self.context.get_proc_address(addr)
     }
 }
@@ -426,7 +429,8 @@ impl<
     ///
     /// Please see [`make_current_surface`].
     ///
-    /// [`make_current_surface`]: struct.Context.html#method.make_current_surface
+    /// [`make_current_surface`]:
+    /// struct.Context.html#method.make_current_surface
     #[inline]
     pub unsafe fn make_not_current(
         self,
@@ -461,7 +465,8 @@ impl<
     /// Please see [`make_current_surface`].
     ///
     /// [`make_not_current`]: struct.Context.html#method.make_not_current
-    /// [`make_current_surface`]: struct.Context.html#method.make_current_surface
+    /// [`make_current_surface`]:
+    /// struct.Context.html#method.make_current_surface
     #[inline]
     pub unsafe fn treat_as_not_current(
         self,
@@ -482,9 +487,9 @@ impl<
     /// Please see [`make_current_surface`] for the prefered method of handling
     /// context currency.
     ///
-    /// [`make_current_surface`]: struct.Context.html#method.make_current_surface
-    /// [`NotCurrent`]: enum.NotCurrent.html
-    /// [`Context`]: struct.Context.html
+    /// [`make_current_surface`]:
+    /// struct.Context.html#method.make_current_surface [`NotCurrent`]:
+    /// enum.NotCurrent.html [`Context`]: struct.Context.html
     ///
     /// FIXME: docs
     #[inline]

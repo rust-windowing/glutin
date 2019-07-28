@@ -6,8 +6,8 @@ use crate::{
     SupportsPBuffersTrait, SupportsSurfacelessTrait,
     SupportsWindowSurfacesTrait,
 };
-pub use glutin_egl_sys::EGLContext;
 
+pub use glutin_egl_sys::EGLContext;
 pub use winit::platform::android::*;
 
 use std::os::raw;

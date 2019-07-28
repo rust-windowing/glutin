@@ -5,7 +5,10 @@ use crate::{
     ContextIsCurrentTrait, ContextIsCurrentYesTrait, CreationError,
     LighterSurface, PixelFormat, SurfaceInUse, SurfaceInUseTrait,
 };
+
 use glutin::dpi;
+
+use std::ffi::c_void;
 use std::marker::PhantomData;
 
 /// A unix-specific extension to the [`ContextBuilder`] which allows building
@@ -56,7 +59,7 @@ pub struct SplitOsMesaContext<IC: ContextIsCurrentTrait> {
 
 impl<IC: ContextIsCurrentYesTrait> SplitOsMesaContext<IC> {
     /// Returns the address of an OpenGL function.
-    pub fn get_proc_address(&self, addr: &str) -> *const () {
+    pub fn get_proc_address(&self, addr: &str) -> *const c_void {
         self.context.get_proc_address(addr)
     }
 }

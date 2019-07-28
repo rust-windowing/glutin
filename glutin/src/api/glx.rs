@@ -52,6 +52,7 @@ mod glx {
 
 pub use self::glx::Glx;
 use self::make_current_guard::MakeCurrentGuard;
+
 use crate::{
     Api, ContextBuilderWrapper, ContextError, CreationError, GlAttributes,
     GlProfile, GlRequest, PixelFormat, PixelFormatRequirements,

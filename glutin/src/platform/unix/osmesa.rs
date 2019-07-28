@@ -2,7 +2,10 @@ use crate::api::osmesa;
 use crate::{
     Api, ContextBuilderWrapper, ContextError, CreationError, PixelFormat,
 };
+
 use winit::dpi;
+
+use std::ffi::c_void;
 
 #[derive(Debug)]
 pub struct OsMesaContext {
@@ -35,7 +38,7 @@ pub struct OsMesaBuffer {
 
 impl OsMesaContext {
     /// Returns the address of an OpenGL function.
-    pub fn get_proc_address(&self, addr: &str) -> *const () {
+    pub fn get_proc_address(&self, addr: &str) -> *const c_void {
         self.context.get_proc_address(addr)
     }
 

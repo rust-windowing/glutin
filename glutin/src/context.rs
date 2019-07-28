@@ -1,4 +1,5 @@
 use super::*;
+use std::ffi::c_void;
 use winit::event_loop::EventLoopWindowTarget;
 
 #[derive(Debug)]
@@ -54,7 +55,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const () {
+    pub fn get_proc_address(&self, addr: &str) -> *const c_void {
         self.context.get_proc_address(addr)
     }
 

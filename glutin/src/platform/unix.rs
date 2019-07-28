@@ -9,14 +9,15 @@
 pub mod osmesa;
 // mod rawext;
 
+// pub use self::rawext::*;
+
 use crate::platform::ContextTraitExt;
 pub use crate::platform_impl::{PlatformAttributes, RawHandle};
 use crate::Context;
+
 pub use glutin_egl_sys::EGLContext;
 pub use glutin_glx_sys::GLXContext;
-
 pub use winit::platform::unix::*;
-// pub use self::rawext::*;
 
 use std::os::raw;
 

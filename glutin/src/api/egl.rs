@@ -60,6 +60,7 @@ mod make_current_guard;
 
 pub use self::egl::Egl;
 use self::make_current_guard::MakeCurrentGuard;
+
 use crate::platform_impl::PlatformAttributes;
 use crate::{
     Api, ContextBuilderWrapper, ContextError, ContextSupports, CreationError,
@@ -81,7 +82,7 @@ use parking_lot::Mutex;
 use winit::dpi;
 use winit::event_loop::EventLoopWindowTarget;
 
-use std::ffi::{CStr, CString};
+use std::ffi::{c_void, CStr, CString};
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::os::raw;
@@ -709,7 +710,7 @@ impl Context {
     // }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const () {
+    pub fn get_proc_address(&self, addr: &str) -> *const c_void {
         let egl = EGL.as_ref().unwrap();
         let addr = CString::new(addr.as_bytes()).unwrap();
         let addr = addr.as_ptr();
