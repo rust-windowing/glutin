@@ -1,5 +1,9 @@
 # Unreleased
 
+# Version 0.20.1 (2019-08-08)
+
+ - **Backport:** We now load `libGL.so` instead of `libGLX.so`. 
+
 # Version 0.20.0 (2019-03-09)
 
 - We no longer load `libegl.so` and `libgl.so` multiple times.
