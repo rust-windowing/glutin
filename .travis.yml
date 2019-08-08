@@ -65,7 +65,7 @@ script:
 
 after_success:
   - |
-        [ $TRAVIS_BRANCH = master ] &&
+        [[ $TRAVIS_BRANCH = master || $TRAVIS_BRANCH = backport ]] &&
         [ $TRAVIS_PULL_REQUEST = false ] && {
             cd glutin
             for crate in ../glutin_*; do 

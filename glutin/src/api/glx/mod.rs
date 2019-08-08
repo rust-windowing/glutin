@@ -28,7 +28,7 @@ mod glx {
 
     impl Glx {
         pub fn new() -> Result<Self, ()> {
-            let paths = vec!["libGLX.so.1", "libGLX.so"];
+            let paths = vec!["libGL.so.1", "libGL.so"];
 
             SymWrapper::new(paths).map(|i| Glx(i))
         }
