@@ -1,6 +1,7 @@
 # Unreleased
 
 - Fixed attribute handling for sRGB in WGL.
+- Fixed VSync being always enabled on EGL.
 
 # Version 0.22.0-alpha1 (2019-06-21)
 
