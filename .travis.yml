@@ -53,27 +53,27 @@ addons:
 env:
   global:
     - secure: "kVjHgK+6ivT5tUleNH/m6+69tPf8gkPNSPLsnXrkMJaIeXSnnKKQegP1O0UCThYAUbbwrUGlrKJUngDxkD8jSANhzAULX9t1iXho41InzYBEErTanXBYF8WO1rK1keKjLwiYw4KuvbiBoSeKabzQRwv0kMttxY57+hKVROr5dSg="
-    - secure: g4ZP621rbq7nPU8Df9/92haJda2R+Sb84lUQIONh6JDTrgw7/mnfmbnZGzXo3gpjKZCuPfdu8D0knMjn7aLaI7U1yczzNs2wwD+G8txNN/rM7VEuzk8BN0Kl1iKbnY9ZtAGLVTMSR6NVAKWAaisNkMLpWDiftTNOkXxTQYerxvw=
 
 install:
   - rustup self update
   - rustup target add $TARGET; true
-  - rustup component add rustfmt
 
 script:
   - cargo build --target $TARGET --verbose
     # Running iOS apps on OSX requires the simulator so we skip that for now
   - if [ "$TARGET" != "x86_64-apple-ios" ]; then cargo test --target $TARGET --verbose; fi
-  - cargo fmt --all -- --check
 
 after_success:
   - |
-        [ $TRAVIS_BRANCH = master ] &&
+        [[ $TRAVIS_BRANCH = master || $TRAVIS_BRANCH = backport ]] &&
         [ $TRAVIS_PULL_REQUEST = false ] && {
             cd glutin
-            for crate in ../glutin_*_sys; do
-                cd "$crate"
-                cargo publish --token ${CRATESIO_TOKEN_GENTZ}
+            for crate in ../glutin_*; do 
+                # We can't do the glutin crate first because it depends on the others.
+                if [ "$crate" != "glutin" ]; then 
+                    cd "$crate"
+                    cargo publish --token ${CRATESIO_TOKEN}
+                fi
             done
 
             cd ../glutin

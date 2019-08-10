@@ -2,6 +2,10 @@
 
 - Fixed attribute handling for sRGB in WGL.
 
+# Version 0.20.1 (2019-08-08)
+
+ - **Backport:** We now load `libGL.so` instead of `libGLX.so`. 
+
 # Version 0.22.0-alpha1 (2019-06-21)
 
 - Update winit dependency to 0.20.0-alpha1. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/blob/master/CHANGELOG.md#0200-alpha-1) for more info.
