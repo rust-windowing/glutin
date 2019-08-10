@@ -439,6 +439,7 @@ impl Context {
                 version,
                 pf_reqs,
                 surface_type,
+                opengl,
                 config_selector,
             )?
         };
@@ -1008,6 +1009,7 @@ unsafe fn choose_fbconfig<F>(
     version: Option<(u8, u8)>,
     pf_reqs: &PixelFormatRequirements,
     surface_type: SurfaceType,
+    opengl: &GlAttributes<&Context>,
     mut config_selector: F,
 ) -> Result<(ffi::egl::types::EGLConfig, PixelFormat), CreationError>
 where
@@ -1177,7 +1179,42 @@ where
         ));
     }
 
-    if num_configs == 0 {
+    // We're interested in those configs which allow our desired VSync.
+    let desired_swap_interval = if opengl.vsync {
+        1
+    } else {
+        0
+    };
+
+    let config_ids = config_ids.into_iter().filter(|&config| {
+        let mut min_swap_interval = 0;
+        let res = egl.GetConfigAttrib(
+            display,
+            config,
+            ffi::egl::MIN_SWAP_INTERVAL as ffi::egl::types::EGLint,
+            &mut min_swap_interval,
+        );
+
+        if desired_swap_interval < min_swap_interval {
+            return false;
+        }
+
+        let mut max_swap_interval = 0;
+        let res = egl.GetConfigAttrib(
+            display,
+            config,
+            ffi::egl::MAX_SWAP_INTERVAL as ffi::egl::types::EGLint,
+            &mut max_swap_interval,
+        );
+
+        if desired_swap_interval > max_swap_interval {
+            return false;
+        }
+
+        true
+    }).collect::<Vec<_>>();
+
+    if config_ids.is_empty() {
         return Err(CreationError::NoAvailablePixelFormat);
     }
 
