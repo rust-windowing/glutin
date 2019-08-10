@@ -11,34 +11,9 @@ pub struct Gl {
     pub gl: gl::Gl,
 }
 
-extern "system" fn dbg_callback(
-    source: gl::types::GLenum,
-    etype: gl::types::GLenum,
-    _id: gl::types::GLuint,
-    severity: gl::types::GLenum,
-    _msg_length: gl::types::GLsizei,
-    msg: *const gl::types::GLchar,
-    _user_data: *mut std::ffi::c_void,
-) {
-    unsafe {
-        println!(
-            "dbg_callback {:#X} {:#X} {:#X} {:?}",
-            source,
-            etype,
-            severity,
-            std::ffi::CStr::from_ptr(msg),
-        );
-    }
-}
-
 pub fn load(gl_context: &glutin::Context<PossiblyCurrent>) -> Gl {
     let gl =
         gl::Gl::load_with(|ptr| gl_context.get_proc_address(ptr) as *const _);
-
-    unsafe {
-        gl.Enable(gl::DEBUG_OUTPUT);
-        gl.DebugMessageCallback(dbg_callback, std::ptr::null());
-    }
 
     let version = unsafe {
         let data = CStr::from_ptr(gl.GetString(gl::VERSION) as *const _)
