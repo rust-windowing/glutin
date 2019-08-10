@@ -10,4 +10,4 @@ members = [
 ]
 
 [replace]
-"winit:0.20.0-alpha1" = { path = "../winit" }
+"winit:0.20.0-alpha2" = { path = "../winit" }

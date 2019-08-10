@@ -895,6 +895,23 @@ impl WindowSurface {
             surface
         };
 
+        // VSync defaults to enabled; disable it if it was not requested.
+        if !ctx.pixel_format.vsync {
+            let _guard = MakeCurrentGuard::new(
+                **ctx.display,
+                surface,
+                surface,
+                ctx.context,
+            )
+            .map_err(|err| CreationError::OsError(err))?;
+
+            unsafe {
+                if egl.SwapInterval(**ctx.display, 0) == ffi::egl::FALSE {
+                    panic!("finish_impl: eglSwapInterval failed: 0x{:x}", egl.GetError());
+                }
+            }
+        }
+
         Ok(WindowSurface {
             display: Arc::clone(&ctx.display),
             pixel_format: ctx.pixel_format.clone(),
@@ -1211,7 +1228,42 @@ where
         ));
     }
 
-    if num_configs == 0 {
+    // We're interested in those configs which allow our desired VSync.
+    let desired_swap_interval = if cb.pf_reqs.vsync {
+        1
+    } else {
+        0
+    };
+
+    let config_ids = config_ids.into_iter().filter(|&config| {
+        let mut min_swap_interval = 0;
+        let res = egl.GetConfigAttrib(
+            display,
+            config,
+            ffi::egl::MIN_SWAP_INTERVAL as ffi::egl::types::EGLint,
+            &mut min_swap_interval,
+        );
+
+        if desired_swap_interval < min_swap_interval {
+            return false;
+        }
+
+        let mut max_swap_interval = 0;
+        let res = egl.GetConfigAttrib(
+            display,
+            config,
+            ffi::egl::MAX_SWAP_INTERVAL as ffi::egl::types::EGLint,
+            &mut max_swap_interval,
+        );
+
+        if desired_swap_interval > max_swap_interval {
+            return false;
+        }
+
+        true
+    }).collect::<Vec<_>>();
+
+    if config_ids.is_empty() {
         return Err(CreationError::NoAvailablePixelFormat);
     }
 
