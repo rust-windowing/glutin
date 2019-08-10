@@ -969,6 +969,26 @@ impl<'a> ContextPrototype<'a> {
             }
         };
 
+        if let Some(surface) = surface {
+            // VSync defaults to enabled; disable it if it was not requested.
+            if !self.opengl.vsync {
+                let _guard = MakeCurrentGuard::new(
+                    self.display,
+                    surface,
+                    surface,
+                    context,
+                )
+                .map_err(|err| CreationError::OsError(err))?;
+
+                let egl = EGL.as_ref().unwrap();
+                unsafe {
+                    if egl.SwapInterval(self.display, 0) == ffi::egl::FALSE {
+                        panic!("finish_impl: eglSwapInterval failed: 0x{:x}", egl.GetError());
+                    }
+                }
+            }
+        }
+
         Ok(Context {
             display: self.display,
             context,
