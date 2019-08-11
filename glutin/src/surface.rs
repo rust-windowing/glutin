@@ -29,8 +29,8 @@ impl PBuffer {
     }
 
     #[inline]
-    pub fn get_pixel_format(&self) -> PixelFormat {
-        self.pbuffer.get_pixel_format()
+    pub fn get_surface_config(&self) -> SurfaceConfig {
+        self.pbuffer.get_surface_config()
     }
 
     #[inline]
@@ -48,10 +48,10 @@ impl WindowSurface {
     #[inline]
     pub unsafe fn new<TE>(
         el: &EventLoopWindowTarget<TE>,
-        ctx: &Context,
+        surface_config: &SurfaceConfig,
         wb: WindowBuilder,
     ) -> Result<(Window, WindowSurface), CreationError> {
-        platform_impl::WindowSurface::new(el, ctx.inner(), wb)
+        platform_impl::WindowSurface::new(el, surface_config, wb)
             .map(|(window, surface)| (window, WindowSurface { surface }))
     }
 
@@ -66,8 +66,8 @@ impl WindowSurface {
     }
 
     #[inline]
-    pub fn get_pixel_format(&self) -> PixelFormat {
-        self.surface.get_pixel_format()
+    pub fn get_surface_config(&self) -> SurfaceConfig {
+        self.surface.get_surface_config()
     }
 
     #[inline]

@@ -45,8 +45,8 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_pixel_format(&self) -> PixelFormat {
-        self.context.get_pixel_format()
+    pub fn get_surface_config(&self) -> SurfaceConfig {
+        self.context.get_surface_config()
     }
 
     #[inline]
@@ -66,24 +66,16 @@ impl Context {
     }
 }
 
-bitflags! {
-    #[derive(Default)]
-    pub struct ContextSupports: u8 {
-        const PBUFFERS = 1 << 0;
-        const WINDOW_SURFACES = 1 << 1;
-        const SURFACELESS = 1 << 2;
-    }
-}
-
 impl<'a> ContextBuilder<'a> {
     #[inline]
     pub fn build<TE>(
         self,
         el: &EventLoopWindowTarget<TE>,
-        ctx_supports: ContextSupports,
+        supports_surfaceless: bool,
+        surface_config: &SurfaceConfig,
     ) -> Result<Context, CreationError> {
         let cb = self.map_sharing(|ctx| &ctx.context);
-        platform_impl::Context::new(el, cb, ctx_supports)
+        platform_impl::Context::new(el, cb, supports_surfaceless, surface_config)
             .map(|context| Context { context })
     }
 }

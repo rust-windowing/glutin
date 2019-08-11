@@ -118,6 +118,7 @@ pub use winit::*;
 use winit::error::OsError;
 
 use std::io;
+use std::default::Default;
 
 /// An object that allows you to build [`Context`]s, [`RawContext<T>`]s and
 /// [`WindowedContext<T>`]s.
@@ -130,10 +131,42 @@ use std::io;
 /// [`RawContext<T>`]: type.RawContext.html
 #[derive(Debug, Clone)]
 pub struct ContextBuilderWrapper<T> {
-    /// The attributes to use to create the context.
-    pub gl_attr: GlAttributes<T>,
-    /// The pixel format requirements
-    pub pf_reqs: PixelFormatRequirements,
+    /// An existing context with which some OpenGL objects get shared.
+    ///
+    /// The default is `None`.
+    pub sharing: Option<T>,
+
+    /// Version to try create. See [`GlRequest`] for more infos.
+    ///
+    /// The default is [`Latest`].
+    ///
+    /// [`Latest`]: enum.GlRequest.html#variant.Latest
+    /// [`GlRequest`]: enum.GlRequest.html
+    pub version: GlRequest,
+
+    /// OpenGL profile to use.
+    ///
+    /// The default is `None`.
+    pub profile: Option<GlProfile>,
+
+    /// Whether to enable the `debug` flag of the context.
+    ///
+    /// Debug contexts are usually slower but give better error reporting.
+    ///
+    /// The default is `true` in debug mode and `false` in release mode.
+    pub debug: bool,
+
+    /// How the OpenGL [`Context`] should detect errors.
+    ///
+    /// The default is `NotRobust` because this is what is typically expected
+    /// when you create an OpenGL [`Context`]. However for safety you should
+    /// consider [`TryRobustLoseContextOnReset`].
+    ///
+    /// [`Context`]: struct.Context.html
+    /// [`TryRobustLoseContextOnReset`]:
+    /// enum.Robustness.html#variant.TryRobustLoseContextOnReset
+    pub robustness: Robustness,
+
     /// Platform specific attributes
     pub plat_attr: platform_impl::PlatformAttributes,
 }
@@ -143,26 +176,51 @@ pub type ContextBuilder<'a> = ContextBuilderWrapper<&'a Context>;
 impl<T> ContextBuilderWrapper<T> {
     /// Turns the `sharing` parameter into another type by calling a closure.
     #[inline]
-    pub fn map_sharing<F, T2>(self, f: F) -> ContextBuilderWrapper<T2>
+    pub(crate) fn map_sharing<F, T2>(self, f: F) -> ContextBuilderWrapper<T2>
     where
         F: FnOnce(T) -> T2,
     {
         ContextBuilderWrapper {
-            gl_attr: self.gl_attr.map_sharing(f),
-            pf_reqs: self.pf_reqs,
+            sharing: self.sharing.map(f),
+            version: self.version,
+            profile: self.profile,
+            debug: self.debug,
+            robustness: self.robustness,
+            plat_attr: self.plat_attr,
+        }
+    }
+
+    /// Turns the `sharing` parameter into another type.
+    #[inline]
+    pub(crate) fn set_sharing<T2>(self, sharing: Option<T2>) -> ContextBuilderWrapper<T2> {
+        ContextBuilderWrapper {
+            sharing,
+            version: self.version,
+            profile: self.profile,
+            debug: self.debug,
+            robustness: self.robustness,
             plat_attr: self.plat_attr,
         }
     }
 }
 
-impl<T> ContextBuilderWrapper<T> {
+impl<T> Default for ContextBuilderWrapper<T> {
     /// Initializes a new `ContextBuilder` with default values.
-    pub fn new() -> Self {
+    fn default() -> Self {
         ContextBuilderWrapper {
-            pf_reqs: std::default::Default::default(),
-            gl_attr: std::default::Default::default(),
-            plat_attr: std::default::Default::default(),
+            sharing: None,
+            version: GlRequest::Latest,
+            profile: None,
+            debug: cfg!(debug_assertions),
+            robustness: Robustness::NotRobust,
+            plat_attr: Default::default(),
         }
+    }
+}
+
+impl<T> ContextBuilderWrapper<T> {
+    fn new() -> Self {
+        Default::default()
     }
 }
 
@@ -170,7 +228,7 @@ impl<T> ContextBuilderWrapper<T> {
     /// Sets how the backend should choose the OpenGL API and version.
     #[inline]
     pub fn with_gl(mut self, request: GlRequest) -> Self {
-        self.gl_attr.version = request;
+        self.version = request;
         self
     }
 
@@ -179,7 +237,7 @@ impl<T> ContextBuilderWrapper<T> {
     /// [`Context`]: struct.Context.html
     #[inline]
     pub fn with_gl_profile(mut self, profile: GlProfile) -> Self {
-        self.gl_attr.profile = Some(profile);
+        self.profile = Some(profile);
         self
     }
 
@@ -192,7 +250,7 @@ impl<T> ContextBuilderWrapper<T> {
     /// [`Context`]: struct.Context.html
     #[inline]
     pub fn with_gl_debug_flag(mut self, flag: bool) -> Self {
-        self.gl_attr.debug = flag;
+        self.debug = flag;
         self
     }
 
@@ -203,16 +261,7 @@ impl<T> ContextBuilderWrapper<T> {
     /// [`Robustness`]: enum.Robustness.html
     #[inline]
     pub fn with_gl_robustness(mut self, robustness: Robustness) -> Self {
-        self.gl_attr.robustness = robustness;
-        self
-    }
-
-    /// Requests that the window has vsync enabled.
-    ///
-    /// By default, vsync is not enabled.
-    #[inline]
-    pub fn with_vsync(mut self, vsync: bool) -> Self {
-        self.gl_attr.vsync = vsync;
+        self.robustness = robustness;
         self
     }
 
@@ -221,105 +270,7 @@ impl<T> ContextBuilderWrapper<T> {
     /// [`Context`]: struct.Context.html
     #[inline]
     pub fn with_shared_lists<T2>(self, other: T2) -> ContextBuilderWrapper<T2> {
-        ContextBuilderWrapper {
-            gl_attr: self.gl_attr.set_sharing(Some(other.into())),
-            pf_reqs: self.pf_reqs,
-            plat_attr: self.plat_attr,
-        }
-    }
-
-    /// Sets the multisampling level to request. A value of `0` indicates that
-    /// multisampling must not be enabled.
-    ///
-    /// # Panic
-    ///
-    /// Will panic if `samples` is not a power of two.
-    #[inline]
-    pub fn with_multisampling(mut self, samples: u16) -> Self {
-        self.pf_reqs.multisampling = match samples {
-            0 => None,
-            _ => {
-                assert!(samples.is_power_of_two());
-                Some(samples)
-            }
-        };
-        self
-    }
-
-    /// Sets the number of bits in the depth buffer.
-    #[inline]
-    pub fn with_depth_buffer(mut self, bits: u8) -> Self {
-        self.pf_reqs.depth_bits = Some(bits);
-        self
-    }
-
-    /// Sets the number of bits in the stencil buffer.
-    #[inline]
-    pub fn with_stencil_buffer(mut self, bits: u8) -> Self {
-        self.pf_reqs.stencil_bits = Some(bits);
-        self
-    }
-
-    /// Sets the number of bits in the color buffer.
-    #[inline]
-    pub fn with_pixel_format(mut self, color_bits: u8, alpha_bits: u8) -> Self {
-        self.pf_reqs.color_bits = Some(color_bits);
-        self.pf_reqs.alpha_bits = Some(alpha_bits);
-        self
-    }
-
-    /// Request the backend to be stereoscopic.
-    #[inline]
-    pub fn with_stereoscopy(mut self) -> Self {
-        self.pf_reqs.stereoscopy = true;
-        self
-    }
-
-    /// Sets whether sRGB should be enabled on the window.
-    ///
-    /// The default value is `false`.
-    #[inline]
-    pub fn with_srgb(mut self, srgb_enabled: bool) -> Self {
-        self.pf_reqs.srgb = srgb_enabled;
-        self
-    }
-
-    /// Sets whether double buffering should be enabled.
-    ///
-    /// The default value is `None`.
-    ///
-    /// ## Platform-specific
-    ///
-    /// This option will be taken into account on the following platforms:
-    ///
-    ///   * MacOS
-    ///   * Unix operating systems using GLX with X
-    ///   * Windows using WGL
-    #[inline]
-    pub fn with_double_buffer(mut self, double_buffer: Option<bool>) -> Self {
-        self.pf_reqs.double_buffer = double_buffer;
-        self
-    }
-
-    /// Sets whether hardware acceleration is required.
-    ///
-    /// The default value is `Some(true)`
-    ///
-    /// ## Platform-specific
-    ///
-    /// This option will be taken into account on the following platforms:
-    ///
-    ///   * MacOS
-    ///   * Unix operating systems using EGL with either X or Wayland
-    ///   * Windows using EGL or WGL
-    ///   * Android using EGL
-    #[inline]
-    pub fn with_hardware_acceleration(
-        mut self,
-        acceleration: Option<bool>,
-    ) -> Self {
-        self.pf_reqs.hardware_accelerated = acceleration;
-        self
+        self.set_sharing(Some(other.into()))
     }
 }
 
@@ -331,7 +282,7 @@ pub enum CreationError {
     NoBackendAvailable(Box<dyn std::error::Error + Send + Sync>),
     RobustnessNotSupported,
     OpenGlVersionNotSupported,
-    NoAvailablePixelFormat,
+    NoAvailableSurfaceConfig,
     PlatformSpecific(String),
     Window(OsError),
     /// We received multiple errors, instead of one.
@@ -370,8 +321,8 @@ impl CreationError {
             CreationError::OpenGlVersionNotSupported => {
                 "The requested OpenGL version is not supported."
             }
-            CreationError::NoAvailablePixelFormat => {
-                "Couldn't find any pixel format that matches the criteria."
+            CreationError::NoAvailableSurfaceConfig => {
+                "Couldn't find any surface config that matches the criteria."
             }
             CreationError::PlatformSpecific(ref text) => &text,
             CreationError::Window(ref err) => {
@@ -592,7 +543,7 @@ pub enum ReleaseBehavior {
 /// Describes a possible format.
 #[allow(missing_docs)]
 #[derive(Debug, Clone)]
-pub struct PixelFormat {
+pub struct SurfaceConfig {
     pub hardware_accelerated: bool,
     /// The number of color bits. Does not include alpha bits.
     pub color_bits: u8,
@@ -605,12 +556,16 @@ pub struct PixelFormat {
     /// the multisampling level.
     pub multisampling: Option<u16>,
     pub srgb: bool,
+    pub vsync: bool,
+    pub pbuffer_support: bool,
+    pub window_surface_support: bool,
+    native_surface_config: platform_impl::NativeSurfaceConfig,
 }
 
 /// Describes how the backend should choose a pixel format.
 // TODO: swap method? (swap, copy)
 #[derive(Clone, Debug)]
-pub struct PixelFormatRequirements {
+pub struct SurfaceConfigBuilder {
     /// If true, only hardware-accelerated formats will be considered. If
     /// false, only software renderers. `None` means "don't care". Default
     /// is `Some(true)`.
@@ -653,18 +608,30 @@ pub struct PixelFormatRequirements {
     /// non-stereoscopic formats. The default is `false`.
     pub stereoscopy: bool,
 
-    /// If true, only sRGB-capable formats will be considered. If false, don't
-    /// care. The default is `false`.
-    pub srgb: bool,
+    /// If sRGB-capable formats will be considered. If `None`, don't care.
+    /// The default is `None`.
+    pub srgb: Option<bool>,
 
     /// The behavior when changing the current context. Default is `Flush`.
     pub release_behavior: ReleaseBehavior,
+
+    /// Whether to use vsync. If vsync is enabled, calling `swap_buffers` will
+    /// block until the screen refreshes. This is typically used to prevent
+    /// screen tearing.
+    ///
+    /// The default is `None`.
+    pub vsync: Option<bool>,
+
+    /// FIXME: missing docs
+    pub pbuffer_support: Option<bool>,
+    /// FIXME: missing docs
+    pub window_surface_support: Option<bool>,
 }
 
-impl Default for PixelFormatRequirements {
+impl Default for SurfaceConfigBuilder {
     #[inline]
-    fn default() -> PixelFormatRequirements {
-        PixelFormatRequirements {
+    fn default() -> Self {
+        SurfaceConfigBuilder {
             hardware_accelerated: Some(true),
             color_bits: Some(24),
             float_color_buffer: false,
@@ -674,102 +641,132 @@ impl Default for PixelFormatRequirements {
             double_buffer: None,
             multisampling: None,
             stereoscopy: false,
-            srgb: false,
+            srgb: None,
+            vsync: None,
+            pbuffer_support: None,
+            window_surface_support: Some(true),
             release_behavior: ReleaseBehavior::Flush,
         }
     }
 }
 
-/// Attributes to use when creating an OpenGL [`Context`].
-///
-/// [`Context`]: struct.Context.html
-#[derive(Clone, Debug)]
-pub struct GlAttributes<T> {
-    /// An existing context with which some OpenGL objects get shared.
-    ///
-    /// The default is `None`.
-    pub sharing: Option<T>,
-
-    /// Version to try create. See [`GlRequest`] for more infos.
-    ///
-    /// The default is [`Latest`].
-    ///
-    /// [`Latest`]: enum.GlRequest.html#variant.Latest
-    /// [`GlRequest`]: enum.GlRequest.html
-    pub version: GlRequest,
-
-    /// OpenGL profile to use.
-    ///
-    /// The default is `None`.
-    pub profile: Option<GlProfile>,
-
-    /// Whether to enable the `debug` flag of the context.
-    ///
-    /// Debug contexts are usually slower but give better error reporting.
-    ///
-    /// The default is `true` in debug mode and `false` in release mode.
-    pub debug: bool,
-
-    /// How the OpenGL [`Context`] should detect errors.
-    ///
-    /// The default is `NotRobust` because this is what is typically expected
-    /// when you create an OpenGL [`Context`]. However for safety you should
-    /// consider [`TryRobustLoseContextOnReset`].
-    ///
-    /// [`Context`]: struct.Context.html
-    /// [`TryRobustLoseContextOnReset`]:
-    /// enum.Robustness.html#variant.TryRobustLoseContextOnReset
-    pub robustness: Robustness,
-
-    /// Whether to use vsync. If vsync is enabled, calling `swap_buffers` will
-    /// block until the screen refreshes. This is typically used to prevent
-    /// screen tearing.
-    ///
-    /// The default is `None`.
-    pub vsync: bool,
-}
-
-impl<T> GlAttributes<T> {
-    /// Turns the `sharing` parameter into another type by calling a closure.
-    #[inline]
-    pub fn map_sharing<F, T2>(self, f: F) -> GlAttributes<T2>
-    where
-        F: FnOnce(T) -> T2,
-    {
-        GlAttributes {
-            sharing: self.sharing.map(f),
-            version: self.version,
-            profile: self.profile,
-            debug: self.debug,
-            robustness: self.robustness,
-            vsync: self.vsync,
-        }
+impl SurfaceConfigBuilder {
+    fn new() -> Self {
+        Default::default()
     }
 
-    /// Turns the `sharing` parameter into another type.
+    /// Sets the multisampling level to request. A value of `0` indicates that
+    /// multisampling must not be enabled.
+    ///
+    /// # Panic
+    ///
+    /// Will panic if `samples` is not a power of two.
     #[inline]
-    fn set_sharing<T2>(self, sharing: Option<T2>) -> GlAttributes<T2> {
-        GlAttributes {
-            sharing,
-            version: self.version,
-            profile: self.profile,
-            debug: self.debug,
-            robustness: self.robustness,
-            vsync: self.vsync,
-        }
+    pub fn with_multisampling(mut self, samples: u16) -> Self {
+        self.multisampling = match samples {
+            0 => None,
+            _ => {
+                assert!(samples.is_power_of_two());
+                Some(samples)
+            }
+        };
+        self
     }
-}
 
-impl<T> Default for GlAttributes<T> {
+    /// Sets the number of bits in the depth buffer.
     #[inline]
-    fn default() -> GlAttributes<T> {
-        GlAttributes {
-            sharing: None,
-            version: GlRequest::Latest,
-            profile: None,
-            debug: cfg!(debug_assertions),
-            robustness: Robustness::NotRobust,
-            vsync: false,
-        }
+    pub fn with_depth_buffer(mut self, bits: u8) -> Self {
+        self.depth_bits = Some(bits);
+        self
+    }
+
+    /// Sets the number of bits in the stencil buffer.
+    #[inline]
+    pub fn with_stencil_buffer(mut self, bits: u8) -> Self {
+        self.stencil_bits = Some(bits);
+        self
+    }
+
+    /// Sets the number of bits in the color buffer.
+    #[inline]
+    pub fn with_pixel_format(mut self, color_bits: u8, alpha_bits: u8) -> Self {
+        self.color_bits = Some(color_bits);
+        self.alpha_bits = Some(alpha_bits);
+        self
+    }
+
+    /// Request the backend to be stereoscopic.
+    #[inline]
+    pub fn with_stereoscopy(mut self) -> Self {
+        self.stereoscopy = true;
+        self
+    }
+
+    /// Sets whether sRGB should be enabled on the window.
+    ///
+    /// The default value is `None`.
+    #[inline]
+    pub fn with_srgb(mut self, srgb: Option<bool>) -> Self {
+        self.srgb = srgb;
+        self
+    }
+
+    /// Requests that the window has vsync enabled.
+    ///
+    /// By default, vsync is not enabled.
+    #[inline]
+    pub fn with_vsync(mut self, vsync: Option<bool>) -> Self {
+        self.vsync = vsync;
+        self
+    }
+
+    #[inline]
+    pub fn with_pbuffer_support(mut self, pbuffer_support: Option<bool>) -> Self {
+        self.pbuffer_support = pbuffer_support;
+        self
+    }
+
+    #[inline]
+    pub fn with_window_surface_support(mut self, window_surface_support: Option<bool>) -> Self {
+        self.window_surface_support = window_surface_support;
+        self
+    }
+
+    /// Sets whether double buffering should be enabled.
+    ///
+    /// The default value is `None`.
+    ///
+    /// ## Platform-specific
+    ///
+    /// This option will be taken into account on the following platforms:
+    ///
+    ///   * MacOS
+    ///   * Unix operating systems using GLX with X
+    ///   * Windows using WGL
+    #[inline]
+    pub fn with_double_buffer(mut self, double_buffer: Option<bool>) -> Self {
+        self.double_buffer = double_buffer;
+        self
+    }
+
+    /// Sets whether hardware acceleration is required.
+    ///
+    /// The default value is `Some(true)`
+    ///
+    /// ## Platform-specific
+    ///
+    /// This option will be taken into account on the following platforms:
+    ///
+    ///   * MacOS
+    ///   * Unix operating systems using EGL with either X or Wayland
+    ///   * Windows using EGL or WGL
+    ///   * Android using EGL
+    #[inline]
+    pub fn with_hardware_acceleration(
+        mut self,
+        acceleration: Option<bool>,
+    ) -> Self {
+        self.hardware_accelerated = acceleration;
+        self
     }
 }
