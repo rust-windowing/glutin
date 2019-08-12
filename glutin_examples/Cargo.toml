@@ -12,7 +12,7 @@ publish = false
 
 [dependencies]
 glutin = { path = "../glutin" }
-winit = "0.19"
+winit = "0.20.0-alpha2"
 takeable-option = "0.4"
 image = "0.21"
 
