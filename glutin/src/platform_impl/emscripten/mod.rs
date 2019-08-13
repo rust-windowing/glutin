@@ -161,6 +161,14 @@ impl Context {
     }
 
     #[inline]
+    pub fn swap_buffers_with_damage(
+        &self,
+        rects: &[Rect],
+    ) -> Result<(), ContextError> {
+        Err(ContextError::OsError("buffer damage not suported".to_string()))
+    }
+
+    #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         // FIXME: this is a dummy pixel format
         PixelFormat {

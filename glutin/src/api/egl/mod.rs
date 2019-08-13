@@ -107,7 +107,7 @@ pub use self::egl::Egl;
 use self::make_current_guard::MakeCurrentGuard;
 use crate::{
     Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
-    PixelFormatRequirements, ReleaseBehavior, Robustness,
+    PixelFormatRequirements, Rect, ReleaseBehavior, Robustness,
 };
 
 use glutin_egl_sys as ffi;
@@ -657,6 +657,56 @@ impl Context {
         let ret = unsafe { egl.SwapBuffers(self.display, *surface) };
 
         if ret == 0 {
+            match unsafe { egl.GetError() } as u32 {
+                ffi::egl::CONTEXT_LOST => {
+                    return Err(ContextError::ContextLost)
+                }
+                err => panic!(
+                    "swap_buffers: eglSwapBuffers failed (eglGetError returned 0x{:x})",
+                    err
+                ),
+            }
+        } else {
+            Ok(())
+        }
+    }
+
+    #[inline]
+    pub fn swap_buffers_with_damage(
+        &self,
+        rects: &[Rect],
+    ) -> Result<(), ContextError> {
+        let egl = EGL.as_ref().unwrap();
+
+        if !egl.SwapBuffersWithDamageKHR.is_loaded() {
+            return Err(ContextError::FunctionUnavailable);
+        }
+
+        let surface = self.surface.as_ref().unwrap().lock();
+        if *surface == ffi::egl::NO_SURFACE {
+            return Err(ContextError::ContextLost);
+        }
+
+        let mut ffirects: Vec<ffi::egl::types::EGLint> =
+            Vec::with_capacity(rects.len() * 4);
+
+        for rect in rects {
+            ffirects.push(rect.x as ffi::egl::types::EGLint);
+            ffirects.push(rect.y as ffi::egl::types::EGLint);
+            ffirects.push(rect.width as ffi::egl::types::EGLint);
+            ffirects.push(rect.height as ffi::egl::types::EGLint);
+        }
+
+        let ret = unsafe {
+            egl.SwapBuffersWithDamageKHR(
+                self.display,
+                *surface,
+                ffirects.as_mut_ptr(),
+                rects.len() as ffi::egl::types::EGLint,
+            )
+        };
+
+        if ret == ffi::egl::FALSE {
             match unsafe { egl.GetError() } as u32 {
                 ffi::egl::CONTEXT_LOST => {
                     return Err(ContextError::ContextLost)

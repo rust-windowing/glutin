@@ -13,7 +13,7 @@ use self::x11::X11Context;
 use crate::api::osmesa;
 use crate::{
     Api, ContextCurrentState, ContextError, CreationError, GlAttributes,
-    NotCurrent, PixelFormat, PixelFormatRequirements,
+    NotCurrent, PixelFormat, PixelFormatRequirements, Rect,
 };
 pub use x11::utils as x11_utils;
 
@@ -232,6 +232,18 @@ impl Context {
         match *self {
             Context::X11(ref ctx) => ctx.swap_buffers(),
             Context::Wayland(ref ctx) => ctx.swap_buffers(),
+            _ => unreachable!(),
+        }
+    }
+
+    #[inline]
+    pub fn swap_buffers_with_damage(
+        &self,
+        rects: &[Rect],
+    ) -> Result<(), ContextError> {
+        match *self {
+            Context::X11(ref ctx) => ctx.swap_buffers_with_damage(rects),
+            Context::Wayland(ref ctx) => ctx.swap_buffers_with_damage(rects),
             _ => unreachable!(),
         }
     }

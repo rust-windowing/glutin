@@ -404,6 +404,7 @@ pub enum ContextError {
     OsError(String),
     IoError(io::Error),
     ContextLost,
+    FunctionUnavailable,
 }
 
 impl ContextError {
@@ -413,6 +414,7 @@ impl ContextError {
             ContextError::OsError(ref string) => string,
             ContextError::IoError(ref err) => err.description(),
             ContextError::ContextLost => "Context lost",
+            ContextError::FunctionUnavailable => "Function unavailable",
         }
     }
 }
@@ -749,4 +751,14 @@ impl<S> Default for GlAttributes<S> {
             vsync: false,
         }
     }
+}
+
+// Rectangles to submit as buffer damage.
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Rect {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
 }

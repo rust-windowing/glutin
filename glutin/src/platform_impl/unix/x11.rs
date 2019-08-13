@@ -10,7 +10,7 @@ use crate::platform::unix::{
 use crate::platform_impl::x11_utils;
 use crate::{
     Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
-    PixelFormatRequirements,
+    PixelFormatRequirements, Rect,
 };
 
 use glutin_glx_sys as ffi;
@@ -667,6 +667,19 @@ impl Context {
         match self.context {
             X11Context::Glx(ref ctx) => ctx.swap_buffers(),
             X11Context::Egl(ref ctx) => ctx.swap_buffers(),
+        }
+    }
+
+    #[inline]
+    pub fn swap_buffers_with_damage(
+        &self,
+        rects: &[Rect],
+    ) -> Result<(), ContextError> {
+        match self.context {
+            X11Context::Glx(_) => Err(ContextError::OsError(
+                "buffer damage not suported".to_string(),
+            )),
+            X11Context::Egl(ref ctx) => ctx.swap_buffers_with_damage(rects),
         }
     }
 
