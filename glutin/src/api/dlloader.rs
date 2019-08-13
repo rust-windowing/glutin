@@ -20,7 +20,7 @@ pub struct SymWrapper<T> {
 }
 
 pub trait SymTrait {
-    fn load_with<F>(loadfn: F) -> Self
+    fn load_with<F>(lib: &Library, loadfn: F) -> Self
     where
         F: FnMut(&'static str) -> *const std::os::raw::c_void;
 }
@@ -31,7 +31,7 @@ impl<T: SymTrait> SymWrapper<T> {
             let lib = Library::new(path);
             if lib.is_ok() {
                 return Ok(SymWrapper {
-                    inner: T::load_with(|sym| unsafe {
+                    inner: T::load_with(lib.as_ref().unwrap(), |sym| unsafe {
                         lib.as_ref()
                             .unwrap()
                             .get(

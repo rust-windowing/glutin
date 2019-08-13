@@ -19,7 +19,7 @@ mod glx {
     unsafe impl Sync for Glx {}
 
     impl SymTrait for ffi::glx::Glx {
-        fn load_with<F>(loadfn: F) -> Self
+        fn load_with<F>(_: &libloading::Library, loadfn: F) -> Self
         where
             F: FnMut(&'static str) -> *const std::os::raw::c_void,
         {

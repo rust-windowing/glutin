@@ -13,6 +13,7 @@
 mod egl {
     use super::ffi;
     use crate::api::dlloader::{SymTrait, SymWrapper};
+    use libloading;
 
     #[derive(Clone)]
     pub struct Egl(pub SymWrapper<ffi::egl::Egl>);
@@ -21,11 +22,55 @@ mod egl {
     unsafe impl Sync for Egl {}
 
     impl SymTrait for ffi::egl::Egl {
-        fn load_with<F>(loadfn: F) -> Self
+        fn load_with<F>(lib: &libloading::Library, _: F) -> Self
         where
             F: FnMut(&'static str) -> *const std::os::raw::c_void,
         {
-            Self::load_with(loadfn)
+            let f = move |s: &'static str| -> *const std::os::raw::c_void {
+                // Check if the symbol is available in the library directly. If
+                // it is, just return it.
+                match unsafe {
+                    lib.get(
+                        std::ffi::CString::new(s.as_bytes())
+                            .unwrap()
+                            .as_bytes_with_nul(),
+                    )
+                } {
+                    Ok(sym) => return *sym,
+                    Err(_) => (),
+                };
+
+                // The symbol was not available in the library, so ask
+                // eglGetProcAddress for it. Note that eglGetProcAddress was
+                // only able to look up extension functions prior to EGL 1.5,
+                // hence this two-part dance.
+                match unsafe { lib.get(b"eglGetProcAddress") } {
+                    Ok(sym) => {
+                        let sym: libloading::Symbol<
+                            unsafe extern "C" fn(
+                                *const std::os::raw::c_void,
+                            )
+                                -> *const std::os::raw::c_void,
+                        > = sym;
+                        let ptr = unsafe {
+                            sym(std::ffi::CString::new(s.as_bytes())
+                                .unwrap()
+                                .as_bytes_with_nul()
+                                .as_ptr()
+                                as *const std::os::raw::c_void)
+                        };
+                        if ptr.is_null() {
+                            panic!("unable to load symbol {:}", s)
+                        }
+                        return ptr;
+                    }
+                    Err(_) => (),
+                };
+
+                std::ptr::null()
+            };
+
+            Self::load_with(f)
         }
     }
 
