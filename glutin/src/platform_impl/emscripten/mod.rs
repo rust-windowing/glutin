@@ -5,6 +5,8 @@ use crate::{
     PixelFormatRequirements,
 };
 
+use winit::window::WindowBuilder;
+use winit::event_loop::EventLoopWindowTarget;
 use glutin_emscripten_sys as ffi;
 use winit;
 use winit::dpi;
@@ -23,8 +25,8 @@ pub enum Context {
 impl Context {
     #[inline]
     pub fn new_windowed<T>(
-        wb: winit::window::WindowBuilder,
-        el: &winit::event_loop::EventLoop<T>,
+        wb: WindowBuilder,
+        el: &EventLoopWindowTarget<T>,
         _pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<(winit::window::Window, Self), CreationError> {
@@ -72,7 +74,7 @@ impl Context {
 
     #[inline]
     pub fn new_headless<T>(
-        el: &winit::event_loop::EventLoop<T>,
+        el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: dpi::PhysicalSize,

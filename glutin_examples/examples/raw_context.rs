@@ -40,7 +40,7 @@ mod this_example {
             #[cfg(target_os = "linux")]
             unsafe {
                 use glutin::platform::unix::{
-                    EventLoopExtUnix, RawContextExt, WindowExtUnix,
+                    EventLoopWindowTargetExtUnix, RawContextExt, WindowExtUnix,
                 };
 
                 if el.is_wayland() {

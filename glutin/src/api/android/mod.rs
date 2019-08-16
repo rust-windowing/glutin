@@ -8,6 +8,8 @@ use crate::{
     Api, ContextError, GlAttributes, PixelFormat, PixelFormatRequirements,
 };
 
+use winit::window::WindowBuilder;
+use winit::event_loop::EventLoopWindowTarget;
 use crate::platform::android::EventLoopExtAndroid;
 use glutin_egl_sys as ffi;
 use parking_lot::Mutex;
@@ -52,8 +54,8 @@ impl android_glue::SyncEventHandler for AndroidSyncEventHandler {
 impl Context {
     #[inline]
     pub fn new_windowed<T>(
-        wb: winit::window::WindowBuilder,
-        el: &winit::event_loop::EventLoop<T>,
+        wb: WindowBuilder,
+        el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Self>,
     ) -> Result<(winit::window::Window, Self), CreationError> {
@@ -105,7 +107,7 @@ impl Context {
 
     #[inline]
     pub fn new_headless<T>(
-        _el: &winit::event_loop::EventLoop<T>,
+        _el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: dpi::PhysicalSize,

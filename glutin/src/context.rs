@@ -1,7 +1,7 @@
 use super::*;
 
 use std::marker::PhantomData;
-use winit::event_loop::EventLoop;
+use winit::event_loop::EventLoopWindowTarget;
 
 /// Represents an OpenGL [`Context`].
 ///
@@ -174,7 +174,7 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     )]
     pub fn build_headless<TE>(
         self,
-        el: &EventLoop<TE>,
+        el: &EventLoopWindowTarget<TE>,
         size: dpi::PhysicalSize,
     ) -> Result<Context<NotCurrent>, CreationError> {
         let ContextBuilder { pf_reqs, gl_attr } = self;

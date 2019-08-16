@@ -1,7 +1,7 @@
 use super::*;
 
 use std::marker::PhantomData;
-use winit::event_loop::EventLoop;
+use winit::event_loop::EventLoopWindowTarget;
 use winit::window::{Window, WindowBuilder};
 
 /// Represents an OpenGL [`Context`] and the [`Window`] with which it is
@@ -330,7 +330,7 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     pub fn build_windowed<TE>(
         self,
         wb: WindowBuilder,
-        el: &EventLoop<TE>,
+        el: &EventLoopWindowTarget<TE>,
     ) -> Result<WindowedContext<NotCurrent>, CreationError> {
         let ContextBuilder { pf_reqs, gl_attr } = self;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);

@@ -6,13 +6,13 @@ use crate::{
     PixelFormatRequirements,
 };
 
-use crate::platform::unix::{EventLoopExtUnix, WindowExtUnix};
+use crate::platform::unix::{EventLoopWindowTargetExtUnix, WindowExtUnix};
 use glutin_egl_sys as ffi;
 use wayland_client::egl as wegl;
 pub use wayland_client::sys::client::wl_display;
 use winit;
 use winit::dpi;
-use winit::event_loop::EventLoop;
+use winit::event_loop::EventLoopWindowTarget;
 use winit::window::{Window, WindowBuilder};
 
 use std::ops::Deref;
@@ -46,7 +46,7 @@ impl Deref for Context {
 impl Context {
     #[inline]
     pub fn new_headless<T>(
-        el: &EventLoop<T>,
+        el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: Option<dpi::PhysicalSize>,
@@ -84,7 +84,7 @@ impl Context {
     #[inline]
     pub fn new<T>(
         wb: WindowBuilder,
-        el: &EventLoop<T>,
+        el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<(Window, Self), CreationError> {
