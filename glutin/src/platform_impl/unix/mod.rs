@@ -18,9 +18,9 @@ use crate::{
 pub use x11::utils as x11_utils;
 
 use crate::platform::unix::x11::XConnection;
-use crate::platform::unix::EventLoopExtUnix;
+use crate::platform::unix::EventLoopWindowTargetExtUnix;
 use winit::dpi;
-use winit::event_loop::EventLoop;
+use winit::event_loop::EventLoopWindowTarget;
 use winit::window::{Window, WindowBuilder};
 
 use std::marker::PhantomData;
@@ -93,7 +93,7 @@ impl Context {
     #[inline]
     pub fn new_windowed<T>(
         wb: WindowBuilder,
-        el: &EventLoop<T>,
+        el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<(Window, Self), CreationError> {
@@ -119,7 +119,7 @@ impl Context {
 
     #[inline]
     pub fn new_headless<T>(
-        el: &EventLoop<T>,
+        el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: dpi::PhysicalSize,
@@ -128,7 +128,7 @@ impl Context {
     }
 
     pub fn new_headless_impl<T>(
-        el: &EventLoop<T>,
+        el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: Option<dpi::PhysicalSize>,
@@ -274,7 +274,7 @@ pub trait HeadlessContextExt {
     /// [`Context`]: struct.Context.html
     fn build_surfaceless<TE>(
         self,
-        el: &EventLoop<TE>,
+        el: &EventLoopWindowTarget<TE>,
     ) -> Result<crate::Context<NotCurrent>, CreationError>
     where
         Self: Sized;
@@ -309,7 +309,7 @@ impl<'a, T: ContextCurrentState> HeadlessContextExt
     #[inline]
     fn build_surfaceless<TE>(
         self,
-        el: &EventLoop<TE>,
+        el: &EventLoopWindowTarget<TE>,
     ) -> Result<crate::Context<NotCurrent>, CreationError>
     where
         Self: Sized,

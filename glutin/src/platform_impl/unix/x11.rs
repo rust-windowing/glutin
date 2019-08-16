@@ -5,7 +5,7 @@ use crate::api::egl::{
 use crate::api::glx::{Context as GlxContext, GLX};
 use crate::platform::unix::x11::XConnection;
 use crate::platform::unix::{
-    EventLoopExtUnix, WindowBuilderExtUnix, WindowExtUnix,
+    EventLoopWindowTargetExtUnix, WindowBuilderExtUnix, WindowExtUnix,
 };
 use crate::platform_impl::x11_utils;
 use crate::{
@@ -16,7 +16,7 @@ use crate::{
 use glutin_glx_sys as ffi;
 use winit;
 use winit::dpi;
-use winit::event_loop::EventLoop;
+use winit::event_loop::EventLoopWindowTarget;
 use winit::window::{Window, WindowBuilder};
 
 use std::ops::{Deref, DerefMut};
@@ -186,7 +186,7 @@ impl Context {
 
     #[inline]
     pub fn new_headless<T>(
-        el: &EventLoop<T>,
+        el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: Option<dpi::PhysicalSize>,
@@ -203,7 +203,7 @@ impl Context {
     }
 
     fn new_headless_impl<T>(
-        el: &EventLoop<T>,
+        el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         size: Option<dpi::PhysicalSize>,
@@ -450,7 +450,7 @@ impl Context {
     #[inline]
     pub fn new<T>(
         wb: WindowBuilder,
-        el: &EventLoop<T>,
+        el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<(Window, Self), CreationError> {
@@ -461,7 +461,7 @@ impl Context {
 
     fn new_impl<T>(
         wb: WindowBuilder,
-        el: &EventLoop<T>,
+        el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
         fallback: bool,
