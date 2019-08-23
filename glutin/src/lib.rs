@@ -93,15 +93,6 @@ extern crate objc;
 ))]
 #[macro_use]
 extern crate log;
-#[cfg(any(
-    target_os = "linux",
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-))]
-#[macro_use]
-extern crate derivative;
 
 pub mod platform;
 
