@@ -298,6 +298,11 @@ impl Context {
     }
 
     #[inline]
+    pub fn swap_buffers_with_damage_supported(&self) -> bool {
+        false
+    }
+
+    #[inline]
     pub fn get_api(&self) -> crate::Api {
         crate::Api::OpenGl
     }

@@ -722,6 +722,12 @@ impl Context {
     }
 
     #[inline]
+    pub fn swap_buffers_with_damage_supported(&self) -> bool {
+        let egl = EGL.as_ref().unwrap();
+        egl.SwapBuffersWithDamageKHR.is_loaded()
+    }
+
+    #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         self.pixel_format.clone()
     }

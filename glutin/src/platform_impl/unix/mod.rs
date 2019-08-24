@@ -249,6 +249,15 @@ impl Context {
     }
 
     #[inline]
+    pub fn swap_buffers_with_damage_supported(&self) -> bool {
+        match *self {
+            Context::X11(ref ctx) => ctx.swap_buffers_with_damage_supported(),
+            Context::Wayland(ref ctx) => ctx.swap_buffers_with_damage_supported(),
+            _ => unreachable!(),
+        }
+    }
+
+    #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         match *self {
             Context::X11(ref ctx) => ctx.get_pixel_format(),

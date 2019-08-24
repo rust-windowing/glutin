@@ -336,6 +336,11 @@ impl Context {
     }
 
     #[inline]
+    pub fn swap_buffers_with_damage_supported(&self) -> bool {
+        false
+    }
+
+    #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         let color_format = ColorFormat::for_view(self.view);
         PixelFormat {

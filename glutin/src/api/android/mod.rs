@@ -188,6 +188,11 @@ impl Context {
     }
 
     #[inline]
+    pub fn swap_buffers_with_damage_supported(&self) -> bool {
+        self.0.egl_context.swap_buffers_with_damage_supported()
+    }
+
+    #[inline]
     pub fn get_api(&self) -> Api {
         self.0.egl_context.get_api()
     }

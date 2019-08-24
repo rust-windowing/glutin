@@ -38,6 +38,10 @@ fn main() {
 
     let windowed_context = unsafe { windowed_context.make_current().unwrap() };
 
+    if !windowed_context.swap_buffers_with_damage_supported() {
+        panic!("Damage not supported, this demo will instead perform full buffer swaps");
+    }
+
     println!(
         "Pixel format of the window's GL context: {:?}",
         windowed_context.get_pixel_format()
@@ -82,12 +86,16 @@ fn main() {
                     // Panics if damage is not supported due to the unwrap.
                     color = color.next();
                     gl.draw_frame([color.red, color.green, color.blue, 1.0]);
-                    windowed_context.swap_buffers_with_damage(&[Rect{
-                        x: 0,
-                        y: 0,
-                        height: 100,
-                        width: 100,
-                    }]).unwrap();
+                    if windowed_context.swap_buffers_with_damage_supported() {
+                        windowed_context.swap_buffers_with_damage(&[Rect{
+                            x: 0,
+                            y: 0,
+                            height: 100,
+                            width: 100,
+                        }]).unwrap();
+                    } else {
+                        windowed_context.swap_buffers().unwrap();
+                    }
                 }
                 _ => (),
             },

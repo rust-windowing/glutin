@@ -212,6 +212,11 @@ impl Context {
     }
 
     #[inline]
+    pub fn swap_buffers_with_damage_supported(&self) -> bool {
+        (**self).swap_buffers_with_damage_supported()
+    }
+
+    #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         (**self).get_pixel_format().clone()
     }

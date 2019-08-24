@@ -684,6 +684,14 @@ impl Context {
     }
 
     #[inline]
+    pub fn swap_buffers_with_damage_supported(&self) -> bool {
+        match self.context {
+            X11Context::Glx(_) => false,
+            X11Context::Egl(ref ctx) => ctx.swap_buffers_with_damage_supported(),
+        }
+    }
+
+    #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         match self.context {
             X11Context::Glx(ref ctx) => ctx.get_pixel_format(),

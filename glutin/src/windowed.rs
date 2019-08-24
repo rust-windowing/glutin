@@ -153,6 +153,10 @@ impl<W> ContextWrapper<PossiblyCurrent, W> {
         self.context.context.swap_buffers_with_damage(rects)
     }
 
+    pub fn swap_buffers_with_damage_supported(&self) -> bool {
+        self.context.context.swap_buffers_with_damage_supported()
+    }
+
     /// Returns the pixel format of the main framebuffer of the context.
     pub fn get_pixel_format(&self) -> PixelFormat {
         self.context.context.get_pixel_format()

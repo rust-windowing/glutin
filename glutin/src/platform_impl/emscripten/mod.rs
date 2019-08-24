@@ -169,6 +169,11 @@ impl Context {
     }
 
     #[inline]
+    pub fn swap_buffers_with_damage_supported(&self) -> bool {
+        false
+    }
+
+    #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         // FIXME: this is a dummy pixel format
         PixelFormat {

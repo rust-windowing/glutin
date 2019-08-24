@@ -268,6 +268,11 @@ impl Context {
     }
 
     #[inline]
+    pub fn swap_buffers_with_damage_supported(&self) -> bool {
+        false
+    }
+
+    #[inline]
     pub fn get_api(&self) -> Api {
         match *self {
             Context::Wgl(ref c) | Context::HiddenWindowWgl(_, ref c) => {
