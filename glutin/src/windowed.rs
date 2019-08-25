@@ -153,6 +153,9 @@ impl<W> ContextWrapper<PossiblyCurrent, W> {
         self.context.context.swap_buffers_with_damage(rects)
     }
 
+    /// Returns whether or not swap_buffer_with_damage is available. If this
+    /// function returns false, any call to swap_buffers_with_damage will
+    /// return an error.
     pub fn swap_buffers_with_damage_supported(&self) -> bool {
         self.context.context.swap_buffers_with_damage_supported()
     }
