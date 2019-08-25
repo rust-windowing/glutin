@@ -39,7 +39,7 @@ fn main() {
     let windowed_context = unsafe { windowed_context.make_current().unwrap() };
 
     if !windowed_context.swap_buffers_with_damage_supported() {
-        panic!("Damage not supported, this demo will instead perform full buffer swaps");
+        panic!("Damage not supported!");
     }
 
     println!(
