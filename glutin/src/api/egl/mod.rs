@@ -52,22 +52,16 @@ mod egl {
                             )
                                 -> *const std::os::raw::c_void,
                         > = sym;
-                        let ptr = unsafe {
+                        unsafe {
                             sym(std::ffi::CString::new(s.as_bytes())
                                 .unwrap()
                                 .as_bytes_with_nul()
                                 .as_ptr()
                                 as *const std::os::raw::c_void)
-                        };
-                        if ptr.is_null() {
-                            panic!("unable to load symbol {:}", s)
                         }
-                        return ptr;
                     }
-                    Err(_) => (),
-                };
-
-                std::ptr::null()
+                    Err(_) => std::ptr::null(),
+                }
             };
 
             Self::load_with(f)
