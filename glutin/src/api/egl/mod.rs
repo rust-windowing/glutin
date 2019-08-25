@@ -22,10 +22,7 @@ mod egl {
     unsafe impl Sync for Egl {}
 
     impl SymTrait for ffi::egl::Egl {
-        fn load_with<F>(lib: &libloading::Library, _: F) -> Self
-        where
-            F: FnMut(&'static str) -> *const std::os::raw::c_void,
-        {
+        fn load_with(lib: &libloading::Library) -> Self {
             let f = move |s: &'static str| -> *const std::os::raw::c_void {
                 // Check if the symbol is available in the library directly. If
                 // it is, just return it.
