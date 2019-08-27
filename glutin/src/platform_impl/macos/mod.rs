@@ -256,7 +256,7 @@ impl Context {
         }
     }
 
-    pub fn get_proc_address(&self, addr: &str) -> *const () {
+    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
         let symbol_name: CFString = FromStr::from_str(addr).unwrap();
         let framework_name: CFString =
             FromStr::from_str("com.apple.opengl").unwrap();

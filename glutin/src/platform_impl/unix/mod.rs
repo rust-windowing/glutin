@@ -219,7 +219,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const () {
+    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
         match *self {
             Context::X11(ref ctx) => ctx.get_proc_address(addr),
             Context::Wayland(ref ctx) => ctx.get_proc_address(addr),

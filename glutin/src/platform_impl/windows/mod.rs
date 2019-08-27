@@ -239,7 +239,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const () {
+    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
         match *self {
             Context::Wgl(ref c) | Context::HiddenWindowWgl(_, ref c) => {
                 c.get_proc_address(addr)

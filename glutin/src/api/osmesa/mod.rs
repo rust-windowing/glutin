@@ -222,7 +222,7 @@ impl OsMesaContext {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const () {
+    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
         unsafe {
             let c_str = CString::new(addr.as_bytes().to_vec()).unwrap();
             std::mem::transmute(osmesa_sys::OSMesaGetProcAddress(

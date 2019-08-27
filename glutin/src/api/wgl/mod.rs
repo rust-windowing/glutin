@@ -215,12 +215,12 @@ impl Context {
         }
     }
 
-    pub fn get_proc_address(&self, addr: &str) -> *const () {
+    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
         let addr = CString::new(addr.as_bytes()).unwrap();
         let addr = addr.as_ptr();
 
         unsafe {
-            let p = gl::wgl::GetProcAddress(addr) as *const ();
+            let p = gl::wgl::GetProcAddress(addr) as *const core::ffi::c_void;
             if !p.is_null() {
                 return p;
             }
