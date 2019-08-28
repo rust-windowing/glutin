@@ -225,9 +225,7 @@ impl OsMesaContext {
     pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
         unsafe {
             let c_str = CString::new(addr.as_bytes().to_vec()).unwrap();
-            std::mem::transmute(osmesa_sys::OSMesaGetProcAddress(
-                std::mem::transmute(c_str.as_ptr()),
-            ))
+            osmesa_sys::OSMesaGetProcAddress(c_str.as_ptr() as *mut _) as *mut _
         }
     }
 }
