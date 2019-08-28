@@ -424,7 +424,7 @@ impl<'a> ContextPrototype<'a> {
                     );
                 }
 
-                let mut swap = unsafe { std::mem::uninitialized() };
+                let mut swap = unsafe { std::mem::zeroed() };
                 unsafe {
                     glx.QueryDrawable(
                         self.xconn.display as *mut _,

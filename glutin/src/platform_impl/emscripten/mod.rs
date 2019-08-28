@@ -39,7 +39,7 @@ impl Context {
         // getting the default values of attributes
         let mut attributes = unsafe {
             let mut attributes: ffi::EmscriptenWebGLContextAttributes =
-                std::mem::uninitialized();
+                std::mem::zeroed();
             ffi::emscripten_webgl_init_context_attributes(&mut attributes);
             attributes
         };

@@ -139,7 +139,7 @@ impl OsMesaContext {
         Ok(OsMesaContext {
             width: size.0,
             height: size.1,
-            buffer: std::iter::repeat(unsafe { std::mem::uninitialized() })
+            buffer: std::iter::repeat(unsafe { std::mem::zeroed() })
                 .take((size.0 * size.1) as usize)
                 .collect(),
             context: unsafe {
@@ -225,7 +225,7 @@ impl OsMesaContext {
     pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
         unsafe {
             let c_str = CString::new(addr.as_bytes().to_vec()).unwrap();
-            osmesa_sys::OSMesaGetProcAddress(c_str.as_ptr() as *mut _) as *mut _
+            core::mem::transmute(osmesa_sys::OSMesaGetProcAddress(c_str.as_ptr() as *mut _))
         }
     }
 }

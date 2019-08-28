@@ -545,7 +545,7 @@ impl Context {
         fallback: bool,
     ) -> Result<Self, CreationError> {
         let attrs = unsafe {
-            let mut attrs = ::std::mem::uninitialized();
+            let mut attrs = ::std::mem::zeroed();
             (xconn.xlib.XGetWindowAttributes)(xconn.display, xwin, &mut attrs);
             attrs
         };
@@ -561,7 +561,7 @@ impl Context {
         }
 
         let attrs = {
-            let mut attrs = unsafe { std::mem::uninitialized() };
+            let mut attrs = unsafe { std::mem::zeroed() };
             unsafe {
                 (xconn.xlib.XGetWindowAttributes)(
                     xconn.display,
