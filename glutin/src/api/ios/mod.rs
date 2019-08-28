@@ -391,7 +391,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, proc_name: &str) -> *const () {
+    pub fn get_proc_address(&self, proc_name: &str) -> *const core::ffi::c_void {
         let proc_name_c = CString::new(proc_name)
             .expect("proc name contained interior nul byte");
         let path = b"/System/Library/Frameworks/OpenGLES.framework/OpenGLES\0";

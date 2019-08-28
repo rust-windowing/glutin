@@ -124,7 +124,7 @@ impl Context<PossiblyCurrent> {
     ///
     /// [`ContextWrapper::get_proc_address`]:
     /// struct.ContextWrapper.html#method.get_proc_address
-    pub fn get_proc_address(&self, addr: &str) -> *const () {
+    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
         self.context.get_proc_address(addr)
     }
 }

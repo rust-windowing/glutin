@@ -187,7 +187,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const () {
+    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
         let glx = GLX.as_ref().unwrap();
         let addr = CString::new(addr.as_bytes()).unwrap();
         let addr = addr.as_ptr();
@@ -424,7 +424,7 @@ impl<'a> ContextPrototype<'a> {
                     );
                 }
 
-                let mut swap = unsafe { std::mem::uninitialized() };
+                let mut swap = unsafe { std::mem::zeroed() };
                 unsafe {
                     glx.QueryDrawable(
                         self.xconn.display as *mut _,

@@ -545,7 +545,7 @@ impl Context {
         fallback: bool,
     ) -> Result<Self, CreationError> {
         let attrs = unsafe {
-            let mut attrs = ::std::mem::uninitialized();
+            let mut attrs = ::std::mem::zeroed();
             (xconn.xlib.XGetWindowAttributes)(xconn.display, xwin, &mut attrs);
             attrs
         };
@@ -561,7 +561,7 @@ impl Context {
         }
 
         let attrs = {
-            let mut attrs = unsafe { std::mem::uninitialized() };
+            let mut attrs = unsafe { std::mem::zeroed() };
             unsafe {
                 (xconn.xlib.XGetWindowAttributes)(
                     xconn.display,
@@ -655,7 +655,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const () {
+    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
         match self.context {
             X11Context::Glx(ref ctx) => ctx.get_proc_address(addr),
             X11Context::Egl(ref ctx) => ctx.get_proc_address(addr),

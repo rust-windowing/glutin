@@ -39,7 +39,7 @@ impl Context {
         // getting the default values of attributes
         let mut attributes = unsafe {
             let mut attributes: ffi::EmscriptenWebGLContextAttributes =
-                std::mem::uninitialized();
+                std::mem::zeroed();
             ffi::emscripten_webgl_init_context_attributes(&mut attributes);
             attributes
         };
@@ -144,7 +144,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const () {
+    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
         let addr = CString::new(addr).unwrap();
 
         unsafe {

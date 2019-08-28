@@ -215,12 +215,12 @@ impl Context {
         }
     }
 
-    pub fn get_proc_address(&self, addr: &str) -> *const () {
+    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
         let addr = CString::new(addr.as_bytes()).unwrap();
         let addr = addr.as_ptr();
 
         unsafe {
-            let p = gl::wgl::GetProcAddress(addr) as *const ();
+            let p = gl::wgl::GetProcAddress(addr) as *const core::ffi::c_void;
             if !p.is_null() {
                 return p;
             }
@@ -749,8 +749,8 @@ unsafe fn choose_arb_pixel_format_id(
         out
     };
 
-    let mut format_id = std::mem::uninitialized();
-    let mut num_formats = std::mem::uninitialized();
+    let mut format_id = std::mem::zeroed();
+    let mut num_formats = std::mem::zeroed();
     if extra.ChoosePixelFormatARB(
         hdc as *const _,
         descriptor.as_ptr(),
@@ -777,7 +777,7 @@ unsafe fn choose_arb_pixel_format(
     format_id: raw::c_int,
 ) -> Result<PixelFormat, ()> {
     let get_info = |attrib: u32| {
-        let mut value = std::mem::uninitialized();
+        let mut value = std::mem::zeroed();
         extra.GetPixelFormatAttribivARB(
             hdc as *const _,
             format_id as raw::c_int,
