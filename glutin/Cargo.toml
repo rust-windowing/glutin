@@ -33,7 +33,7 @@ objc = "0.2.6"
 glutin_gles2_sys = { version = "0.1.3", path = "../glutin_gles2_sys" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-cgl = "0.2"
+cgl = "0.3"
 cocoa = "0.18"
 core-foundation = "0.6"
 core-graphics = "0.17"
