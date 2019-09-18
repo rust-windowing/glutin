@@ -63,7 +63,7 @@
 use crate::platform::ios::{WindowBuilderExtIOS, WindowExtIOS};
 use crate::{
     Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
-    PixelFormatRequirements,
+    PixelFormatRequirements, Rect,
 };
 
 use winit::window::WindowBuilder;
@@ -325,6 +325,19 @@ impl Context {
                 )))
             }
         }
+    }
+
+    #[inline]
+    pub fn swap_buffers_with_damage(
+        &self,
+        rects: &[Rect],
+    ) -> Result<(), ContextError> {
+        Err(ContextError::OsError("buffer damage not suported".to_string()))
+    }
+
+    #[inline]
+    pub fn swap_buffers_with_damage_supported(&self) -> bool {
+        false
     }
 
     #[inline]

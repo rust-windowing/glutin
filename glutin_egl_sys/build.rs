@@ -37,6 +37,7 @@ fn main() {
                 "EGL_MESA_platform_gbm",
                 "EGL_EXT_platform_wayland",
                 "EGL_EXT_platform_device",
+                "EGL_KHR_swap_buffers_with_damage",
             ],
         );
 

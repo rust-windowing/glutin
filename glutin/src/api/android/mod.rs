@@ -5,7 +5,7 @@ use crate::api::egl::{
 };
 use crate::CreationError::{self, OsError};
 use crate::{
-    Api, ContextError, GlAttributes, PixelFormat, PixelFormatRequirements,
+    Api, ContextError, GlAttributes, PixelFormat, PixelFormatRequirements, Rect,
 };
 
 use winit::window::WindowBuilder;
@@ -174,6 +174,22 @@ impl Context {
             }
         }
         self.0.egl_context.swap_buffers()
+    }
+
+    #[inline]
+    pub fn swap_buffers_with_damage(&self, rects: &[Rect]) -> Result<(), ContextError> {
+        if let Some(ref stopped) = self.0.stopped {
+            let stopped = stopped.lock();
+            if *stopped {
+                return Err(ContextError::ContextLost);
+            }
+        }
+        self.0.egl_context.swap_buffers_with_damage(rects)
+    }
+
+    #[inline]
+    pub fn swap_buffers_with_damage_supported(&self) -> bool {
+        self.0.egl_context.swap_buffers_with_damage_supported()
     }
 
     #[inline]

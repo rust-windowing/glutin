@@ -136,6 +136,30 @@ impl<W> ContextWrapper<PossiblyCurrent, W> {
         self.context.context.swap_buffers()
     }
 
+    /// Swaps the buffers in case of double or triple buffering using specified
+    /// damage rects.
+    ///
+    /// You should call this function every time you have finished rendering, or
+    /// the image may not be displayed on the screen.
+    ///
+    /// **Warning**: if you enabled vsync, this function will block until the
+    /// next time the screen is refreshed. However drivers can choose to
+    /// override your vsync settings, which means that you can't know in
+    /// advance whether `swap_buffers` will block or not.
+    pub fn swap_buffers_with_damage(
+        &self,
+        rects: &[Rect],
+    ) -> Result<(), ContextError> {
+        self.context.context.swap_buffers_with_damage(rects)
+    }
+
+    /// Returns whether or not swap_buffer_with_damage is available. If this
+    /// function returns false, any call to swap_buffers_with_damage will
+    /// return an error.
+    pub fn swap_buffers_with_damage_supported(&self) -> bool {
+        self.context.context.swap_buffers_with_damage_supported()
+    }
+
     /// Returns the pixel format of the main framebuffer of the context.
     pub fn get_pixel_format(&self) -> PixelFormat {
         self.context.context.get_pixel_format()

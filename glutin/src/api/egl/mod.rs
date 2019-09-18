@@ -13,6 +13,13 @@
 mod egl {
     use super::ffi;
     use crate::api::dlloader::{SymTrait, SymWrapper};
+    use libloading;
+    use std::sync::{Arc, Mutex};
+
+    #[cfg(unix)]
+    use libloading::os::unix as libloading_os;
+    #[cfg(windows)]
+    use libloading::os::windows as libloading_os;
 
     #[derive(Clone)]
     pub struct Egl(pub SymWrapper<ffi::egl::Egl>);
@@ -20,12 +27,63 @@ mod egl {
     /// Because `*const raw::c_void` doesn't implement `Sync`.
     unsafe impl Sync for Egl {}
 
+    type EglGetProcAddressType = libloading_os::Symbol<
+        unsafe extern "C" fn(
+            *const std::os::raw::c_void,
+        ) -> *const std::os::raw::c_void,
+    >;
+
+    lazy_static! {
+        static ref EGL_GET_PROC_ADDRESS: Arc<Mutex<Option<EglGetProcAddressType>>> =
+            Arc::new(Mutex::new(None));
+    }
+
     impl SymTrait for ffi::egl::Egl {
-        fn load_with<F>(loadfn: F) -> Self
-        where
-            F: FnMut(&'static str) -> *const std::os::raw::c_void,
-        {
-            Self::load_with(loadfn)
+        fn load_with(lib: &libloading::Library) -> Self {
+            let f = move |s: &'static str| -> *const std::os::raw::c_void {
+                // Check if the symbol is available in the library directly. If
+                // it is, just return it.
+                match unsafe {
+                    lib.get(
+                        std::ffi::CString::new(s.as_bytes())
+                            .unwrap()
+                            .as_bytes_with_nul(),
+                    )
+                } {
+                    Ok(sym) => return *sym,
+                    Err(_) => (),
+                };
+
+                let mut egl_get_proc_address =
+                    (*EGL_GET_PROC_ADDRESS).lock().unwrap();
+                if egl_get_proc_address.is_none() {
+                    unsafe {
+                        let sym: libloading::Symbol<
+                            unsafe extern "C" fn(
+                                *const std::os::raw::c_void,
+                            )
+                                -> *const std::os::raw::c_void,
+                        > = lib.get(b"eglGetProcAddress").unwrap();
+                        *egl_get_proc_address = Some(sym.into_raw());
+                    }
+                }
+
+                // The symbol was not available in the library, so ask
+                // eglGetProcAddress for it. Note that eglGetProcAddress was
+                // only able to look up extension functions prior to EGL 1.5,
+                // hence this two-part dance.
+                unsafe {
+                    (egl_get_proc_address.as_ref().unwrap())(
+                        std::ffi::CString::new(s.as_bytes())
+                            .unwrap()
+                            .as_bytes_with_nul()
+                            .as_ptr()
+                            as *const std::os::raw::c_void,
+                    )
+                }
+            };
+
+            Self::load_with(f)
         }
     }
 
@@ -62,7 +120,7 @@ pub use self::egl::Egl;
 use self::make_current_guard::MakeCurrentGuard;
 use crate::{
     Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
-    PixelFormatRequirements, ReleaseBehavior, Robustness,
+    PixelFormatRequirements, Rect, ReleaseBehavior, Robustness,
 };
 
 use glutin_egl_sys as ffi;
@@ -624,6 +682,62 @@ impl Context {
         } else {
             Ok(())
         }
+    }
+
+    #[inline]
+    pub fn swap_buffers_with_damage(
+        &self,
+        rects: &[Rect],
+    ) -> Result<(), ContextError> {
+        let egl = EGL.as_ref().unwrap();
+
+        if !egl.SwapBuffersWithDamageKHR.is_loaded() {
+            return Err(ContextError::FunctionUnavailable);
+        }
+
+        let surface = self.surface.as_ref().unwrap().lock();
+        if *surface == ffi::egl::NO_SURFACE {
+            return Err(ContextError::ContextLost);
+        }
+
+        let mut ffirects: Vec<ffi::egl::types::EGLint> =
+            Vec::with_capacity(rects.len() * 4);
+
+        for rect in rects {
+            ffirects.push(rect.x as ffi::egl::types::EGLint);
+            ffirects.push(rect.y as ffi::egl::types::EGLint);
+            ffirects.push(rect.width as ffi::egl::types::EGLint);
+            ffirects.push(rect.height as ffi::egl::types::EGLint);
+        }
+
+        let ret = unsafe {
+            egl.SwapBuffersWithDamageKHR(
+                self.display,
+                *surface,
+                ffirects.as_mut_ptr(),
+                rects.len() as ffi::egl::types::EGLint,
+            )
+        };
+
+        if ret == ffi::egl::FALSE {
+            match unsafe { egl.GetError() } as u32 {
+                ffi::egl::CONTEXT_LOST => {
+                    return Err(ContextError::ContextLost)
+                }
+                err => panic!(
+                    "swap_buffers: eglSwapBuffers failed (eglGetError returned 0x{:x})",
+                    err
+                ),
+            }
+        } else {
+            Ok(())
+        }
+    }
+
+    #[inline]
+    pub fn swap_buffers_with_damage_supported(&self) -> bool {
+        let egl = EGL.as_ref().unwrap();
+        egl.SwapBuffersWithDamageKHR.is_loaded()
     }
 
     #[inline]

@@ -2,7 +2,7 @@
 
 use crate::{
     Api, ContextCurrentState, ContextError, CreationError, GlAttributes,
-    GlRequest, NotCurrent, PixelFormat, PixelFormatRequirements,
+    GlRequest, NotCurrent, PixelFormat, PixelFormatRequirements, Rect,
 };
 
 use crate::api::egl::{
@@ -257,6 +257,19 @@ impl Context {
             Context::Egl(ref c) => c.swap_buffers(),
             _ => unreachable!(),
         }
+    }
+
+    #[inline]
+    pub fn swap_buffers_with_damage(
+        &self,
+        rects: &[Rect],
+    ) -> Result<(), ContextError> {
+        Err(ContextError::OsError("buffer damage not suported".to_string()))
+    }
+
+    #[inline]
+    pub fn swap_buffers_with_damage_supported(&self) -> bool {
+        false
     }
 
     #[inline]
