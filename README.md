@@ -90,5 +90,5 @@ In order to build in XCode, you must link both `UIKit.framework` and `OpenGLES.f
 Help! I'm receiving `NoAvailablePixelFormat`!
 
  - See: https://github.com/rust-windowing/glutin/issues/952#issuecomment-467228004
- - If you are on Windows w/ an AMD gpu and are requesting a non-srgb surface, see: https://github.com/rust-windowing/glutin/issues/1219
+ - If you are on Windows w/ an AMD gpu and are requesting a non-srgb non-floating point surface, see: https://github.com/rust-windowing/glutin/issues/1219
 
