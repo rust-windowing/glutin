@@ -6,7 +6,7 @@ use crate::api::egl::{
 use crate::platform::android::EventLoopExtAndroid;
 use crate::CreationError::{self, OsError};
 use crate::{
-    Api, ContextError, GlAttributes, PixelFormat, PixelFormatRequirements,
+    Api, ContextError, GlAttributes, PixelFormat, PixelFormatRequirements, Rect,
 };
 
 use glutin_egl_sys as ffi;
@@ -174,6 +174,17 @@ impl Context {
             }
         }
         self.0.egl_context.swap_buffers()
+    }
+
+    #[inline]
+    pub fn swap_buffers_with_damage(&self, rects: &[Rect]) -> Result<(), ContextError> {
+        if let Some(ref stopped) = self.0.stopped {
+            let stopped = stopped.lock();
+            if *stopped {
+                return Err(ContextError::ContextLost);
+            }
+        }
+        self.0.egl_context.swap_buffers_with_damage(rects)
     }
 
     #[inline]

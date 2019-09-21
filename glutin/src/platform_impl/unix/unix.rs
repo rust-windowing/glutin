@@ -12,7 +12,7 @@ mod wayland;
 // use self::x11::X11Context;
 use crate::{
     Api, ContextBuilderWrapper, ContextError, ContextSupports, CreationError,
-    GlAttributes, PixelFormat, PixelFormatRequirements,
+    GlAttributes, PixelFormat, PixelFormatRequirements, Rect,
 };
 // pub use self::x11::utils as x11_utils;
 
@@ -285,6 +285,14 @@ impl WindowSurface {
         match self {
             // WindowSurface::X11(ref surface) => surface.swap_buffers(),
             WindowSurface::Wayland(ref surface) => surface.swap_buffers(),
+        }
+    }
+
+    #[inline]
+    pub fn swap_buffers_with_damage(&self, rects: &[Rect]) -> Result<(), ContextError> {
+        match self {
+            // WindowSurface::X11(ref surface) => surface.swap_buffers_with_damage(rects),
+            WindowSurface::Wayland(ref surface) => surface.swap_buffers_with_damage(rects),
         }
     }
 

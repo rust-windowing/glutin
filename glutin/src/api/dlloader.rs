@@ -9,7 +9,6 @@
 
 use libloading::Library;
 
-use std::ffi::CString;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
@@ -20,9 +19,7 @@ pub struct SymWrapper<T> {
 }
 
 pub trait SymTrait {
-    fn load_with<F>(loadfn: F) -> Self
-    where
-        F: FnMut(&'static str) -> *const std::os::raw::c_void;
+    fn load_with(lib: &Library) -> Self;
 }
 
 impl<T: SymTrait> SymWrapper<T> {
@@ -31,17 +28,7 @@ impl<T: SymTrait> SymWrapper<T> {
             let lib = Library::new(path);
             if lib.is_ok() {
                 return Ok(SymWrapper {
-                    inner: T::load_with(|sym| unsafe {
-                        lib.as_ref()
-                            .unwrap()
-                            .get(
-                                CString::new(sym.as_bytes())
-                                    .unwrap()
-                                    .as_bytes_with_nul(),
-                            )
-                            .map(|sym| *sym)
-                            .unwrap_or(std::ptr::null_mut())
-                    }),
+                    inner: T::load_with(lib.as_ref().unwrap()),
                     _lib: Arc::new(lib.unwrap()),
                 });
             }

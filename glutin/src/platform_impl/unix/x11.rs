@@ -674,6 +674,19 @@ impl Context {
     }
 
     #[inline]
+    pub fn swap_buffers_with_damage(
+        &self,
+        rects: &[Rect],
+    ) -> Result<(), ContextError> {
+        match self.context {
+            X11Context::Glx(_) => Err(ContextError::OsError(
+                "buffer damage not suported".to_string(),
+            )),
+            X11Context::Egl(ref ctx) => ctx.swap_buffers_with_damage(rects),
+        }
+    }
+
+    #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         match self.context {
             X11Context::Glx(ref ctx) => ctx.get_pixel_format(),

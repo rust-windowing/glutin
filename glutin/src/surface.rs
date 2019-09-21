@@ -80,6 +80,23 @@ impl WindowSurface {
         self.surface.swap_buffers()
     }
 
+    /// Swaps the buffers in case of double or triple buffering using specified
+    /// damage rects.
+    ///
+    /// You should call this function every time you have finished rendering, or
+    /// the image may not be displayed on the screen.
+    ///
+    /// **Warning**: if you enabled vsync, this function will block until the
+    /// next time the screen is refreshed. However drivers can choose to
+    /// override your vsync settings, which means that you can't know in
+    /// advance whether `swap_buffers` will block or not.
+    pub fn swap_buffers_with_damage(
+        &self,
+        rects: &[Rect],
+    ) -> Result<(), ContextError> {
+        self.context.context.swap_buffers_with_damage(rects)
+    }
+
     #[inline]
     pub fn update_after_resize(&self, size: dpi::PhysicalSize) {
         #![cfg(any(

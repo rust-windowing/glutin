@@ -260,6 +260,18 @@ impl Context {
     }
 
     #[inline]
+    pub fn swap_buffers_with_damage(
+        &self,
+        rects: &[Rect],
+    ) -> Result<(), ContextError> {
+        match *self {
+            Context::Wgl(ref c) => Err(ContextError::OsError("buffer damage not suported".to_string())),
+            Context::Egl(ref c) => c.swap_buffers_with_damage(rect),
+            _ => unreachable!(),
+        }
+    }
+
+    #[inline]
     pub fn get_api(&self) -> Api {
         match *self {
             Context::Wgl(ref c) | Context::HiddenWindowWgl(_, ref c) => {

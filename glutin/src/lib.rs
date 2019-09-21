@@ -168,7 +168,7 @@ pub struct ContextBuilderWrapper<T> {
     pub robustness: Robustness,
 
     /// Platform specific attributes
-    pub plat_attr: platform_impl::PlatformAttributes,
+    pub plat_attr: platform_impl::ContextPlatformAttributes,
 }
 
 pub type ContextBuilder<'a> = ContextBuilderWrapper<&'a Context>;
@@ -626,6 +626,8 @@ pub struct SurfaceConfigBuilder {
     pub pbuffer_support: Option<bool>,
     /// FIXME: missing docs
     pub window_surface_support: Option<bool>,
+
+    pub plat_attr: platform_impl::SurfacePlatformAttributes,
 }
 
 impl Default for SurfaceConfigBuilder {
@@ -769,4 +771,13 @@ impl SurfaceConfigBuilder {
         self.hardware_accelerated = acceleration;
         self
     }
+}
+
+// Rectangles to submit as buffer damage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Rect {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
 }

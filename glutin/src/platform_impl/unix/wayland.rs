@@ -2,7 +2,7 @@ use crate::api::egl::{self, NativeDisplay};
 use crate::platform_impl::PlatformAttributes;
 use crate::{
     ContextBuilderWrapper, ContextError, ContextSupports, CreationError,
-    GlAttributes, PixelFormat, PixelFormatRequirements,
+    GlAttributes, PixelFormat, PixelFormatRequirements, Rect,
 };
 
 use crate::platform::unix::{
@@ -82,6 +82,14 @@ impl WindowSurface {
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
         self.surface.swap_buffers()
+    }
+
+    #[inline]
+    pub fn swap_buffers_with_damage(
+        &self,
+        rects: &[Rect],
+    ) -> Result<(), ContextError> {
+        self.surface.swap_buffers_with_damage(rects)
     }
 
     #[inline]
