@@ -652,7 +652,7 @@ impl Default for PixelFormatRequirements {
             double_buffer: None,
             multisampling: None,
             stereoscopy: false,
-            srgb: false,
+            srgb: true,
             release_behavior: ReleaseBehavior::Flush,
             x11_visual_xid: None,
         }
