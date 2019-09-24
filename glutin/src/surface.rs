@@ -1,5 +1,4 @@
 use super::*;
-use winit::event_loop::EventLoopWindowTarget;
 use winit::window::{Window, WindowBuilder};
 
 #[derive(Debug)]
@@ -9,8 +8,8 @@ pub struct PBuffer {
 
 impl PBuffer {
     #[inline]
-    pub unsafe fn new<TE>(
-        el: &EventLoopWindowTarget<TE>,
+    pub unsafe fn new(
+        el: &Display,
         ctx: &Context,
         size: dpi::PhysicalSize,
     ) -> Result<PBuffer, CreationError> {
@@ -46,8 +45,8 @@ pub struct WindowSurface {
 
 impl WindowSurface {
     #[inline]
-    pub unsafe fn new<TE>(
-        el: &EventLoopWindowTarget<TE>,
+    pub unsafe fn new(
+        el: &Display,
         surface_config: &SurfaceConfig,
         wb: WindowBuilder,
     ) -> Result<(Window, WindowSurface), CreationError> {

@@ -1,6 +1,5 @@
 use super::*;
 use std::ffi::c_void;
-use winit::event_loop::EventLoopWindowTarget;
 
 #[derive(Debug)]
 pub struct Context {
@@ -70,12 +69,12 @@ impl<'a> ContextBuilder<'a> {
     #[inline]
     pub fn build<TE>(
         self,
-        el: &EventLoopWindowTarget<TE>,
+        el: &Display,
         supports_surfaceless: bool,
         surface_config: &SurfaceConfig,
     ) -> Result<Context, CreationError> {
         let cb = self.map_sharing(|ctx| &ctx.context);
-        platform_impl::Context::new(el, cb, supports_surfaceless, surface_config)
+        platform_impl::Context::new(el, cb, supports_surfaceless, surface_config.with_config(&surface_config.config))
             .map(|context| Context { context })
     }
 }

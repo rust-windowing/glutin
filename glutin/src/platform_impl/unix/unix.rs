@@ -12,7 +12,7 @@ mod wayland;
 // use self::x11::X11Context;
 use crate::{
     Api, ContextBuilderWrapper, ContextError, ContextSupports, CreationError,
-    GlAttributes, PixelFormat, PixelFormatRequirements, Rect,
+    GlAttributes, PixelFormat, PixelFormatRequirements, Rect, SurfaceConfigAttribs
 };
 // pub use self::x11::utils as x11_utils;
 
@@ -46,6 +46,39 @@ pub enum ContextType {
 pub enum Context {
     // X11(x11::Context),
     Wayland(wayland::Context),
+}
+
+#[derive(Debug)]
+pub enum SurfaceConfig {
+    // X11(x11::SurfaceConfig),
+    Wayland(wayland::SurfaceConfig),
+}
+
+#[derive(Debug)]
+pub enum Display {
+    // X11(x11::Display),
+    Wayland(wayland::Display),
+}
+
+impl Display {
+    #[inline]
+    pub fn new<TE>(
+        el: &EventLoopWindowTarget<TE>,
+    ) -> Result<Self, CreationError> {
+        wayland::Display::new(el)
+            .map(|display| Display { display })
+    }
+}
+
+impl SurfaceConfig {
+    #[inline]
+    pub fn new(
+        el: &Display,
+        scb: SurfaceConfigBuilder,
+    ) -> (SurfaceConfigAttribs, SurfaceConfig) {
+        wayland::SurfaceConfig::new(el, scb)
+            .map(|(attribs, config)| (attribs, SurfaceConfig::Wayland(config)))
+    }
 }
 
 impl Context {
@@ -85,14 +118,19 @@ impl Context {
         el: &EventLoopWindowTarget<T>,
         cb: ContextBuilderWrapper<&Context>,
         ctx_supports: ContextSupports,
+        surface_config: SurfaceConfigWrapper<&SurfaceConfig>,
     ) -> Result<Self, CreationError> {
         if el.is_wayland() {
             Context::is_compatible(&cb.gl_attr.sharing, ContextType::Wayland)?;
-            let cb = cb.clone().map_sharing(|ctx| match *ctx {
+            let cb = cb.map_sharing(|ctx| match *ctx {
                 Context::Wayland(ref ctx) => ctx,
                 _ => unreachable!(),
             });
-            wayland::Context::new(el, cb, ctx_supports)
+            let surface_config = surface_config.map_sharing(|surface_config| match *surface_config {
+                SurfaceConfig::Wayland(ref ctx) => ctx,
+                _ => unreachable!(),
+            });
+            wayland::Context::new(el, cb, ctx_supports, surface_config)
                 .map(|context| Context::Wayland(context))
         } else {
             unimplemented!()
