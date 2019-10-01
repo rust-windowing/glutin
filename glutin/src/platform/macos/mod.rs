@@ -303,9 +303,13 @@ impl Context {
 
     #[inline]
     pub unsafe fn raw_handle(&self) -> *mut raw::c_void {
-        match *self {
-            Context::WindowedContext(ref c) => *c.context.deref() as *mut _,
-            Context::HeadlessContext(ref c) => *c.context.deref() as *mut _,
+        match self {
+            Context::WindowedContext(c) => {
+                c.context.deref().CGLContextObj() as *mut _
+            }
+            Context::HeadlessContext(c) => {
+                c.context.deref().CGLContextObj() as *mut _
+            }
         }
     }
 
