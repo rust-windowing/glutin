@@ -79,9 +79,6 @@ pub const kEAGLRenderingAPIOpenGLES1: NSUInteger = 1;
 pub const kEAGLRenderingAPIOpenGLES2: NSUInteger = 2;
 pub const kEAGLRenderingAPIOpenGLES3: NSUInteger = 3;
 
-#[link(name = "UIKit", kind = "framework")]
-#[link(name = "CoreFoundation", kind = "framework")]
-#[link(name = "GlKit", kind = "framework")]
 extern "C" {
     pub static kEAGLColorFormatRGB565: id;
     // pub static kEAGLColorFormatRGBA8: id;
