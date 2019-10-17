@@ -293,7 +293,7 @@ impl Context {
     #[inline]
     pub fn swap_buffers_with_damage(
         &self,
-        rects: &[Rect],
+        _rects: &[Rect],
     ) -> Result<(), ContextError> {
         Err(ContextError::OsError("buffer damage not suported".to_string()))
     }
