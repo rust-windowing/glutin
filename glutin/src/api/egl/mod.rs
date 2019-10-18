@@ -1086,19 +1086,21 @@ impl<'a> ContextPrototype<'a> {
 
         if let Some(surface) = surface {
             // VSync defaults to enabled; disable it if it was not requested.
-            if !self.opengl.vsync {
-                let _guard = MakeCurrentGuard::new(
-                    self.display,
-                    surface,
-                    surface,
-                    context,
-                )
-                .map_err(|err| CreationError::OsError(err))?;
+            if let Some(vsync) = self.opengl.vsync {
+                if !vsync {
+                    let _guard = MakeCurrentGuard::new(
+                        self.display,
+                        surface,
+                        surface,
+                        context,
+                        )
+                        .map_err(|err| CreationError::OsError(err))?;
 
-                let egl = EGL.as_ref().unwrap();
-                unsafe {
-                    if egl.SwapInterval(self.display, 0) == ffi::egl::FALSE {
-                        panic!("finish_impl: eglSwapInterval failed: 0x{:x}", egl.GetError());
+                    let egl = EGL.as_ref().unwrap();
+                    unsafe {
+                        if egl.SwapInterval(self.display, 0) == ffi::egl::FALSE {
+                            panic!("finish_impl: eglSwapInterval failed: 0x{:x}", egl.GetError());
+                        }
                     }
                 }
             }
@@ -1294,8 +1296,12 @@ where
     }
 
     // We're interested in those configs which allow our desired VSync.
-    let desired_swap_interval = if opengl.vsync {
-        1
+    let desired_swap_interval = if let Some(vsync) = opengl.vsync {
+        if vsync {
+            1
+        } else {
+            0
+        }
     } else {
         0
     };

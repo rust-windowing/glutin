@@ -181,7 +181,7 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     ///
     /// By default, vsync is not enabled.
     #[inline]
-    pub fn with_vsync(mut self, vsync: bool) -> Self {
+    pub fn with_vsync(mut self, vsync: Option<bool>) -> Self {
         self.gl_attr.vsync = vsync;
         self
     }
@@ -705,7 +705,7 @@ pub struct GlAttributes<S> {
     /// screen tearing.
     ///
     /// The default is `false`.
-    pub vsync: bool,
+    pub vsync: Option<bool>,
 }
 
 impl<S> GlAttributes<S> {
@@ -748,7 +748,7 @@ impl<S> Default for GlAttributes<S> {
             profile: None,
             debug: cfg!(debug_assertions),
             robustness: Robustness::NotRobust,
-            vsync: false,
+            vsync: Some(false),
         }
     }
 }
