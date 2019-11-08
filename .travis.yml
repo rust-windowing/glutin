@@ -42,6 +42,15 @@ matrix:
       os: osx
       rust: stable
 
+    # Xcode
+    - env: TARGET=x86_64-apple-ios
+      rust: stable
+      os: osx
+      osx_image: xcode11.2
+      xcode_destination: platform=iOS Simulator,name=iPhone 11 Pro,OS=13.2
+      script:
+        - make -C glutin_examples/ios-example ci
+
 addons:
   apt:
     packages:

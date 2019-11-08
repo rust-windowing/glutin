@@ -3,6 +3,7 @@ members = [
     "glutin",
     "glutin_lighter",
     "glutin_examples",
+    "glutin_examples/ios-example/rust",
     "glutin_egl_sys",
     "glutin_glx_sys",
     "glutin_wgl_sys",
