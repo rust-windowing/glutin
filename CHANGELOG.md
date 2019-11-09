@@ -1,5 +1,9 @@
 # Unreleased
 
+- Update winit dependency to 0.20.0-alpha4. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/blob/master/CHANGELOG.md#0200-alpha-4) for more info.
+
+# Version 0.22.0-alpha2 (2019-08-15)
+
 - Fixed attribute handling for sRGB in WGL.
 - Fixed VSync being always enabled on EGL.
 
