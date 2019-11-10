@@ -9,8 +9,6 @@
 
 # Version 0.22.0-alpha3 (2019-8-15)
 
- - Added better attribute handling for sRGB in WGL.
- - Added support for setting VSync in EGL.
  - Switched from needing a `EventLoop` to a `EventLoopWindowTarget`
 
 # Version 0.22.0-alpha2 (2019-08-15)
