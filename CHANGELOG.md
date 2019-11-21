@@ -3,6 +3,9 @@
 # Version 0.22.0-alpha4 (2019-11-10)
 
 - Update winit dependency to 0.20.0-alpha4. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/blob/master/CHANGELOG.md#0200-alpha-4) for more info.
+# Version 0.22.0-alpha4 (2019-11-10)
+
+- Update winit dependency to 0.20.0-alpha4. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/blob/master/CHANGELOG.md#0200-alpha-4) for more info.
 - Added an xcode example for building for iOS.
 - Made using sRGB the default.
 - MacOSX's raw_handle trait method  now returns the CGLContext object.

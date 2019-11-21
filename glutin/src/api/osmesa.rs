@@ -10,20 +10,28 @@ pub mod ffi {
     pub use osmesa_sys::OSMesaContext;
 }
 
+use crate::platform_impl::PlatformAttributes;
 use crate::{
-    Api, ContextError, CreationError, GlAttributes, GlProfile, GlRequest,
-    PixelFormatRequirements, Robustness,
+    Api, ContextBuilderWrapper, ContextError, CreationError, GlAttributes,
+    GlProfile, GlRequest, PixelFormat, PixelFormatRequirements, Robustness,
 };
 
 use winit::dpi;
 
-use std::ffi::CString;
+use std::ffi::{c_void, CString};
+use std::mem::MaybeUninit;
 use std::os::raw;
 
 #[derive(Debug)]
 pub struct OsMesaContext {
     context: osmesa_sys::OSMesaContext,
-    buffer: Vec<u32>,
+}
+
+#[derive(Derivative)]
+#[derivative(Debug)]
+pub struct OsMesaBuffer {
+    #[derivative(Debug = "ignore")]
+    buffer: Vec<MaybeUninit<u8>>,
     width: u32,
     height: u32,
 }
@@ -69,19 +77,17 @@ impl std::error::Error for LoadingError {
 
 impl OsMesaContext {
     pub fn new(
-        _pf_reqs: &PixelFormatRequirements,
-        opengl: &GlAttributes<&OsMesaContext>,
-        size: dpi::PhysicalSize,
+        cb: ContextBuilderWrapper<&OsMesaContext>,
     ) -> Result<Self, CreationError> {
         osmesa_sys::OsMesa::try_loading()
             .map_err(LoadingError::new)
             .map_err(|e| CreationError::NoBackendAvailable(Box::new(e)))?;
 
-        if opengl.sharing.is_some() {
+        if cb.gl_attr.sharing.is_some() {
             panic!("Context sharing not possible with OsMesa")
         }
 
-        match opengl.robustness {
+        match cb.gl_attr.robustness {
             Robustness::RobustNoResetNotification
             | Robustness::RobustLoseContextOnReset => {
                 return Err(CreationError::RobustnessNotSupported.into());
@@ -93,7 +99,7 @@ impl OsMesaContext {
 
         let mut attribs = Vec::new();
 
-        if let Some(profile) = opengl.profile {
+        if let Some(profile) = cb.gl_attr.profile {
             attribs.push(osmesa_sys::OSMESA_PROFILE);
 
             match profile {
@@ -106,7 +112,7 @@ impl OsMesaContext {
             }
         }
 
-        match opengl.version {
+        match cb.gl_attr.version {
             GlRequest::Latest => {}
             GlRequest::Specific(Api::OpenGl, (major, minor)) => {
                 attribs.push(osmesa_sys::OSMESA_CONTEXT_MAJOR_VERSION);
@@ -134,14 +140,7 @@ impl OsMesaContext {
         // attribs array must be NULL terminated.
         attribs.push(0);
 
-        let size: (u32, u32) = size.into();
-
         Ok(OsMesaContext {
-            width: size.0,
-            height: size.1,
-            buffer: std::iter::repeat(unsafe { std::mem::zeroed() })
-                .take((size.0 * size.1) as usize)
-                .collect(),
             context: unsafe {
                 let ctx = osmesa_sys::OSMesaCreateContextAttribs(
                     attribs.as_ptr(),
@@ -158,13 +157,16 @@ impl OsMesaContext {
     }
 
     #[inline]
-    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
+    pub unsafe fn make_current_osmesa_buffer(
+        &self,
+        buffer: &OsMesaBuffer,
+    ) -> Result<(), ContextError> {
         let ret = osmesa_sys::OSMesaMakeCurrent(
             self.context,
-            self.buffer.as_ptr() as *mut _,
-            0x1401,
-            self.width as raw::c_int,
-            self.height as raw::c_int,
+            buffer.buffer.as_ptr() as *mut _,
+            0x1401, // GL_UNSIGNED_BYTE
+            buffer.width as raw::c_int,
+            buffer.height as raw::c_int,
         );
 
         // an error can only happen in case of invalid parameter, which would
@@ -188,6 +190,11 @@ impl OsMesaContext {
             // and seeing if it work.
             //
             // https://gitlab.freedesktop.org/mesa/mesa/merge_requests/533
+            //
+            // EDIT: 2019/06/13: This PR has recieved no attention, and will
+            // likely never be merged in my lifetime :/
+            //
+            // Honestly, just go use EGL-Surfaceless!
             let ret = osmesa_sys::OSMesaMakeCurrent(
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
@@ -222,10 +229,12 @@ impl OsMesaContext {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
+    pub fn get_proc_address(&self, addr: &str) -> *const c_void {
         unsafe {
             let c_str = CString::new(addr.as_bytes().to_vec()).unwrap();
-            core::mem::transmute(osmesa_sys::OSMesaGetProcAddress(c_str.as_ptr() as *mut _))
+            std::mem::transmute(osmesa_sys::OSMesaGetProcAddress(
+                c_str.as_ptr(),
+            ))
         }
     }
 }
@@ -239,3 +248,24 @@ impl Drop for OsMesaContext {
 
 unsafe impl Send for OsMesaContext {}
 unsafe impl Sync for OsMesaContext {}
+
+impl OsMesaBuffer {
+    pub fn new(
+        ctx: &OsMesaContext,
+        size: dpi::PhysicalSize,
+    ) -> Result<Self, CreationError> {
+        let size: (u32, u32) = size.into();
+        Ok(OsMesaBuffer {
+            width: size.0,
+            height: size.1,
+            buffer: std::iter::repeat(MaybeUninit::uninit())
+                .take(size.0 as usize * size.1 as usize * 4)
+                .collect(),
+        })
+    }
+
+    #[inline]
+    pub fn get_pixel_format(&self) -> PixelFormat {
+        unimplemented!()
+    }
+}

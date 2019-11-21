@@ -1,7 +1,8 @@
 #![cfg(target_os = "macos")]
+use crate::platform::macos::WindowExtMacOS;
 use crate::{
     ContextError, CreationError, GlAttributes, PixelFormat,
-    PixelFormatRequirements, Robustness, Rect,
+    PixelFormatRequirements, Robustness, Rect
 };
 
 use cgl::{
@@ -17,8 +18,6 @@ use core_foundation::bundle::{
 };
 use core_foundation::string::CFString;
 use objc::runtime::{BOOL, NO};
-
-use crate::platform::macos::WindowExtMacOS;
 use winit;
 use winit::dpi;
 use winit::event_loop::EventLoopWindowTarget;
@@ -157,7 +156,7 @@ impl Context {
 
             let context = WindowedContext {
                 context: gl_context,
-                pixel_format: pixel_format,
+                pixel_format,
             };
             Ok((win, Context::WindowedContext(context)))
         }
@@ -256,7 +255,7 @@ impl Context {
         }
     }
 
-    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
+    pub fn get_proc_address(&self, addr: &str) -> *const () {
         let symbol_name: CFString = FromStr::from_str(addr).unwrap();
         let framework_name: CFString =
             FromStr::from_str("com.apple.opengl").unwrap();
@@ -280,6 +279,8 @@ impl Context {
             match *self {
                 Context::WindowedContext(ref c) => {
                     let pool = NSAutoreleasePool::new(nil);
+                    // FIXME: Does not work if `NSOpenGLPFADoubleBuffer` is not
+                    // set?
                     c.context.flushBuffer();
                     let _: () = msg_send![pool, release];
                 }
@@ -295,11 +296,6 @@ impl Context {
         _rects: &[Rect],
     ) -> Result<(), ContextError> {
         Err(ContextError::OsError("buffer damage not suported".to_string()))
-    }
-
-    #[inline]
-    pub fn swap_buffers_with_damage_supported(&self) -> bool {
-        false
     }
 
     #[inline]

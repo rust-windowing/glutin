@@ -49,7 +49,7 @@ pub fn load(gl_context: &glutin::Context<PossiblyCurrent>) -> Gl {
         gl.LinkProgram(program);
         gl.UseProgram(program);
 
-        let mut vb = std::mem::zeroed();
+        let mut vb = std::mem::uninitialized();
         gl.GenBuffers(1, &mut vb);
         gl.BindBuffer(gl::ARRAY_BUFFER, vb);
         gl.BufferData(
@@ -61,7 +61,7 @@ pub fn load(gl_context: &glutin::Context<PossiblyCurrent>) -> Gl {
         );
 
         if gl.BindVertexArray.is_loaded() {
-            let mut vao = std::mem::zeroed();
+            let mut vao = std::mem::uninitialized();
             gl.GenVertexArrays(1, &mut vao);
             gl.BindVertexArray(vao);
         }

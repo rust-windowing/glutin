@@ -2,12 +2,22 @@
 
 use crate::platform::ContextTraitExt;
 use crate::{Context, ContextCurrentState};
+use crate::{
+    SupportsPBuffersTrait, SupportsSurfacelessTrait,
+    SupportsWindowSurfacesTrait,
+};
 
 pub use winit::platform::ios::*;
 
 use std::os::raw;
 
-impl<T: ContextCurrentState> ContextTraitExt for Context<T> {
+impl<
+        IC: ContextCurrentState,
+        PBT: SupportsPBuffersTrait,
+        WST: SupportsWindowSurfacesTrait,
+        ST: SupportsSurfacelessTrait,
+    > ContextTraitExt for Context<IC, PBT, WST, ST>
+{
     type Handle = *mut raw::c_void;
     #[inline]
     unsafe fn raw_handle(&self) -> Self::Handle {

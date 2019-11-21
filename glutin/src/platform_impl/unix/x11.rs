@@ -5,12 +5,12 @@ use crate::api::egl::{
 use crate::api::glx::{Context as GlxContext, GLX};
 use crate::platform::unix::x11::XConnection;
 use crate::platform::unix::{
-    EventLoopWindowTargetExtUnix, WindowBuilderExtUnix, WindowExtUnix,
+    EventLoopExtUnix, WindowBuilderExtUnix, WindowExtUnix,
 };
-use crate::platform_impl::x11_utils;
+use crate::platform_impl::{x11_utils, PlatformAttributes};
 use crate::{
-    Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
-    PixelFormatRequirements, Rect,
+    Api, ContextBuilderWrapper, ContextError, CreationError, GlAttributes,
+    GlRequest, PixelFormat, PixelFormatRequirements,
 };
 
 use glutin_glx_sys as ffi;
@@ -95,10 +95,10 @@ unsafe impl Sync for Context {}
 //
 // https://bugs.freedesktop.org/show_bug.cgi?id=67676<Paste>
 // I'm on a patch.
-pub fn select_config<T, F>(
+pub fn select_config<'a, T, F, CTX>(
     xconn: &Arc<XConnection>,
     transparent: Option<bool>,
-    pf_reqs: &PixelFormatRequirements,
+    cb: &'a ContextBuilderWrapper<&'a CTX>,
     config_ids: Vec<T>,
     mut convert_to_xvisualinfo: F,
 ) -> Result<(T, ffi::XVisualInfo), ()>
@@ -119,18 +119,8 @@ where
             &xconn,
             visual_infos,
             transparent == Some(true),
-            pf_reqs.x11_visual_xid,
+            cb.plat_attr.x11_visual_xid,
         );
-
-        let pict_format = unsafe {
-            (xconn.xrender.XRenderFindVisualFormat)(
-                xconn.display as *mut _,
-                visual_infos.visual,
-            )
-        };
-        if pict_format.is_null() {
-            continue;
-        }
 
         match (lacks_what, &this_lacks_what) {
             (Some(Ok(())), _) => unreachable!(),
@@ -184,144 +174,148 @@ impl Context {
         }
     }
 
-    #[inline]
-    pub fn new_headless<T>(
-        el: &EventLoopWindowTarget<T>,
-        pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context>,
-        size: Option<dpi::PhysicalSize>,
-    ) -> Result<Self, CreationError> {
-        Self::try_then_fallback(|fallback| {
-            Self::new_headless_impl(
-                el,
-                pf_reqs,
-                gl_attr,
-                size.clone(),
-                fallback,
-            )
-        })
-    }
-
-    fn new_headless_impl<T>(
-        el: &EventLoopWindowTarget<T>,
-        pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context>,
-        size: Option<dpi::PhysicalSize>,
-        fallback: bool,
-    ) -> Result<Self, CreationError> {
-        let xconn = match el.xlib_xconnection() {
-            Some(xconn) => xconn,
-            None => {
-                return Err(CreationError::NoBackendAvailable(Box::new(
-                    NoX11Connection,
-                )));
-            }
-        };
-
-        // Get the screen_id for the window being built.
-        let screen_id = unsafe { (xconn.xlib.XDefaultScreen)(xconn.display) };
-
-        let mut builder_glx_u = None;
-        let mut builder_egl_u = None;
-
-        // start the context building process
-        if let Some(size) = size {
-            let context = Self::new_first_stage(
-                &xconn,
-                pf_reqs,
-                gl_attr,
-                screen_id,
-                &mut builder_glx_u,
-                &mut builder_egl_u,
-                EglSurfaceType::PBuffer,
-                fallback,
-                fallback,
-                Some(false),
-            )?;
-
-            // finish creating the OpenGL context
-            let context = match context {
-                Prototype::Glx(ctx) => {
-                    X11Context::Glx(ctx.finish_pbuffer(size)?)
-                }
-                Prototype::Egl(ctx) => {
-                    X11Context::Egl(ctx.finish_pbuffer(size)?)
-                }
-            };
-
-            let context = Context::PBuffer(ContextInner {
-                xconn: Arc::clone(&xconn),
-                context,
-            });
-
-            Ok(context)
-        } else {
-            // Surfaceless
-            let context = Self::new_first_stage(
-                &xconn,
-                pf_reqs,
-                gl_attr,
-                screen_id,
-                &mut builder_glx_u,
-                &mut builder_egl_u,
-                EglSurfaceType::Surfaceless,
-                !fallback,
-                fallback,
-                Some(false),
-            )?;
-
-            // finish creating the OpenGL context
-            let context = match context {
-                // TODO: glx impl
-                //
-                // According to GLX_EXT_no_config_context
-                // > 2) Are no-config contexts constrained to those GL & ES
-                // > implementations which can support them?
-                // >
-                // > RESOLVED: Yes. ES2 + OES_surfaceless_context, ES 3.0, and
-                // > GL 3.0 all support binding a context without a drawable.
-                // > This implies that they don't need to know drawable
-                // > attributes at context creation time.
-                // >
-                // > In principle, equivalent functionality could be possible
-                // > with ES 1.x + OES_surfaceless_context. This extension
-                // > makes no promises about that. An implementation wishing to
-                // > reliably support this combination, or a similarly
-                // > permissive combination for GL < 3.0, should indicate so
-                // > with an additional GLX extension.
-
-                // Prototype::Glx(ctx) =>
-                // X11Context::Glx(ctx.finish_surfaceless(xwin)?),
-                Prototype::Egl(ctx) => {
-                    X11Context::Egl(ctx.finish_surfaceless()?)
-                }
-                _ => unimplemented!(),
-            };
-
-            let context = Context::Surfaceless(ContextInner {
-                xconn: Arc::clone(&xconn),
-                context,
-            });
-
-            Ok(context)
-        }
-    }
+    // #[inline]
+    // pub fn new_headless<T>(
+    // el: &EventLoopWindowTarget<T>,
+    // pf_reqs: &PixelFormatRequirements,
+    // gl_attr: &GlAttributes<&Context>,
+    // plat_attr: &PlatformAttributes,
+    // size: Option<dpi::PhysicalSize>,
+    // ) -> Result<Self, CreationError> {
+    // Self::try_then_fallback(|fallback| {
+    // Self::new_headless_impl(
+    // el,
+    // pf_reqs,
+    // gl_attr,
+    // plat_attr,
+    // size.clone(),
+    // fallback,
+    // )
+    // })
+    // }
+    //
+    // fn new_headless_impl<T>(
+    // el: &EventLoopWindowTarget<T>,
+    // pf_reqs: &PixelFormatRequirements,
+    // gl_attr: &GlAttributes<&Context>,
+    // plat_attr: &PlatformAttributes,
+    // size: Option<dpi::PhysicalSize>,
+    // fallback: bool,
+    // ) -> Result<Self, CreationError> {
+    // let xconn = match el.xlib_xconnection() {
+    // Some(xconn) => xconn,
+    // None => {
+    // return Err(CreationError::NoBackendAvailable(Box::new(
+    // NoX11Connection,
+    // )));
+    // }
+    // };
+    //
+    // Get the screen_id for the window being built.
+    // let screen_id = unsafe { (xconn.xlib.XDefaultScreen)(xconn.display) };
+    //
+    // let mut builder_glx_u = None;
+    // let mut builder_egl_u = None;
+    //
+    // start the context building process
+    // if let Some(size) = size {
+    // let context = Self::new_first_stage(
+    // &xconn,
+    // pf_reqs,
+    // gl_attr,
+    // plat_attr,
+    // screen_id,
+    // &mut builder_glx_u,
+    // &mut builder_egl_u,
+    // EglSurfaceType::PBuffer,
+    // fallback,
+    // fallback,
+    // Some(false),
+    // )?;
+    //
+    // finish creating the OpenGL context
+    // let context = match context {
+    // Prototype::Glx(ctx) => {
+    // X11Context::Glx(ctx.finish_pbuffer(size)?)
+    // }
+    // Prototype::Egl(ctx) => {
+    // X11Context::Egl(ctx.finish_pbuffer(size)?)
+    // }
+    // };
+    //
+    // let context = Context::PBuffer(ContextInner {
+    // xconn: Arc::clone(&xconn),
+    // context,
+    // });
+    //
+    // Ok(context)
+    // } else {
+    // Surfaceless
+    // let context = Self::new_first_stage(
+    // &xconn,
+    // pf_reqs,
+    // gl_attr,
+    // plat_attr,
+    // screen_id,
+    // &mut builder_glx_u,
+    // &mut builder_egl_u,
+    // EglSurfaceType::Surfaceless,
+    // !fallback,
+    // fallback,
+    // Some(false),
+    // )?;
+    //
+    // finish creating the OpenGL context
+    // let context = match context {
+    // TODO: glx impl
+    //
+    // According to GLX_EXT_no_config_context
+    // > 2) Are no-config contexts constrained to those GL & ES
+    // > implementations which can support them?
+    // >
+    // > RESOLVED: Yes. ES2 + OES_surfaceless_context, ES 3.0, and
+    // > GL 3.0 all support binding a context without a drawable.
+    // > This implies that they don't need to know drawable
+    // > attributes at context creation time.
+    // >
+    // > In principle, equivalent functionality could be possible
+    // > with ES 1.x + OES_surfaceless_context. This extension
+    // > makes no promises about that. An implementation wishing to
+    // > reliably support this combination, or a similarly
+    // > permissive combination for GL < 3.0, should indicate so
+    // > with an additional GLX extension.
+    //
+    // Prototype::Glx(ctx) =>
+    // X11Context::Glx(ctx.finish_surfaceless(xwin)?),
+    // Prototype::Egl(ctx) => {
+    // X11Context::Egl(ctx.finish_surfaceless()?)
+    // }
+    // _ => unimplemented!(),
+    // };
+    //
+    // let context = Context::Surfaceless(ContextInner {
+    // xconn: Arc::clone(&xconn),
+    // context,
+    // });
+    //
+    // Ok(context)
+    // }
+    // }
 
     #[inline]
     fn new_first_stage<'a>(
         xconn: &Arc<XConnection>,
-        pf_reqs: &PixelFormatRequirements,
-        gl_attr: &'a GlAttributes<&'a Context>,
+        cb: &'a ContextBuilderWrapper<&'a Context>,
         screen_id: raw::c_int,
-        builder_glx_u: &'a mut Option<GlAttributes<&'a GlxContext>>,
-        builder_egl_u: &'a mut Option<GlAttributes<&'a EglContext>>,
+        builder_glx_u: &'a mut Option<ContextBuilderWrapper<&'a GlxContext>>,
+        builder_egl_u: &'a mut Option<ContextBuilderWrapper<&'a EglContext>>,
         surface_type: EglSurfaceType,
         prefer_egl: bool,
         force_prefer_unless_only: bool,
         transparent: Option<bool>,
     ) -> Result<Prototype<'a>, CreationError> {
         let select_config = |cs, display| {
-            select_config(&xconn, transparent, pf_reqs, cs, |config_id| {
+            select_config(&xconn, transparent, cb, cs, |config_id| {
                 let xid = egl::get_native_visual_id(display, *config_id)
                     as ffi::VisualID;
                 if xid == 0 {
@@ -331,7 +325,7 @@ impl Context {
             })
             .map(|(c, _)| c)
         };
-        Ok(match gl_attr.version {
+        Ok(match cb.gl_attr.version {
             GlRequest::Latest
             | GlRequest::Specific(Api::OpenGl, _)
             | GlRequest::GlThenGles { .. } => {
@@ -341,7 +335,7 @@ impl Context {
                 // However, with surfaceless, GLX isn't really there, so we
                 // should prefer EGL.
                 let glx = |builder_u: &'a mut Option<_>| {
-                    let builder = gl_attr.clone();
+                    let builder = cb.clone();
                     *builder_u =
                         Some(builder.map_sharing(|c| match c.context {
                             X11Context::Glx(ref c) => c,
@@ -349,7 +343,6 @@ impl Context {
                         }));
                     Ok(Prototype::Glx(GlxContext::new(
                         Arc::clone(&xconn),
-                        pf_reqs,
                         builder_u.as_ref().unwrap(),
                         screen_id,
                         surface_type,
@@ -358,7 +351,7 @@ impl Context {
                 };
 
                 let egl = |builder_u: &'a mut Option<_>| {
-                    let builder = gl_attr.clone();
+                    let builder = cb.clone();
                     *builder_u =
                         Some(builder.map_sharing(|c| match c.context {
                             X11Context::Egl(ref c) => c,
@@ -367,7 +360,6 @@ impl Context {
                     let native_display =
                         NativeDisplay::X11(Some(xconn.display as *const _));
                     Ok(Prototype::Egl(EglContext::new(
-                        pf_reqs,
                         builder_u.as_ref().unwrap(),
                         native_display,
                         surface_type,
@@ -420,14 +412,13 @@ impl Context {
             }
             GlRequest::Specific(Api::OpenGlEs, _) => {
                 if let Some(_) = *EGL {
-                    let builder = gl_attr.clone();
+                    let builder = cb.clone();
                     *builder_egl_u =
                         Some(builder.map_sharing(|c| match c.context {
                             X11Context::Egl(ref c) => c,
                             _ => panic!(),
                         }));
                     Prototype::Egl(EglContext::new(
-                        pf_reqs,
                         builder_egl_u.as_ref().unwrap(),
                         NativeDisplay::X11(Some(xconn.display as *const _)),
                         surface_type,
@@ -449,23 +440,32 @@ impl Context {
 
     #[inline]
     pub fn new<T>(
-        wb: WindowBuilder,
         el: &EventLoopWindowTarget<T>,
-        pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context>,
-    ) -> Result<(Window, Self), CreationError> {
+        cb: ContextBuilderWrapper<&Context>,
+        pbuffer_support: bool,
+        window_surface_support: bool,
+        surfaceless_support: bool,
+    ) -> Result<Self, CreationError> {
         Self::try_then_fallback(|fallback| {
-            Self::new_impl(wb.clone(), el, pf_reqs, gl_attr, fallback)
+            Self::new_impl(
+                el,
+                &cb,
+                pbuffer_support,
+                window_surface_support,
+                surfaceless_support,
+                fallback,
+            )
         })
     }
 
     fn new_impl<T>(
-        wb: WindowBuilder,
         el: &EventLoopWindowTarget<T>,
-        pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context>,
+        cb: &ContextBuilderWrapper<&Context>,
+        pbuffer_support: bool,
+        window_surface_support: bool,
+        surfaceless_support: bool,
         fallback: bool,
-    ) -> Result<(Window, Self), CreationError> {
+    ) -> Result<Self, CreationError> {
         let xconn = match el.xlib_xconnection() {
             Some(xconn) => xconn,
             None => {
@@ -484,15 +484,14 @@ impl Context {
         // start the context building process
         let context = Self::new_first_stage(
             &xconn,
-            pf_reqs,
-            gl_attr,
+            cb,
             screen_id,
             &mut builder_glx_u,
             &mut builder_egl_u,
             EglSurfaceType::Window,
             fallback,
             fallback,
-            Some(wb.window.transparent),
+            cb.plat_attr.glx_transparency,
         )?;
 
         // getting the `visual_infos` (a struct that contains information about
@@ -525,89 +524,93 @@ impl Context {
         Ok((win, context))
     }
 
-    #[inline]
-    pub fn new_raw_context(
-        xconn: Arc<XConnection>,
-        xwin: raw::c_ulong,
-        pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context>,
-    ) -> Result<Self, CreationError> {
-        Self::try_then_fallback(|fallback| {
-            Self::new_raw_context_impl(&xconn, xwin, pf_reqs, gl_attr, fallback)
-        })
-    }
-
-    fn new_raw_context_impl(
-        xconn: &Arc<XConnection>,
-        xwin: raw::c_ulong,
-        pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Context>,
-        fallback: bool,
-    ) -> Result<Self, CreationError> {
-        let attrs = unsafe {
-            let mut attrs = ::std::mem::zeroed();
-            (xconn.xlib.XGetWindowAttributes)(xconn.display, xwin, &mut attrs);
-            attrs
-        };
-
-        // Not particularly efficient, but it's the only method I can find.
-        let mut screen_id = 0;
-        unsafe {
-            while attrs.screen
-                != (xconn.xlib.XScreenOfDisplay)(xconn.display, screen_id)
-            {
-                screen_id += 1;
-            }
-        }
-
-        let attrs = {
-            let mut attrs = unsafe { std::mem::zeroed() };
-            unsafe {
-                (xconn.xlib.XGetWindowAttributes)(
-                    xconn.display,
-                    xwin,
-                    &mut attrs,
-                );
-            }
-            attrs
-        };
-
-        let visual_xid =
-            unsafe { (xconn.xlib.XVisualIDFromVisual)(attrs.visual) };
-        let mut pf_reqs = pf_reqs.clone();
-        pf_reqs.x11_visual_xid = Some(visual_xid);
-        pf_reqs.depth_bits = Some(attrs.depth as _);
-
-        let mut builder_glx_u = None;
-        let mut builder_egl_u = None;
-
-        // start the context building process
-        let context = Self::new_first_stage(
-            &xconn,
-            &pf_reqs,
-            gl_attr,
-            screen_id,
-            &mut builder_glx_u,
-            &mut builder_egl_u,
-            EglSurfaceType::Window,
-            fallback,
-            fallback,
-            None,
-        )?;
-
-        // finish creating the OpenGL context
-        let context = match context {
-            Prototype::Glx(ctx) => X11Context::Glx(ctx.finish(xwin)?),
-            Prototype::Egl(ctx) => X11Context::Egl(ctx.finish(xwin as _)?),
-        };
-
-        let context = Context::Windowed(ContextInner {
-            xconn: Arc::clone(&xconn),
-            context,
-        });
-
-        Ok(context)
-    }
+    // #[inline]
+    // pub fn new_raw_context(
+    // xconn: Arc<XConnection>,
+    // xwin: raw::c_ulong,
+    // pf_reqs: &PixelFormatRequirements,
+    // gl_attr: &GlAttributes<&Context>,
+    // plat_attr: &PlatformAttributes,
+    // ) -> Result<Self, CreationError> {
+    // Self::try_then_fallback(|fallback| {
+    // Self::new_raw_context_impl(&xconn, xwin, pf_reqs, gl_attr, plat_attr,
+    // fallback) })
+    // }
+    //
+    // fn new_raw_context_impl(
+    // xconn: &Arc<XConnection>,
+    // xwin: raw::c_ulong,
+    // pf_reqs: &PixelFormatRequirements,
+    // gl_attr: &GlAttributes<&Context>,
+    // plat_attr: &PlatformAttributes,
+    // fallback: bool,
+    // ) -> Result<Self, CreationError> {
+    // let attrs = unsafe {
+    // let mut attrs = 0;
+    // (xconn.xlib.XGetWindowAttributes)(xconn.display, xwin, &mut attrs);
+    // attrs
+    // };
+    //
+    // Not particularly efficient, but it's the only method I can find.
+    // let mut screen_id = 0;
+    // unsafe {
+    // while attrs.screen
+    // != (xconn.xlib.XScreenOfDisplay)(xconn.display, screen_id)
+    // {
+    // screen_id += 1;
+    // }
+    // }
+    //
+    // let attrs = {
+    // let mut attrs = 0;
+    // unsafe {
+    // (xconn.xlib.XGetWindowAttributes)(
+    // xconn.display,
+    // xwin,
+    // &mut attrs,
+    // );
+    // }
+    // attrs
+    // };
+    //
+    // let visual_xid =
+    // unsafe { (xconn.xlib.XVisualIDFromVisual)(attrs.visual) };
+    // let mut pf_reqs = pf_reqs.clone();
+    // let mut plat_attr = plat_attr.clone();
+    // plat_attr.x11_visual_xid = Some(visual_xid);
+    // pf_reqs.depth_bits = Some(attrs.depth as _);
+    //
+    // let mut builder_glx_u = None;
+    // let mut builder_egl_u = None;
+    //
+    // start the context building process
+    // let context = Self::new_first_stage(
+    // &xconn,
+    // &pf_reqs,
+    // gl_attr,
+    // &plat_attr,
+    // screen_id,
+    // &mut builder_glx_u,
+    // &mut builder_egl_u,
+    // EglSurfaceType::Window,
+    // fallback,
+    // fallback,
+    // None,
+    // )?;
+    //
+    // finish creating the OpenGL context
+    // let context = match context {
+    // Prototype::Glx(ctx) => X11Context::Glx(ctx.finish(xwin)?),
+    // Prototype::Egl(ctx) => X11Context::Egl(ctx.finish(xwin as _)?),
+    // };
+    //
+    // let context = Context::Windowed(ContextInner {
+    // xconn: Arc::clone(&xconn),
+    // context,
+    // });
+    //
+    // Ok(context)
+    // }
 
     #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
@@ -655,7 +658,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
+    pub fn get_proc_address(&self, addr: &str) -> *const () {
         match self.context {
             X11Context::Glx(ref ctx) => ctx.get_proc_address(addr),
             X11Context::Egl(ref ctx) => ctx.get_proc_address(addr),
@@ -680,14 +683,6 @@ impl Context {
                 "buffer damage not suported".to_string(),
             )),
             X11Context::Egl(ref ctx) => ctx.swap_buffers_with_damage(rects),
-        }
-    }
-
-    #[inline]
-    pub fn swap_buffers_with_damage_supported(&self) -> bool {
-        match self.context {
-            X11Context::Glx(_) => false,
-            X11Context::Egl(ref ctx) => ctx.swap_buffers_with_damage_supported(),
         }
     }
 

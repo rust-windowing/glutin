@@ -57,13 +57,16 @@ mod glx {
 
 pub use self::glx::Glx;
 use self::make_current_guard::MakeCurrentGuard;
+
 use crate::{
-    Api, ContextError, CreationError, GlAttributes, GlProfile, GlRequest,
-    PixelFormat, PixelFormatRequirements, ReleaseBehavior, Robustness,
+    Api, ContextBuilderWrapper, ContextError, CreationError, GlAttributes,
+    GlProfile, GlRequest, PixelFormat, PixelFormatRequirements,
+    ReleaseBehavior, Robustness,
 };
 
 use crate::platform::unix::x11::XConnection;
 use crate::platform_impl::x11_utils::SurfaceType;
+use crate::platform_impl::PlatformAttributes;
 use glutin_glx_sys as ffi;
 use winit::dpi;
 
@@ -87,8 +90,7 @@ impl Context {
     // transparent is `None` if window is raw.
     pub fn new<'a>(
         xconn: Arc<XConnection>,
-        pf_reqs: &PixelFormatRequirements,
-        opengl: &'a GlAttributes<&'a Context>,
+        cb: &'a ContextBuilderWrapper<&'a Context>,
         screen_id: raw::c_int,
         surface_type: SurfaceType,
         transparent: Option<bool>,
@@ -116,7 +118,7 @@ impl Context {
                 &extensions,
                 &xconn,
                 screen_id,
-                pf_reqs,
+                cb,
                 surface_type,
                 transparent,
             )?
@@ -125,7 +127,7 @@ impl Context {
         Ok(ContextPrototype {
             extensions,
             xconn,
-            opengl,
+            gl_attr: &cb.gl_attr,
             fb_config,
             visual_infos: unsafe { std::mem::transmute(visual_infos) },
             pixel_format,
@@ -192,7 +194,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
+    pub fn get_proc_address(&self, addr: &str) -> *const () {
         let glx = GLX.as_ref().unwrap();
         let addr = CString::new(addr.as_bytes()).unwrap();
         let addr = addr.as_ptr();
@@ -254,7 +256,7 @@ impl Drop for Context {
 pub struct ContextPrototype<'a> {
     extensions: String,
     xconn: Arc<XConnection>,
-    opengl: &'a GlAttributes<&'a Context>,
+    gl_attr: &'a GlAttributes<&'a Context>,
     fb_config: ffi::glx::types::GLXFBConfig,
     visual_infos: ffi::XVisualInfo,
     pixel_format: PixelFormat,
@@ -271,7 +273,7 @@ impl<'a> ContextPrototype<'a> {
         &self,
     ) -> Result<(ffi::glx_extra::Glx, ffi::GLXContext), CreationError> {
         let glx = GLX.as_ref().unwrap();
-        let share = match self.opengl.sharing {
+        let share = match self.gl_attr.sharing {
             Some(ctx) => ctx.context,
             None => std::ptr::null(),
         };
@@ -284,7 +286,7 @@ impl<'a> ContextPrototype<'a> {
             }
         });
 
-        let context = match self.opengl.version {
+        let context = match self.gl_attr.version {
             GlRequest::Latest => {
                 let opengl_versions = [
                     (4, 6),
@@ -309,9 +311,9 @@ impl<'a> ContextPrototype<'a> {
                             &self.extensions,
                             &self.xconn.xlib,
                             *opengl_version,
-                            self.opengl.profile,
-                            self.opengl.debug,
-                            self.opengl.robustness,
+                            self.gl_attr.profile,
+                            self.gl_attr.debug,
+                            self.gl_attr.robustness,
                             share,
                             self.xconn.display,
                             self.fb_config,
@@ -329,9 +331,9 @@ impl<'a> ContextPrototype<'a> {
                         &self.extensions,
                         &self.xconn.xlib,
                         (1, 0),
-                        self.opengl.profile,
-                        self.opengl.debug,
-                        self.opengl.robustness,
+                        self.gl_attr.profile,
+                        self.gl_attr.debug,
+                        self.gl_attr.robustness,
                         share,
                         self.xconn.display,
                         self.fb_config,
@@ -346,9 +348,9 @@ impl<'a> ContextPrototype<'a> {
                 &self.extensions,
                 &self.xconn.xlib,
                 (major, minor),
-                self.opengl.profile,
-                self.opengl.debug,
-                self.opengl.robustness,
+                self.gl_attr.profile,
+                self.gl_attr.debug,
+                self.gl_attr.robustness,
                 share,
                 self.xconn.display,
                 self.fb_config,
@@ -363,9 +365,9 @@ impl<'a> ContextPrototype<'a> {
                 &self.extensions,
                 &self.xconn.xlib,
                 (major, minor),
-                self.opengl.profile,
-                self.opengl.debug,
-                self.opengl.robustness,
+                self.gl_attr.profile,
+                self.gl_attr.debug,
+                self.gl_attr.robustness,
                 share,
                 self.xconn.display,
                 self.fb_config,
@@ -413,7 +415,7 @@ impl<'a> ContextPrototype<'a> {
         let (extra_functions, context) = self.create_context()?;
 
         // vsync
-        if self.opengl.vsync {
+        if self.gl_attr.vsync {
             let _guard = MakeCurrentGuard::new(&self.xconn, window, context)
                 .map_err(|err| CreationError::OsError(err))?;
 
@@ -429,7 +431,7 @@ impl<'a> ContextPrototype<'a> {
                     );
                 }
 
-                let mut swap = unsafe { std::mem::zeroed() };
+                let mut swap = 0;
                 unsafe {
                     glx.QueryDrawable(
                         self.xconn.display as *mut _,
@@ -612,7 +614,7 @@ unsafe fn choose_fbconfig(
     extensions: &str,
     xconn: &Arc<XConnection>,
     screen_id: raw::c_int,
-    pf_reqs: &PixelFormatRequirements,
+    cb: &ContextBuilderWrapper<&Context>,
     surface_type: SurfaceType,
     transparent: Option<bool>,
 ) -> Result<
@@ -627,7 +629,7 @@ unsafe fn choose_fbconfig(
         out.push(ffi::glx::X_RENDERABLE as raw::c_int);
         out.push(1);
 
-        if let Some(xid) = pf_reqs.x11_visual_xid {
+        if let Some(xid) = cb.plat_attr.x11_visual_xid {
             // getting the visual infos
             let fvi = crate::platform_impl::x11_utils::get_visual_info_from_xid(
                 &xconn, xid,
@@ -654,7 +656,7 @@ unsafe fn choose_fbconfig(
         // TODO: Use RGB/RGB_FLOAT_BIT_ARB if they don't want alpha bits,
         // fallback to it if they don't care
         out.push(ffi::glx::RENDER_TYPE as raw::c_int);
-        if pf_reqs.float_color_buffer {
+        if cb.pf_reqs.float_color_buffer {
             if check_ext(extensions, "GLX_ARB_fbconfig_float") {
                 out.push(ffi::glx_extra::RGBA_FLOAT_BIT_ARB as raw::c_int);
             } else {
@@ -664,7 +666,7 @@ unsafe fn choose_fbconfig(
             out.push(ffi::glx::RGBA_BIT as raw::c_int);
         }
 
-        if let Some(color) = pf_reqs.color_bits {
+        if let Some(color) = cb.pf_reqs.color_bits {
             out.push(ffi::glx::RED_SIZE as raw::c_int);
             out.push((color / 3) as raw::c_int);
             out.push(ffi::glx::GREEN_SIZE as raw::c_int);
@@ -677,26 +679,26 @@ unsafe fn choose_fbconfig(
             );
         }
 
-        if let Some(alpha) = pf_reqs.alpha_bits {
+        if let Some(alpha) = cb.pf_reqs.alpha_bits {
             out.push(ffi::glx::ALPHA_SIZE as raw::c_int);
             out.push(alpha as raw::c_int);
         }
 
-        if let Some(depth) = pf_reqs.depth_bits {
+        if let Some(depth) = cb.pf_reqs.depth_bits {
             out.push(ffi::glx::DEPTH_SIZE as raw::c_int);
             out.push(depth as raw::c_int);
         }
 
-        if let Some(stencil) = pf_reqs.stencil_bits {
+        if let Some(stencil) = cb.pf_reqs.stencil_bits {
             out.push(ffi::glx::STENCIL_SIZE as raw::c_int);
             out.push(stencil as raw::c_int);
         }
 
-        let double_buffer = pf_reqs.double_buffer.unwrap_or(true);
+        let double_buffer = cb.pf_reqs.double_buffer.unwrap_or(true);
         out.push(ffi::glx::DOUBLEBUFFER as raw::c_int);
         out.push(if double_buffer { 1 } else { 0 });
 
-        if let Some(multisampling) = pf_reqs.multisampling {
+        if let Some(multisampling) = cb.pf_reqs.multisampling {
             if check_ext(extensions, "GLX_ARB_multisample") {
                 out.push(ffi::glx_extra::SAMPLE_BUFFERS_ARB as raw::c_int);
                 out.push(if multisampling == 0 { 0 } else { 1 });
@@ -708,9 +710,9 @@ unsafe fn choose_fbconfig(
         }
 
         out.push(ffi::glx::STEREO as raw::c_int);
-        out.push(if pf_reqs.stereoscopy { 1 } else { 0 });
+        out.push(if cb.pf_reqs.stereoscopy { 1 } else { 0 });
 
-        if pf_reqs.srgb {
+        if cb.pf_reqs.srgb {
             if check_ext(extensions, "GLX_ARB_framebuffer_sRGB") {
                 out.push(
                     ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as raw::c_int,
@@ -726,7 +728,7 @@ unsafe fn choose_fbconfig(
             }
         }
 
-        match pf_reqs.release_behavior {
+        match cb.pf_reqs.release_behavior {
             ReleaseBehavior::Flush => (),
             ReleaseBehavior::None => {
                 if check_ext(extensions, "GLX_ARB_context_flush_control") {
@@ -771,7 +773,7 @@ unsafe fn choose_fbconfig(
         match crate::platform_impl::x11_utils::select_config(
             xconn,
             transparent,
-            pf_reqs,
+            cb,
             (0..num_configs).collect(),
             |config_id| {
                 let visual_infos_raw = glx.GetVisualFromFBConfig(

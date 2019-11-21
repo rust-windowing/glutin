@@ -1,7 +1,7 @@
 use super::*;
 
 use std::marker::PhantomData;
-use winit::event_loop::EventLoopWindowTarget;
+use winit::event_loop::EventLoop;
 use winit::window::{Window, WindowBuilder};
 
 /// Represents an OpenGL [`Context`] and the [`Window`] with which it is
@@ -134,30 +134,6 @@ impl<W> ContextWrapper<PossiblyCurrent, W> {
     /// advance whether `swap_buffers` will block or not.
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
         self.context.context.swap_buffers()
-    }
-
-    /// Swaps the buffers in case of double or triple buffering using specified
-    /// damage rects.
-    ///
-    /// You should call this function every time you have finished rendering, or
-    /// the image may not be displayed on the screen.
-    ///
-    /// **Warning**: if you enabled vsync, this function will block until the
-    /// next time the screen is refreshed. However drivers can choose to
-    /// override your vsync settings, which means that you can't know in
-    /// advance whether `swap_buffers` will block or not.
-    pub fn swap_buffers_with_damage(
-        &self,
-        rects: &[Rect],
-    ) -> Result<(), ContextError> {
-        self.context.context.swap_buffers_with_damage(rects)
-    }
-
-    /// Returns whether or not swap_buffer_with_damage is available. If this
-    /// function returns false, any call to swap_buffers_with_damage will
-    /// return an error.
-    pub fn swap_buffers_with_damage_supported(&self) -> bool {
-        self.context.context.swap_buffers_with_damage_supported()
     }
 
     /// Returns the pixel format of the main framebuffer of the context.
@@ -326,8 +302,7 @@ impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
 
 impl<W> ContextWrapper<PossiblyCurrent, W> {
     /// Returns the address of an OpenGL function.
-    #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
+    pub fn get_proc_address(&self, addr: &str) -> *const () {
         self.context.get_proc_address(addr)
     }
 }
@@ -355,7 +330,7 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     pub fn build_windowed<TE>(
         self,
         wb: WindowBuilder,
-        el: &EventLoopWindowTarget<TE>,
+        el: &EventLoop<TE>,
     ) -> Result<WindowedContext<NotCurrent>, CreationError> {
         let ContextBuilder { pf_reqs, gl_attr } = self;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);

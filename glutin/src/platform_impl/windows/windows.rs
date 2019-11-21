@@ -2,7 +2,7 @@
 
 use crate::{
     Api, ContextCurrentState, ContextError, CreationError, GlAttributes,
-    GlRequest, NotCurrent, PixelFormat, PixelFormatRequirements, Rect,
+    GlRequest, NotCurrent, PixelFormat, PixelFormatRequirements,
 };
 
 use crate::api::egl::{
@@ -239,7 +239,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
+    pub fn get_proc_address(&self, addr: &str) -> *const () {
         match *self {
             Context::Wgl(ref c) | Context::HiddenWindowWgl(_, ref c) => {
                 c.get_proc_address(addr)
@@ -264,12 +264,11 @@ impl Context {
         &self,
         rects: &[Rect],
     ) -> Result<(), ContextError> {
-        Err(ContextError::OsError("buffer damage not suported".to_string()))
-    }
-
-    #[inline]
-    pub fn swap_buffers_with_damage_supported(&self) -> bool {
-        false
+        match *self {
+            Context::Wgl(ref c) => Err(ContextError::OsError("buffer damage not suported".to_string())),
+            Context::Egl(ref c) => c.swap_buffers_with_damage(rect),
+            _ => unreachable!(),
+        }
     }
 
     #[inline]
@@ -313,44 +312,5 @@ impl Context {
             | Context::EglPbuffer(ref c) => Some(c.get_egl_display()),
             _ => None,
         }
-    }
-}
-
-pub trait RawContextExt {
-    /// Creates a raw context on the provided window.
-    ///
-    /// Unsafe behaviour might happen if you:
-    ///   - Provide us with invalid parameters.
-    ///   - The window is destroyed before the context
-    unsafe fn build_raw_context(
-        self,
-        hwnd: *mut raw::c_void,
-    ) -> Result<crate::RawContext<NotCurrent>, CreationError>
-    where
-        Self: Sized;
-}
-
-impl<'a, T: ContextCurrentState> RawContextExt
-    for crate::ContextBuilder<'a, T>
-{
-    #[inline]
-    unsafe fn build_raw_context(
-        self,
-        hwnd: *mut raw::c_void,
-    ) -> Result<crate::RawContext<NotCurrent>, CreationError>
-    where
-        Self: Sized,
-    {
-        let crate::ContextBuilder { pf_reqs, gl_attr } = self;
-        let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
-        Context::new_raw_context(hwnd as *mut _, &pf_reqs, &gl_attr)
-            .map(|context| crate::Context {
-                context,
-                phantom: PhantomData,
-            })
-            .map(|context| crate::RawContext {
-                context,
-                window: (),
-            })
     }
 }

@@ -66,12 +66,12 @@ use crate::{
     PixelFormatRequirements, Rect,
 };
 
-use winit::window::WindowBuilder;
-use winit::event_loop::EventLoopWindowTarget;
 use glutin_gles2_sys as ffi;
 use objc::declare::ClassDecl;
 use objc::runtime::{Class, Object, Sel, BOOL, NO, YES};
 use winit::dpi;
+use winit::event_loop::EventLoopWindowTarget;
+use winit::window::WindowBuilder;
 
 use std::ffi::CString;
 use std::os::raw;
@@ -222,7 +222,7 @@ impl Context {
         gl_attr: &GlAttributes<&Context>,
         size: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
-        let wb = winit::window::WindowBuilder::new()
+        let wb = WindowBuilder::new()
             .with_visible(false)
             .with_inner_size(size.to_logical(1.));
         Self::new_windowed(wb, el, pf_reqs, gl_attr)
@@ -336,11 +336,6 @@ impl Context {
     }
 
     #[inline]
-    pub fn swap_buffers_with_damage_supported(&self) -> bool {
-        false
-    }
-
-    #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         let color_format = ColorFormat::for_view(self.view);
         PixelFormat {
@@ -404,7 +399,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, proc_name: &str) -> *const core::ffi::c_void {
+    pub fn get_proc_address(&self, proc_name: &str) -> *const () {
         let proc_name_c = CString::new(proc_name)
             .expect("proc name contained interior nul byte");
         let path = b"/System/Library/Frameworks/OpenGLES.framework/OpenGLES\0";

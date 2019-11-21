@@ -12,9 +12,10 @@ publish = false
 
 [dependencies]
 glutin = { path = "../glutin" }
-winit = "0.20.0-alpha4"
-takeable-option = "0.4"
+glutin_lighter = { path = "../glutin_lighter" }
+takeable-option = "0.5"
 image = "0.21"
+env_logger = "0.6"
 
 [build-dependencies]
 gl_generator = "0.13"

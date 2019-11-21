@@ -6,17 +6,22 @@
     target_os = "openbsd",
 ))]
 
+pub mod osmesa;
+// mod rawext;
+
+// pub use self::rawext::*;
+
 use crate::platform::ContextTraitExt;
-pub use crate::platform_impl::{HeadlessContextExt, RawContextExt, RawHandle};
-use crate::{Context, ContextCurrentState};
+pub use crate::platform_impl::{PlatformAttributes, RawHandle};
+use crate::Context;
+
 pub use glutin_egl_sys::EGLContext;
 pub use glutin_glx_sys::GLXContext;
-
 pub use winit::platform::unix::*;
 
 use std::os::raw;
 
-impl<T: ContextCurrentState> ContextTraitExt for Context<T> {
+impl ContextTraitExt for Context {
     type Handle = RawHandle;
 
     #[inline]

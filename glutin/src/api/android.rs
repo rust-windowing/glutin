@@ -3,18 +3,18 @@
 use crate::api::egl::{
     Context as EglContext, NativeDisplay, SurfaceType as EglSurfaceType,
 };
+use crate::platform::android::EventLoopExtAndroid;
 use crate::CreationError::{self, OsError};
 use crate::{
     Api, ContextError, GlAttributes, PixelFormat, PixelFormatRequirements, Rect,
 };
 
-use winit::window::WindowBuilder;
-use winit::event_loop::EventLoopWindowTarget;
-use crate::platform::android::EventLoopExtAndroid;
 use glutin_egl_sys as ffi;
 use parking_lot::Mutex;
 use winit;
 use winit::dpi;
+use winit::event_loop::EventLoopWindowTarget;
+use winit::window::WindowBuilder;
 
 use std::sync::Arc;
 
@@ -161,7 +161,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
+    pub fn get_proc_address(&self, addr: &str) -> *const () {
         self.0.egl_context.get_proc_address(addr)
     }
 
@@ -185,11 +185,6 @@ impl Context {
             }
         }
         self.0.egl_context.swap_buffers_with_damage(rects)
-    }
-
-    #[inline]
-    pub fn swap_buffers_with_damage_supported(&self) -> bool {
-        self.0.egl_context.swap_buffers_with_damage_supported()
     }
 
     #[inline]

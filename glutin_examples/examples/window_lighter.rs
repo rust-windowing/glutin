@@ -3,29 +3,24 @@ mod support;
 use glutin::event::{Event, WindowEvent};
 use glutin::event_loop::{ControlFlow, EventLoop};
 use glutin::window::WindowBuilder;
-use glutin::{ContextBuilder, ContextSupports, WindowSurface};
+use glutin::ContextBuilder;
 
 fn main() {
     env_logger::init();
     let el = EventLoop::new();
-    let wb = WindowBuilder::new()
-        .with_title("A transparent window!")
-        .with_decorations(false)
-        .with_transparent(true);
+    let wb = WindowBuilder::new().with_title("A fantastic window!");
 
-    let ctx = ContextBuilder::new()
-        .build(&el, ContextSupports::WINDOW_SURFACES)
-        .unwrap();
-    let (win, surface) = WindowSurface::new(&el, &ctx, wb).unwrap();
+    let windowed_context =
+        ContextBuilder::new().build_windowed(wb, &el).unwrap();
 
-    unsafe { ctx.make_current_surface(&surface).unwrap() }
+    let windowed_context = unsafe { windowed_context.make_current().unwrap() };
 
     println!(
         "Pixel format of the window's GL context: {:?}",
-        ctx.get_pixel_format()
+        windowed_context.get_pixel_format()
     );
 
-    let gl = support::load(|s| ctx.get_proc_address(s));
+    let gl = support::load(&windowed_context.context());
 
     el.run(move |event, _, control_flow| {
         println!("{:?}", event);
@@ -35,15 +30,13 @@ fn main() {
             Event::LoopDestroyed => return,
             Event::WindowEvent { ref event, .. } => match event {
                 WindowEvent::Resized(logical_size) => {
-                    let dpi_factor = win.hidpi_factor();
-                    ctx.update_after_resize();
-                    surface.update_after_resize(
-                        logical_size.to_physical(dpi_factor),
-                    );
+                    let dpi_factor = windowed_context.window().hidpi_factor();
+                    windowed_context
+                        .resize(logical_size.to_physical(dpi_factor));
                 }
                 WindowEvent::RedrawRequested => {
-                    gl.draw_frame([0.0; 4]);
-                    surface.swap_buffers().unwrap();
+                    gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
+                    windowed_context.swap_buffers().unwrap();
                 }
                 WindowEvent::CloseRequested => {
                     *control_flow = ControlFlow::Exit
