@@ -1,4 +1,5 @@
 use super::*;
+use crate::display::Display;
 
 /// Describes a possible format.
 #[allow(missing_docs)]
@@ -37,7 +38,7 @@ pub type Config = ConfigWrapper<platform_impl::Config>;
 impl<T> ConfigWrapper<T> {
     /// Turns the `config` parameter into another type by calling a closure.
     #[inline]
-    pub(crate) fn map_config<F, T2>(self, f: F) -> ContextWrapper<T2>
+    pub(crate) fn map_config<F, T2>(self, f: F) -> ConfigWrapper<T2>
     where
         F: FnOnce(T) -> T2,
     {
@@ -49,7 +50,7 @@ impl<T> ConfigWrapper<T> {
 
     /// Turns the `config` parameter into another type.
     #[inline]
-    pub(crate) fn with_config<T2>(&self, config: T2) -> ContextWrapper<T2> {
+    pub(crate) fn with_config<T2>(&self, config: T2) -> ConfigWrapper<T2> {
         ConfigWrapper {
             config,
             attribs: self.attribs.clone(),

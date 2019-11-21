@@ -1,5 +1,6 @@
 use crate::api::osmesa;
-use crate::{Api, ContextBuilderWrapper, ContextError, CreationError};
+use crate::context::{ContextBuilderWrapper, ContextError};
+use crate::{Api, CreationError};
 
 use winit::dpi;
 

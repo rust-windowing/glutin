@@ -120,9 +120,9 @@ pub use self::egl::Egl;
 use self::make_current_guard::MakeCurrentGuard;
 
 use crate::config::{ConfigAttribs, ConfigBuilder, ConfigWrapper};
+use crate::context::{ContextBuilderWrapper, ContextError};
 use crate::{
-    Api, ContextBuilderWrapper, ContextError, CreationError, GlRequest,
-    GlVersion, Rect, ReleaseBehavior, Robustness,
+    Api, CreationError, GlRequest, GlVersion, Rect, ReleaseBehavior, Robustness,
 };
 
 use glutin_egl_sys as ffi;
@@ -256,7 +256,7 @@ pub struct Context {
 }
 
 #[derive(Debug, Clone)]
-struct Config {
+pub struct Config {
     display: Arc<DisplayInternal>,
     config_id: ffi::egl::types::EGLConfig,
     version: Option<GlVersion>,

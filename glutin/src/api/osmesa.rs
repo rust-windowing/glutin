@@ -10,10 +10,8 @@ pub mod ffi {
     pub use osmesa_sys::OSMesaContext;
 }
 
-use crate::{
-    Api, ContextBuilderWrapper, ContextError, CreationError, GlAttributes,
-    GlProfile, GlRequest, Robustness,
-};
+use crate::context::{ContextBuilderWrapper, ContextError};
+use crate::{Api, CreationError, GlProfile, GlRequest, GlVersion, Robustness};
 
 use winit::dpi;
 
@@ -113,7 +111,7 @@ impl OsMesaContext {
 
         match cb.gl_attr.version {
             GlRequest::Latest => {}
-            GlRequest::Specific(Api::OpenGl, (major, minor)) => {
+            GlRequest::Specific(Api::OpenGl, GlVersion(major, minor)) => {
                 attribs.push(osmesa_sys::OSMESA_CONTEXT_MAJOR_VERSION);
                 attribs.push(major as raw::c_int);
                 attribs.push(osmesa_sys::OSMESA_CONTEXT_MINOR_VERSION);

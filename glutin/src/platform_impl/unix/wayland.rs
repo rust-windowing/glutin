@@ -1,8 +1,7 @@
 use crate::api::egl::{self, NativeDisplay};
-use crate::{
-    ConfigBuilder, ContextBuilderWrapper, ContextError, ContextSupports,
-    CreationError, GlAttributes, PixelFormat, PixelFormatRequirements, Rect,
-};
+use crate::config::{ConfigAttribs, ConfigBuilder, ConfigWrapper};
+use crate::context::{ContextBuilderWrapper, ContextError};
+use crate::{CreationError, PixelFormat, PixelFormatRequirements, Rect};
 
 use crate::platform::unix::{
     EventLoopExtUnix, EventLoopWindowTargetExtUnix, WindowExtUnix,
@@ -160,7 +159,7 @@ impl Context {
     pub(crate) fn new<T>(
         el: &EventLoopWindowTarget<T>,
         cb: ContextBuilderWrapper<&Context>,
-        ctx_supports: ContextSupports,
+        supports_surfaceless: bool,
         conf: ConfigWrapper<&Config>,
     ) -> Result<Self, CreationError> {
         let display_ptr = el.wayland_display().unwrap() as *const _;
@@ -171,7 +170,7 @@ impl Context {
             egl::Context::new(
                 &cb,
                 native_display,
-                ctx_supports,
+                supports_surfaceless,
                 |c, _| Ok(c[0]),
                 conf.with_config(&conf.config),
             )?

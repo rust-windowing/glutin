@@ -10,14 +10,17 @@ mod wayland;
 // mod x11;
 
 // use self::x11::X11Context;
-use crate::{
-    Api, ConfigAttribs, ContextBuilderWrapper, ContextError, ContextSupports,
-    CreationError, GlAttributes, PixelFormat, PixelFormatRequirements, Rect,
-};
-// pub use self::x11::utils as x11_utils;
-
+use crate::config::{ConfigAttribs, ConfigBuilder, ConfigWrapper};
+use crate::context::{ContextBuilderWrapper, ContextError};
 use crate::platform::unix::x11::XConnection;
 use crate::platform::unix::{EventLoopExtUnix, EventLoopWindowTargetExtUnix};
+use crate::{
+    Api, CreationError, GlAttributes, PixelFormat, PixelFormatRequirements,
+    Rect,
+};
+
+// pub use self::x11::utils as x11_utils;
+
 use winit::dpi;
 use winit::event_loop::EventLoopWindowTarget;
 use winit::window::{Window, WindowBuilder};
@@ -113,7 +116,7 @@ impl Context {
     pub(crate) fn new<T>(
         el: &EventLoopWindowTarget<T>,
         cb: ContextBuilderWrapper<&Context>,
-        ctx_supports: ContextSupports,
+        supports_surfaceless: bool,
         conf: ConfigWrapper<&Config>,
     ) -> Result<Self, CreationError> {
         if el.is_wayland() {
@@ -126,7 +129,7 @@ impl Context {
                 Config::Wayland(ref ctx) => ctx,
                 _ => unreachable!(),
             });
-            wayland::Context::new(el, cb, ctx_supports, conf)
+            wayland::Context::new(el, cb, supports_surfaceless, conf)
                 .map(|context| Context::Wayland(context))
         } else {
             unimplemented!()

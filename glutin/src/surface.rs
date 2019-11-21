@@ -1,4 +1,7 @@
 use super::*;
+use crate::config::Config;
+use crate::context::ContextError;
+use crate::display::Display;
 use winit::window::{Window, WindowBuilder};
 
 #[derive(Debug)]
@@ -10,7 +13,7 @@ impl PBuffer {
     #[inline]
     pub unsafe fn new(
         el: &Display,
-        ctx: &Context,
+        ctx: &Config,
         size: dpi::PhysicalSize,
     ) -> Result<PBuffer, CreationError> {
         platform_impl::PBuffer::new(el, ctx.inner(), size)
