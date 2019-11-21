@@ -8,7 +8,7 @@ A low-level library for OpenGL context creation, written in pure Rust.
 
 ```toml
 [dependencies]
-glutin = "0.22.0-alpha3"
+glutin = "0.22.0-alpha4"
 ```
 
 ## [Documentation](https://docs.rs/glutin)
@@ -59,10 +59,6 @@ The plan is that glutin tries to dynamically link-to and use wayland if possible
 ### Wayland
 
 Due to an issue with how mesa and Wayland play together, all shared contexts must use the same events pool as each other.
-
-### iOS
-
-In order to build in XCode, you must link both `UIKit.framework` and `OpenGLES.framework`. In order for your app to not crash while attempting to obtain a context, you must also link `CoreFoundation.framework` and `GLKit.framework`.
 
 ## Common issues
 
