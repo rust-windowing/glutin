@@ -265,7 +265,9 @@ impl Context {
         rects: &[Rect],
     ) -> Result<(), ContextError> {
         match *self {
-            Context::Wgl(ref c) => Err(ContextError::OsError("buffer damage not suported".to_string())),
+            Context::Wgl(ref c) => Err(ContextError::OsError(
+                "buffer damage not suported".to_string(),
+            )),
             Context::Egl(ref c) => c.swap_buffers_with_damage(rect),
             _ => unreachable!(),
         }

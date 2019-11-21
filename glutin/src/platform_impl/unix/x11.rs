@@ -7,7 +7,7 @@ use crate::platform::unix::x11::XConnection;
 use crate::platform::unix::{
     EventLoopExtUnix, WindowBuilderExtUnix, WindowExtUnix,
 };
-use crate::platform_impl::{x11_utils, PlatformAttributes};
+use crate::platform_impl::{x11_utils};
 use crate::{
     Api, ContextBuilderWrapper, ContextError, CreationError, GlAttributes,
     GlRequest, PixelFormat, PixelFormatRequirements,
@@ -179,7 +179,7 @@ impl Context {
     // el: &EventLoopWindowTarget<T>,
     // pf_reqs: &PixelFormatRequirements,
     // gl_attr: &GlAttributes<&Context>,
-    // plat_attr: &PlatformAttributes,
+    // plat_attr: &ContextPlatformAttributes,
     // size: Option<dpi::PhysicalSize>,
     // ) -> Result<Self, CreationError> {
     // Self::try_then_fallback(|fallback| {
@@ -198,7 +198,7 @@ impl Context {
     // el: &EventLoopWindowTarget<T>,
     // pf_reqs: &PixelFormatRequirements,
     // gl_attr: &GlAttributes<&Context>,
-    // plat_attr: &PlatformAttributes,
+    // plat_attr: &ContextPlatformAttributes,
     // size: Option<dpi::PhysicalSize>,
     // fallback: bool,
     // ) -> Result<Self, CreationError> {
@@ -530,7 +530,7 @@ impl Context {
     // xwin: raw::c_ulong,
     // pf_reqs: &PixelFormatRequirements,
     // gl_attr: &GlAttributes<&Context>,
-    // plat_attr: &PlatformAttributes,
+    // plat_attr: &ContextPlatformAttributes,
     // ) -> Result<Self, CreationError> {
     // Self::try_then_fallback(|fallback| {
     // Self::new_raw_context_impl(&xconn, xwin, pf_reqs, gl_attr, plat_attr,
@@ -542,7 +542,7 @@ impl Context {
     // xwin: raw::c_ulong,
     // pf_reqs: &PixelFormatRequirements,
     // gl_attr: &GlAttributes<&Context>,
-    // plat_attr: &PlatformAttributes,
+    // plat_attr: &ContextPlatformAttributes,
     // fallback: bool,
     // ) -> Result<Self, CreationError> {
     // let attrs = unsafe {

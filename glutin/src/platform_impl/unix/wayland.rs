@@ -1,8 +1,7 @@
 use crate::api::egl::{self, NativeDisplay};
-use crate::platform_impl::PlatformAttributes;
 use crate::{
-    ContextBuilderWrapper, ContextError, ContextSupports, CreationError,
-    GlAttributes, PixelFormat, PixelFormatRequirements, Rect,
+    ConfigBuilder, ContextBuilderWrapper, ContextError, ContextSupports,
+    CreationError, GlAttributes, PixelFormat, PixelFormatRequirements, Rect,
 };
 
 use crate::platform::unix::{
@@ -169,9 +168,12 @@ impl Context {
             let cb = cb.map_sharing(|c| &c.context);
             let native_display =
                 NativeDisplay::Wayland(Some(display_ptr as *const _));
-            egl::Context::new(&cb, native_display, ctx_supports, |c, _| {
-                Ok(c[0])
-            }, conf.with_config(&conf.config)
+            egl::Context::new(
+                &cb,
+                native_display,
+                ctx_supports,
+                |c, _| Ok(c[0]),
+                conf.with_config(&conf.config),
             )?
         };
         Ok(Context { context })

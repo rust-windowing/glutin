@@ -14,8 +14,8 @@ mod egl {
     use super::ffi;
     use crate::api::dlloader::{SymTrait, SymWrapper};
     use libloading;
-    use std::sync::Arc;
     use parking_lot::Mutex;
+    use std::sync::Arc;
 
     #[cfg(unix)]
     use libloading::os::unix as libloading_os;
@@ -119,10 +119,10 @@ mod make_current_guard;
 pub use self::egl::Egl;
 use self::make_current_guard::MakeCurrentGuard;
 
+use crate::config::{ConfigAttribs, ConfigBuilder, ConfigWrapper};
 use crate::{
-    Api, ContextBuilderWrapper, ContextError, CreationError,
-    GlVersion, GlRequest, ConfigBuilder, ConfigWrapper,
-    ReleaseBehavior, Robustness, Rect, ConfigAttribs,
+    Api, ContextBuilderWrapper, ContextError, CreationError, GlRequest,
+    GlVersion, Rect, ReleaseBehavior, Robustness,
 };
 
 use glutin_egl_sys as ffi;
@@ -282,20 +282,14 @@ impl Config {
             unsafe { bind_and_get_api(&cb.version, disp.egl_version)? };
 
         let (config_id, attribs) = unsafe {
-            choose_fbconfig(
-                disp,
-                api,
-                version,
-                cb,
-                config_selector,
-            )?
+            choose_fbconfig(disp, api, version, cb, config_selector)?
         };
 
         Ok((
             attribs,
             Config {
                 display: Arc::clone(&disp.0),
-                api: api,
+                api,
                 version,
                 config_id,
             },
@@ -337,9 +331,12 @@ unsafe fn rebind_api(
     let egl = EGL.as_ref().unwrap();
     if egl_version >= (1, 2) {
         if match api {
-            Api::OpenGl if egl_version >= (1, 4) => egl.BindAPI(ffi::egl::OPENGL_API),
+            Api::OpenGl if egl_version >= (1, 4) => {
+                egl.BindAPI(ffi::egl::OPENGL_API)
+            }
             Api::OpenGlEs => egl.BindAPI(ffi::egl::OPENGL_ES_API),
-        } == 0 {
+        } == 0
+        {
             return Err(CreationError::OpenGlVersionNotSupported);
         }
     }
@@ -355,7 +352,9 @@ unsafe fn bind_and_get_api(
     match version {
         GlRequest::Latest => {
             if egl_version >= (1, 2) {
-                if egl_version >= (1, 4) && egl.BindAPI(ffi::egl::OPENGL_API) != 0 {
+                if egl_version >= (1, 4)
+                    && egl.BindAPI(ffi::egl::OPENGL_API) != 0
+                {
                     Ok((None, Api::OpenGl))
                 } else if egl.BindAPI(ffi::egl::OPENGL_ES_API) != 0 {
                     Ok((None, Api::OpenGlEs))
@@ -392,7 +391,9 @@ unsafe fn bind_and_get_api(
             opengl_version,
         } => {
             if egl_version >= (1, 2) {
-                if egl_version >= (1, 4) && egl.BindAPI(ffi::egl::OPENGL_API) != 0 {
+                if egl_version >= (1, 4)
+                    && egl.BindAPI(ffi::egl::OPENGL_API) != 0
+                {
                     Ok((Some(*opengl_version), Api::OpenGl))
                 } else if egl.BindAPI(ffi::egl::OPENGL_ES_API) != 0 {
                     Ok((Some(*opengles_version), Api::OpenGlEs))
@@ -578,8 +579,7 @@ impl Context {
         cb: &'a ContextBuilderWrapper<&'a Context>,
         supports_surfaceless: bool,
         conf: ConfigWrapper<&Config>,
-    ) -> Result<Context, CreationError>
-    {
+    ) -> Result<Context, CreationError> {
         let egl = EGL.as_ref().unwrap();
 
         // FIXME: Support mixing apis
@@ -588,7 +588,8 @@ impl Context {
         // FIXME: Also check for the GL_OES_surfaceless_context *CONTEXT*
         // extension
         if supports_surfaceless
-            && disp.extensions
+            && disp
+                .extensions
                 .iter()
                 .find(|s| s == &"EGL_KHR_surfaceless_context")
                 .is_none()
@@ -605,57 +606,31 @@ impl Context {
 
         let context = unsafe {
             if let Some(version) = conf.attribs.version {
-                create_context(
-                    disp,
-                    cb,
-                    conf,
-                    version,
-                    share,
-                )?
+                create_context(disp, cb, conf, version, share)?
             } else if conf.attribs.api == Api::OpenGlEs {
-                if let Ok(ctx) = create_context(
-                    disp,
-                    cb,
-                    conf,
-                    GlVersion(2, 0),
-                    share,
-                ) {
+                if let Ok(ctx) =
+                    create_context(disp, cb, conf, GlVersion(2, 0), share)
+                {
                     ctx
-                } else if let Ok(ctx) = create_context(
-                    disp,
-                    cb,
-                    conf,
-                    GlVersion(1, 0),
-                    share,
-                ) {
+                } else if let Ok(ctx) =
+                    create_context(disp, cb, conf, GlVersion(1, 0), share)
+                {
                     ctx
                 } else {
                     return Err(CreationError::OpenGlVersionNotSupported);
                 }
             } else {
-                if let Ok(ctx) = create_context(
-                    disp,
-                    cb,
-                    conf,
-                    GlVersion(3, 2),
-                    share,
-                ) {
+                if let Ok(ctx) =
+                    create_context(disp, cb, conf, GlVersion(3, 2), share)
+                {
                     ctx
-                } else if let Ok(ctx) = create_context(
-                    disp,
-                    cb,
-                    conf,
-                    GlVersion(3, 1),
-                    share,
-                ) {
+                } else if let Ok(ctx) =
+                    create_context(disp, cb, conf, GlVersion(3, 1), share)
+                {
                     ctx
-                } else if let Ok(ctx) = create_context(
-                    disp,
-                    cb,
-                    conf,
-                    GlVersion(1, 0),
-                    share,
-                ) {
+                } else if let Ok(ctx) =
+                    create_context(disp, cb, conf, GlVersion(1, 0), share)
+                {
                     ctx
                 } else {
                     return Err(CreationError::OpenGlVersionNotSupported);
@@ -681,7 +656,8 @@ impl Context {
             let has_been_current = surf.has_been_current.lock();
 
             if !*has_been_current {
-                // VSync defaults to enabled; disable it if it was not requested.
+                // VSync defaults to enabled; disable it if it was not
+                // requested.
                 if !is_pbuffer && !surf.config.attribs.vsync {
                     let _guard = MakeCurrentGuard::new(
                         **surf.display,
@@ -692,8 +668,13 @@ impl Context {
                     .map_err(|err| ContextError::OsError(err))?;
 
                     unsafe {
-                        if egl.SwapInterval(**surf.display, 0) == ffi::egl::FALSE {
-                            panic!("finish_impl: eglSwapInterval failed: 0x{:x}", egl.GetError());
+                        if egl.SwapInterval(**surf.display, 0)
+                            == ffi::egl::FALSE
+                        {
+                            panic!(
+                                "finish_impl: eglSwapInterval failed: 0x{:x}",
+                                egl.GetError()
+                            );
                         }
                     }
                 }
@@ -701,8 +682,12 @@ impl Context {
             }
         }
 
-        let ret =
-            egl.MakeCurrent(**self.display, surf.surface, surf.surface, self.context);
+        let ret = egl.MakeCurrent(
+            **self.display,
+            surf.surface,
+            surf.surface,
+            self.context,
+        );
 
         check_make_current(Some(ret))
     }
@@ -1072,7 +1057,9 @@ impl WindowSurface {
         let egl = EGL.as_ref().unwrap();
 
         if !egl.SwapBuffersWithDamageKHR.is_loaded() {
-            return Err(ContextError::OsError("buffer damage not suported".to_string()));
+            return Err(ContextError::OsError(
+                "buffer damage not suported".to_string(),
+            ));
         }
 
         if self.surface == ffi::egl::NO_SURFACE {
@@ -1416,45 +1403,36 @@ where
 
     let config_ids = if let Some(vsync) = cb.vsync {
         // We're interested in those configs which allow our desired VSync.
-        let desired_swap_interval = if vsync {
-            1
-        } else {
-            0
-        };
+        let desired_swap_interval = if vsync { 1 } else { 0 };
 
-        config_ids.into_iter().filter_map(|config_id| {
-            let mut min_swap_interval = attrib!(
-                egl,
-                disp,
-                config_id,
-                ffi::egl::MIN_SWAP_INTERVAL,
-            );
+        config_ids
+            .into_iter()
+            .filter_map(|config_id| {
+                let mut min_swap_interval =
+                    attrib!(egl, disp, config_id, ffi::egl::MIN_SWAP_INTERVAL,);
 
-            if let Err(min_swap_interval) = min_swap_interval {
-                return Some(Err(min_swap_interval));
-            }
+                if let Err(min_swap_interval) = min_swap_interval {
+                    return Some(Err(min_swap_interval));
+                }
 
-            if desired_swap_interval < min_swap_interval.unwrap() {
-                return None;
-            }
+                if desired_swap_interval < min_swap_interval.unwrap() {
+                    return None;
+                }
 
-            let mut max_swap_interval = attrib!(
-                egl,
-                disp,
-                config_id,
-                ffi::egl::MAX_SWAP_INTERVAL,
-            );
+                let mut max_swap_interval =
+                    attrib!(egl, disp, config_id, ffi::egl::MAX_SWAP_INTERVAL,);
 
-            if let Err(max_swap_interval) = max_swap_interval {
-                return Some(Err(max_swap_interval));
-            }
+                if let Err(max_swap_interval) = max_swap_interval {
+                    return Some(Err(max_swap_interval));
+                }
 
-            if desired_swap_interval > max_swap_interval.unwrap() {
-                return None;
-            }
+                if desired_swap_interval > max_swap_interval.unwrap() {
+                    return None;
+                }
 
-            Some(Ok(config_id))
-        }).collect::<Result<Vec<_>, _>>()?
+                Some(Ok(config_id))
+            })
+            .collect::<Result<Vec<_>, _>>()?
     } else {
         config_ids
     };
@@ -1466,19 +1444,11 @@ where
     let config_id = config_selector(config_ids, ***disp)
         .map_err(|_| CreationError::NoAvailableConfig)?;
 
-    let mut min_swap_interval = attrib!(
-        egl,
-        disp,
-        config_id,
-        ffi::egl::MIN_SWAP_INTERVAL,
-    )?;
+    let mut min_swap_interval =
+        attrib!(egl, disp, config_id, ffi::egl::MIN_SWAP_INTERVAL,)?;
 
-    let mut max_swap_interval = attrib!(
-        egl,
-        disp,
-        config_id,
-        ffi::egl::MAX_SWAP_INTERVAL,
-    )?;
+    let mut max_swap_interval =
+        attrib!(egl, disp, config_id, ffi::egl::MAX_SWAP_INTERVAL,)?;
 
     assert!(min_swap_interval >= 0);
 
@@ -1497,16 +1467,13 @@ where
         color_bits: attrib!(egl, disp, config_id, ffi::egl::RED_SIZE)? as u8
             + attrib!(egl, disp, config_id, ffi::egl::BLUE_SIZE)? as u8
             + attrib!(egl, disp, config_id, ffi::egl::GREEN_SIZE)? as u8,
-        alpha_bits: attrib!(egl, disp, config_id, ffi::egl::ALPHA_SIZE)?
-            as u8,
-        depth_bits: attrib!(egl, disp, config_id, ffi::egl::DEPTH_SIZE)?
-            as u8,
+        alpha_bits: attrib!(egl, disp, config_id, ffi::egl::ALPHA_SIZE)? as u8,
+        depth_bits: attrib!(egl, disp, config_id, ffi::egl::DEPTH_SIZE)? as u8,
         stencil_bits: attrib!(egl, disp, config_id, ffi::egl::STENCIL_SIZE)?
             as u8,
         stereoscopy: false,
         double_buffer: true,
-        multisampling: match attrib!(egl, disp, config_id, ffi::egl::SAMPLES)?
-        {
+        multisampling: match attrib!(egl, disp, config_id, ffi::egl::SAMPLES)? {
             0 | 1 => None,
             a => Some(a as u16),
         },
@@ -1529,7 +1496,8 @@ unsafe fn create_context<'a>(
     let mut flags = 0;
 
     if disp.egl_version >= (1, 5)
-        || disp.extensions
+        || disp
+            .extensions
             .iter()
             .find(|s| s == &"EGL_KHR_create_context")
             .is_some()
@@ -1541,7 +1509,8 @@ unsafe fn create_context<'a>(
 
         // handling robustness
         let supports_robustness = disp.egl_version >= (1, 5)
-            || disp.extensions
+            || disp
+                .extensions
                 .iter()
                 .find(|s| s == &"EGL_EXT_create_context_robustness")
                 .is_some();
@@ -1550,7 +1519,8 @@ unsafe fn create_context<'a>(
             Robustness::NotRobust => (),
 
             Robustness::NoError => {
-                if disp.extensions
+                if disp
+                    .extensions
                     .iter()
                     .find(|s| s == &"EGL_KHR_create_context_no_error")
                     .is_some()

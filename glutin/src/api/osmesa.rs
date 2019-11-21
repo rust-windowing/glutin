@@ -10,10 +10,9 @@ pub mod ffi {
     pub use osmesa_sys::OSMesaContext;
 }
 
-use crate::platform_impl::PlatformAttributes;
 use crate::{
     Api, ContextBuilderWrapper, ContextError, CreationError, GlAttributes,
-    GlProfile, GlRequest, PixelFormat, PixelFormatRequirements, Robustness,
+    GlProfile, GlRequest, Robustness,
 };
 
 use winit::dpi;
@@ -127,7 +126,7 @@ impl OsMesaContext {
                 )));
             }
             GlRequest::GlThenGles {
-                opengl_version: (major, minor),
+                opengl_version: GlVersion(major, minor),
                 ..
             } => {
                 attribs.push(osmesa_sys::OSMESA_CONTEXT_MAJOR_VERSION);
@@ -262,10 +261,5 @@ impl OsMesaBuffer {
                 .take(size.0 as usize * size.1 as usize * 4)
                 .collect(),
         })
-    }
-
-    #[inline]
-    pub fn get_pixel_format(&self) -> PixelFormat {
-        unimplemented!()
     }
 }

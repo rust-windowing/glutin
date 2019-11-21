@@ -11,8 +11,8 @@ mod wayland;
 
 // use self::x11::X11Context;
 use crate::{
-    Api, ContextBuilderWrapper, ContextError, ContextSupports, CreationError,
-    GlAttributes, PixelFormat, PixelFormatRequirements, Rect, ConfigAttribs
+    Api, ConfigAttribs, ContextBuilderWrapper, ContextError, ContextSupports,
+    CreationError, GlAttributes, PixelFormat, PixelFormatRequirements, Rect,
 };
 // pub use self::x11::utils as x11_utils;
 
@@ -65,17 +65,13 @@ impl Display {
     pub fn new<TE>(
         el: &EventLoopWindowTarget<TE>,
     ) -> Result<Self, CreationError> {
-        wayland::Display::new(el)
-            .map(|display| Display { display })
+        wayland::Display::new(el).map(|display| Display::Wayland(display))
     }
 }
 
 impl Config {
     #[inline]
-    pub fn new(
-        el: &Display,
-        cb: ConfigBuilder,
-    ) -> (ConfigAttribs, Config) {
+    pub fn new(el: &Display, cb: ConfigBuilder) -> (ConfigAttribs, Config) {
         wayland::Config::new(el, cb)
             .map(|(attribs, config)| (attribs, Config::Wayland(config)))
     }
@@ -257,16 +253,19 @@ impl Default for BackingApi {
 }
 
 #[derive(Default, Debug, Clone)]
-pub struct PlatformAttributes {
+pub struct SurfacePlatformAttributes {
     /// X11 only: set internally to insure a certain visual xid is used when
     /// choosing the fbconfig.
     pub(crate) x11_visual_xid: Option<std::os::raw::c_ulong>,
 
-    /// GLX only: Whether the context will have transparency support.
-    pub glx_transparency: Option<bool>,
-
     /// Ignored by surfaceless, which is always egl.
     pub backing_api: BackingApi,
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct ContextPlatformAttributes {
+    /// GLX only: Whether the context will have transparency support.
+    pub glx_transparency: Option<bool>,
 }
 
 #[derive(Debug)]
@@ -327,10 +326,16 @@ impl WindowSurface {
     }
 
     #[inline]
-    pub fn swap_buffers_with_damage(&self, rects: &[Rect]) -> Result<(), ContextError> {
+    pub fn swap_buffers_with_damage(
+        &self,
+        rects: &[Rect],
+    ) -> Result<(), ContextError> {
         match self {
-            // WindowSurface::X11(ref surface) => surface.swap_buffers_with_damage(rects),
-            WindowSurface::Wayland(ref surface) => surface.swap_buffers_with_damage(rects),
+            // WindowSurface::X11(ref surface) =>
+            // surface.swap_buffers_with_damage(rects),
+            WindowSurface::Wayland(ref surface) => {
+                surface.swap_buffers_with_damage(rects)
+            }
         }
     }
 

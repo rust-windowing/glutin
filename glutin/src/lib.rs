@@ -107,22 +107,18 @@ extern crate bitflags;
 pub mod platform;
 
 mod api;
+mod config;
 mod context;
+mod display;
 mod platform_impl;
 mod surface;
-mod config;
-mod display;
 
-pub use crate::context::*;
-pub use crate::surface::*;
-pub use crate::config::*;
-pub use crate::display::*;
 pub use winit::*;
 
 use winit::error::OsError;
 
-use std::io;
 use std::default::Default;
+use std::io;
 
 /// An object that allows you to build [`Context`]s, [`RawContext<T>`]s and
 /// [`WindowedContext<T>`]s.
@@ -187,7 +183,10 @@ impl<T> ContextBuilderWrapper<T> {
 
     /// Turns the `sharing` parameter into another type.
     #[inline]
-    pub(crate) fn set_sharing<T2>(self, sharing: Option<T2>) -> ContextBuilderWrapper<T2> {
+    pub(crate) fn set_sharing<T2>(
+        self,
+        sharing: Option<T2>,
+    ) -> ContextBuilderWrapper<T2> {
         ContextBuilderWrapper {
             sharing,
             profile: self.profile,
@@ -453,7 +452,8 @@ pub enum GlRequest {
 /// The minimum core profile GL context. Useful for getting the minimum
 /// required GL version while still running on OSX, which often forbids
 /// the compatibility profile features.
-pub static GL_CORE: GlRequest = GlRequest::Specific(Api::OpenGl, GlVersion(3, 2));
+pub static GL_CORE: GlRequest =
+    GlRequest::Specific(Api::OpenGl, GlVersion(3, 2));
 
 /// Specifies the tolerance of the OpenGL [`Context`] to faults. If you accept
 /// raw OpenGL commands and/or raw shader code from an untrusted source, you

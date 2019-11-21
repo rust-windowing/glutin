@@ -1,7 +1,5 @@
 use crate::api::osmesa;
-use crate::{
-    Api, ContextBuilderWrapper, ContextError, CreationError, PixelFormat,
-};
+use crate::{Api, ContextBuilderWrapper, ContextError, CreationError};
 
 use winit::dpi;
 
@@ -69,10 +67,6 @@ impl OsMesaContext {
 impl OsMesaBuffer {
     pub(crate) fn inner(&self) -> &osmesa::OsMesaBuffer {
         &self.buffer
-    }
-
-    pub fn get_pixel_format(&self) -> PixelFormat {
-        self.buffer.get_pixel_format()
     }
 
     pub fn new(

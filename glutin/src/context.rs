@@ -74,7 +74,12 @@ impl<'a> ContextBuilder<'a> {
         conf: &Config,
     ) -> Result<Context, CreationError> {
         let cb = self.map_sharing(|ctx| &ctx.context);
-        platform_impl::Context::new(el, cb, supports_surfaceless, conf.with_config(&conf.config))
-            .map(|context| Context { context })
+        platform_impl::Context::new(
+            el,
+            cb,
+            supports_surfaceless,
+            conf.with_config(&conf.config),
+        )
+        .map(|context| Context { context })
     }
 }

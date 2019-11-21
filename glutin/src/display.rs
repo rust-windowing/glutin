@@ -9,7 +9,6 @@ impl Display {
     pub fn new<TE>(
         el: &EventLoopWindowTarget<TE>,
     ) -> Result<Self, CreationError> {
-        platform_impl::Display::new(el)
-            .map(|display| Display { display })
+        platform_impl::Display::new(el).map(|display| Display { display })
     }
 }

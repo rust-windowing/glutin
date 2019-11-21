@@ -11,9 +11,11 @@ pub mod osmesa;
 
 // pub use self::rawext::*;
 
+use crate::context::Context;
 use crate::platform::ContextTraitExt;
-pub use crate::platform_impl::{PlatformAttributes, RawHandle};
-use crate::Context;
+pub use crate::platform_impl::{
+    ContextPlatformAttributes, RawHandle, SurfacePlatformAttributes,
+};
 
 pub use glutin_egl_sys::EGLContext;
 pub use glutin_glx_sys::GLXContext;

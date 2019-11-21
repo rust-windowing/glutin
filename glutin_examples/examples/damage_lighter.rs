@@ -22,9 +22,21 @@ impl Color {
     }
     fn next(&self) -> Color {
         Color {
-            red: if self.red >= 1.0 { 0.0 } else { self.red + 0.01 },
-            green: if self.green >= 1.0 { 0.0 } else { self.green + 0.01 },
-            blue: if self.blue >= 1.0 { 0.0 } else { self.blue + 0.01 },
+            red: if self.red >= 1.0 {
+                0.0
+            } else {
+                self.red + 0.01
+            },
+            green: if self.green >= 1.0 {
+                0.0
+            } else {
+                self.green + 0.01
+            },
+            blue: if self.blue >= 1.0 {
+                0.0
+            } else {
+                self.blue + 0.01
+            },
         }
     }
 }
@@ -62,15 +74,14 @@ fn main() {
             Event::LoopDestroyed => return,
             Event::WindowEvent { ref event, .. } => match event {
                 WindowEvent::Resized(logical_size) => {
-                    let dpi_factor =
-                        windowed_context.window().hidpi_factor();
+                    let dpi_factor = windowed_context.window().hidpi_factor();
                     windowed_context
                         .resize(logical_size.to_physical(dpi_factor));
                 }
                 WindowEvent::CloseRequested => {
                     *control_flow = ControlFlow::Exit
                 }
-                WindowEvent::CursorMoved{ .. } => {
+                WindowEvent::CursorMoved { .. } => {
                     // Select a new color to render, draw and swap buffers.
                     //
                     // Note that damage is *intentionally* being misreported
@@ -87,12 +98,14 @@ fn main() {
                     color = color.next();
                     gl.draw_frame([color.red, color.green, color.blue, 1.0]);
                     if windowed_context.swap_buffers_with_damage_supported() {
-                        windowed_context.swap_buffers_with_damage(&[Rect{
-                            x: 0,
-                            y: 0,
-                            height: 100,
-                            width: 100,
-                        }]).unwrap();
+                        windowed_context
+                            .swap_buffers_with_damage(&[Rect {
+                                x: 0,
+                                y: 0,
+                                height: 100,
+                                width: 100,
+                            }])
+                            .unwrap();
                     } else {
                         windowed_context.swap_buffers().unwrap();
                     }

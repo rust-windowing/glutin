@@ -241,7 +241,10 @@ impl ConfigBuilder {
     }
 
     #[inline]
-    pub fn with_window_surface_support(mut self, window_surface_support: bool) -> Self {
+    pub fn with_window_surface_support(
+        mut self,
+        window_surface_support: bool,
+    ) -> Self {
         self.window_surface_support = window_surface_support;
         self
     }
@@ -285,10 +288,7 @@ impl ConfigBuilder {
     }
 
     #[inline]
-    pub fn build(
-        self,
-        el: &Display,
-    ) -> Config {
+    pub fn build(self, el: &Display) -> Config {
         platform_impl::Config::new(el, self)
             .map(|(attribs, config)| Config { attribs, config })
     }

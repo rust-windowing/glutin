@@ -66,7 +66,6 @@ use crate::{
 
 use crate::platform::unix::x11::XConnection;
 use crate::platform_impl::x11_utils::SurfaceType;
-use crate::platform_impl::PlatformAttributes;
 use glutin_glx_sys as ffi;
 use winit::dpi;
 

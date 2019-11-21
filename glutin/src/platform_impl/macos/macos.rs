@@ -2,7 +2,7 @@
 use crate::platform::macos::WindowExtMacOS;
 use crate::{
     ContextError, CreationError, GlAttributes, PixelFormat,
-    PixelFormatRequirements, Robustness, Rect
+    PixelFormatRequirements, Rect, Robustness,
 };
 
 use cgl::{
@@ -295,7 +295,9 @@ impl Context {
         &self,
         _rects: &[Rect],
     ) -> Result<(), ContextError> {
-        Err(ContextError::OsError("buffer damage not suported".to_string()))
+        Err(ContextError::OsError(
+            "buffer damage not suported".to_string(),
+        ))
     }
 
     #[inline]

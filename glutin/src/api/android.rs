@@ -177,7 +177,10 @@ impl Context {
     }
 
     #[inline]
-    pub fn swap_buffers_with_damage(&self, rects: &[Rect]) -> Result<(), ContextError> {
+    pub fn swap_buffers_with_damage(
+        &self,
+        rects: &[Rect],
+    ) -> Result<(), ContextError> {
         if let Some(ref stopped) = self.0.stopped {
             let stopped = stopped.lock();
             if *stopped {

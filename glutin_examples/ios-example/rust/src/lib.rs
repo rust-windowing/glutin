@@ -2,7 +2,7 @@ use glutin::event::{Event, WindowEvent};
 use glutin::event_loop::{ControlFlow, EventLoop};
 use glutin::window::WindowBuilder;
 use glutin::ContextBuilder;
-#[path = "../../../examples/support/mod.rs"]
+#[path = "../../../examples/support.rs"]
 mod support;
 
 fn main() {
@@ -22,7 +22,7 @@ fn main() {
         windowed_context.get_pixel_format()
     );
     let gl = support::load(&windowed_context.context());
-    let mut inc : f32 = 0.0;
+    let mut inc: f32 = 0.0;
 
     el.run(move |event, _, control_flow| {
         println!("{:?}", event);
@@ -32,17 +32,21 @@ fn main() {
             Event::LoopDestroyed => return,
             Event::WindowEvent { ref event, .. } => match event {
                 WindowEvent::Resized(logical_size) => {
-                    let dpi_factor =
-                        windowed_context.window().hidpi_factor();
+                    let dpi_factor = windowed_context.window().hidpi_factor();
                     windowed_context
                         .resize(logical_size.to_physical(dpi_factor));
                 }
                 WindowEvent::Touch(_touch) => {
-                    const INCREMENTER : f32 = 0.05;
+                    const INCREMENTER: f32 = 0.05;
                     inc += INCREMENTER;
-                    gl.draw_frame([inc % 1.0, (inc + INCREMENTER) % 1.0, (inc + INCREMENTER) % 1.0, 0.0]);
+                    gl.draw_frame([
+                        inc % 1.0,
+                        (inc + INCREMENTER) % 1.0,
+                        (inc + INCREMENTER) % 1.0,
+                        0.0,
+                    ]);
                     windowed_context.swap_buffers().unwrap();
-                },
+                }
                 WindowEvent::RedrawRequested => {
                     gl.draw_frame([0.0; 4]);
                     windowed_context.swap_buffers().unwrap();
