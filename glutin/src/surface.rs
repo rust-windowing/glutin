@@ -28,8 +28,8 @@ impl PBuffer {
     }
 
     #[inline]
-    pub fn get_surface_config(&self) -> SurfaceConfig {
-        self.pbuffer.get_surface_config()
+    pub fn get_config(&self) -> Config {
+        self.pbuffer.get_config()
     }
 
     #[inline]
@@ -47,10 +47,10 @@ impl WindowSurface {
     #[inline]
     pub unsafe fn new(
         el: &Display,
-        surface_config: &SurfaceConfig,
+        conf: &Config,
         wb: WindowBuilder,
     ) -> Result<(Window, WindowSurface), CreationError> {
-        platform_impl::WindowSurface::new(el, surface_config, wb)
+        platform_impl::WindowSurface::new(el, conf, wb)
             .map(|(window, surface)| (window, WindowSurface { surface }))
     }
 
@@ -65,8 +65,8 @@ impl WindowSurface {
     }
 
     #[inline]
-    pub fn get_surface_config(&self) -> SurfaceConfig {
-        self.surface.get_surface_config()
+    pub fn get_config(&self) -> Config {
+        self.surface.get_config()
     }
 
     #[inline]

@@ -110,12 +110,12 @@ mod api;
 mod context;
 mod platform_impl;
 mod surface;
-mod surface_config;
+mod config;
 mod display;
 
 pub use crate::context::*;
 pub use crate::surface::*;
-pub use crate::surface_config::*;
+pub use crate::config::*;
 pub use crate::display::*;
 pub use winit::*;
 
@@ -268,7 +268,7 @@ pub enum CreationError {
     NoBackendAvailable(Box<dyn std::error::Error + Send + Sync>),
     RobustnessNotSupported,
     OpenGlVersionNotSupported,
-    NoAvailableSurfaceConfig,
+    NoAvailableConfig,
     PlatformSpecific(String),
     Window(OsError),
     /// We received multiple errors, instead of one.
@@ -307,8 +307,8 @@ impl CreationError {
             CreationError::OpenGlVersionNotSupported => {
                 "The requested OpenGL version is not supported."
             }
-            CreationError::NoAvailableSurfaceConfig => {
-                "Couldn't find any surface config that matches the criteria."
+            CreationError::NoAvailableConfig => {
+                "Couldn't find any config that matches the criteria."
             }
             CreationError::PlatformSpecific(ref text) => &text,
             CreationError::Window(ref err) => {

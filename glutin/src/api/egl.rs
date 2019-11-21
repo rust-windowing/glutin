@@ -14,7 +14,8 @@ mod egl {
     use super::ffi;
     use crate::api::dlloader::{SymTrait, SymWrapper};
     use libloading;
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
+    use parking_lot::Mutex;
 
     #[cfg(unix)]
     use libloading::os::unix as libloading_os;
@@ -54,8 +55,7 @@ mod egl {
                     Err(_) => (),
                 };
 
-                let mut egl_get_proc_address =
-                    (*EGL_GET_PROC_ADDRESS).lock().unwrap();
+                let mut egl_get_proc_address = (*EGL_GET_PROC_ADDRESS).lock();
                 if egl_get_proc_address.is_none() {
                     unsafe {
                         let sym: libloading::Symbol<
@@ -119,11 +119,10 @@ mod make_current_guard;
 pub use self::egl::Egl;
 use self::make_current_guard::MakeCurrentGuard;
 
-use crate::platform_impl::PlatformAttributes;
 use crate::{
     Api, ContextBuilderWrapper, ContextError, CreationError,
-    GlVersion, GlRequest, SurfaceConfigBuilder, SurfaceConfigWrapper,
-    ReleaseBehavior, Robustness, Rect, SurfaceConfigAttribs
+    GlVersion, GlRequest, ConfigBuilder, ConfigWrapper,
+    ReleaseBehavior, Robustness, Rect, ConfigAttribs,
 };
 
 use glutin_egl_sys as ffi;
@@ -186,7 +185,7 @@ pub enum NativeDisplay {
 #[derive(Debug)]
 pub struct DisplayInternal {
     display: ffi::egl::types::EGLDisplay,
-    egl_version: (ffi::egl::types::EGLint, ffi::egl::types::EGLint),
+    egl_version: EGLVersion,
     extensions: Vec<String>,
 }
 
@@ -196,26 +195,26 @@ pub struct Display(Arc<DisplayInternal>);
 impl Display {
     pub fn new<TE>(
         el: &EventLoopWindowTarget<TE>,
-        native_display: NativeDisplay,
+        ndisp: NativeDisplay,
     ) -> Result<Self, CreationError> {
         let egl = EGL.as_ref().unwrap();
         // calling `eglGetDisplay` or equivalent
-        let display = get_native_display(&native_display);
+        let disp = get_native_display(&ndisp);
 
-        if display.is_null() {
+        if disp.is_null() {
             return Err(CreationError::OsError(
                 "Could not create EGL display object".to_string(),
             ));
         }
 
-        let egl_version = get_egl_version(display)?;
+        let egl_version = get_egl_version(disp)?;
 
         // the list of extensions supported by the client once initialized is
         // different from the list of extensions obtained earlier
         let extensions = if egl_version >= (1, 2) {
             let p = unsafe {
                 CStr::from_ptr(
-                    egl.QueryString(display, ffi::egl::EXTENSIONS as i32),
+                    egl.QueryString(disp, ffi::egl::EXTENSIONS as i32),
                 )
             };
             let list = String::from_utf8(p.to_bytes().to_vec())
@@ -226,7 +225,7 @@ impl Display {
         };
 
         Ok(Display(Arc::new(DisplayInternal {
-            display,
+            display: disp,
             extensions,
             egl_version,
         })))
@@ -253,22 +252,24 @@ impl Deref for Display {
 pub struct Context {
     display: Arc<DisplayInternal>,
     context: ffi::egl::types::EGLContext,
+    config: ConfigWrapper<Config>,
 }
 
-struct SurfaceConfig {
+#[derive(Debug, Clone)]
+struct Config {
     display: Arc<DisplayInternal>,
     config_id: ffi::egl::types::EGLConfig,
     version: Option<GlVersion>,
-    api: Option<Api>,
+    api: Api,
 }
 
-impl SurfaceConfig {
+impl Config {
     #[inline]
     pub fn build<F>(
-        display: &Display,
-        scb: SurfaceConfigBuilder,
+        disp: &Display,
+        cb: ConfigBuilder,
         config_selector: F,
-    ) -> (SurfaceConfigAttribs, SurfaceConfig)
+    ) -> Result<(ConfigAttribs, Config), CreationError>
     where
         F: FnMut(
             Vec<ffi::egl::types::EGLConfig>,
@@ -278,45 +279,46 @@ impl SurfaceConfig {
         let egl = EGL.as_ref().unwrap();
         // binding the right API and choosing the version
         let (version, api) =
-            unsafe { bind_and_get_api(scb.version, display.egl_version)? };
+            unsafe { bind_and_get_api(&cb.version, disp.egl_version)? };
 
         let (config_id, attribs) = unsafe {
             choose_fbconfig(
-                display,
+                disp,
                 api,
                 version,
-                scb,
+                cb,
                 config_selector,
             )?
         };
 
-        (
+        Ok((
             attribs,
-            SurfaceConfig {
-                api,
+            Config {
+                display: Arc::clone(&disp.0),
+                api: api,
                 version,
                 config_id,
             },
-        )
+        ))
     }
 }
 
 #[cfg(target_os = "android")]
 #[inline]
-fn get_native_display(native_display: &NativeDisplay) -> *const raw::c_void {
+fn get_native_display(ndisp: &NativeDisplay) -> *const raw::c_void {
     let egl = EGL.as_ref().unwrap();
     unsafe { egl.GetDisplay(ffi::egl::DEFAULT_DISPLAY as *mut _) }
 }
 
 fn get_egl_version(
-    display: ffi::egl::types::EGLDisplay,
-) -> Result<(ffi::egl::types::EGLint, ffi::egl::types::EGLint), CreationError> {
+    disp: ffi::egl::types::EGLDisplay,
+) -> Result<EGLVersion, CreationError> {
     unsafe {
         let egl = EGL.as_ref().unwrap();
         let mut major: ffi::egl::types::EGLint = 0;
         let mut minor: ffi::egl::types::EGLint = 0;
 
-        if egl.Initialize(display, &mut major, &mut minor) == 0 {
+        if egl.Initialize(disp, &mut major, &mut minor) == 0 {
             return Err(CreationError::OsError(
                 "eglInitialize failed".to_string(),
             ));
@@ -329,13 +331,13 @@ fn get_egl_version(
 type EGLVersion = (ffi::egl::types::EGLint, ffi::egl::types::EGLint);
 
 unsafe fn rebind_api(
-    api: Option<Api>,
+    api: Api,
     egl_version: EGLVersion,
 ) -> Result<(), CreationError> {
     let egl = EGL.as_ref().unwrap();
-    if let Some(api) = api {
+    if egl_version >= (1, 2) {
         if match api {
-            Api::OpenGl => egl.BindAPI(ffi::egl::OPENGL_API),
+            Api::OpenGl if egl_version >= (1, 4) => egl.BindAPI(ffi::egl::OPENGL_API),
             Api::OpenGlEs => egl.BindAPI(ffi::egl::OPENGL_ES_API),
         } == 0 {
             return Err(CreationError::OpenGlVersionNotSupported);
@@ -405,7 +407,7 @@ unsafe fn bind_and_get_api(
 }
 
 #[cfg(not(target_os = "android"))]
-fn get_native_display(native_display: &NativeDisplay) -> *const raw::c_void {
+fn get_native_display(ndisp: &NativeDisplay) -> *const raw::c_void {
     let egl = EGL.as_ref().unwrap();
     // the first step is to query the list of extensions without any display, if
     // supported
@@ -429,7 +431,7 @@ fn get_native_display(native_display: &NativeDisplay) -> *const raw::c_void {
     let has_dp_extension =
         |e: &str| dp_extensions.iter().find(|s| s == &e).is_some();
 
-    match *native_display {
+    match *ndisp {
         // Note: Some EGL implementations are missing the
         // `eglGetPlatformDisplay(EXT)` symbol       despite reporting
         // `EGL_EXT_platform_base`. I'm pretty sure this is a bug.
@@ -572,21 +574,21 @@ impl Context {
     /// To finish the process, you must call `.finish(window)` on the
     /// `ContextPrototype`.
     pub(crate) fn new<'a>(
-        display: &Display,
+        disp: &Display,
         cb: &'a ContextBuilderWrapper<&'a Context>,
         supports_surfaceless: bool,
-        surface_config: SurfaceConfigWrapper<&SurfaceConfig>,
+        conf: ConfigWrapper<&Config>,
     ) -> Result<Context, CreationError>
     {
         let egl = EGL.as_ref().unwrap();
 
         // FIXME: Support mixing apis
-        rebind_api(surface_config.config.api, display.egl_version);
+        rebind_api(conf.config.api, disp.egl_version);
 
         // FIXME: Also check for the GL_OES_surfaceless_context *CONTEXT*
         // extension
         if supports_surfaceless
-            && display.extensions
+            && disp.extensions
                 .iter()
                 .find(|s| s == &"EGL_KHR_surfaceless_context")
                 .is_none()
@@ -602,27 +604,27 @@ impl Context {
         };
 
         let context = unsafe {
-            if let Some(version) = cb.version {
+            if let Some(version) = conf.attribs.version {
                 create_context(
-                    display,
+                    disp,
                     cb,
-                    surface_config,
+                    conf,
                     version,
                     share,
                 )?
-            } else if surface_config.api == Api::OpenGlEs {
+            } else if conf.attribs.api == Api::OpenGlEs {
                 if let Ok(ctx) = create_context(
-                    display,
+                    disp,
                     cb,
-                    surface_config,
+                    conf,
                     GlVersion(2, 0),
                     share,
                 ) {
                     ctx
                 } else if let Ok(ctx) = create_context(
-                    display,
+                    disp,
                     cb,
-                    surface_config,
+                    conf,
                     GlVersion(1, 0),
                     share,
                 ) {
@@ -632,26 +634,25 @@ impl Context {
                 }
             } else {
                 if let Ok(ctx) = create_context(
-                    display,
+                    disp,
                     cb,
-                    surface_config,
+                    conf,
                     GlVersion(3, 2),
                     share,
                 ) {
                     ctx
                 } else if let Ok(ctx) = create_context(
-                    display,
-                    api,
+                    disp,
                     cb,
-                    surface_config,
+                    conf,
                     GlVersion(3, 1),
                     share,
                 ) {
                     ctx
                 } else if let Ok(ctx) = create_context(
-                    display,
+                    disp,
                     cb,
-                    surface_config,
+                    conf,
                     GlVersion(1, 0),
                     share,
                 ) {
@@ -663,21 +664,45 @@ impl Context {
         };
 
         Ok(Context {
-            display: Arc::clone(&display.0),
+            display: Arc::clone(&disp.0),
             context,
-            api,
-            pixel_format,
-            config_id,
+            config: conf.with_config(conf.config.clone()),
         })
     }
 
-    unsafe fn make_current(
+    unsafe fn make_current<T: SurfaceTypeTrait>(
         &self,
-        surface: ffi::egl::types::EGLSurface,
+        surf: &EGLSurface<T>,
+        is_pbuffer: bool,
     ) -> Result<(), ContextError> {
         let egl = EGL.as_ref().unwrap();
+
+        {
+            let has_been_current = surf.has_been_current.lock();
+
+            if !*has_been_current {
+                // VSync defaults to enabled; disable it if it was not requested.
+                if !is_pbuffer && !surf.config.attribs.vsync {
+                    let _guard = MakeCurrentGuard::new(
+                        **surf.display,
+                        surf.surface,
+                        surf.surface,
+                        self.context,
+                    )
+                    .map_err(|err| ContextError::OsError(err))?;
+
+                    unsafe {
+                        if egl.SwapInterval(**surf.display, 0) == ffi::egl::FALSE {
+                            panic!("finish_impl: eglSwapInterval failed: 0x{:x}", egl.GetError());
+                        }
+                    }
+                }
+                *has_been_current = true;
+            }
+        }
+
         let ret =
-            egl.MakeCurrent(**self.display, surface, surface, self.context);
+            egl.MakeCurrent(**self.display, surf.surface, surf.surface, self.context);
 
         check_make_current(Some(ret))
     }
@@ -698,9 +723,9 @@ impl Context {
     #[inline]
     pub unsafe fn make_current_surface(
         &self,
-        surface: &WindowSurface,
+        surf: &WindowSurface,
     ) -> Result<(), ContextError> {
-        self.make_current(surface.surface)
+        self.make_current(surf, false)
     }
 
     #[inline]
@@ -708,7 +733,7 @@ impl Context {
         &self,
         pbuffer: &PBuffer,
     ) -> Result<(), ContextError> {
-        self.make_current(pbuffer.surface)
+        self.make_current(pbuffer, true)
     }
 
     #[inline]
@@ -736,13 +761,13 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_pixel_format(&self) -> PixelFormat {
-        self.pixel_format.clone()
+    pub fn get_config(&self) -> ConfigWrapper<Config> {
+        self.config.clone()
     }
 
     #[inline]
     pub fn get_api(&self) -> Api {
-        self.api
+        self.config.config.api
     }
 
     #[inline]
@@ -829,7 +854,7 @@ impl Context {
 
     #[inline]
     pub fn get_native_visual_id(&self) -> ffi::egl::types::EGLint {
-        get_native_visual_id(**self.display, self.config_id)
+        get_native_visual_id(**self.display, self.config.config.config_id)
     }
 }
 
@@ -938,14 +963,14 @@ impl Drop for Context {
 
 #[inline]
 pub fn get_native_visual_id(
-    display: ffi::egl::types::EGLDisplay,
+    disp: ffi::egl::types::EGLDisplay,
     config_id: ffi::egl::types::EGLConfig,
 ) -> ffi::egl::types::EGLint {
     let egl = EGL.as_ref().unwrap();
     let mut value = 0;
     let ret = unsafe {
         egl.GetConfigAttrib(
-            display,
+            disp,
             config_id,
             ffi::egl::NATIVE_VISUAL_ID as ffi::egl::types::EGLint,
             &mut value,
@@ -977,56 +1002,41 @@ pub type PBuffer = EGLSurface<PBufferSurfaceType>;
 pub struct EGLSurface<T: SurfaceTypeTrait> {
     display: Arc<DisplayInternal>,
     surface: ffi::egl::types::EGLSurface,
-    pixel_format: PixelFormat,
+    config: ConfigWrapper<Config>,
     phantom: PhantomData<T>,
+    has_been_current: Mutex<bool>,
 }
 
 impl WindowSurface {
     #[inline]
     pub fn new_window_surface<T>(
-        el: &EventLoopWindowTarget<T>,
-        ctx: &Context,
+        disp: &Display,
+        conf: ConfigWrapper<&Config>,
         nwin: ffi::EGLNativeWindowType,
     ) -> Result<Self, CreationError> {
         let egl = EGL.as_ref().unwrap();
-        let surface = unsafe {
-            let surface = egl.CreateWindowSurface(
-                **ctx.display,
-                ctx.config_id,
+        let surf = unsafe {
+            let surf = egl.CreateWindowSurface(
+                ***disp,
+                conf.config.config_id,
                 nwin,
                 std::ptr::null(),
             );
-            if surface.is_null() {
+            if surf.is_null() {
                 return Err(CreationError::OsError(format!(
                     "eglCreateWindowSurface failed with 0x{:x}",
                     egl.GetError()
                 )));
             }
-            surface
+            surf
         };
 
-        // VSync defaults to enabled; disable it if it was not requested.
-        if !ctx.pixel_format.vsync {
-            let _guard = MakeCurrentGuard::new(
-                **ctx.display,
-                surface,
-                surface,
-                ctx.context,
-            )
-            .map_err(|err| CreationError::OsError(err))?;
-
-            unsafe {
-                if egl.SwapInterval(**ctx.display, 0) == ffi::egl::FALSE {
-                    panic!("finish_impl: eglSwapInterval failed: 0x{:x}", egl.GetError());
-                }
-            }
-        }
-
         Ok(WindowSurface {
-            display: Arc::clone(&ctx.display),
-            pixel_format: ctx.pixel_format.clone(),
-            surface,
+            display: Arc::clone(&disp.0),
+            config: conf.with_config(conf.config.clone()),
+            surface: surf,
             phantom: PhantomData,
+            has_been_current: Mutex::new(false),
         })
     }
 
@@ -1107,15 +1117,15 @@ impl WindowSurface {
 impl PBuffer {
     #[inline]
     pub fn new_pbuffer<T>(
-        _el: &EventLoopWindowTarget<T>,
-        ctx: &Context,
+        disp: &Display,
+        conf: ConfigWrapper<&Config>,
         size: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
         let size: (u32, u32) = size.into();
 
         let egl = EGL.as_ref().unwrap();
 
-        let tex_fmt = if ctx.pixel_format.alpha_bits > 0 {
+        let tex_fmt = if conf.attribs.alpha_bits > 0 {
             ffi::egl::TEXTURE_RGBA
         } else {
             ffi::egl::TEXTURE_RGB
@@ -1129,10 +1139,10 @@ impl PBuffer {
             ffi::egl::NONE as raw::c_int,
         ];
 
-        let surface = unsafe {
+        let surf = unsafe {
             let pbuffer = egl.CreatePbufferSurface(
-                **ctx.display,
-                ctx.config_id,
+                ***disp,
+                conf.config.config_id,
                 attrs.as_ptr(),
             );
             if pbuffer.is_null() || pbuffer == ffi::egl::NO_SURFACE {
@@ -1144,10 +1154,11 @@ impl PBuffer {
         };
 
         Ok(PBuffer {
-            display: Arc::clone(&ctx.display),
-            pixel_format: ctx.pixel_format.clone(),
-            surface,
+            display: Arc::clone(&disp.0),
+            config: conf.with_config(conf.config.clone()),
+            surface: surf,
             phantom: PhantomData,
+            has_been_current: Mutex::new(false),
         })
     }
 }
@@ -1163,8 +1174,8 @@ impl<T: SurfaceTypeTrait> EGLSurface<T> {
     }
 
     #[inline]
-    pub fn get_pixel_format(&self) -> PixelFormat {
-        self.pixel_format.clone()
+    pub fn get_config(&self) -> ConfigWrapper<Config> {
+        self.config.clone()
     }
 
     #[inline]
@@ -1208,12 +1219,12 @@ impl<T: SurfaceTypeTrait> Drop for EGLSurface<T> {
 }
 
 unsafe fn choose_fbconfig<F>(
-    display: &Display,
+    disp: &Display,
     api: Api,
-    version: Option<(u8, u8)>,
-    scb: SurfaceConfigBuilder,
+    version: Option<GlVersion>,
+    cb: ConfigBuilder,
     mut config_selector: F,
-) -> Result<(ffi::egl::types::EGLConfig, PixelFormat), CreationError>
+) -> Result<(ffi::egl::types::EGLConfig, ConfigAttribs), CreationError>
 where
     F: FnMut(
         Vec<ffi::egl::types::EGLConfig>,
@@ -1225,44 +1236,42 @@ where
     let descriptor = {
         let mut out: Vec<raw::c_int> = Vec::with_capacity(37);
 
-        if display.egl_version >= (1, 2) {
+        if disp.egl_version >= (1, 2) {
             out.push(ffi::egl::COLOR_BUFFER_TYPE as raw::c_int);
             out.push(ffi::egl::RGB_BUFFER as raw::c_int);
         }
 
         out.push(ffi::egl::SURFACE_TYPE as raw::c_int);
-        let mut surface_type =
-            if scb.window_surface_support {
-                ffi::egl::WINDOW_BIT
-            } else {
-                0
-            };
-        if scb.pbuffer_support {
-            surface_type = surface_type | ffi::egl::PBUFFER_BIT
+        let mut surface_type = 0;
+        if cb.window_surface_support {
+            surface_type = surface_type | ffi::egl::WINDOW_BIT;
+        }
+        if cb.pbuffer_support {
+            surface_type = surface_type | ffi::egl::PBUFFER_BIT;
         }
         out.push(surface_type as raw::c_int);
 
         match (api, version) {
-            (Api::OpenGlEs, Some((3, _))) => {
-                if display.egl_version < (1, 3) {
-                    return Err(CreationError::NoAvailableSurfaceConfig);
+            (Api::OpenGlEs, Some(GlVersion(3, _))) => {
+                if disp.egl_version < (1, 3) {
+                    return Err(CreationError::NoAvailableConfig);
                 }
                 out.push(ffi::egl::RENDERABLE_TYPE as raw::c_int);
                 out.push(ffi::egl::OPENGL_ES3_BIT as raw::c_int);
                 out.push(ffi::egl::CONFORMANT as raw::c_int);
                 out.push(ffi::egl::OPENGL_ES3_BIT as raw::c_int);
             }
-            (Api::OpenGlEs, Some((2, _))) => {
-                if display.egl_version < (1, 3) {
-                    return Err(CreationError::NoAvailableSurfaceConfig);
+            (Api::OpenGlEs, Some(GlVersion(2, _))) => {
+                if disp.egl_version < (1, 3) {
+                    return Err(CreationError::NoAvailableConfig);
                 }
                 out.push(ffi::egl::RENDERABLE_TYPE as raw::c_int);
                 out.push(ffi::egl::OPENGL_ES2_BIT as raw::c_int);
                 out.push(ffi::egl::CONFORMANT as raw::c_int);
                 out.push(ffi::egl::OPENGL_ES2_BIT as raw::c_int);
             }
-            (Api::OpenGlEs, Some((1, _))) => {
-                if display.egl_version >= (1, 3) {
+            (Api::OpenGlEs, Some(GlVersion(1, _))) => {
+                if disp.egl_version >= (1, 3) {
                     out.push(ffi::egl::RENDERABLE_TYPE as raw::c_int);
                     out.push(ffi::egl::OPENGL_ES_BIT as raw::c_int);
                     out.push(ffi::egl::CONFORMANT as raw::c_int);
@@ -1271,8 +1280,8 @@ where
             }
             (Api::OpenGlEs, _) => unimplemented!(),
             (Api::OpenGl, _) => {
-                if display.egl_version < (1, 3) {
-                    return Err(CreationError::NoAvailableSurfaceConfig);
+                if disp.egl_version < (1, 3) {
+                    return Err(CreationError::NoAvailableConfig);
                 }
                 out.push(ffi::egl::RENDERABLE_TYPE as raw::c_int);
                 out.push(ffi::egl::OPENGL_BIT as raw::c_int);
@@ -1282,7 +1291,7 @@ where
             (_, _) => unimplemented!(),
         };
 
-        if let Some(hardware_accelerated) = cb.pf_reqs.hardware_accelerated {
+        if let Some(hardware_accelerated) = cb.hardware_accelerated {
             out.push(ffi::egl::CONFIG_CAVEAT as raw::c_int);
             out.push(if hardware_accelerated {
                 ffi::egl::NONE as raw::c_int
@@ -1291,7 +1300,7 @@ where
             });
         }
 
-        if let Some(color) = cb.pf_reqs.color_bits {
+        if let Some(color) = cb.color_bits {
             out.push(ffi::egl::RED_SIZE as raw::c_int);
             out.push((color / 3) as raw::c_int);
             out.push(ffi::egl::GREEN_SIZE as raw::c_int);
@@ -1304,32 +1313,32 @@ where
             );
         }
 
-        if let Some(alpha) = cb.pf_reqs.alpha_bits {
+        if let Some(alpha) = cb.alpha_bits {
             out.push(ffi::egl::ALPHA_SIZE as raw::c_int);
             out.push(alpha as raw::c_int);
         }
 
-        if let Some(depth) = cb.pf_reqs.depth_bits {
+        if let Some(depth) = cb.depth_bits {
             out.push(ffi::egl::DEPTH_SIZE as raw::c_int);
             out.push(depth as raw::c_int);
         }
 
-        if let Some(stencil) = cb.pf_reqs.stencil_bits {
+        if let Some(stencil) = cb.stencil_bits {
             out.push(ffi::egl::STENCIL_SIZE as raw::c_int);
             out.push(stencil as raw::c_int);
         }
 
-        if let Some(true) = cb.pf_reqs.double_buffer {
-            return Err(CreationError::NoAvailableSurfaceConfig);
+        if let Some(true) = cb.double_buffer {
+            return Err(CreationError::NoAvailableConfig);
         }
 
-        if let Some(multisampling) = cb.pf_reqs.multisampling {
+        if let Some(multisampling) = cb.multisampling {
             out.push(ffi::egl::SAMPLES as raw::c_int);
             out.push(multisampling as raw::c_int);
         }
 
-        if cb.pf_reqs.stereoscopy {
-            return Err(CreationError::NoAvailableSurfaceConfig);
+        if cb.stereoscopy {
+            return Err(CreationError::NoAvailableConfig);
         }
 
         if let Some(xid) = cb.plat_attr.x11_visual_xid {
@@ -1339,7 +1348,7 @@ where
 
         // FIXME: srgb is not taken into account
 
-        match cb.pf_reqs.release_behavior {
+        match cb.release_behavior {
             ReleaseBehavior::Flush => (),
             ReleaseBehavior::None => {
                 // TODO: with EGL you need to manually set the behavior
@@ -1354,7 +1363,7 @@ where
     // calling `eglChooseConfig`
     let mut num_configs = 0;
     if egl.ChooseConfig(
-        ***display,
+        ***disp,
         descriptor.as_ptr(),
         std::ptr::null_mut(),
         0,
@@ -1367,13 +1376,13 @@ where
     }
 
     if num_configs == 0 {
-        return Err(CreationError::NoAvailableSurfaceConfig);
+        return Err(CreationError::NoAvailableConfig);
     }
 
     let mut config_ids = Vec::with_capacity(num_configs as usize);
     config_ids.resize_with(num_configs as usize, || std::mem::zeroed());
     if egl.ChooseConfig(
-        ***display,
+        ***disp,
         descriptor.as_ptr(),
         config_ids.as_mut_ptr(),
         num_configs,
@@ -1385,51 +1394,9 @@ where
         ));
     }
 
-    // We're interested in those configs which allow our desired VSync.
-    let desired_swap_interval = if cb.pf_reqs.vsync {
-        1
-    } else {
-        0
-    };
-
-    let config_ids = config_ids.into_iter().filter(|&config| {
-        let mut min_swap_interval = 0;
-        let res = egl.GetConfigAttrib(
-            ***display,
-            config,
-            ffi::egl::MIN_SWAP_INTERVAL as ffi::egl::types::EGLint,
-            &mut min_swap_interval,
-        );
-
-        if desired_swap_interval < min_swap_interval {
-            return false;
-        }
-
-        let mut max_swap_interval = 0;
-        let res = egl.GetConfigAttrib(
-            ***display,
-            config,
-            ffi::egl::MAX_SWAP_INTERVAL as ffi::egl::types::EGLint,
-            &mut max_swap_interval,
-        );
-
-        if desired_swap_interval > max_swap_interval {
-            return false;
-        }
-
-        true
-    }).collect::<Vec<_>>();
-
-    if config_ids.is_empty() {
-        return Err(CreationError::NoAvailableSurfaceConfig);
-    }
-
-    let config_id = config_selector(config_ids, ***display)
-        .map_err(|_| CreationError::NoAvailableSurfaceConfig)?;
-
     // analyzing each config
     macro_rules! attrib {
-        ($egl:expr, $display:expr, $config:expr, $attr:expr) => {{
+        ($egl:expr, $display:expr, $config:expr, $attr:expr $(,)?) => {{
             let mut value = 0;
             let res = $egl.GetConfigAttrib(
                 ***$display,
@@ -1438,33 +1405,107 @@ where
                 &mut value,
             );
             if res == 0 {
-                return Err(CreationError::OsError(
+                Err(CreationError::OsError(
                     "eglGetConfigAttrib failed".to_string(),
-                ));
+                ))
+            } else {
+                Ok(value)
             }
-            value
         }};
     };
 
-    let desc = PixelFormat {
+    let config_ids = if let Some(vsync) = cb.vsync {
+        // We're interested in those configs which allow our desired VSync.
+        let desired_swap_interval = if vsync {
+            1
+        } else {
+            0
+        };
+
+        config_ids.into_iter().filter_map(|config_id| {
+            let mut min_swap_interval = attrib!(
+                egl,
+                disp,
+                config_id,
+                ffi::egl::MIN_SWAP_INTERVAL,
+            );
+
+            if let Err(min_swap_interval) = min_swap_interval {
+                return Some(Err(min_swap_interval));
+            }
+
+            if desired_swap_interval < min_swap_interval.unwrap() {
+                return None;
+            }
+
+            let mut max_swap_interval = attrib!(
+                egl,
+                disp,
+                config_id,
+                ffi::egl::MAX_SWAP_INTERVAL,
+            );
+
+            if let Err(max_swap_interval) = max_swap_interval {
+                return Some(Err(max_swap_interval));
+            }
+
+            if desired_swap_interval > max_swap_interval.unwrap() {
+                return None;
+            }
+
+            Some(Ok(config_id))
+        }).collect::<Result<Vec<_>, _>>()?
+    } else {
+        config_ids
+    };
+
+    if config_ids.is_empty() {
+        return Err(CreationError::NoAvailableConfig);
+    }
+
+    let config_id = config_selector(config_ids, ***disp)
+        .map_err(|_| CreationError::NoAvailableConfig)?;
+
+    let mut min_swap_interval = attrib!(
+        egl,
+        disp,
+        config_id,
+        ffi::egl::MIN_SWAP_INTERVAL,
+    )?;
+
+    let mut max_swap_interval = attrib!(
+        egl,
+        disp,
+        config_id,
+        ffi::egl::MAX_SWAP_INTERVAL,
+    )?;
+
+    assert!(min_swap_interval >= 0);
+
+    let desc = ConfigAttribs {
+        api,
+        version,
+        vsync: min_swap_interval <= 1 && max_swap_interval >= 1,
+        window_surface_support: cb.window_surface_support,
+        pbuffer_support: cb.pbuffer_support,
         hardware_accelerated: attrib!(
             egl,
-            display,
+            disp,
             config_id,
-            ffi::egl::CONFIG_CAVEAT
-        ) != ffi::egl::SLOW_CONFIG as i32,
-        color_bits: attrib!(egl, display, config_id, ffi::egl::RED_SIZE) as u8
-            + attrib!(egl, display, config_id, ffi::egl::BLUE_SIZE) as u8
-            + attrib!(egl, display, config_id, ffi::egl::GREEN_SIZE) as u8,
-        alpha_bits: attrib!(egl, display, config_id, ffi::egl::ALPHA_SIZE)
+            ffi::egl::CONFIG_CAVEAT,
+        )? != ffi::egl::SLOW_CONFIG as i32,
+        color_bits: attrib!(egl, disp, config_id, ffi::egl::RED_SIZE)? as u8
+            + attrib!(egl, disp, config_id, ffi::egl::BLUE_SIZE)? as u8
+            + attrib!(egl, disp, config_id, ffi::egl::GREEN_SIZE)? as u8,
+        alpha_bits: attrib!(egl, disp, config_id, ffi::egl::ALPHA_SIZE)?
             as u8,
-        depth_bits: attrib!(egl, display, config_id, ffi::egl::DEPTH_SIZE)
+        depth_bits: attrib!(egl, disp, config_id, ffi::egl::DEPTH_SIZE)?
             as u8,
-        stencil_bits: attrib!(egl, display, config_id, ffi::egl::STENCIL_SIZE)
+        stencil_bits: attrib!(egl, disp, config_id, ffi::egl::STENCIL_SIZE)?
             as u8,
         stereoscopy: false,
         double_buffer: true,
-        multisampling: match attrib!(egl, display, config_id, ffi::egl::SAMPLES)
+        multisampling: match attrib!(egl, disp, config_id, ffi::egl::SAMPLES)?
         {
             0 | 1 => None,
             a => Some(a as u16),
@@ -1476,9 +1517,9 @@ where
 }
 
 unsafe fn create_context<'a>(
-    display: &Display,
+    disp: &Display,
     cb: &'a ContextBuilderWrapper<&'a Context>,
-    surface_config: SurfaceConfigWrapper<&SurfaceConfig>,
+    conf: ConfigWrapper<&Config>,
     version: GlVersion,
     share: ffi::EGLContext,
 ) -> Result<ffi::egl::types::EGLContext, CreationError> {
@@ -1487,8 +1528,8 @@ unsafe fn create_context<'a>(
     let mut context_attributes = Vec::with_capacity(10);
     let mut flags = 0;
 
-    if display.egl_version >= (1, 5)
-        || display.extensions
+    if disp.egl_version >= (1, 5)
+        || disp.extensions
             .iter()
             .find(|s| s == &"EGL_KHR_create_context")
             .is_some()
@@ -1499,8 +1540,8 @@ unsafe fn create_context<'a>(
         context_attributes.push(version.1 as i32);
 
         // handling robustness
-        let supports_robustness = display.egl_version >= (1, 5)
-            || display.extensions
+        let supports_robustness = disp.egl_version >= (1, 5)
+            || disp.extensions
                 .iter()
                 .find(|s| s == &"EGL_EXT_create_context_robustness")
                 .is_some();
@@ -1509,7 +1550,7 @@ unsafe fn create_context<'a>(
             Robustness::NotRobust => (),
 
             Robustness::NoError => {
-                if display.extensions
+                if disp.extensions
                     .iter()
                     .find(|s| s == &"EGL_KHR_create_context_no_error")
                     .is_some()
@@ -1579,7 +1620,7 @@ unsafe fn create_context<'a>(
         }
 
         if cb.debug {
-            if display.egl_version >= (1, 5) {
+            if disp.egl_version >= (1, 5) {
                 context_attributes.push(ffi::egl::CONTEXT_OPENGL_DEBUG as i32);
                 context_attributes.push(ffi::egl::TRUE as i32);
             }
@@ -1600,7 +1641,7 @@ unsafe fn create_context<'a>(
             context_attributes.push(ffi::egl::CONTEXT_FLAGS_KHR as i32);
             context_attributes.push(flags);
         }
-    } else if display.egl_version >= (1, 3) && api == Api::OpenGlEs {
+    } else if disp.egl_version >= (1, 3) && conf.config.api == Api::OpenGlEs {
         // robustness is not supported
         match cb.robustness {
             Robustness::RobustNoResetNotification
@@ -1617,8 +1658,8 @@ unsafe fn create_context<'a>(
     context_attributes.push(ffi::egl::NONE as i32);
 
     let context = egl.CreateContext(
-        ***display,
-        surface_config.config_id,
+        ***disp,
+        conf.config.config_id,
         share,
         context_attributes.as_ptr(),
     );

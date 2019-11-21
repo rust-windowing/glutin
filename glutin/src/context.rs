@@ -44,8 +44,8 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_surface_config(&self) -> SurfaceConfig {
-        self.context.get_surface_config()
+    pub fn get_config(&self) -> Config {
+        self.context.get_config()
     }
 
     #[inline]
@@ -71,10 +71,10 @@ impl<'a> ContextBuilder<'a> {
         self,
         el: &Display,
         supports_surfaceless: bool,
-        surface_config: &SurfaceConfig,
+        conf: &Config,
     ) -> Result<Context, CreationError> {
         let cb = self.map_sharing(|ctx| &ctx.context);
-        platform_impl::Context::new(el, cb, supports_surfaceless, surface_config.with_config(&surface_config.config))
+        platform_impl::Context::new(el, cb, supports_surfaceless, conf.with_config(&conf.config))
             .map(|context| Context { context })
     }
 }

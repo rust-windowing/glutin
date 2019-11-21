@@ -27,18 +27,18 @@ pub struct Context {
 }
 
 #[derive(Debug)]
-pub struct SurfaceConfig {
-    config: egl::SurfaceConfig,
+pub struct Config {
+    config: egl::Config,
 }
 
-impl SurfaceConfig {
+impl Config {
     #[inline]
     pub fn build<TE>(
         el: &EventLoopWindowTarget<TE>,
-        scb: SurfaceConfigBuilder,
-    ) -> (SurfaceConfigAttribs, SurfaceConfig) {
-        egl::SurfaceConfig::new(el, scb)
-            .map(|(attribs, config)| (attribs, SurfaceConfig { config }))
+        cb: ConfigBuilder,
+    ) -> (ConfigAttribs, Config) {
+        egl::Config::new(el, cb)
+            .map(|(attribs, config)| (attribs, Config { config }))
     }
 }
 
@@ -162,7 +162,7 @@ impl Context {
         el: &EventLoopWindowTarget<T>,
         cb: ContextBuilderWrapper<&Context>,
         ctx_supports: ContextSupports,
-        surface_config: SurfaceConfigWrapper<&SurfaceConfig>,
+        conf: ConfigWrapper<&Config>,
     ) -> Result<Self, CreationError> {
         let display_ptr = el.wayland_display().unwrap() as *const _;
         let context = {
@@ -171,7 +171,7 @@ impl Context {
                 NativeDisplay::Wayland(Some(display_ptr as *const _));
             egl::Context::new(&cb, native_display, ctx_supports, |c, _| {
                 Ok(c[0])
-            }, surface_config.with_config(&surface_config.config)
+            }, conf.with_config(&conf.config)
             )?
         };
         Ok(Context { context })
