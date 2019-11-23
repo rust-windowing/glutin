@@ -17,10 +17,13 @@ use std::ops::Deref;
 use std::os::raw;
 use std::sync::Arc;
 
-// Wrapper for Debug
-#[derive(Derivative)]
-#[derivative(Debug)]
-pub struct EglSurface(#[derivative(Debug = "ignore")] Arc<wegl::WlEglSurface>);
+pub struct EglSurface(Arc<wegl::WlEglSurface>);
+
+impl std::fmt::Debug for EglSurface {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "EglSurface(...)")
+    }
+}
 
 #[derive(Debug)]
 pub enum Context {
