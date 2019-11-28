@@ -122,7 +122,13 @@ use self::make_current_guard::MakeCurrentGuard;
 use crate::config::{ConfigAttribs, ConfigBuilder, ConfigWrapper};
 use crate::context::{ContextBuilderWrapper, ContextError};
 use crate::{
-    Api, CreationError, GlRequest, GlVersion, Rect, ReleaseBehavior, Robustness,
+    CreationError, Rect,
+};
+use crate::config::{
+    Api, GlRequest, GlVersion, ReleaseBehavior,
+};
+use crate::context::{
+    Robustness,
 };
 
 use glutin_egl_sys as ffi;
@@ -194,7 +200,6 @@ pub struct Display(Arc<DisplayInternal>);
 
 impl Display {
     pub fn new<TE>(
-        el: &EventLoopWindowTarget<TE>,
         ndisp: NativeDisplay,
     ) -> Result<Self, CreationError> {
         let egl = EGL.as_ref().unwrap();
@@ -268,7 +273,7 @@ impl Config {
     pub fn build<F>(
         disp: &Display,
         cb: ConfigBuilder,
-        config_selector: F,
+        conf_selector: F,
     ) -> Result<(ConfigAttribs, Config), CreationError>
     where
         F: FnMut(
@@ -282,7 +287,7 @@ impl Config {
             unsafe { bind_and_get_api(&cb.version, disp.egl_version)? };
 
         let (config_id, attribs) = unsafe {
-            choose_fbconfig(disp, api, version, cb, config_selector)?
+            choose_fbconfig(disp, api, version, cb, conf_selector)?
         };
 
         Ok((
@@ -949,14 +954,14 @@ impl Drop for Context {
 #[inline]
 pub fn get_native_visual_id(
     disp: ffi::egl::types::EGLDisplay,
-    config_id: ffi::egl::types::EGLConfig,
+    conf_id: ffi::egl::types::EGLConfig,
 ) -> ffi::egl::types::EGLint {
     let egl = EGL.as_ref().unwrap();
     let mut value = 0;
     let ret = unsafe {
         egl.GetConfigAttrib(
             disp,
-            config_id,
+            conf_id,
             ffi::egl::NATIVE_VISUAL_ID as ffi::egl::types::EGLint,
             &mut value,
         )
@@ -1210,7 +1215,7 @@ unsafe fn choose_fbconfig<F>(
     api: Api,
     version: Option<GlVersion>,
     cb: ConfigBuilder,
-    mut config_selector: F,
+    mut conf_selector: F,
 ) -> Result<(ffi::egl::types::EGLConfig, ConfigAttribs), CreationError>
 where
     F: FnMut(
@@ -1348,13 +1353,13 @@ where
     };
 
     // calling `eglChooseConfig`
-    let mut num_configs = 0;
+    let mut num_confs = 0;
     if egl.ChooseConfig(
         ***disp,
         descriptor.as_ptr(),
         std::ptr::null_mut(),
         0,
-        &mut num_configs,
+        &mut num_confs,
     ) == 0
     {
         return Err(CreationError::OsError(
@@ -1362,18 +1367,18 @@ where
         ));
     }
 
-    if num_configs == 0 {
+    if num_confs == 0 {
         return Err(CreationError::NoAvailableConfig);
     }
 
-    let mut config_ids = Vec::with_capacity(num_configs as usize);
-    config_ids.resize_with(num_configs as usize, || std::mem::zeroed());
+    let mut conf_ids = Vec::with_capacity(num_confs as usize);
+    conf_ids.resize_with(num_confs as usize, || std::mem::zeroed());
     if egl.ChooseConfig(
         ***disp,
         descriptor.as_ptr(),
-        config_ids.as_mut_ptr(),
-        num_configs,
-        &mut num_configs,
+        conf_ids.as_mut_ptr(),
+        num_confs,
+        &mut num_confs,
     ) == 0
     {
         return Err(CreationError::OsError(
@@ -1383,11 +1388,11 @@ where
 
     // analyzing each config
     macro_rules! attrib {
-        ($egl:expr, $display:expr, $config:expr, $attr:expr $(,)?) => {{
+        ($egl:expr, $display:expr, $conf:expr, $attr:expr $(,)?) => {{
             let mut value = 0;
             let res = $egl.GetConfigAttrib(
                 ***$display,
-                $config,
+                $conf,
                 $attr as ffi::egl::types::EGLint,
                 &mut value,
             );
@@ -1401,15 +1406,15 @@ where
         }};
     };
 
-    let config_ids = if let Some(vsync) = cb.vsync {
+    let conf_ids = if let Some(vsync) = cb.vsync {
         // We're interested in those configs which allow our desired VSync.
         let desired_swap_interval = if vsync { 1 } else { 0 };
 
-        config_ids
+        conf_ids
             .into_iter()
-            .filter_map(|config_id| {
+            .filter_map(|conf_id| {
                 let mut min_swap_interval =
-                    attrib!(egl, disp, config_id, ffi::egl::MIN_SWAP_INTERVAL,);
+                    attrib!(egl, disp, conf_id, ffi::egl::MIN_SWAP_INTERVAL,);
 
                 if let Err(min_swap_interval) = min_swap_interval {
                     return Some(Err(min_swap_interval));
@@ -1420,7 +1425,7 @@ where
                 }
 
                 let mut max_swap_interval =
-                    attrib!(egl, disp, config_id, ffi::egl::MAX_SWAP_INTERVAL,);
+                    attrib!(egl, disp, conf_id, ffi::egl::MAX_SWAP_INTERVAL,);
 
                 if let Err(max_swap_interval) = max_swap_interval {
                     return Some(Err(max_swap_interval));
@@ -1430,25 +1435,25 @@ where
                     return None;
                 }
 
-                Some(Ok(config_id))
+                Some(Ok(conf_id))
             })
             .collect::<Result<Vec<_>, _>>()?
     } else {
-        config_ids
+        conf_ids
     };
 
-    if config_ids.is_empty() {
+    if conf_ids.is_empty() {
         return Err(CreationError::NoAvailableConfig);
     }
 
-    let config_id = config_selector(config_ids, ***disp)
+    let conf_id = conf_selector(conf_ids, ***disp)
         .map_err(|_| CreationError::NoAvailableConfig)?;
 
     let mut min_swap_interval =
-        attrib!(egl, disp, config_id, ffi::egl::MIN_SWAP_INTERVAL,)?;
+        attrib!(egl, disp, conf_id, ffi::egl::MIN_SWAP_INTERVAL,)?;
 
     let mut max_swap_interval =
-        attrib!(egl, disp, config_id, ffi::egl::MAX_SWAP_INTERVAL,)?;
+        attrib!(egl, disp, conf_id, ffi::egl::MAX_SWAP_INTERVAL,)?;
 
     assert!(min_swap_interval >= 0);
 
@@ -1461,26 +1466,26 @@ where
         hardware_accelerated: attrib!(
             egl,
             disp,
-            config_id,
+            conf_id,
             ffi::egl::CONFIG_CAVEAT,
         )? != ffi::egl::SLOW_CONFIG as i32,
-        color_bits: attrib!(egl, disp, config_id, ffi::egl::RED_SIZE)? as u8
-            + attrib!(egl, disp, config_id, ffi::egl::BLUE_SIZE)? as u8
-            + attrib!(egl, disp, config_id, ffi::egl::GREEN_SIZE)? as u8,
-        alpha_bits: attrib!(egl, disp, config_id, ffi::egl::ALPHA_SIZE)? as u8,
-        depth_bits: attrib!(egl, disp, config_id, ffi::egl::DEPTH_SIZE)? as u8,
-        stencil_bits: attrib!(egl, disp, config_id, ffi::egl::STENCIL_SIZE)?
+        color_bits: attrib!(egl, disp, conf_id, ffi::egl::RED_SIZE)? as u8
+            + attrib!(egl, disp, conf_id, ffi::egl::BLUE_SIZE)? as u8
+            + attrib!(egl, disp, conf_id, ffi::egl::GREEN_SIZE)? as u8,
+        alpha_bits: attrib!(egl, disp, conf_id, ffi::egl::ALPHA_SIZE)? as u8,
+        depth_bits: attrib!(egl, disp, conf_id, ffi::egl::DEPTH_SIZE)? as u8,
+        stencil_bits: attrib!(egl, disp, conf_id, ffi::egl::STENCIL_SIZE)?
             as u8,
         stereoscopy: false,
         double_buffer: true,
-        multisampling: match attrib!(egl, disp, config_id, ffi::egl::SAMPLES)? {
+        multisampling: match attrib!(egl, disp, conf_id, ffi::egl::SAMPLES)? {
             0 | 1 => None,
             a => Some(a as u16),
         },
         srgb: false, // TODO: use EGL_KHR_gl_colorspace to know that
     };
 
-    Ok((config_id, desc))
+    Ok((conf_id, desc))
 }
 
 unsafe fn create_context<'a>(

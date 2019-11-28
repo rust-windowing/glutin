@@ -11,7 +11,9 @@ pub mod ffi {
 }
 
 use crate::context::{ContextBuilderWrapper, ContextError};
-use crate::{Api, CreationError, GlProfile, GlRequest, GlVersion, Robustness};
+use crate::CreationError;
+use crate::config::{Api, GlRequest, GlVersion};
+use crate::context::{GlProfile, Robustness};
 
 use winit::dpi;
 
@@ -75,16 +77,17 @@ impl std::error::Error for LoadingError {
 impl OsMesaContext {
     pub fn new(
         cb: ContextBuilderWrapper<&OsMesaContext>,
+        version: GlRequest,
     ) -> Result<Self, CreationError> {
         osmesa_sys::OsMesa::try_loading()
             .map_err(LoadingError::new)
             .map_err(|e| CreationError::NoBackendAvailable(Box::new(e)))?;
 
-        if cb.gl_attr.sharing.is_some() {
+        if cb.sharing.is_some() {
             panic!("Context sharing not possible with OsMesa")
         }
 
-        match cb.gl_attr.robustness {
+        match cb.robustness {
             Robustness::RobustNoResetNotification
             | Robustness::RobustLoseContextOnReset => {
                 return Err(CreationError::RobustnessNotSupported.into());
@@ -92,11 +95,9 @@ impl OsMesaContext {
             _ => (),
         }
 
-        // TODO: use `pf_reqs` for the format
-
         let mut attribs = Vec::new();
 
-        if let Some(profile) = cb.gl_attr.profile {
+        if let Some(profile) = cb.profile {
             attribs.push(osmesa_sys::OSMESA_PROFILE);
 
             match profile {
@@ -109,7 +110,7 @@ impl OsMesaContext {
             }
         }
 
-        match cb.gl_attr.version {
+        match version {
             GlRequest::Latest => {}
             GlRequest::Specific(Api::OpenGl, GlVersion(major, minor)) => {
                 attribs.push(osmesa_sys::OSMESA_CONTEXT_MAJOR_VERSION);
@@ -178,18 +179,15 @@ impl OsMesaContext {
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
         if osmesa_sys::OSMesaGetCurrentContext() == self.context {
-            // Supported with the non-gallium drivers, but not the gallium ones
-            // I (gentz) have filed a patch upstream to mesa to correct this,
-            // however, older users (or anyone not running mesa-git, tbh)
+            // Supported with the non-gallium drivers, but not the older gallium
+            // ones. I (gentz) have filed a patch upstream to mesa to correct
+            // this and it eventually got accepted, however, older users
             // probably won't support this.
             //
             // There is no way to tell, ofc, without just calling the function
             // and seeing if it work.
             //
             // https://gitlab.freedesktop.org/mesa/mesa/merge_requests/533
-            //
-            // EDIT: 2019/06/13: This PR has recieved no attention, and will
-            // likely never be merged in my lifetime :/
             //
             // Honestly, just go use EGL-Surfaceless!
             let ret = osmesa_sys::OSMesaMakeCurrent(

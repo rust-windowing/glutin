@@ -1,6 +1,71 @@
 use super::*;
 use crate::display::Display;
 
+/// All APIs related to OpenGL that you can possibly get while using glutin.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Api {
+    /// The classical OpenGL. Available on Windows, Unix operating systems,
+    /// OS/X.
+    OpenGl,
+    /// OpenGL embedded system. Available on Unix operating systems, Android.
+    OpenGlEs,
+    /// OpenGL for the web. Very similar to OpenGL ES.
+    WebGl,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct GlVersion(pub u8, pub u8);
+
+/// Describes the OpenGL API and version that are being requested when a context
+/// is created.
+#[derive(Debug, Copy, Clone)]
+pub enum GlRequest {
+    /// Request the latest version of the "best" API of this platform.
+    ///
+    /// On desktop, will try OpenGL.
+    Latest,
+
+    /// Request a specific version of a specific API.
+    ///
+    /// Example: `GlRequest::Specific(Api::OpenGl, (3, 3))`.
+    Specific(Api, GlVersion),
+
+    /// If OpenGL is available, create an OpenGL [`Context`] with the specified
+    /// `opengl_version`. Else if OpenGL ES or WebGL is available, create a
+    /// context with the specified `opengles_version`.
+    ///
+    /// [`Context`]: struct.Context.html
+    GlThenGles {
+        /// The version to use for OpenGL.
+        opengl_version: GlVersion,
+        /// The version to use for OpenGL ES.
+        opengles_version: GlVersion,
+    },
+}
+
+impl Default for GlRequest {
+    fn default() -> Self {
+        GlRequest::Latest
+    }
+}
+
+/// The minimum core profile GL context. Useful for getting the minimum
+/// required GL version while still running on OSX, which often forbids
+/// the compatibility profile features.
+pub static GL_CORE: GlRequest =
+    GlRequest::Specific(Api::OpenGl, GlVersion(3, 2));
+
+/// The behavior of the driver when you change the current context.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum ReleaseBehavior {
+    /// Doesn't do anything. Most notably doesn't flush.
+    None,
+
+    /// Flushes the context that was previously current as if `glFlush` was
+    /// called.
+    Flush,
+}
+
 /// Describes a possible format.
 #[allow(missing_docs)]
 #[derive(Debug, Clone)]
@@ -289,8 +354,9 @@ impl ConfigBuilder {
     }
 
     #[inline]
-    pub fn build(self, el: &Display) -> Config {
+    pub fn build(self, el: &Display) -> Result<Config, CreationError> {
         platform_impl::Config::new(el, self)
             .map(|(attribs, config)| Config { attribs, config })
     }
 }
+

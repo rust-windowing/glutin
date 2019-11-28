@@ -1,6 +1,7 @@
 use crate::api::osmesa;
 use crate::context::{ContextBuilderWrapper, ContextError};
-use crate::{Api, CreationError};
+use crate::CreationError;
+use crate::config::{Api, GlRequest};
 
 use winit::dpi;
 
@@ -12,19 +13,19 @@ pub struct OsMesaContext {
 }
 
 pub trait OsMesaContextExt {
-    fn build_osmesa(self) -> Result<OsMesaContext, CreationError>
+    fn build_osmesa(self, version: GlRequest) -> Result<OsMesaContext, CreationError>
     where
         Self: Sized;
 }
 
 impl<'a> OsMesaContextExt for OsMesaContextBuilder<'a> {
     #[inline]
-    fn build_osmesa(self) -> Result<OsMesaContext, CreationError>
+    fn build_osmesa(self, version: GlRequest) -> Result<OsMesaContext, CreationError>
     where
         Self: Sized,
     {
         let cb = self.map_sharing(|ctx| &ctx.context);
-        osmesa::OsMesaContext::new(cb).map(|context| OsMesaContext { context })
+        osmesa::OsMesaContext::new(cb, version).map(|context| OsMesaContext { context })
     }
 }
 

@@ -99,18 +99,18 @@ pub fn select_config<'a, T, F, CTX>(
     xconn: &Arc<XConnection>,
     transparent: Option<bool>,
     cb: &'a ContextBuilderWrapper<&'a CTX>,
-    config_ids: Vec<T>,
+    conf_ids: Vec<T>,
     mut convert_to_xvisualinfo: F,
 ) -> Result<(T, ffi::XVisualInfo), ()>
 where
     F: FnMut(&T) -> Option<ffi::XVisualInfo>,
 {
     use crate::platform_impl::x11_utils::Lacks;
-    let mut chosen_config_id = None;
+    let mut chosen_conf_id = None;
     let mut lacks_what = None;
 
-    for config_id in config_ids {
-        let visual_infos = match convert_to_xvisualinfo(&config_id) {
+    for conf_id in conf_ids {
+        let visual_infos = match convert_to_xvisualinfo(&conf_id) {
             Some(vi) => vi,
             None => continue,
         };
@@ -127,14 +127,14 @@ where
 
             // Found it.
             (_, Ok(())) => {
-                chosen_config_id = Some((config_id, visual_infos));
+                chosen_conf_id = Some((conf_id, visual_infos));
                 lacks_what = Some(this_lacks_what);
                 break;
             }
 
             // Better have something than nothing.
             (None, _) => {
-                chosen_config_id = Some((config_id, visual_infos));
+                chosen_conf_id = Some((conf_id, visual_infos));
                 lacks_what = Some(this_lacks_what);
             }
 
@@ -144,7 +144,7 @@ where
 
             // Lacking transparency is better than lacking the xid.
             (Some(Err(Lacks::XID)), Err(Lacks::Transparency)) => {
-                chosen_config_id = Some((config_id, visual_infos));
+                chosen_conf_id = Some((conf_id, visual_infos));
                 lacks_what = Some(this_lacks_what);
             }
         }
@@ -157,7 +157,7 @@ where
         None => unreachable!(),
     }
 
-    chosen_config_id.ok_or(())
+    chosen_conf_id.ok_or(())
 }
 
 impl Context {
@@ -314,9 +314,9 @@ impl Context {
         force_prefer_unless_only: bool,
         transparent: Option<bool>,
     ) -> Result<Prototype<'a>, CreationError> {
-        let select_config = |cs, display| {
-            select_config(&xconn, transparent, cb, cs, |config_id| {
-                let xid = egl::get_native_visual_id(display, *config_id)
+        let select_conf = |cs, display| {
+            select_conf(&xconn, transparent, cb, cs, |conf_id| {
+                let xid = egl::get_native_visual_id(display, *conf_id)
                     as ffi::VisualID;
                 if xid == 0 {
                     return None;
@@ -363,7 +363,7 @@ impl Context {
                         builder_u.as_ref().unwrap(),
                         native_display,
                         surface_type,
-                        select_config,
+                        select_conf,
                     )?))
                 };
 
@@ -422,7 +422,7 @@ impl Context {
                         builder_egl_u.as_ref().unwrap(),
                         NativeDisplay::X11(Some(xconn.display as *const _)),
                         surface_type,
-                        select_config,
+                        select_conf,
                     )?)
                 } else {
                     return Err(CreationError::NotSupported(

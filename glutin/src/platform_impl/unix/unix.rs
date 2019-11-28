@@ -10,12 +10,12 @@ mod wayland;
 // mod x11;
 
 // use self::x11::X11Context;
-use crate::config::{ConfigAttribs, ConfigBuilder, ConfigWrapper};
+use crate::config::{Api, ConfigAttribs, ConfigBuilder, ConfigWrapper};
 use crate::context::{ContextBuilderWrapper, ContextError};
 use crate::platform::unix::x11::XConnection;
 use crate::platform::unix::{EventLoopExtUnix, EventLoopWindowTargetExtUnix};
 use crate::{
-    Api, CreationError, GlAttributes, PixelFormat, PixelFormatRequirements,
+    CreationError, PixelFormat, PixelFormatRequirements,
     Rect,
 };
 
@@ -55,21 +55,6 @@ pub enum Context {
 pub enum Config {
     // X11(x11::Config),
     Wayland(wayland::Config),
-}
-
-#[derive(Debug)]
-pub enum Display {
-    // X11(x11::Display),
-    Wayland(wayland::Display),
-}
-
-impl Display {
-    #[inline]
-    pub fn new<TE>(
-        el: &EventLoopWindowTarget<TE>,
-    ) -> Result<Self, CreationError> {
-        wayland::Display::new(el).map(|display| Display::Wayland(display))
-    }
 }
 
 impl Config {
@@ -113,37 +98,26 @@ impl Context {
     }
 
     #[inline]
-    pub(crate) fn new<T>(
-        el: &EventLoopWindowTarget<T>,
+    pub(crate) fn new(
+        disp: &Display,
         cb: ContextBuilderWrapper<&Context>,
         supports_surfaceless: bool,
         conf: ConfigWrapper<&Config>,
     ) -> Result<Self, CreationError> {
-        if el.is_wayland() {
-            Context::is_compatible(&cb.gl_attr.sharing, ContextType::Wayland)?;
-            let cb = cb.map_sharing(|ctx| match *ctx {
-                Context::Wayland(ref ctx) => ctx,
-                _ => unreachable!(),
-            });
-            let conf = conf.map_sharing(|conf| match *conf {
-                Config::Wayland(ref ctx) => ctx,
-                _ => unreachable!(),
-            });
-            wayland::Context::new(el, cb, supports_surfaceless, conf)
-                .map(|context| Context::Wayland(context))
-        } else {
-            unimplemented!()
-            // Context::is_compatible(&cb.gl_attr.sharing, ContextType::X11)?;
-            // let cb = cb.map_sharing(|ctx| match *ctx {
-            //    Context::X11(ref ctx) => ctx,
-            //    _ => unreachable!(),
-            //});
-            // x11::Context::new(
-            //    el,
-            //    cb,
-            //    supports,
-            //)
-            //.map(|context| Context::X11(context))
+        match disp.display {
+            Display::Wayland(disp) => {
+                Context::is_compatible(&cb.sharing, ContextType::Wayland)?;
+                let cb = cb.map_sharing(|ctx| match *ctx {
+                    Context::Wayland(ref ctx) => ctx,
+                    _ => unreachable!(),
+                });
+                let conf = conf.map_config(|conf| match *conf {
+                    Config::Wayland(ref ctx) => ctx,
+                    _ => unreachable!(),
+                });
+                wayland::Context::new(disp, cb, supports_surfaceless, conf)
+                    .map(|context| Context::Wayland(context))
+            }
         }
     }
 
@@ -193,14 +167,6 @@ impl Context {
         match self {
             // Context::X11(ref ctx) => ctx.is_current(),
             Context::Wayland(ref ctx) => ctx.is_current(),
-        }
-    }
-
-    #[inline]
-    pub fn get_pixel_format(&self) -> PixelFormat {
-        match self {
-            // Context::X11(ref ctx) => ctx.get_pixel_format(),
-            Context::Wayland(ref ctx) => ctx.get_pixel_format(),
         }
     }
 
@@ -279,18 +245,19 @@ pub enum WindowSurface {
 
 impl WindowSurface {
     #[inline]
-    pub fn new<T>(
-        el: &EventLoopWindowTarget<T>,
-        ctx: &Context,
+    pub fn new(
+        disp: &Display,
+        conf: &ConfigWrapper<Config>,
         wb: WindowBuilder,
     ) -> Result<(Window, Self), CreationError> {
-        match ctx {
-            // Context::X11(ref ctx) => x11::WindowSurface::new(el, ctx, wb)
-            //    .map(|(surface, win)| (WindowSurface::X11(surface), win)),
-            Context::Wayland(ref ctx) => wayland::WindowSurface::new(
-                el, ctx, wb,
+        match disp {
+            Display::Wayland(ref disp) => wayland::WindowSurface::new(
+                disp, conf.clone().map_config(|conf| match conf {
+                    Config::Wayland(ref conf) => conf,
+                    _ => panic!("Contradicting backend for config and display."),
+                }), wb,
             )
-            .map(|(win, surface)| (win, WindowSurface::Wayland(surface))),
+            .map(|(win, surf)| (win, WindowSurface::Wayland(surf))),
         }
     }
 
@@ -345,8 +312,16 @@ impl WindowSurface {
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
         match self {
-            // WindowSurface::X11(ref ctx) => ctx.make_not_current(),
-            WindowSurface::Wayland(ref ctx) => ctx.make_not_current(),
+            // WindowSurface::X11(ref surface) => surface.make_not_current(),
+            WindowSurface::Wayland(ref surface) => surface.make_not_current(),
+        }
+    }
+
+    #[inline]
+    pub fn get_config(&self) -> ConfigWrapper<Config> {
+        match self {
+            // WindowSurface::X11(ref surface) => surface.get_config(),
+            WindowSurface::Wayland(ref surface) => surface.get_config().map_config(|conf| Config::Wayland(conf)),
         }
     }
 }
@@ -359,18 +334,19 @@ pub enum PBuffer {
 
 impl PBuffer {
     #[inline]
-    pub fn new<T>(
-        el: &EventLoopWindowTarget<T>,
-        ctx: &Context,
+    pub fn new(
+        disp: &Display,
+        conf: &ConfigWrapper<Config>,
         size: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
-        match ctx {
-            // Context::X11(ref ctx) => {
-            //    x11::PBuffer::new(el, ctx, size).map(|pbuffer|
-            // PBuffer::X11(pbuffer))
-            //}
-            Context::Wayland(ref ctx) => wayland::PBuffer::new(el, ctx, size)
-                .map(|pbuffer| PBuffer::Wayland(pbuffer)),
+        match disp {
+            Display::Wayland(ref disp) => wayland::PBuffer::new(
+                disp, conf.clone().map_config(|conf| match conf {
+                    Config::Wayland(ref conf) => conf,
+                    _ => panic!("Contradicting backend for config and display."),
+                }), size,
+            )
+            .map(|(win, surf)| (win, PBuffer::Wayland(surf))),
         }
     }
 
@@ -393,8 +369,45 @@ impl PBuffer {
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
         match self {
-            // PBuffer::X11(ref ctx) => ctx.make_not_current(),
-            PBuffer::Wayland(ref ctx) => ctx.make_not_current(),
+            // PBuffer::X11(ref pbuffer) => pbuffer.make_not_current(),
+            PBuffer::Wayland(ref pbuffer) => pbuffer.make_not_current(),
+        }
+    }
+
+    #[inline]
+    pub fn get_config(&self) -> ConfigWrapper<Config> {
+        match self {
+            // PBuffer::X11(ref pbuffer) => pbuffer.get_config(),
+            PBuffer::Wayland(ref pbuffer) => pbuffer.get_config().map_config(|conf| Config::Wayland(conf)),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum Display {
+    // X11(x11::Display),
+    Wayland(wayland::Display),
+}
+
+impl Display {
+    pub fn new<TE>(
+        el: &EventLoopWindowTarget<TE>,
+    ) -> Result<Self, CreationError> {
+        if el.is_wayland() {
+            wayland::Display::new(el).map(|disp| Display::Wayland(disp))
+        } else {
+            unimplemented!()
+            // Context::is_compatible(&cb.gl_attr.sharing, ContextType::X11)?;
+            // let cb = cb.map_sharing(|ctx| match *ctx {
+            //    Context::X11(ref ctx) => ctx,
+            //    _ => unreachable!(),
+            //});
+            // x11::Context::new(
+            //    el,
+            //    cb,
+            //    supports,
+            //)
+            //.map(|context| Context::X11(context))
         }
     }
 }

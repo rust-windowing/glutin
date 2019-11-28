@@ -12,11 +12,11 @@ pub struct PBuffer {
 impl PBuffer {
     #[inline]
     pub unsafe fn new(
-        el: &Display,
-        ctx: &Config,
+        disp: &Display,
+        conf: &Config,
         size: dpi::PhysicalSize,
     ) -> Result<PBuffer, CreationError> {
-        platform_impl::PBuffer::new(el, ctx.inner(), size)
+        platform_impl::PBuffer::new(&disp.display, conf, size)
             .map(|pbuffer| PBuffer { pbuffer })
     }
 
@@ -49,11 +49,11 @@ pub struct WindowSurface {
 impl WindowSurface {
     #[inline]
     pub unsafe fn new(
-        el: &Display,
+        disp: &Display,
         conf: &Config,
         wb: WindowBuilder,
     ) -> Result<(Window, WindowSurface), CreationError> {
-        platform_impl::WindowSurface::new(el, conf, wb)
+        platform_impl::WindowSurface::new(&disp.display, conf, wb)
             .map(|(window, surface)| (window, WindowSurface { surface }))
     }
 
@@ -96,7 +96,7 @@ impl WindowSurface {
         &self,
         rects: &[Rect],
     ) -> Result<(), ContextError> {
-        self.context.context.swap_buffers_with_damage(rects)
+        self.surface.swap_buffers_with_damage(rects)
     }
 
     #[inline]

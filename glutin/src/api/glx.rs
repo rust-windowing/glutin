@@ -751,21 +751,21 @@ unsafe fn choose_fbconfig(
     };
 
     // calling glXChooseFBConfig
-    let (fb_config, visual_infos): (
+    let (fb_conf, visual_infos): (
         ffi::glx::types::GLXFBConfig,
         ffi::XVisualInfo,
     ) = {
-        let mut num_configs = 0;
-        let configs = glx.ChooseFBConfig(
+        let mut num_confs = 0;
+        let confs = glx.ChooseFBConfig(
             xconn.display as *mut _,
             screen_id,
             descriptor.as_ptr(),
-            &mut num_configs,
+            &mut num_confs,
         );
-        if configs.is_null() {
+        if confs.is_null() {
             return Err(CreationError::NoAvailablePixelFormat);
         }
-        if num_configs == 0 {
+        if num_confs == 0 {
             return Err(CreationError::NoAvailablePixelFormat);
         }
 
@@ -773,11 +773,11 @@ unsafe fn choose_fbconfig(
             xconn,
             transparent,
             cb,
-            (0..num_configs).collect(),
-            |config_id| {
+            (0..num_confs).collect(),
+            |conf_id| {
                 let visual_infos_raw = glx.GetVisualFromFBConfig(
                     xconn.display as *mut _,
-                    *configs.offset(*config_id as isize),
+                    *confs.offset(*conf_id as isize),
                 );
 
                 if visual_infos_raw.is_null() {
@@ -790,15 +790,15 @@ unsafe fn choose_fbconfig(
                 Some(visual_infos)
             },
         ) {
-            Ok((config_id, visual_infos)) => {
-                let config = *configs.offset(config_id as isize);
-                let config = config.clone();
+            Ok((conf_id, visual_infos)) => {
+                let conf = *confs.offset(conf_id as isize);
+                let conf = conf.clone();
 
-                (xconn.xlib.XFree)(configs as *mut _);
-                (config, visual_infos)
+                (xconn.xlib.XFree)(confs as *mut _);
+                (conf, visual_infos)
             }
             Err(()) => {
-                (xconn.xlib.XFree)(configs as *mut _);
+                (xconn.xlib.XFree)(confs as *mut _);
                 return Err(CreationError::NoAvailablePixelFormat);
             }
         }
@@ -808,7 +808,7 @@ unsafe fn choose_fbconfig(
         let mut value = 0;
         glx.GetFBConfigAttrib(
             xconn.display as *mut _,
-            fb_config,
+            fb_conf,
             attrib,
             &mut value,
         );
@@ -842,7 +842,7 @@ unsafe fn choose_fbconfig(
             ) != 0,
     };
 
-    Ok((fb_config, pf_desc, visual_infos))
+    Ok((fb_conf, pf_desc, visual_infos))
 }
 
 /// Checks if `ext` is available.

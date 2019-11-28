@@ -1,5 +1,5 @@
 use crate::api::egl::{self, NativeDisplay};
-use crate::config::{ConfigAttribs, ConfigBuilder, ConfigWrapper};
+use crate::config::{ConfigAttribs, ConfigBuilder, ConfigWrapper, Api};
 use crate::context::{ContextBuilderWrapper, ContextError};
 use crate::{CreationError, PixelFormat, PixelFormatRequirements, Rect};
 
@@ -20,8 +20,19 @@ use std::os::raw;
 use std::sync::Arc;
 
 #[derive(Debug)]
-pub struct Context {
-    context: egl::Context,
+pub struct Display {
+    display: egl::Display,
+}
+
+impl Display {
+    pub fn new<TE>(
+        el: &EventLoopWindowTarget<TE>,
+    ) -> Result<Self, CreationError> {
+        let display_ptr = el.wayland_display().unwrap() as *const _;
+        let native_disp =
+            NativeDisplay::Wayland(Some(display_ptr as *const _));
+        egl::Display::new(native_disp).map(|display| Display { display })
+    }
 }
 
 #[derive(Debug)]
@@ -51,8 +62,8 @@ pub struct WindowSurface {
 impl WindowSurface {
     #[inline]
     pub fn new<T>(
-        el: &EventLoopWindowTarget<T>,
-        ctx: &Context,
+        disp: &Display,
+        conf: ConfigWrapper<&Config>,
         wb: WindowBuilder,
     ) -> Result<(Window, Self), CreationError> {
         let win = wb.build(el)?;
@@ -80,8 +91,8 @@ impl WindowSurface {
         };
 
         egl::WindowSurface::new_window_surface(
-            el,
-            &ctx.context,
+            disp,
+            conf.with_config(conf.config),
             wsurface.ptr() as *const _,
         )
         .map(|surface| (win, WindowSurface { wsurface, surface }))
@@ -129,12 +140,12 @@ pub struct PBuffer {
 
 impl PBuffer {
     #[inline]
-    pub fn new<T>(
-        el: &EventLoopWindowTarget<T>,
-        ctx: &Context,
+    pub fn new(
+        disp: &Display,
+        conf: ConfigWrapper<&Config>,
         size: dpi::PhysicalSize,
     ) -> Result<Self, CreationError> {
-        egl::PBuffer::new_pbuffer(el, &ctx.context, size)
+        egl::PBuffer::new_pbuffer(disp, conf.with_config(conf.config), size)
             .map(|pbuffer| PBuffer { pbuffer })
     }
 
@@ -154,6 +165,11 @@ impl PBuffer {
     }
 }
 
+#[derive(Debug)]
+pub struct Context {
+    context: egl::Context,
+}
+
 impl Context {
     #[inline]
     pub(crate) fn new<T>(
@@ -162,17 +178,13 @@ impl Context {
         supports_surfaceless: bool,
         conf: ConfigWrapper<&Config>,
     ) -> Result<Self, CreationError> {
-        let display_ptr = el.wayland_display().unwrap() as *const _;
         let context = {
             let cb = cb.map_sharing(|c| &c.context);
-            let native_display =
-                NativeDisplay::Wayland(Some(display_ptr as *const _));
             egl::Context::new(
                 &cb,
-                native_display,
                 supports_surfaceless,
                 |c, _| Ok(c[0]),
-                conf.with_config(&conf.config),
+                conf.with_config(conf.config),
             )?
         };
         Ok(Context { context })
@@ -215,7 +227,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_api(&self) -> crate::Api {
+    pub fn get_api(&self) -> Api {
         self.context.get_api()
     }
 

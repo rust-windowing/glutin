@@ -2,6 +2,7 @@ use super::*;
 use crate::config::Config;
 use crate::display::Display;
 use crate::surface::{PBuffer, WindowSurface};
+use crate::config::Api;
 use std::ffi::c_void;
 
 #[derive(Debug)]
@@ -72,13 +73,13 @@ impl<'a> ContextBuilder<'a> {
     #[inline]
     pub fn build<TE>(
         self,
-        el: &Display,
+        disp: &Display,
         supports_surfaceless: bool,
         conf: &Config,
     ) -> Result<Context, CreationError> {
         let cb = self.map_sharing(|ctx| &ctx.context);
         platform_impl::Context::new(
-            el,
+            &disp.display,
             cb,
             supports_surfaceless,
             conf.with_config(&conf.config),
@@ -261,4 +262,63 @@ impl std::error::Error for ContextError {
     fn description(&self) -> &str {
         self.to_string()
     }
+}
+
+/// Specifies the tolerance of the OpenGL [`Context`] to faults. If you accept
+/// raw OpenGL commands and/or raw shader code from an untrusted source, you
+/// should definitely care about this.
+///
+/// [`Context`]: struct.Context.html
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum Robustness {
+    /// Not everything is checked. Your application can crash if you do
+    /// something wrong with your shaders.
+    NotRobust,
+
+    /// The driver doesn't check anything. This option is very dangerous.
+    /// Please know what you're doing before using it. See the
+    /// `GL_KHR_no_error` extension.
+    ///
+    /// Since this option is purely an optimization, no error will be returned
+    /// if the backend doesn't support it. Instead it will automatically
+    /// fall back to [`NotRobust`].
+    ///
+    /// [`NotRobust`]: enum.Robustness.html#variant.NotRobust
+    NoError,
+
+    /// Everything is checked to avoid any crash. The driver will attempt to
+    /// avoid any problem, but if a problem occurs the behavior is
+    /// implementation-defined. You are just guaranteed not to get a crash.
+    RobustNoResetNotification,
+
+    /// Same as [`RobustNoResetNotification`] but the context creation doesn't
+    /// fail if it's not supported.
+    ///
+    /// [`RobustNoResetNotification`]:
+    /// enum.Robustness.html#variant.RobustNoResetNotification
+    TryRobustNoResetNotification,
+
+    /// Everything is checked to avoid any crash. If a problem occurs, the
+    /// context will enter a "context lost" state. It must then be
+    /// recreated. For the moment, glutin doesn't provide a way to recreate
+    /// a context with the same window :-/
+    RobustLoseContextOnReset,
+
+    /// Same as [`RobustLoseContextOnReset`] but the context creation doesn't
+    /// fail if it's not supported.
+    ///
+    /// [`RobustLoseContextOnReset`]:
+    /// enum.Robustness.html#variant.RobustLoseContextOnReset
+    TryRobustLoseContextOnReset,
+}
+
+/// Describes the requested OpenGL [`Context`] profiles.
+///
+/// [`Context`]: struct.Context.html
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GlProfile {
+    /// Include all the immediate more functions and definitions.
+    Compatibility,
+    /// Include all the future-compatible functions and definitions.
+    Core,
 }
