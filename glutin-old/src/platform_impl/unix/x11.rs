@@ -154,7 +154,7 @@ where
         Some(Ok(())) => (),
         Some(Err(Lacks::Transparency)) => warn!("Glutin could not a find fb config with an alpha mask. Transparency may be broken."),
         Some(Err(Lacks::XID)) => panic!(),
-        None => unreachable!(),
+        None => warn!("No configs were found. Period."),
     }
 
     chosen_conf_id.ok_or(())

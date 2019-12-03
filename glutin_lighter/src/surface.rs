@@ -59,13 +59,10 @@ pub struct LighterWindowSurfaceWrapper<W, IU: SurfaceInUseTrait> {
     phantom: PhantomData<IU>,
 }
 
-impl<W, IU: SurfaceInUseTrait> LighterSurface
-    for LighterWindowSurfaceWrapper<W, IU>
-{
+impl<W, IU: SurfaceInUseTrait> LighterSurface for LighterWindowSurfaceWrapper<W, IU> {
     type Inner = WindowSurface;
     type NotInUseType = LighterWindowSurfaceWrapper<W, SurfaceInUse::No>;
-    type PossiblyInUseType =
-        LighterWindowSurfaceWrapper<W, SurfaceInUse::Possibly>;
+    type PossiblyInUseType = LighterWindowSurfaceWrapper<W, SurfaceInUse::Possibly>;
 
     #[inline]
     fn inner(&self) -> &Self::Inner {
@@ -103,8 +100,7 @@ impl<W, IU: SurfaceInUseTrait> LighterSurface
     #[inline]
     unsafe fn make_not_current(
         mut self,
-    ) -> Result<Self::NotInUseType, (Self::PossiblyInUseType, ContextError)>
-    {
+    ) -> Result<Self::NotInUseType, (Self::PossiblyInUseType, ContextError)> {
         match self.surface.make_not_current() {
             Ok(()) => Ok(LighterWindowSurfaceWrapper {
                 surface: Takeable::new_take(&mut self.surface),
@@ -130,13 +126,13 @@ impl<IU: SurfaceInUseTrait> LighterWindowSurface<IU> {
         ctx: CTX,
         wb: WindowBuilder,
     ) -> Result<LighterWindowSurface<SurfaceInUse::No>, CreationError> {
-        WindowSurface::new(el, ctx.into().inner(), wb).map(
-            |(window, surface)| LighterWindowSurface {
+        WindowSurface::new(el, ctx.into().inner(), wb).map(|(window, surface)| {
+            LighterWindowSurface {
                 surface: Takeable::new(surface),
                 window: Takeable::new(window),
                 phantom: PhantomData,
-            },
-        )
+            }
+        })
     }
 
     #[inline]
@@ -241,8 +237,7 @@ impl<IU: SurfaceInUseTrait> LighterSurface for LighterPBuffer<IU> {
     #[inline]
     unsafe fn make_not_current(
         mut self,
-    ) -> Result<Self::NotInUseType, (Self::PossiblyInUseType, ContextError)>
-    {
+    ) -> Result<Self::NotInUseType, (Self::PossiblyInUseType, ContextError)> {
         match self.pbuffer.make_not_current() {
             Ok(()) => Ok(LighterPBuffer {
                 pbuffer: Takeable::new_take(&mut self.pbuffer),
@@ -267,11 +262,9 @@ impl<IU: SurfaceInUseTrait> LighterPBuffer<IU> {
         ctx: CTX,
         size: dpi::PhysicalSize,
     ) -> Result<LighterPBuffer<SurfaceInUse::No>, CreationError> {
-        PBuffer::new(el, ctx.into().inner(), size).map(|pbuffer| {
-            LighterPBuffer {
-                pbuffer: Takeable::new(pbuffer),
-                phantom: PhantomData,
-            }
+        PBuffer::new(el, ctx.into().inner(), size).map(|pbuffer| LighterPBuffer {
+            pbuffer: Takeable::new(pbuffer),
+            phantom: PhantomData,
         })
     }
 }

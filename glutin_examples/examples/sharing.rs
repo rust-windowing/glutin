@@ -42,12 +42,12 @@ fn main() {
         .build_windowed(wb, &el)
         .unwrap();
 
-    let headless_id = ct.insert(ContextCurrentWrapper::NotCurrent(
-        ContextWrapper::Headless(headless_context),
-    ));
-    let windowed_id = ct.insert(ContextCurrentWrapper::NotCurrent(
-        ContextWrapper::Windowed(windowed_context),
-    ));
+    let headless_id = ct.insert(ContextCurrentWrapper::NotCurrent(ContextWrapper::Headless(
+        headless_context,
+    )));
+    let windowed_id = ct.insert(ContextCurrentWrapper::NotCurrent(ContextWrapper::Windowed(
+        windowed_context,
+    )));
 
     let windowed_context = ct.get_current(windowed_id).unwrap();
     println!(
@@ -115,8 +115,7 @@ fn main() {
             Event::WindowEvent { ref event, .. } => match event {
                 WindowEvent::Resized(logical_size) => {
                     let windowed_context = ct.get_current(windowed_id).unwrap();
-                    let dpi_factor =
-                        windowed_context.windowed().window().hidpi_factor();
+                    let dpi_factor = windowed_context.windowed().window().hidpi_factor();
                     size = logical_size.to_physical(dpi_factor);
                     windowed_context.windowed().resize(size);
 
@@ -128,21 +127,11 @@ fn main() {
                             size.width as _,
                             size.height as _,
                         );
-                        glw.gl.Viewport(
-                            0,
-                            0,
-                            size.width as _,
-                            size.height as _,
-                        );
+                        glw.gl.Viewport(0, 0, size.width as _, size.height as _);
                         std::mem::drop(windowed_context);
 
                         let _ = ct.get_current(headless_id).unwrap();
-                        glc.gl.Viewport(
-                            0,
-                            0,
-                            size.width as _,
-                            size.height as _,
-                        );
+                        glc.gl.Viewport(0, 0, size.width as _, size.height as _);
                     }
                 }
                 WindowEvent::RedrawRequested => {
@@ -167,9 +156,7 @@ fn main() {
                     }
                     windowed_context.windowed().swap_buffers().unwrap();
                 }
-                WindowEvent::CloseRequested => {
-                    *control_flow = ControlFlow::Exit
-                }
+                WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                 _ => (),
             },
             _ => (),

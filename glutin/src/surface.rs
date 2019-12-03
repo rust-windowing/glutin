@@ -1,85 +1,97 @@
-use super::*;
 use crate::config::Config;
-use crate::context::ContextError;
 use crate::display::Display;
-use winit::window::{Window, WindowBuilder};
+use crate::platform_impl;
 
-#[derive(Debug)]
-pub struct PBuffer {
-    pub(crate) pbuffer: platform_impl::PBuffer,
+use glutin_winit_interface::{NativePixmapSource, NativeWindowSource};
+use winit_types::dpi;
+use winit_types::error::Error;
+
+#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+pub enum SurfaceType {
+    Window,
+    PBuffer,
+    Pixmap,
 }
 
-impl PBuffer {
+pub trait SurfaceTypeTrait {
+    fn surface_type() -> SurfaceType;
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum Window {}
+#[derive(Copy, Clone, Debug)]
+pub enum PBuffer {}
+#[derive(Copy, Clone, Debug)]
+pub enum Pixmap {}
+
+impl SurfaceTypeTrait for Window {
+    fn surface_type() -> SurfaceType { SurfaceType::Window }
+}
+impl SurfaceTypeTrait for PBuffer {
+    fn surface_type() -> SurfaceType { SurfaceType::PBuffer }
+}
+impl SurfaceTypeTrait for Pixmap {
+    fn surface_type() -> SurfaceType { SurfaceType::Pixmap }
+}
+
+#[derive(Debug)]
+pub struct Surface<T: SurfaceTypeTrait>(pub(crate) platform_impl::Surface<T>);
+
+impl<T: SurfaceTypeTrait> Surface<T> {
+    #[inline]
+    pub fn is_current(&self) -> bool {
+        self.0.is_current()
+    }
+
+    #[inline]
+    pub fn get_config(&self) -> Config {
+        self.0.get_config()
+    }
+
+    #[inline]
+    pub unsafe fn make_not_current(&self) -> Result<(), Error> {
+        self.0.make_not_current()
+    }
+}
+
+impl Surface<Pixmap> {
+    #[inline]
+    pub unsafe fn new<NPS: NativePixmapSource>(
+        disp: &Display,
+        conf: &Config,
+        nps: &NPS,
+    ) -> Result<(NPS::Pixmap, Self), Error> {
+        platform_impl::Surface::<Pixmap>::new(&disp.0, conf.as_ref(), nps)
+            .map(|(pix, surf)| (pix, Surface(surf)))
+    }
+}
+
+impl Surface<PBuffer> {
     #[inline]
     pub unsafe fn new(
         disp: &Display,
         conf: &Config,
         size: dpi::PhysicalSize,
-    ) -> Result<PBuffer, CreationError> {
-        platform_impl::PBuffer::new(&disp.display, conf, size)
-            .map(|pbuffer| PBuffer { pbuffer })
-    }
-
-    #[inline]
-    pub(crate) fn inner(&self) -> &platform_impl::PBuffer {
-        &self.pbuffer
-    }
-
-    #[inline]
-    pub fn is_current(&self) -> bool {
-        self.pbuffer.is_current()
-    }
-
-    #[inline]
-    pub fn get_config(&self) -> Config {
-        self.pbuffer.get_config()
-    }
-
-    #[inline]
-    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
-        self.pbuffer.make_not_current()
+    ) -> Result<Self, Error> {
+        platform_impl::Surface::<PBuffer>::new(&disp.0, conf.as_ref(), size)
+            .map(Surface)
     }
 }
 
-#[derive(Debug)]
-pub struct WindowSurface {
-    pub(crate) surface: platform_impl::WindowSurface,
-}
-
-impl WindowSurface {
+impl Surface<Window> {
     #[inline]
-    pub unsafe fn new(
+    pub unsafe fn new<NWS: NativeWindowSource>(
         disp: &Display,
         conf: &Config,
-        wb: WindowBuilder,
-    ) -> Result<(Window, WindowSurface), CreationError> {
-        platform_impl::WindowSurface::new(&disp.display, conf, wb)
-            .map(|(window, surface)| (window, WindowSurface { surface }))
+        nws: &NWS,
+    ) -> Result<(NWS::Window, Self), Error> {
+        platform_impl::Surface::<Window>::new(&disp.0, conf.as_ref(), nws)
+            .map(|(win, surf)| (win, Surface(surf)))
     }
 
     #[inline]
-    pub(crate) fn inner(&self) -> &platform_impl::WindowSurface {
-        &self.surface
-    }
-
-    #[inline]
-    pub fn is_current(&self) -> bool {
-        self.surface.is_current()
-    }
-
-    #[inline]
-    pub fn get_config(&self) -> Config {
-        self.surface.get_config()
-    }
-
-    #[inline]
-    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
-        self.surface.make_not_current()
-    }
-
-    #[inline]
-    pub fn swap_buffers(&self) -> Result<(), ContextError> {
-        self.surface.swap_buffers()
+    pub fn swap_buffers(&self) -> Result<(), Error> {
+        self.0.swap_buffers()
     }
 
     /// Swaps the buffers in case of double or triple buffering using specified
@@ -92,11 +104,8 @@ impl WindowSurface {
     /// next time the screen is refreshed. However drivers can choose to
     /// override your vsync settings, which means that you can't know in
     /// advance whether `swap_buffers` will block or not.
-    pub fn swap_buffers_with_damage(
-        &self,
-        rects: &[Rect],
-    ) -> Result<(), ContextError> {
-        self.surface.swap_buffers_with_damage(rects)
+    pub fn swap_buffers_with_damage(&self, rects: &[Rect]) -> Result<(), Error> {
+        self.0.swap_buffers_with_damage(rects)
     }
 
     #[inline]
@@ -108,6 +117,15 @@ impl WindowSurface {
             target_os = "netbsd",
             target_os = "openbsd",
         ))]
-        self.surface.update_after_resize(size);
+        self.0.update_after_resize(size);
     }
+}
+
+// Rectangles to submit as buffer damage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Rect {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
 }

@@ -7,7 +7,6 @@
     target_os = "netbsd",
     target_os = "openbsd",
 ))]
-#![allow(unused_variables)]
 
 #[cfg(not(target_os = "android"))]
 mod egl {
@@ -29,9 +28,7 @@ mod egl {
     unsafe impl Sync for Egl {}
 
     type EglGetProcAddressType = libloading_os::Symbol<
-        unsafe extern "C" fn(
-            *const std::os::raw::c_void,
-        ) -> *const std::os::raw::c_void,
+        unsafe extern "C" fn(*const std::os::raw::c_void) -> *const std::os::raw::c_void,
     >;
 
     lazy_static! {
@@ -77,8 +74,7 @@ mod egl {
                         std::ffi::CString::new(s.as_bytes())
                             .unwrap()
                             .as_bytes_with_nul()
-                            .as_ptr()
-                            as *const std::os::raw::c_void,
+                            .as_ptr() as *const std::os::raw::c_void,
                     )
                 }
             };
@@ -119,17 +115,10 @@ mod make_current_guard;
 pub use self::egl::Egl;
 use self::make_current_guard::MakeCurrentGuard;
 
-use crate::config::{ConfigAttribs, ConfigBuilder, ConfigWrapper};
-use crate::context::{ContextBuilderWrapper, ContextError};
-use crate::{
-    CreationError, Rect,
-};
-use crate::config::{
-    Api, GlRequest, GlVersion, ReleaseBehavior,
-};
-use crate::context::{
-    Robustness,
-};
+use crate::config::{Api, GlRequest, GlVersion, ReleaseBehavior, ConfigAttribs, ConfigBuilder, ConfigWrapper};
+use crate::context::{ContextBuilderWrapper, Robustness};
+use crate::surface::{Rect, SurfaceTypeTrait, SurfaceType, Window, Pixmap, PBuffer};
+use crate::platform_impl::RawHandle;
 
 use glutin_egl_sys as ffi;
 use parking_lot::Mutex;
@@ -142,8 +131,10 @@ use parking_lot::Mutex;
     target_os = "netbsd",
     target_os = "openbsd",
 ))]
-use winit::dpi;
-use winit::event_loop::EventLoopWindowTarget;
+use winit_types::dpi;
+use winit_types::error::{Error, ErrorType};
+use winit_types::platform::OsError;
+use glutin_winit_interface::{NativeDisplay, NativeDisplaySource};
 
 use std::ffi::{c_void, CStr, CString};
 use std::marker::PhantomData;
@@ -169,28 +160,10 @@ lazy_static! {
     pub static ref EGL: Option<Egl> = Egl::new().ok();
 }
 
-/// Specifies the type of display passed as `native_display`.
-#[derive(Debug)]
-#[allow(dead_code)]
-pub enum NativeDisplay {
-    /// `None` means `EGL_DEFAULT_DISPLAY`.
-    X11(Option<ffi::EGLNativeDisplayType>),
-    /// `None` means `EGL_DEFAULT_DISPLAY`.
-    Gbm(Option<ffi::EGLNativeDisplayType>),
-    /// `None` means `EGL_DEFAULT_DISPLAY`.
-    Wayland(Option<ffi::EGLNativeDisplayType>),
-    /// `EGL_DEFAULT_DISPLAY` is mandatory for Android.
-    Android,
-    // TODO: should be `EGLDeviceEXT`
-    Device(ffi::EGLNativeDisplayType),
-    /// Don't specify any display type. Useful on windows. `None` means
-    /// `EGL_DEFAULT_DISPLAY`.
-    Other(Option<ffi::EGLNativeDisplayType>),
-}
-
 #[derive(Debug)]
 pub struct DisplayInternal {
     display: ffi::egl::types::EGLDisplay,
+    native_display: NativeDisplay,
     egl_version: EGLVersion,
     extensions: Vec<String>,
 }
@@ -199,17 +172,15 @@ pub struct DisplayInternal {
 pub struct Display(Arc<DisplayInternal>);
 
 impl Display {
-    pub fn new<TE>(
-        ndisp: NativeDisplay,
-    ) -> Result<Self, CreationError> {
+    pub fn new<NDS: NativeDisplaySource>(nds: &NDS) -> Result<Self, Error> {
         let egl = EGL.as_ref().unwrap();
         // calling `eglGetDisplay` or equivalent
-        let disp = get_native_display(&ndisp);
+        let disp = get_native_display(&nds.display());
 
         if disp.is_null() {
-            return Err(CreationError::OsError(
-                "Could not create EGL display object".to_string(),
-            ));
+            return Err(make_oserror!(OsError::Misc(
+                "Could not create EGL display object".to_string()
+            )));
         }
 
         let egl_version = get_egl_version(disp)?;
@@ -217,13 +188,8 @@ impl Display {
         // the list of extensions supported by the client once initialized is
         // different from the list of extensions obtained earlier
         let extensions = if egl_version >= (1, 2) {
-            let p = unsafe {
-                CStr::from_ptr(
-                    egl.QueryString(disp, ffi::egl::EXTENSIONS as i32),
-                )
-            };
-            let list = String::from_utf8(p.to_bytes().to_vec())
-                .unwrap_or_else(|_| format!(""));
+            let p = unsafe { CStr::from_ptr(egl.QueryString(disp, ffi::egl::EXTENSIONS as i32)) };
+            let list = String::from_utf8(p.to_bytes().to_vec()).unwrap_or_else(|_| format!(""));
             list.split(' ').map(|e| e.to_string()).collect::<Vec<_>>()
         } else {
             vec![]
@@ -233,6 +199,7 @@ impl Display {
             display: disp,
             extensions,
             egl_version,
+            native_display: nds.display(),
         })))
     }
 }
@@ -257,7 +224,7 @@ impl Deref for Display {
 pub struct Context {
     display: Arc<DisplayInternal>,
     context: ffi::egl::types::EGLContext,
-    config: ConfigWrapper<Config>,
+    config: ConfigWrapper<Config, ConfigAttribs>,
 }
 
 #[derive(Debug, Clone)]
@@ -270,25 +237,23 @@ pub struct Config {
 
 impl Config {
     #[inline]
-    pub fn build<F>(
+    pub fn new<F>(
         disp: &Display,
         cb: ConfigBuilder,
         conf_selector: F,
-    ) -> Result<(ConfigAttribs, Config), CreationError>
+    ) -> Result<(ConfigAttribs, Config), Error>
     where
         F: FnMut(
             Vec<ffi::egl::types::EGLConfig>,
-            ffi::egl::types::EGLDisplay,
+            &Display,
         ) -> Result<ffi::egl::types::EGLConfig, ()>,
     {
         let egl = EGL.as_ref().unwrap();
         // binding the right API and choosing the version
-        let (version, api) =
-            unsafe { bind_and_get_api(&cb.version, disp.egl_version)? };
+        let (version, api) = unsafe { bind_and_get_api(&cb.version, disp.egl_version)? };
 
-        let (config_id, attribs) = unsafe {
-            choose_fbconfig(disp, api, version, cb, conf_selector)?
-        };
+        let (config_id, attribs) =
+            unsafe { choose_fbconfig(disp, api, version, cb, conf_selector)? };
 
         Ok((
             attribs,
@@ -309,18 +274,16 @@ fn get_native_display(ndisp: &NativeDisplay) -> *const raw::c_void {
     unsafe { egl.GetDisplay(ffi::egl::DEFAULT_DISPLAY as *mut _) }
 }
 
-fn get_egl_version(
-    disp: ffi::egl::types::EGLDisplay,
-) -> Result<EGLVersion, CreationError> {
+fn get_egl_version(disp: ffi::egl::types::EGLDisplay) -> Result<EGLVersion, Error> {
     unsafe {
         let egl = EGL.as_ref().unwrap();
         let mut major: ffi::egl::types::EGLint = 0;
         let mut minor: ffi::egl::types::EGLint = 0;
 
         if egl.Initialize(disp, &mut major, &mut minor) == 0 {
-            return Err(CreationError::OsError(
-                "eglInitialize failed".to_string(),
-            ));
+            return Err(make_oserror!(OsError::Misc(
+                "eglInitialize failed".to_string()
+            )));
         }
 
         Ok((major, minor))
@@ -329,20 +292,16 @@ fn get_egl_version(
 
 type EGLVersion = (ffi::egl::types::EGLint, ffi::egl::types::EGLint);
 
-unsafe fn rebind_api(
-    api: Api,
-    egl_version: EGLVersion,
-) -> Result<(), CreationError> {
+unsafe fn rebind_api(api: Api, egl_version: EGLVersion) -> Result<(), Error> {
     let egl = EGL.as_ref().unwrap();
     if egl_version >= (1, 2) {
         if match api {
-            Api::OpenGl if egl_version >= (1, 4) => {
-                egl.BindAPI(ffi::egl::OPENGL_API)
-            }
+            Api::OpenGl if egl_version >= (1, 4) => egl.BindAPI(ffi::egl::OPENGL_API),
             Api::OpenGlEs => egl.BindAPI(ffi::egl::OPENGL_ES_API),
-        } == 0
+            _ => ffi::egl::TRUE,
+        } == ffi::egl::FALSE
         {
-            return Err(CreationError::OpenGlVersionNotSupported);
+            return Err(make_error!(ErrorType::OpenGlVersionNotSupported));
         }
     }
 
@@ -352,19 +311,17 @@ unsafe fn rebind_api(
 unsafe fn bind_and_get_api(
     version: &GlRequest,
     egl_version: EGLVersion,
-) -> Result<(Option<GlVersion>, Api), CreationError> {
+) -> Result<(Option<GlVersion>, Api), Error> {
     let egl = EGL.as_ref().unwrap();
     match version {
         GlRequest::Latest => {
             if egl_version >= (1, 2) {
-                if egl_version >= (1, 4)
-                    && egl.BindAPI(ffi::egl::OPENGL_API) != 0
-                {
+                if egl_version >= (1, 4) && egl.BindAPI(ffi::egl::OPENGL_API) != 0 {
                     Ok((None, Api::OpenGl))
                 } else if egl.BindAPI(ffi::egl::OPENGL_ES_API) != 0 {
                     Ok((None, Api::OpenGlEs))
                 } else {
-                    Err(CreationError::OpenGlVersionNotSupported)
+                    Err(make_error!(ErrorType::OpenGlVersionNotSupported))
                 }
             } else {
                 Ok((None, Api::OpenGlEs))
@@ -372,38 +329,34 @@ unsafe fn bind_and_get_api(
         }
         GlRequest::Specific(Api::OpenGlEs, version) => {
             if egl_version < (1, 2) {
-                return Err(CreationError::OpenGlVersionNotSupported);
+                return Err(make_error!(ErrorType::OpenGlVersionNotSupported));
             }
             if egl.BindAPI(ffi::egl::OPENGL_ES_API) == 0 {
-                return Err(CreationError::OpenGlVersionNotSupported);
+                return Err(make_error!(ErrorType::OpenGlVersionNotSupported));
             }
             Ok((Some(*version), Api::OpenGlEs))
         }
         GlRequest::Specific(Api::OpenGl, version) => {
             if egl_version < (1, 4) {
-                return Err(CreationError::OpenGlVersionNotSupported);
+                return Err(make_error!(ErrorType::OpenGlVersionNotSupported));
             }
             if egl.BindAPI(ffi::egl::OPENGL_API) == 0 {
-                return Err(CreationError::OpenGlVersionNotSupported);
+                return Err(make_error!(ErrorType::OpenGlVersionNotSupported));
             }
             Ok((Some(*version), Api::OpenGl))
         }
-        GlRequest::Specific(_, _) => {
-            Err(CreationError::OpenGlVersionNotSupported)
-        }
+        GlRequest::Specific(_, _) => Err(make_error!(ErrorType::OpenGlVersionNotSupported)),
         GlRequest::GlThenGles {
             opengles_version,
             opengl_version,
         } => {
             if egl_version >= (1, 2) {
-                if egl_version >= (1, 4)
-                    && egl.BindAPI(ffi::egl::OPENGL_API) != 0
-                {
+                if egl_version >= (1, 4) && egl.BindAPI(ffi::egl::OPENGL_API) != 0 {
                     Ok((Some(*opengl_version), Api::OpenGl))
                 } else if egl.BindAPI(ffi::egl::OPENGL_ES_API) != 0 {
                     Ok((Some(*opengles_version), Api::OpenGlEs))
                 } else {
-                    Err(CreationError::OpenGlVersionNotSupported)
+                    Err(make_error!(ErrorType::OpenGlVersionNotSupported))
                 }
             } else {
                 Ok((Some(*opengles_version), Api::OpenGlEs))
@@ -418,8 +371,7 @@ fn get_native_display(ndisp: &NativeDisplay) -> *const raw::c_void {
     // the first step is to query the list of extensions without any display, if
     // supported
     let dp_extensions = unsafe {
-        let p =
-            egl.QueryString(ffi::egl::NO_DISPLAY, ffi::egl::EXTENSIONS as i32);
+        let p = egl.QueryString(ffi::egl::NO_DISPLAY, ffi::egl::EXTENSIONS as i32);
 
         // this possibility is available only with EGL 1.5 or
         // EGL_EXT_platform_base, otherwise `eglQueryString` returns an
@@ -428,14 +380,12 @@ fn get_native_display(ndisp: &NativeDisplay) -> *const raw::c_void {
             vec![]
         } else {
             let p = CStr::from_ptr(p);
-            let list = String::from_utf8(p.to_bytes().to_vec())
-                .unwrap_or_else(|_| format!(""));
+            let list = String::from_utf8(p.to_bytes().to_vec()).unwrap_or_else(|_| format!(""));
             list.split(' ').map(|e| e.to_string()).collect::<Vec<_>>()
         }
     };
 
-    let has_dp_extension =
-        |e: &str| dp_extensions.iter().find(|s| s == &e).is_some();
+    let has_dp_extension = |e: &str| dp_extensions.iter().find(|s| s == &e).is_some();
 
     match *ndisp {
         // Note: Some EGL implementations are missing the
@@ -444,17 +394,12 @@ fn get_native_display(ndisp: &NativeDisplay) -> *const raw::c_void {
         //       Therefore we detect whether the symbol is loaded in addition to
         // checking for       extensions.
         NativeDisplay::X11(display)
-            if has_dp_extension("EGL_KHR_platform_x11")
-                && egl.GetPlatformDisplay.is_loaded() =>
+            if has_dp_extension("EGL_KHR_platform_x11") && egl.GetPlatformDisplay.is_loaded() =>
         {
-            let d = display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *const _);
+            let d = display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _);
             // TODO: `PLATFORM_X11_SCREEN_KHR`
             unsafe {
-                egl.GetPlatformDisplay(
-                    ffi::egl::PLATFORM_X11_KHR,
-                    d as *mut _,
-                    std::ptr::null(),
-                )
+                egl.GetPlatformDisplay(ffi::egl::PLATFORM_X11_KHR, d as *mut _, std::ptr::null())
             }
         }
 
@@ -462,28 +407,19 @@ fn get_native_display(ndisp: &NativeDisplay) -> *const raw::c_void {
             if has_dp_extension("EGL_EXT_platform_x11")
                 && egl.GetPlatformDisplayEXT.is_loaded() =>
         {
-            let d = display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *const _);
+            let d = display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _);
             // TODO: `PLATFORM_X11_SCREEN_EXT`
             unsafe {
-                egl.GetPlatformDisplayEXT(
-                    ffi::egl::PLATFORM_X11_EXT,
-                    d as *mut _,
-                    std::ptr::null(),
-                )
+                egl.GetPlatformDisplayEXT(ffi::egl::PLATFORM_X11_EXT, d as *mut _, std::ptr::null())
             }
         }
 
         NativeDisplay::Gbm(display)
-            if has_dp_extension("EGL_KHR_platform_gbm")
-                && egl.GetPlatformDisplay.is_loaded() =>
+            if has_dp_extension("EGL_KHR_platform_gbm") && egl.GetPlatformDisplay.is_loaded() =>
         {
-            let d = display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *const _);
+            let d = display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _);
             unsafe {
-                egl.GetPlatformDisplay(
-                    ffi::egl::PLATFORM_GBM_KHR,
-                    d as *mut _,
-                    std::ptr::null(),
-                )
+                egl.GetPlatformDisplay(ffi::egl::PLATFORM_GBM_KHR, d as *mut _, std::ptr::null())
             }
         }
 
@@ -491,13 +427,9 @@ fn get_native_display(ndisp: &NativeDisplay) -> *const raw::c_void {
             if has_dp_extension("EGL_MESA_platform_gbm")
                 && egl.GetPlatformDisplayEXT.is_loaded() =>
         {
-            let d = display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *const _);
+            let d = display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _);
             unsafe {
-                egl.GetPlatformDisplayEXT(
-                    ffi::egl::PLATFORM_GBM_KHR,
-                    d as *mut _,
-                    std::ptr::null(),
-                )
+                egl.GetPlatformDisplayEXT(ffi::egl::PLATFORM_GBM_KHR, d as *mut _, std::ptr::null())
             }
         }
 
@@ -505,7 +437,7 @@ fn get_native_display(ndisp: &NativeDisplay) -> *const raw::c_void {
             if has_dp_extension("EGL_KHR_platform_wayland")
                 && egl.GetPlatformDisplay.is_loaded() =>
         {
-            let d = display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *const _);
+            let d = display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _);
             unsafe {
                 egl.GetPlatformDisplay(
                     ffi::egl::PLATFORM_WAYLAND_KHR,
@@ -519,7 +451,7 @@ fn get_native_display(ndisp: &NativeDisplay) -> *const raw::c_void {
             if has_dp_extension("EGL_EXT_platform_wayland")
                 && egl.GetPlatformDisplayEXT.is_loaded() =>
         {
-            let d = display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *const _);
+            let d = display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _);
             unsafe {
                 egl.GetPlatformDisplayEXT(
                     ffi::egl::PLATFORM_WAYLAND_EXT,
@@ -558,14 +490,15 @@ fn get_native_display(ndisp: &NativeDisplay) -> *const raw::c_void {
         | NativeDisplay::Gbm(Some(display))
         | NativeDisplay::Wayland(Some(display))
         | NativeDisplay::Device(display)
-        | NativeDisplay::Other(Some(display)) => unsafe {
-            egl.GetDisplay(display as *mut _)
-        },
+        | NativeDisplay::Windows(Some(display))
+        | NativeDisplay::Other(Some(display))
+        => unsafe { egl.GetDisplay(display as *mut _) },
 
         NativeDisplay::X11(None)
         | NativeDisplay::Gbm(None)
         | NativeDisplay::Wayland(None)
         | NativeDisplay::Android
+        | NativeDisplay::Windows(None)
         | NativeDisplay::Other(None) => unsafe {
             egl.GetDisplay(ffi::egl::DEFAULT_DISPLAY as *mut _)
         },
@@ -583,12 +516,14 @@ impl Context {
         disp: &Display,
         cb: &'a ContextBuilderWrapper<&'a Context>,
         supports_surfaceless: bool,
-        conf: ConfigWrapper<&Config>,
-    ) -> Result<Context, CreationError> {
+        conf: ConfigWrapper<&Config, &ConfigAttribs>,
+    ) -> Result<Context, Error> {
         let egl = EGL.as_ref().unwrap();
 
         // FIXME: Support mixing apis
-        rebind_api(conf.config.api, disp.egl_version);
+        unsafe {
+            rebind_api(conf.config.api, disp.egl_version)?;
+        }
 
         // FIXME: Also check for the GL_OES_surfaceless_context *CONTEXT*
         // extension
@@ -599,9 +534,9 @@ impl Context {
                 .find(|s| s == &"EGL_KHR_surfaceless_context")
                 .is_none()
         {
-            return Err(CreationError::NotSupported(
+            return Err(make_error!(ErrorType::NotSupported(
                 "EGL surfaceless not supported".to_string(),
-            ));
+            )));
         }
 
         let share = match cb.sharing {
@@ -611,34 +546,24 @@ impl Context {
 
         let context = unsafe {
             if let Some(version) = conf.attribs.version {
-                create_context(disp, cb, conf, version, share)?
+                create_context(disp, cb, &conf, version, share)?
             } else if conf.attribs.api == Api::OpenGlEs {
-                if let Ok(ctx) =
-                    create_context(disp, cb, conf, GlVersion(2, 0), share)
-                {
+                if let Ok(ctx) = create_context(disp, cb, &conf, GlVersion(2, 0), share) {
                     ctx
-                } else if let Ok(ctx) =
-                    create_context(disp, cb, conf, GlVersion(1, 0), share)
-                {
+                } else if let Ok(ctx) = create_context(disp, cb, &conf, GlVersion(1, 0), share) {
                     ctx
                 } else {
-                    return Err(CreationError::OpenGlVersionNotSupported);
+                    return Err(make_error!(ErrorType::OpenGlVersionNotSupported));
                 }
             } else {
-                if let Ok(ctx) =
-                    create_context(disp, cb, conf, GlVersion(3, 2), share)
-                {
+                if let Ok(ctx) = create_context(disp, cb, &conf, GlVersion(3, 2), share) {
                     ctx
-                } else if let Ok(ctx) =
-                    create_context(disp, cb, conf, GlVersion(3, 1), share)
-                {
+                } else if let Ok(ctx) = create_context(disp, cb, &conf, GlVersion(3, 1), share) {
                     ctx
-                } else if let Ok(ctx) =
-                    create_context(disp, cb, conf, GlVersion(1, 0), share)
-                {
+                } else if let Ok(ctx) = create_context(disp, cb, &conf, GlVersion(1, 0), share) {
                     ctx
                 } else {
-                    return Err(CreationError::OpenGlVersionNotSupported);
+                    return Err(make_error!(ErrorType::OpenGlVersionNotSupported));
                 }
             }
         };
@@ -646,36 +571,32 @@ impl Context {
         Ok(Context {
             display: Arc::clone(&disp.0),
             context,
-            config: conf.with_config(conf.config.clone()),
+            config: conf.clone(),
         })
     }
 
-    unsafe fn make_current<T: SurfaceTypeTrait>(
+    pub(crate) unsafe fn make_current<T: SurfaceTypeTrait>(
         &self,
-        surf: &EGLSurface<T>,
-        is_pbuffer: bool,
-    ) -> Result<(), ContextError> {
+        surf: &Surface<T>,
+    ) -> Result<(), Error> {
         let egl = EGL.as_ref().unwrap();
 
         {
-            let has_been_current = surf.has_been_current.lock();
+            let mut has_been_current = surf.has_been_current.lock();
 
             if !*has_been_current {
                 // VSync defaults to enabled; disable it if it was not
                 // requested.
-                if !is_pbuffer && !surf.config.attribs.vsync {
+                if T::surface_type() == SurfaceType::Window && !surf.config.attribs.vsync {
                     let _guard = MakeCurrentGuard::new(
                         **surf.display,
                         surf.surface,
                         surf.surface,
                         self.context,
-                    )
-                    .map_err(|err| ContextError::OsError(err))?;
+                    )?;
 
                     unsafe {
-                        if egl.SwapInterval(**surf.display, 0)
-                            == ffi::egl::FALSE
-                        {
+                        if egl.SwapInterval(**surf.display, 0) == ffi::egl::FALSE {
                             panic!(
                                 "finish_impl: eglSwapInterval failed: 0x{:x}",
                                 egl.GetError()
@@ -687,18 +608,13 @@ impl Context {
             }
         }
 
-        let ret = egl.MakeCurrent(
-            **self.display,
-            surf.surface,
-            surf.surface,
-            self.context,
-        );
+        let ret = egl.MakeCurrent(**self.display, surf.surface, surf.surface, self.context);
 
         check_make_current(Some(ret))
     }
 
     #[inline]
-    pub unsafe fn make_current_surfaceless(&self) -> Result<(), ContextError> {
+    pub unsafe fn make_current_surfaceless(&self) -> Result<(), Error> {
         let egl = EGL.as_ref().unwrap();
         let ret = egl.MakeCurrent(
             **self.display,
@@ -711,23 +627,7 @@ impl Context {
     }
 
     #[inline]
-    pub unsafe fn make_current_surface(
-        &self,
-        surf: &WindowSurface,
-    ) -> Result<(), ContextError> {
-        self.make_current(surf, false)
-    }
-
-    #[inline]
-    pub unsafe fn make_current_pbuffer(
-        &self,
-        pbuffer: &PBuffer,
-    ) -> Result<(), ContextError> {
-        self.make_current(pbuffer, true)
-    }
-
-    #[inline]
-    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+    pub unsafe fn make_not_current(&self) -> Result<(), Error> {
         let egl = EGL.as_ref().unwrap();
 
         if egl.GetCurrentContext() == self.context {
@@ -751,7 +651,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_config(&self) -> ConfigWrapper<Config> {
+    pub fn get_config(&self) -> ConfigWrapper<Config, ConfigAttribs> {
         self.config.clone()
     }
 
@@ -761,8 +661,8 @@ impl Context {
     }
 
     #[inline]
-    pub unsafe fn raw_handle(&self) -> ffi::egl::types::EGLContext {
-        self.context
+    pub unsafe fn raw_handle(&self) -> RawHandle {
+        RawHandle::Egl(self.context)
     }
 
     #[inline]
@@ -848,11 +748,11 @@ impl Context {
     }
 }
 
-unsafe fn check_make_current(ret: Option<u32>) -> Result<(), ContextError> {
+unsafe fn check_make_current(ret: Option<u32>) -> Result<(), Error> {
     let egl = EGL.as_ref().unwrap();
     if ret == Some(0) {
         match egl.GetError() as u32 {
-            ffi::egl::CONTEXT_LOST => Err(ContextError::ContextLost),
+            ffi::egl::CONTEXT_LOST => Err(make_error!(ErrorType::ContextLost)),
             err => panic!(
                 "make_current: eglMakeCurrent failed (eglGetError returned 0x{:x})",
                 err
@@ -866,11 +766,8 @@ unsafe fn check_make_current(ret: Option<u32>) -> Result<(), ContextError> {
 unsafe impl Send for Context {}
 unsafe impl Sync for Context {}
 
-unsafe impl Send for WindowSurface {}
-unsafe impl Sync for WindowSurface {}
-
-unsafe impl Send for PBuffer {}
-unsafe impl Sync for PBuffer {}
+unsafe impl<T: SurfaceTypeTrait> Send for Surface<T> {}
+unsafe impl<T: SurfaceTypeTrait> Sync for Surface<T> {}
 
 impl Drop for Display {
     fn drop(&mut self) {
@@ -975,55 +872,38 @@ pub fn get_native_visual_id(
     value
 }
 
-pub trait SurfaceTypeTrait {}
-
 #[derive(Debug)]
-pub enum WindowSurfaceType {}
-#[derive(Debug)]
-pub enum PBufferSurfaceType {}
-
-impl SurfaceTypeTrait for WindowSurfaceType {}
-impl SurfaceTypeTrait for PBufferSurfaceType {}
-
-pub type WindowSurface = EGLSurface<WindowSurfaceType>;
-pub type PBuffer = EGLSurface<PBufferSurfaceType>;
-
-#[derive(Debug)]
-pub struct EGLSurface<T: SurfaceTypeTrait> {
+pub struct Surface<T: SurfaceTypeTrait> {
     display: Arc<DisplayInternal>,
     surface: ffi::egl::types::EGLSurface,
-    config: ConfigWrapper<Config>,
+    config: ConfigWrapper<Config, ConfigAttribs>,
     phantom: PhantomData<T>,
     has_been_current: Mutex<bool>,
 }
 
-impl WindowSurface {
+impl Surface<Window> {
     #[inline]
-    pub fn new_window_surface<T>(
+    pub fn new(
         disp: &Display,
-        conf: ConfigWrapper<&Config>,
+        conf: ConfigWrapper<&Config, &ConfigAttribs>,
         nwin: ffi::EGLNativeWindowType,
-    ) -> Result<Self, CreationError> {
+    ) -> Result<Self, Error> {
         let egl = EGL.as_ref().unwrap();
         let surf = unsafe {
-            let surf = egl.CreateWindowSurface(
-                ***disp,
-                conf.config.config_id,
-                nwin,
-                std::ptr::null(),
-            );
+            let surf =
+                egl.CreateWindowSurface(***disp, conf.config.config_id, nwin, std::ptr::null());
             if surf.is_null() {
-                return Err(CreationError::OsError(format!(
+                return Err(make_oserror!(OsError::Misc(format!(
                     "eglCreateWindowSurface failed with 0x{:x}",
                     egl.GetError()
-                )));
+                ))));
             }
             surf
         };
 
-        Ok(WindowSurface {
+        Ok(Surface {
             display: Arc::clone(&disp.0),
-            config: conf.with_config(conf.config.clone()),
+            config: conf.clone(),
             surface: surf,
             phantom: PhantomData,
             has_been_current: Mutex::new(false),
@@ -1031,10 +911,10 @@ impl WindowSurface {
     }
 
     #[inline]
-    pub fn swap_buffers(&self) -> Result<(), ContextError> {
+    pub fn swap_buffers(&self) -> Result<(), Error> {
         let egl = EGL.as_ref().unwrap();
         if self.surface == ffi::egl::NO_SURFACE {
-            return Err(ContextError::ContextLost);
+            return Err(make_error!(ErrorType::ContextLost));
         }
 
         let ret = unsafe { egl.SwapBuffers(**self.display, self.surface) };
@@ -1042,7 +922,7 @@ impl WindowSurface {
         if ret == 0 {
             match unsafe { egl.GetError() } as u32 {
                 ffi::egl::CONTEXT_LOST => {
-                    return Err(ContextError::ContextLost)
+                    return Err(make_error!(ErrorType::ContextLost));
                 }
                 err => panic!(
                     "swap_buffers: eglSwapBuffers failed (eglGetError returned 0x{:x})",
@@ -1055,24 +935,20 @@ impl WindowSurface {
     }
 
     #[inline]
-    pub fn swap_buffers_with_damage(
-        &self,
-        rects: &[Rect],
-    ) -> Result<(), ContextError> {
+    pub fn swap_buffers_with_damage(&self, rects: &[Rect]) -> Result<(), Error> {
         let egl = EGL.as_ref().unwrap();
 
         if !egl.SwapBuffersWithDamageKHR.is_loaded() {
-            return Err(ContextError::OsError(
+            return Err(make_error!(ErrorType::NotSupported(
                 "buffer damage not suported".to_string(),
-            ));
+            )));
         }
 
         if self.surface == ffi::egl::NO_SURFACE {
-            return Err(ContextError::ContextLost);
+            return Err(make_error!(ErrorType::ContextLost));
         }
 
-        let mut ffirects: Vec<ffi::egl::types::EGLint> =
-            Vec::with_capacity(rects.len() * 4);
+        let mut ffirects: Vec<ffi::egl::types::EGLint> = Vec::with_capacity(rects.len() * 4);
 
         for rect in rects {
             ffirects.push(rect.x as ffi::egl::types::EGLint);
@@ -1093,7 +969,7 @@ impl WindowSurface {
         if ret == ffi::egl::FALSE {
             match unsafe { egl.GetError() } as u32 {
                 ffi::egl::CONTEXT_LOST => {
-                    return Err(ContextError::ContextLost)
+                    return Err(make_error!(ErrorType::ContextLost));
                 }
                 err => panic!(
                     "swap_buffers: eglSwapBuffers failed (eglGetError returned 0x{:x})",
@@ -1106,13 +982,13 @@ impl WindowSurface {
     }
 }
 
-impl PBuffer {
+impl Surface<PBuffer> {
     #[inline]
-    pub fn new_pbuffer<T>(
+    pub fn new<T>(
         disp: &Display,
-        conf: ConfigWrapper<&Config>,
+        conf: ConfigWrapper<&Config, &ConfigAttribs>,
         size: dpi::PhysicalSize,
-    ) -> Result<Self, CreationError> {
+    ) -> Result<Self, Error> {
         let size: (u32, u32) = size.into();
 
         let egl = EGL.as_ref().unwrap();
@@ -1132,22 +1008,18 @@ impl PBuffer {
         ];
 
         let surf = unsafe {
-            let pbuffer = egl.CreatePbufferSurface(
-                ***disp,
-                conf.config.config_id,
-                attrs.as_ptr(),
-            );
+            let pbuffer = egl.CreatePbufferSurface(***disp, conf.config.config_id, attrs.as_ptr());
             if pbuffer.is_null() || pbuffer == ffi::egl::NO_SURFACE {
-                return Err(CreationError::OsError(
+                return Err(make_oserror!(OsError::Misc(
                     "eglCreatePbufferSurface failed".to_string(),
-                ));
+                )));
             }
             pbuffer
         };
 
-        Ok(PBuffer {
+        Ok(Surface {
             display: Arc::clone(&disp.0),
-            config: conf.with_config(conf.config.clone()),
+            config: conf.clone(),
             surface: surf,
             phantom: PhantomData,
             has_been_current: Mutex::new(false),
@@ -1155,7 +1027,7 @@ impl PBuffer {
     }
 }
 
-impl<T: SurfaceTypeTrait> EGLSurface<T> {
+impl<T: SurfaceTypeTrait> Surface<T> {
     #[inline]
     pub fn is_current(&self) -> bool {
         let egl = EGL.as_ref().unwrap();
@@ -1166,12 +1038,12 @@ impl<T: SurfaceTypeTrait> EGLSurface<T> {
     }
 
     #[inline]
-    pub fn get_config(&self) -> ConfigWrapper<Config> {
+    pub fn get_config(&self) -> ConfigWrapper<Config, ConfigAttribs> {
         self.config.clone()
     }
 
     #[inline]
-    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+    pub unsafe fn make_not_current(&self) -> Result<(), Error> {
         let egl = EGL.as_ref().unwrap();
 
         if egl.GetCurrentSurface(ffi::egl::DRAW as i32) == self.surface
@@ -1191,17 +1063,13 @@ impl<T: SurfaceTypeTrait> EGLSurface<T> {
     }
 }
 
-impl<T: SurfaceTypeTrait> Drop for EGLSurface<T> {
+impl<T: SurfaceTypeTrait> Drop for Surface<T> {
     fn drop(&mut self) {
         unsafe {
             let egl = EGL.as_ref().unwrap();
 
             let mut guard = MakeCurrentGuard::new_keep(**self.display);
-            guard.if_any_same_then_invalidate(
-                self.surface,
-                self.surface,
-                ffi::egl::NO_CONTEXT,
-            );
+            guard.if_any_same_then_invalidate(self.surface, self.surface, ffi::egl::NO_CONTEXT);
             std::mem::drop(guard);
 
             egl.DestroySurface(**self.display, self.surface);
@@ -1216,11 +1084,11 @@ unsafe fn choose_fbconfig<F>(
     version: Option<GlVersion>,
     cb: ConfigBuilder,
     mut conf_selector: F,
-) -> Result<(ffi::egl::types::EGLConfig, ConfigAttribs), CreationError>
+) -> Result<(ffi::egl::types::EGLConfig, ConfigAttribs), Error>
 where
     F: FnMut(
         Vec<ffi::egl::types::EGLConfig>,
-        ffi::egl::types::EGLDisplay,
+        &Display,
     ) -> Result<ffi::egl::types::EGLConfig, ()>,
 {
     let egl = EGL.as_ref().unwrap();
@@ -1238,15 +1106,18 @@ where
         if cb.window_surface_support {
             surface_type = surface_type | ffi::egl::WINDOW_BIT;
         }
-        if cb.pbuffer_support {
+        if cb.pbuffer_surface_support {
             surface_type = surface_type | ffi::egl::PBUFFER_BIT;
+        }
+        if cb.pixmap_surface_support {
+            surface_type = surface_type | ffi::egl::PIXMAP_BIT;
         }
         out.push(surface_type as raw::c_int);
 
         match (api, version) {
             (Api::OpenGlEs, Some(GlVersion(3, _))) => {
                 if disp.egl_version < (1, 3) {
-                    return Err(CreationError::NoAvailableConfig);
+                    return Err(make_error!(ErrorType::NoAvailableConfig));
                 }
                 out.push(ffi::egl::RENDERABLE_TYPE as raw::c_int);
                 out.push(ffi::egl::OPENGL_ES3_BIT as raw::c_int);
@@ -1255,7 +1126,7 @@ where
             }
             (Api::OpenGlEs, Some(GlVersion(2, _))) => {
                 if disp.egl_version < (1, 3) {
-                    return Err(CreationError::NoAvailableConfig);
+                    return Err(make_error!(ErrorType::NoAvailableConfig));
                 }
                 out.push(ffi::egl::RENDERABLE_TYPE as raw::c_int);
                 out.push(ffi::egl::OPENGL_ES2_BIT as raw::c_int);
@@ -1273,7 +1144,7 @@ where
             (Api::OpenGlEs, _) => unimplemented!(),
             (Api::OpenGl, _) => {
                 if disp.egl_version < (1, 3) {
-                    return Err(CreationError::NoAvailableConfig);
+                    return Err(make_error!(ErrorType::NoAvailableConfig));
                 }
                 out.push(ffi::egl::RENDERABLE_TYPE as raw::c_int);
                 out.push(ffi::egl::OPENGL_BIT as raw::c_int);
@@ -1296,13 +1167,9 @@ where
             out.push(ffi::egl::RED_SIZE as raw::c_int);
             out.push((color / 3) as raw::c_int);
             out.push(ffi::egl::GREEN_SIZE as raw::c_int);
-            out.push(
-                (color / 3 + if color % 3 != 0 { 1 } else { 0 }) as raw::c_int,
-            );
+            out.push((color / 3 + if color % 3 != 0 { 1 } else { 0 }) as raw::c_int);
             out.push(ffi::egl::BLUE_SIZE as raw::c_int);
-            out.push(
-                (color / 3 + if color % 3 == 2 { 1 } else { 0 }) as raw::c_int,
-            );
+            out.push((color / 3 + if color % 3 == 2 { 1 } else { 0 }) as raw::c_int);
         }
 
         if let Some(alpha) = cb.alpha_bits {
@@ -1321,7 +1188,7 @@ where
         }
 
         if let Some(true) = cb.double_buffer {
-            return Err(CreationError::NoAvailableConfig);
+            return Err(make_error!(ErrorType::NoAvailableConfig));
         }
 
         if let Some(multisampling) = cb.multisampling {
@@ -1330,7 +1197,7 @@ where
         }
 
         if cb.stereoscopy {
-            return Err(CreationError::NoAvailableConfig);
+            return Err(make_error!(ErrorType::NoAvailableConfig));
         }
 
         if let Some(xid) = cb.plat_attr.x11_visual_xid {
@@ -1362,13 +1229,13 @@ where
         &mut num_confs,
     ) == 0
     {
-        return Err(CreationError::OsError(
+        return Err(make_oserror!(OsError::Misc(
             "eglChooseConfig failed".to_string(),
-        ));
+        )));
     }
 
     if num_confs == 0 {
-        return Err(CreationError::NoAvailableConfig);
+        return Err(make_error!(ErrorType::NoAvailableConfig));
     }
 
     let mut conf_ids = Vec::with_capacity(num_confs as usize);
@@ -1381,9 +1248,9 @@ where
         &mut num_confs,
     ) == 0
     {
-        return Err(CreationError::OsError(
+        return Err(make_oserror!(OsError::Misc(
             "eglChooseConfig failed".to_string(),
-        ));
+        )));
     }
 
     // analyzing each config
@@ -1397,9 +1264,9 @@ where
                 &mut value,
             );
             if res == 0 {
-                Err(CreationError::OsError(
+                Err(make_oserror!(OsError::Misc(
                     "eglGetConfigAttrib failed".to_string(),
-                ))
+                )))
             } else {
                 Ok(value)
             }
@@ -1413,7 +1280,7 @@ where
         conf_ids
             .into_iter()
             .filter_map(|conf_id| {
-                let mut min_swap_interval =
+                let min_swap_interval =
                     attrib!(egl, disp, conf_id, ffi::egl::MIN_SWAP_INTERVAL,);
 
                 if let Err(min_swap_interval) = min_swap_interval {
@@ -1424,7 +1291,7 @@ where
                     return None;
                 }
 
-                let mut max_swap_interval =
+                let max_swap_interval =
                     attrib!(egl, disp, conf_id, ffi::egl::MAX_SWAP_INTERVAL,);
 
                 if let Err(max_swap_interval) = max_swap_interval {
@@ -1443,17 +1310,15 @@ where
     };
 
     if conf_ids.is_empty() {
-        return Err(CreationError::NoAvailableConfig);
+        return Err(make_error!(ErrorType::NoAvailableConfig));
     }
 
-    let conf_id = conf_selector(conf_ids, ***disp)
-        .map_err(|_| CreationError::NoAvailableConfig)?;
+    let conf_id = conf_selector(conf_ids, disp)
+        .map_err(|_| make_error!(ErrorType::NoAvailableConfig))?;
 
-    let mut min_swap_interval =
-        attrib!(egl, disp, conf_id, ffi::egl::MIN_SWAP_INTERVAL,)?;
+    let mut min_swap_interval = attrib!(egl, disp, conf_id, ffi::egl::MIN_SWAP_INTERVAL,)?;
 
-    let mut max_swap_interval =
-        attrib!(egl, disp, conf_id, ffi::egl::MAX_SWAP_INTERVAL,)?;
+    let mut max_swap_interval = attrib!(egl, disp, conf_id, ffi::egl::MAX_SWAP_INTERVAL,)?;
 
     assert!(min_swap_interval >= 0);
 
@@ -1462,20 +1327,16 @@ where
         version,
         vsync: min_swap_interval <= 1 && max_swap_interval >= 1,
         window_surface_support: cb.window_surface_support,
-        pbuffer_support: cb.pbuffer_support,
-        hardware_accelerated: attrib!(
-            egl,
-            disp,
-            conf_id,
-            ffi::egl::CONFIG_CAVEAT,
-        )? != ffi::egl::SLOW_CONFIG as i32,
+        pbuffer_surface_support: cb.pbuffer_surface_support,
+        pixmap_surface_support: cb.pixmap_surface_support,
+        hardware_accelerated: attrib!(egl, disp, conf_id, ffi::egl::CONFIG_CAVEAT,)?
+            != ffi::egl::SLOW_CONFIG as i32,
         color_bits: attrib!(egl, disp, conf_id, ffi::egl::RED_SIZE)? as u8
             + attrib!(egl, disp, conf_id, ffi::egl::BLUE_SIZE)? as u8
             + attrib!(egl, disp, conf_id, ffi::egl::GREEN_SIZE)? as u8,
         alpha_bits: attrib!(egl, disp, conf_id, ffi::egl::ALPHA_SIZE)? as u8,
         depth_bits: attrib!(egl, disp, conf_id, ffi::egl::DEPTH_SIZE)? as u8,
-        stencil_bits: attrib!(egl, disp, conf_id, ffi::egl::STENCIL_SIZE)?
-            as u8,
+        stencil_bits: attrib!(egl, disp, conf_id, ffi::egl::STENCIL_SIZE)? as u8,
         stereoscopy: false,
         double_buffer: true,
         multisampling: match attrib!(egl, disp, conf_id, ffi::egl::SAMPLES)? {
@@ -1491,10 +1352,10 @@ where
 unsafe fn create_context<'a>(
     disp: &Display,
     cb: &'a ContextBuilderWrapper<&'a Context>,
-    conf: ConfigWrapper<&Config>,
+    conf: &ConfigWrapper<&Config, &ConfigAttribs>,
     version: GlVersion,
     share: ffi::EGLContext,
-) -> Result<ffi::egl::types::EGLContext, CreationError> {
+) -> Result<ffi::egl::types::EGLContext, Error> {
     let egl = EGL.as_ref().unwrap();
 
     let mut context_attributes = Vec::with_capacity(10);
@@ -1530,66 +1391,48 @@ unsafe fn create_context<'a>(
                     .find(|s| s == &"EGL_KHR_create_context_no_error")
                     .is_some()
                 {
-                    context_attributes.push(
-                        ffi::egl::CONTEXT_OPENGL_NO_ERROR_KHR as raw::c_int,
-                    );
+                    context_attributes.push(ffi::egl::CONTEXT_OPENGL_NO_ERROR_KHR as raw::c_int);
                     context_attributes.push(1);
                 }
             }
 
             Robustness::RobustNoResetNotification => {
                 if supports_robustness {
-                    context_attributes.push(
-                        ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY
-                            as raw::c_int,
-                    );
                     context_attributes
-                        .push(ffi::egl::NO_RESET_NOTIFICATION as raw::c_int);
-                    flags = flags
-                        | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
+                        .push(ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY as raw::c_int);
+                    context_attributes.push(ffi::egl::NO_RESET_NOTIFICATION as raw::c_int);
+                    flags = flags | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
                 } else {
-                    return Err(CreationError::RobustnessNotSupported);
+                    return Err(make_error!(ErrorType::RobustnessNotSupported));
                 }
             }
 
             Robustness::TryRobustNoResetNotification => {
                 if supports_robustness {
-                    context_attributes.push(
-                        ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY
-                            as raw::c_int,
-                    );
                     context_attributes
-                        .push(ffi::egl::NO_RESET_NOTIFICATION as raw::c_int);
-                    flags = flags
-                        | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
+                        .push(ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY as raw::c_int);
+                    context_attributes.push(ffi::egl::NO_RESET_NOTIFICATION as raw::c_int);
+                    flags = flags | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
                 }
             }
 
             Robustness::RobustLoseContextOnReset => {
                 if supports_robustness {
-                    context_attributes.push(
-                        ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY
-                            as raw::c_int,
-                    );
                     context_attributes
-                        .push(ffi::egl::LOSE_CONTEXT_ON_RESET as raw::c_int);
-                    flags = flags
-                        | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
+                        .push(ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY as raw::c_int);
+                    context_attributes.push(ffi::egl::LOSE_CONTEXT_ON_RESET as raw::c_int);
+                    flags = flags | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
                 } else {
-                    return Err(CreationError::RobustnessNotSupported);
+                    return Err(make_error!(ErrorType::RobustnessNotSupported));
                 }
             }
 
             Robustness::TryRobustLoseContextOnReset => {
                 if supports_robustness {
-                    context_attributes.push(
-                        ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY
-                            as raw::c_int,
-                    );
                     context_attributes
-                        .push(ffi::egl::LOSE_CONTEXT_ON_RESET as raw::c_int);
-                    flags = flags
-                        | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
+                        .push(ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY as raw::c_int);
+                    context_attributes.push(ffi::egl::LOSE_CONTEXT_ON_RESET as raw::c_int);
+                    flags = flags | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
                 }
             }
         }
@@ -1619,9 +1462,8 @@ unsafe fn create_context<'a>(
     } else if disp.egl_version >= (1, 3) && conf.config.api == Api::OpenGlEs {
         // robustness is not supported
         match cb.robustness {
-            Robustness::RobustNoResetNotification
-            | Robustness::RobustLoseContextOnReset => {
-                return Err(CreationError::RobustnessNotSupported);
+            Robustness::RobustNoResetNotification | Robustness::RobustLoseContextOnReset => {
+                return Err(make_error!(ErrorType::RobustnessNotSupported));
             }
             _ => (),
         }
@@ -1642,7 +1484,7 @@ unsafe fn create_context<'a>(
     if context.is_null() {
         match egl.GetError() as u32 {
             ffi::egl::BAD_MATCH | ffi::egl::BAD_ATTRIBUTE => {
-                return Err(CreationError::OpenGlVersionNotSupported);
+                return Err(make_error!(ErrorType::OpenGlVersionNotSupported));
             }
             e => panic!("create_context: eglCreateContext failed: 0x{:x}", e),
         }

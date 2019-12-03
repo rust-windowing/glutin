@@ -1,4 +1,5 @@
 /// FIXME: rework
+use winit_types::error::Error;
 
 /// A unix-specific extension for the [`ContextBuilder`] which allows
 /// assembling [`RawContext<T>`]s.
@@ -17,7 +18,7 @@ pub trait RawContextExt {
         surface: *mut raw::c_void,
         width: u32,
         height: u32,
-    ) -> Result<crate::RawContext<NotCurrent>, CreationError>
+    ) -> Result<crate::RawContext<NotCurrent>, Error>
     where
         Self: Sized;
 
@@ -30,7 +31,7 @@ pub trait RawContextExt {
         self,
         xconn: Arc<XConnection>,
         xwin: raw::c_ulong,
-    ) -> Result<crate::RawContext<NotCurrent>, CreationError>
+    ) -> Result<crate::RawContext<NotCurrent>, Error>
     where
         Self: Sized;
 }
@@ -44,7 +45,7 @@ impl<'a, IC: ContextCurrentState, PBT: SupportsPBuffersTrait, WST: SupportsWindo
         surface: *mut raw::c_void,
         width: u32,
         height: u32,
-    ) -> Result<crate::RawContext<NotCurrent>, CreationError>
+    ) -> Result<crate::RawContext<NotCurrent>, Error>
     where
         Self: Sized,
     {
@@ -80,7 +81,7 @@ impl<'a, IC: ContextCurrentState, PBT: SupportsPBuffersTrait, WST: SupportsWindo
         self,
         xconn: Arc<XConnection>,
         xwin: raw::c_ulong,
-    ) -> Result<crate::RawContext<NotCurrent>, CreationError>
+    ) -> Result<crate::RawContext<NotCurrent>, Error>
     where
         Self: Sized,
     {

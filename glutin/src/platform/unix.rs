@@ -13,13 +13,10 @@ pub mod osmesa;
 
 use crate::context::Context;
 use crate::platform::ContextTraitExt;
-pub use crate::platform_impl::{
-    ContextPlatformAttributes, RawHandle, SurfacePlatformAttributes,
-};
+pub use crate::platform_impl::{ContextPlatformAttributes, RawHandle, SurfacePlatformAttributes};
 
 pub use glutin_egl_sys::EGLContext;
-pub use glutin_glx_sys::GLXContext;
-pub use winit::platform::unix::*;
+pub use glutin_glx_sys::glx::types::GLXContext;
 
 use std::os::raw;
 
@@ -28,11 +25,11 @@ impl ContextTraitExt for Context {
 
     #[inline]
     unsafe fn raw_handle(&self) -> Self::Handle {
-        self.context.raw_handle()
+        self.0.raw_handle()
     }
 
     #[inline]
     unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
-        self.context.get_egl_display()
+        self.0.get_egl_display()
     }
 }

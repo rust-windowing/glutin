@@ -1,41 +1,13 @@
-use super::*;
-use winit::event_loop::EventLoopWindowTarget;
+use crate::platform_impl;
+
+use glutin_winit_interface::NativeDisplaySource;
+use winit_types::error::Error;
 
 #[derive(Debug)]
-pub struct DisplayWrapper<T, TE> {
-    pub(crate) display: T,
-    pub(crate) el: TE,
-}
+pub struct Display(pub(crate) platform_impl::Display);
 
-pub type Display<TE> = DisplayWrapper<platform_impl::Display, TE>;
-
-impl<TE> Display<EventLoopWindowTarget<TE>> {
-    pub fn new(
-        el: &EventLoopWindowTarget<TE>,
-    ) -> Result<Self, CreationError> {
-        platform_impl::Display::new(el).map(|display| Display { display, el: el.clone() })
-    }
-}
-
-impl<T, TE> DisplayWrapper<T, TE> {
-    /// Turns the `display` parameter into another type by calling a closure.
-    #[inline]
-    pub(crate) fn map_display<F, T2>(&self, f: F) -> DisplayWrapper<T2, TE>
-    where
-        F: FnOnce(T) -> T2,
-    {
-        DisplayWrapper {
-            display: f(self.display),
-            el: self.el,
-        }
-    }
-
-    #[inline]
-    pub(crate) fn as_ref<TE2>(self) -> DisplayWrapper<T, TE2>
-    {
-        DisplayWrapper {
-            display: self.display,
-            el: &self.el,
-        }
+impl Display {
+    pub fn new<NDS: NativeDisplaySource>(nds: &NDS) -> Result<Self, Error> {
+        platform_impl::Display::new(nds).map(Display)
     }
 }

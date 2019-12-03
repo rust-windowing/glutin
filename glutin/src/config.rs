@@ -1,5 +1,7 @@
-use super::*;
 use crate::display::Display;
+use crate::platform_impl;
+
+use winit_types::error::Error;
 
 /// All APIs related to OpenGL that you can possibly get while using glutin.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,8 +54,7 @@ impl Default for GlRequest {
 /// The minimum core profile GL context. Useful for getting the minimum
 /// required GL version while still running on OSX, which often forbids
 /// the compatibility profile features.
-pub static GL_CORE: GlRequest =
-    GlRequest::Specific(Api::OpenGl, GlVersion(3, 2));
+pub static GL_CORE: GlRequest = GlRequest::Specific(Api::OpenGl, GlVersion(3, 2));
 
 /// The behavior of the driver when you change the current context.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -86,24 +87,36 @@ pub struct ConfigAttribs {
     pub multisampling: Option<u16>,
     pub srgb: bool,
     pub vsync: bool,
-    pub pbuffer_support: bool,
+    pub pbuffer_surface_support: bool,
+    pub pixmap_surface_support: bool,
     pub window_surface_support: bool,
 }
 
 /// Describes a possible format.
 #[allow(missing_docs)]
 #[derive(Debug, Clone)]
-pub struct ConfigWrapper<T> {
-    pub attribs: ConfigAttribs,
+pub struct ConfigWrapper<T, CA> {
+    pub attribs: CA,
     pub(crate) config: T,
 }
 
-pub type Config = ConfigWrapper<platform_impl::Config>;
+pub type Config = ConfigWrapper<platform_impl::Config, ConfigAttribs>;
 
-impl<T> ConfigWrapper<T> {
+impl<T: Clone, CA: Clone> ConfigWrapper<&T, &CA> {
     /// Turns the `config` parameter into another type by calling a closure.
     #[inline]
-    pub(crate) fn map_config<F, T2>(self, f: F) -> ConfigWrapper<T2>
+    pub(crate) fn clone(self) -> ConfigWrapper<T, CA> {
+        ConfigWrapper {
+            config: self.config.clone(),
+            attribs: self.attribs.clone(),
+        }
+    }
+}
+
+impl<T, CA> ConfigWrapper<T, CA> {
+    /// Turns the `config` parameter into another type by calling a closure.
+    #[inline]
+    pub(crate) fn map_config<F, T2>(self, f: F) -> ConfigWrapper<T2, CA>
     where
         F: FnOnce(T) -> T2,
     {
@@ -112,13 +125,15 @@ impl<T> ConfigWrapper<T> {
             attribs: self.attribs,
         }
     }
+}
 
+impl Config {
     /// Turns the `config` parameter into another type.
     #[inline]
-    pub(crate) fn with_config<T2>(&self, config: T2) -> ConfigWrapper<T2> {
+    pub(crate) fn as_ref(&self) -> ConfigWrapper<&platform_impl::Config, &ConfigAttribs> {
         ConfigWrapper {
-            config,
-            attribs: self.attribs.clone(),
+            config: &self.config,
+            attribs: &self.attribs,
         }
     }
 }
@@ -192,9 +207,11 @@ pub struct ConfigBuilder {
     pub vsync: Option<bool>,
 
     /// FIXME: missing docs
-    pub pbuffer_support: bool,
+    pub pbuffer_surface_support: bool,
     /// FIXME: missing docs
     pub window_surface_support: bool,
+    /// FIXME: missing docs
+    pub pixmap_surface_support: bool,
 
     pub plat_attr: platform_impl::SurfacePlatformAttributes,
 }
@@ -215,7 +232,8 @@ impl Default for ConfigBuilder {
             stereoscopy: false,
             srgb: None,
             vsync: None,
-            pbuffer_support: false,
+            pbuffer_surface_support: false,
+            pixmap_surface_support: false,
             window_surface_support: true,
             release_behavior: ReleaseBehavior::Flush,
             plat_attr: Default::default(),
@@ -277,8 +295,8 @@ impl ConfigBuilder {
 
     /// Request the backend to be stereoscopic.
     #[inline]
-    pub fn with_stereoscopy(mut self) -> Self {
-        self.stereoscopy = true;
+    pub fn with_stereoscopy(mut self, stereo: bool) -> Self {
+        self.stereoscopy = stereo;
         self
     }
 
@@ -301,17 +319,20 @@ impl ConfigBuilder {
     }
 
     #[inline]
-    pub fn with_pbuffer_support(mut self, pbuffer_support: bool) -> Self {
-        self.pbuffer_support = pbuffer_support;
+    pub fn with_pbuffer_surface_support(mut self, pbss: bool) -> Self {
+        self.pbuffer_surface_support = pbss;
         self
     }
 
     #[inline]
-    pub fn with_window_surface_support(
-        mut self,
-        window_surface_support: bool,
-    ) -> Self {
-        self.window_surface_support = window_surface_support;
+    pub fn with_pixmap_surface_support(mut self, pss: bool) -> Self {
+        self.pixmap_surface_support = pss;
+        self
+    }
+
+    #[inline]
+    pub fn with_window_surface_support(mut self, wss: bool) -> Self {
+        self.window_surface_support = wss;
         self
     }
 
@@ -327,8 +348,8 @@ impl ConfigBuilder {
     ///   * Unix operating systems using GLX with X
     ///   * Windows using WGL
     #[inline]
-    pub fn with_double_buffer(mut self, double_buffer: Option<bool>) -> Self {
-        self.double_buffer = double_buffer;
+    pub fn with_double_buffer(mut self, db: Option<bool>) -> Self {
+        self.double_buffer = db;
         self
     }
 
@@ -345,18 +366,14 @@ impl ConfigBuilder {
     ///   * Windows using EGL or WGL
     ///   * Android using EGL
     #[inline]
-    pub fn with_hardware_acceleration(
-        mut self,
-        acceleration: Option<bool>,
-    ) -> Self {
-        self.hardware_accelerated = acceleration;
+    pub fn with_hardware_acceleration(mut self, accel: Option<bool>) -> Self {
+        self.hardware_accelerated = accel;
         self
     }
 
     #[inline]
-    pub fn build(self, el: &Display) -> Result<Config, CreationError> {
-        platform_impl::Config::new(el, self)
+    pub fn build(self, disp: &Display) -> Result<Config, Error> {
+        platform_impl::Config::new(&disp.0, self)
             .map(|(attribs, config)| Config { attribs, config })
     }
 }
-

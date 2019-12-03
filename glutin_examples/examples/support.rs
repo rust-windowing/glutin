@@ -54,8 +54,7 @@ where
         gl.BindBuffer(gl::ARRAY_BUFFER, vb);
         gl.BufferData(
             gl::ARRAY_BUFFER,
-            (VERTEX_DATA.len() * std::mem::size_of::<f32>())
-                as gl::types::GLsizeiptr,
+            (VERTEX_DATA.len() * std::mem::size_of::<f32>()) as gl::types::GLsizeiptr,
             VERTEX_DATA.as_ptr() as *const _,
             gl::STATIC_DRAW,
         );
@@ -66,10 +65,8 @@ where
             gl.BindVertexArray(vao);
         }
 
-        let pos_attrib =
-            gl.GetAttribLocation(program, b"position\0".as_ptr() as *const _);
-        let color_attrib =
-            gl.GetAttribLocation(program, b"color\0".as_ptr() as *const _);
+        let pos_attrib = gl.GetAttribLocation(program, b"position\0".as_ptr() as *const _);
+        let color_attrib = gl.GetAttribLocation(program, b"color\0".as_ptr() as *const _);
         gl.VertexAttribPointer(
             pos_attrib as gl::types::GLuint,
             2,

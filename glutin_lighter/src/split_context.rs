@@ -100,10 +100,7 @@ pub mod ContextIsCurrent {
     ///
     /// FIXME: Docs outdated
     pub trait ContextIsCurrentTrait: Debug + Clone + Copy {}
-    pub trait ContextIsCurrentYesTrait:
-        ContextIsCurrentTrait + Debug + Clone + Copy
-    {
-    }
+    pub trait ContextIsCurrentYesTrait: ContextIsCurrentTrait + Debug + Clone + Copy {}
 
     // This is nightly only:
     // impl !Send for Context<PossiblyCurrent> {}
@@ -170,11 +167,8 @@ impl<
     }
 }
 
-impl<
-        IC: ContextIsCurrentTrait,
-        PBT: SupportsPBuffersTrait,
-        ST: SupportsSurfacelessTrait,
-    > SplitContext<IC, PBT, SupportsWindowSurfaces::Yes, ST>
+impl<IC: ContextIsCurrentTrait, PBT: SupportsPBuffersTrait, ST: SupportsSurfacelessTrait>
+    SplitContext<IC, PBT, SupportsWindowSurfaces::Yes, ST>
 {
     /// Sets this context as the current context. The previously current context
     /// (if any) is no longer current.
@@ -272,13 +266,8 @@ impl<
     pub fn unify_with_window<W, IU: SurfaceInUseTrait>(
         self,
         surface: LighterWindowSurfaceWrapper<W, IU>,
-    ) -> UnifiedContext<
-        IC,
-        PBT,
-        SupportsWindowSurfaces::Yes,
-        ST,
-        LighterWindowSurfaceWrapper<W, IU>,
-    > {
+    ) -> UnifiedContext<IC, PBT, SupportsWindowSurfaces::Yes, ST, LighterWindowSurfaceWrapper<W, IU>>
+    {
         UnifiedContext {
             context: self,
             surface,
@@ -286,11 +275,8 @@ impl<
     }
 }
 
-impl<
-        IC: ContextIsCurrentTrait,
-        WST: SupportsWindowSurfacesTrait,
-        ST: SupportsSurfacelessTrait,
-    > SplitContext<IC, SupportsPBuffers::Yes, WST, ST>
+impl<IC: ContextIsCurrentTrait, WST: SupportsWindowSurfacesTrait, ST: SupportsSurfacelessTrait>
+    SplitContext<IC, SupportsPBuffers::Yes, WST, ST>
 {
     #[inline]
     pub unsafe fn make_current_pbuffer<IU: SurfaceInUseTrait>(
@@ -298,21 +284,11 @@ impl<
         pbuffer: LighterPBuffer<IU>,
     ) -> Result<
         (
-            SplitContext<
-                ContextIsCurrent::Possibly,
-                SupportsPBuffers::Yes,
-                WST,
-                ST,
-            >,
+            SplitContext<ContextIsCurrent::Possibly, SupportsPBuffers::Yes, WST, ST>,
             LighterPBuffer<SurfaceInUse::Possibly>,
         ),
         (
-            SplitContext<
-                ContextIsCurrent::PossiblyAndSurfaceBound,
-                SupportsPBuffers::Yes,
-                WST,
-                ST,
-            >,
+            SplitContext<ContextIsCurrent::PossiblyAndSurfaceBound, SupportsPBuffers::Yes, WST, ST>,
             LighterPBuffer<SurfaceInUse::Possibly>,
             ContextError,
         ),
@@ -334,8 +310,7 @@ impl<
     pub fn unify_with_pbuffer<IU: SurfaceInUseTrait>(
         self,
         pbuffer: LighterPBuffer<IU>,
-    ) -> UnifiedContext<IC, SupportsPBuffers::Yes, WST, ST, LighterPBuffer<IU>>
-    {
+    ) -> UnifiedContext<IC, SupportsPBuffers::Yes, WST, ST, LighterPBuffer<IU>> {
         UnifiedContext {
             context: self,
             surface: pbuffer,
@@ -343,22 +318,14 @@ impl<
     }
 }
 
-impl<
-        IC: ContextIsCurrentTrait,
-        PBT: SupportsPBuffersTrait,
-        WST: SupportsWindowSurfacesTrait,
-    > SplitContext<IC, PBT, WST, SupportsSurfaceless::Yes>
+impl<IC: ContextIsCurrentTrait, PBT: SupportsPBuffersTrait, WST: SupportsWindowSurfacesTrait>
+    SplitContext<IC, PBT, WST, SupportsSurfaceless::Yes>
 {
     #[inline]
     pub unsafe fn make_current_surfaceless(
         self,
     ) -> Result<
-        SplitContext<
-            ContextIsCurrent::Possibly,
-            PBT,
-            WST,
-            SupportsSurfaceless::Yes,
-        >,
+        SplitContext<ContextIsCurrent::Possibly, PBT, WST, SupportsSurfaceless::Yes>,
         (
             SplitContext<
                 ContextIsCurrent::PossiblyAndSurfaceBound,
@@ -437,12 +404,7 @@ impl<
     ) -> Result<
         SplitContext<ContextIsCurrent::No, PBT, WST, ST>,
         (
-            SplitContext<
-                ContextIsCurrent::PossiblyAndSurfaceBound,
-                PBT,
-                WST,
-                ST,
-            >,
+            SplitContext<ContextIsCurrent::PossiblyAndSurfaceBound, PBT, WST, ST>,
             ContextError,
         ),
     > {
@@ -468,9 +430,7 @@ impl<
     /// [`make_current_surface`]:
     /// struct.Context.html#method.make_current_surface
     #[inline]
-    pub unsafe fn treat_as_not_current(
-        self,
-    ) -> SplitContext<ContextIsCurrent::No, PBT, WST, ST> {
+    pub unsafe fn treat_as_not_current(self) -> SplitContext<ContextIsCurrent::No, PBT, WST, ST> {
         SplitContext {
             context: self.context,
             phantom: PhantomData,
@@ -504,12 +464,7 @@ impl<
 }
 
 impl<PBT: SupportsPBuffersTrait, ST: SupportsSurfacelessTrait>
-    SplitContext<
-        ContextIsCurrent::PossiblyAndSurfaceBound,
-        PBT,
-        SupportsWindowSurfaces::Yes,
-        ST,
-    >
+    SplitContext<ContextIsCurrent::PossiblyAndSurfaceBound, PBT, SupportsWindowSurfaces::Yes, ST>
 {
     /// Update the context after the underlying surface resizes.
     ///
@@ -596,10 +551,7 @@ pub trait LighterContextBuilderTrait {
         _pbuffer_support: PBT2,
         _window_surface_support: WST2,
         _surfaceless_support: ST2,
-    ) -> Result<
-        SplitContext<ContextIsCurrent::No, PBT2, WST2, ST2>,
-        CreationError,
-    >;
+    ) -> Result<SplitContext<ContextIsCurrent::No, PBT2, WST2, ST2>, CreationError>;
 }
 
 impl<
@@ -608,8 +560,7 @@ impl<
         PBT: SupportsPBuffersTrait,
         WST: SupportsWindowSurfacesTrait,
         ST: SupportsSurfacelessTrait,
-    > LighterContextBuilderTrait
-    for LighterContextBuilder<'a, IC, PBT, WST, ST>
+    > LighterContextBuilderTrait for LighterContextBuilder<'a, IC, PBT, WST, ST>
 {
     #[inline]
     fn build_lighter<
@@ -623,10 +574,7 @@ impl<
         _pbuffer_support: PBT2,
         _window_surface_support: WST2,
         _surfaceless_support: ST2,
-    ) -> Result<
-        SplitContext<ContextIsCurrent::No, PBT2, WST2, ST2>,
-        CreationError,
-    > {
+    ) -> Result<SplitContext<ContextIsCurrent::No, PBT2, WST2, ST2>, CreationError> {
         let mut ctx_supports: ContextSupports = Default::default();
         if PBT2::supported() {
             ctx_supports = ctx_supports | ContextSupports::PBUFFERS

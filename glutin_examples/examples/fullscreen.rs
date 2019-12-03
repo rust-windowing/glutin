@@ -1,8 +1,6 @@
 mod support;
 
-use glutin::event::{
-    ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent,
-};
+use glutin::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use glutin::event_loop::{ControlFlow, EventLoop};
 use glutin::monitor::MonitorHandle;
 use glutin::window::WindowBuilder;
@@ -19,9 +17,7 @@ fn main() {
         // On macOS there are two fullscreen modes "native" and "simple"
         #[cfg(target_os = "macos")]
         {
-            print!(
-                "Please choose the fullscreen mode: (1) native, (2) simple: "
-            );
+            print!("Please choose the fullscreen mode: (1) native, (2) simple: ");
             std::io::stdout().flush().unwrap();
 
             let mut num = String::new();
@@ -68,16 +64,13 @@ fn main() {
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::Resized(logical_size) => {
                     let dpi_factor = windowed_context.window().hidpi_factor();
-                    windowed_context
-                        .resize(logical_size.to_physical(dpi_factor));
+                    windowed_context.resize(logical_size.to_physical(dpi_factor));
                 }
                 WindowEvent::RedrawRequested => {
                     gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
                     windowed_context.swap_buffers().unwrap();
                 }
-                WindowEvent::CloseRequested => {
-                    *control_flow = ControlFlow::Exit
-                }
+                WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                 WindowEvent::KeyboardInput {
                     input:
                         KeyboardInput {
@@ -87,9 +80,7 @@ fn main() {
                         },
                     ..
                 } => match (virtual_code, state) {
-                    (VirtualKeyCode::Escape, _) => {
-                        *control_flow = ControlFlow::Exit
-                    }
+                    (VirtualKeyCode::Escape, _) => *control_flow = ControlFlow::Exit,
                     (VirtualKeyCode::F, ElementState::Pressed) => {
                         #[cfg(target_os = "macos")]
                         {
@@ -109,9 +100,9 @@ fn main() {
                         if !is_fullscreen {
                             windowed_context.window().set_fullscreen(None);
                         } else {
-                            windowed_context.window().set_fullscreen(Some(
-                                windowed_context.window().current_monitor(),
-                            ));
+                            windowed_context
+                                .window()
+                                .set_fullscreen(Some(windowed_context.window().current_monitor()));
                         }
                     }
                     (VirtualKeyCode::M, ElementState::Pressed) => {

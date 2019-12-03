@@ -2,12 +2,7 @@
 
 use crate::platform::ContextTraitExt;
 use crate::{Context, ContextCurrentState};
-use crate::{
-    SupportsPBuffersTrait, SupportsSurfacelessTrait,
-    SupportsWindowSurfacesTrait,
-};
-
-pub use winit::platform::ios::*;
+use crate::{SupportsPBuffersTrait, SupportsSurfacelessTrait, SupportsWindowSurfacesTrait};
 
 use std::os::raw;
 

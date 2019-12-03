@@ -1,9 +1,9 @@
 pub use glutin::platform::unix::osmesa::*;
 
 use crate::{
-    Api, ContextBuilderWrapper, ContextError, ContextIsCurrent,
-    ContextIsCurrentTrait, ContextIsCurrentYesTrait, CreationError,
-    LighterSurface, PixelFormat, SurfaceInUse, SurfaceInUseTrait,
+    Api, ContextBuilderWrapper, ContextError, ContextIsCurrent, ContextIsCurrentTrait,
+    ContextIsCurrentYesTrait, CreationError, LighterSurface, PixelFormat, SurfaceInUse,
+    SurfaceInUseTrait,
 };
 
 use glutin::dpi;
@@ -30,13 +30,9 @@ pub trait LighterOsMesaContextExt {
         Self: Sized;
 }
 
-impl<'a, T: ContextIsCurrentTrait> LighterOsMesaContextExt
-    for LighterOsMesaContextBuilder<'a, T>
-{
+impl<'a, T: ContextIsCurrentTrait> LighterOsMesaContextExt for LighterOsMesaContextBuilder<'a, T> {
     #[inline]
-    fn build_osmesa_lighter(
-        self,
-    ) -> Result<SplitOsMesaContext<ContextIsCurrent::No>, CreationError>
+    fn build_osmesa_lighter(self) -> Result<SplitOsMesaContext<ContextIsCurrent::No>, CreationError>
     where
         Self: Sized,
     {
@@ -48,8 +44,7 @@ impl<'a, T: ContextIsCurrentTrait> LighterOsMesaContextExt
     }
 }
 
-pub type LighterOsMesaContextBuilder<'a, IC> =
-    ContextBuilderWrapper<&'a SplitOsMesaContext<IC>>;
+pub type LighterOsMesaContextBuilder<'a, IC> = ContextBuilderWrapper<&'a SplitOsMesaContext<IC>>;
 
 #[derive(Debug)]
 pub struct SplitOsMesaContext<IC: ContextIsCurrentTrait> {
@@ -89,16 +84,13 @@ impl<IC: ContextIsCurrentTrait> SplitOsMesaContext<IC> {
     > {
         match self.context.make_current_osmesa_buffer(buffer.inner()) {
             Ok(()) => Ok((self.treat_as_current(), buffer.treat_as_current())),
-            Err(err) => {
-                Err((self.treat_as_current(), buffer.treat_as_current(), err))
-            }
+            Err(err) => Err((self.treat_as_current(), buffer.treat_as_current(), err)),
         }
     }
 
     pub unsafe fn make_not_current(
         self,
-    ) -> Result<SplitOsMesaContext<ContextIsCurrent::No>, (Self, ContextError)>
-    {
+    ) -> Result<SplitOsMesaContext<ContextIsCurrent::No>, (Self, ContextError)> {
         match self.context.make_not_current() {
             Ok(()) => Ok(SplitOsMesaContext {
                 context: self.context,
@@ -108,18 +100,14 @@ impl<IC: ContextIsCurrentTrait> SplitOsMesaContext<IC> {
         }
     }
 
-    pub unsafe fn treat_as_current<IC2: ContextIsCurrentYesTrait>(
-        self,
-    ) -> SplitOsMesaContext<IC2> {
+    pub unsafe fn treat_as_current<IC2: ContextIsCurrentYesTrait>(self) -> SplitOsMesaContext<IC2> {
         SplitOsMesaContext {
             context: self.context,
             phantom: PhantomData,
         }
     }
 
-    pub unsafe fn treat_as_not_current(
-        self,
-    ) -> SplitOsMesaContext<ContextIsCurrent::No> {
+    pub unsafe fn treat_as_not_current(self) -> SplitOsMesaContext<ContextIsCurrent::No> {
         SplitOsMesaContext {
             context: self.context,
             phantom: PhantomData,
@@ -180,8 +168,7 @@ impl<IU: SurfaceInUseTrait> LighterSurface for LighterOsMesaBuffer<IU> {
 
     unsafe fn make_not_current(
         self,
-    ) -> Result<Self::NotInUseType, (Self::PossiblyInUseType, ContextError)>
-    {
+    ) -> Result<Self::NotInUseType, (Self::PossiblyInUseType, ContextError)> {
         panic!("This cannot be implemented with OsMesa.")
     }
 }
@@ -200,62 +187,39 @@ impl<IU: SurfaceInUseTrait> LighterOsMesaBuffer<IU> {
 }
 
 #[derive(Debug)]
-pub struct UnifiedOsMesaContext<
-    IC: ContextIsCurrentTrait,
-    IU: SurfaceInUseTrait,
-> {
+pub struct UnifiedOsMesaContext<IC: ContextIsCurrentTrait, IU: SurfaceInUseTrait> {
     pub(crate) context: SplitOsMesaContext<IC>,
     pub(crate) buffer: LighterOsMesaBuffer<IU>,
 }
 
-impl<IC: ContextIsCurrentTrait, IU: SurfaceInUseTrait>
-    UnifiedOsMesaContext<IC, IU>
-{
+impl<IC: ContextIsCurrentTrait, IU: SurfaceInUseTrait> UnifiedOsMesaContext<IC, IU> {
     pub unsafe fn make_current(
         self,
     ) -> Result<
-        UnifiedOsMesaContext<
-            ContextIsCurrent::Possibly,
-            SurfaceInUse::Possibly,
-        >,
+        UnifiedOsMesaContext<ContextIsCurrent::Possibly, SurfaceInUse::Possibly>,
         (
-            UnifiedOsMesaContext<
-                ContextIsCurrent::Possibly,
-                SurfaceInUse::Possibly,
-            >,
+            UnifiedOsMesaContext<ContextIsCurrent::Possibly, SurfaceInUse::Possibly>,
             ContextError,
         ),
     > {
         match self.context.make_current_osmesa_buffer(self.buffer) {
-            Ok((context, buffer)) => {
-                Ok(UnifiedOsMesaContext { context, buffer })
-            }
-            Err((context, buffer, err)) => {
-                Err((UnifiedOsMesaContext { context, buffer }, err))
-            }
+            Ok((context, buffer)) => Ok(UnifiedOsMesaContext { context, buffer }),
+            Err((context, buffer, err)) => Err((UnifiedOsMesaContext { context, buffer }, err)),
         }
     }
 }
 
-impl<IC: ContextIsCurrentTrait, IU: SurfaceInUseTrait>
-    UnifiedOsMesaContext<IC, IU>
-{
+impl<IC: ContextIsCurrentTrait, IU: SurfaceInUseTrait> UnifiedOsMesaContext<IC, IU> {
     pub unsafe fn make_current_osmesa_buffer<IU2: SurfaceInUseTrait>(
         self,
         buffer: LighterOsMesaBuffer<IU2>,
     ) -> Result<
         (
-            UnifiedOsMesaContext<
-                ContextIsCurrent::Possibly,
-                SurfaceInUse::Possibly,
-            >,
+            UnifiedOsMesaContext<ContextIsCurrent::Possibly, SurfaceInUse::Possibly>,
             LighterOsMesaBuffer<SurfaceInUse::No>,
         ),
         (
-            UnifiedOsMesaContext<
-                ContextIsCurrent::Possibly,
-                SurfaceInUse::Possibly,
-            >,
+            UnifiedOsMesaContext<ContextIsCurrent::Possibly, SurfaceInUse::Possibly>,
             LighterOsMesaBuffer<SurfaceInUse::Possibly>,
             ContextError,
         ),

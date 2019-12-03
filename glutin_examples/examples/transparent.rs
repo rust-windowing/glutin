@@ -37,17 +37,13 @@ fn main() {
                 WindowEvent::Resized(logical_size) => {
                     let dpi_factor = win.hidpi_factor();
                     ctx.update_after_resize();
-                    surface.update_after_resize(
-                        logical_size.to_physical(dpi_factor),
-                    );
+                    surface.update_after_resize(logical_size.to_physical(dpi_factor));
                 }
                 WindowEvent::RedrawRequested => {
                     gl.draw_frame([0.0; 4]);
                     surface.swap_buffers().unwrap();
                 }
-                WindowEvent::CloseRequested => {
-                    *control_flow = ControlFlow::Exit
-                }
+                WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                 _ => (),
             },
             _ => (),

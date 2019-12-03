@@ -1,90 +1,70 @@
-use super::*;
+use crate::config::Api;
 use crate::config::Config;
 use crate::display::Display;
-use crate::surface::{PBuffer, WindowSurface};
-use crate::config::Api;
+use crate::platform_impl;
+use crate::surface::{Surface, SurfaceTypeTrait};
+
 use std::ffi::c_void;
 
+use winit_types::error::Error;
+
 #[derive(Debug)]
-pub struct Context {
-    pub(crate) context: platform_impl::Context,
-}
+pub struct Context(pub(crate) platform_impl::Context);
 
 impl Context {
     #[inline]
-    pub(crate) fn inner(&self) -> &platform_impl::Context {
-        &self.context
+    pub unsafe fn make_current_surfaceless(&self) -> Result<(), Error> {
+        self.0.make_current_surfaceless()
     }
 
     #[inline]
-    pub unsafe fn make_current_surfaceless(&self) -> Result<(), ContextError> {
-        self.context.make_current_surfaceless()
+    pub unsafe fn make_current<T: SurfaceTypeTrait>(&self, surf: &Surface<T>) -> Result<(), Error> {
+        self.0.make_current(&surf.0)
     }
 
     #[inline]
-    pub unsafe fn make_current_surface(
-        &self,
-        surface: &WindowSurface,
-    ) -> Result<(), ContextError> {
-        self.context.make_current_surface(surface.inner())
-    }
-
-    #[inline]
-    pub unsafe fn make_current_pbuffer(
-        &self,
-        pbuffer: &PBuffer,
-    ) -> Result<(), ContextError> {
-        self.context.make_current_pbuffer(pbuffer.inner())
-    }
-
-    #[inline]
-    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
-        self.context.make_not_current()
+    pub unsafe fn make_not_current(&self) -> Result<(), Error> {
+        self.0.make_not_current()
     }
 
     #[inline]
     pub fn is_current(&self) -> bool {
-        self.context.is_current()
+        self.0.is_current()
     }
 
     #[inline]
     pub fn get_config(&self) -> Config {
-        self.context.get_config()
+        self.0.get_config()
     }
 
     #[inline]
     pub fn get_api(&self) -> Api {
-        self.context.get_api()
+        self.0.get_api()
     }
 
     #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const c_void {
-        self.context.get_proc_address(addr)
+        self.0.get_proc_address(addr)
     }
 
     #[inline]
     pub fn update_after_resize(&self) {
         #[cfg(target_os = "macos")]
-        self.context.update_after_resize()
+        self.0.update_after_resize()
     }
 }
 
 impl<'a> ContextBuilder<'a> {
     #[inline]
-    pub fn build<TE>(
+    pub fn build(
         self,
         disp: &Display,
         supports_surfaceless: bool,
         conf: &Config,
-    ) -> Result<Context, CreationError> {
-        let cb = self.map_sharing(|ctx| &ctx.context);
-        platform_impl::Context::new(
-            &disp.display,
-            cb,
-            supports_surfaceless,
-            conf.with_config(&conf.config),
-        )
-        .map(|context| Context { context })
+    ) -> Result<Context, Error> {
+        let cb = self.map_sharing(|ctx| &ctx.0);
+        platform_impl::Context::new(&disp.0, cb, supports_surfaceless, conf.as_ref())
+            .map(Context)
     }
 }
 
@@ -151,10 +131,7 @@ impl<T> ContextBuilderWrapper<T> {
 
     /// Turns the `sharing` parameter into another type.
     #[inline]
-    pub(crate) fn set_sharing<T2>(
-        self,
-        sharing: Option<T2>,
-    ) -> ContextBuilderWrapper<T2> {
+    pub(crate) fn set_sharing<T2>(self, sharing: Option<T2>) -> ContextBuilderWrapper<T2> {
         ContextBuilderWrapper {
             sharing,
             profile: self.profile,
@@ -224,43 +201,6 @@ impl<T> ContextBuilderWrapper<T> {
     #[inline]
     pub fn with_shared_lists<T2>(self, other: T2) -> ContextBuilderWrapper<T2> {
         self.set_sharing(Some(other.into()))
-    }
-}
-
-/// Error that can happen when manipulating an OpenGL [`Context`].
-///
-/// [`Context`]: struct.Context.html
-#[derive(Debug)]
-pub enum ContextError {
-    /// General platform error.
-    OsError(String),
-    IoError(io::Error),
-    ContextLost,
-}
-
-impl ContextError {
-    fn to_string(&self) -> &str {
-        use std::error::Error;
-        match *self {
-            ContextError::OsError(ref string) => string,
-            ContextError::IoError(ref err) => err.description(),
-            ContextError::ContextLost => "Context lost",
-        }
-    }
-}
-
-impl std::fmt::Display for ContextError {
-    fn fmt(
-        &self,
-        formatter: &mut std::fmt::Formatter,
-    ) -> Result<(), std::fmt::Error> {
-        formatter.write_str(self.to_string())
-    }
-}
-
-impl std::error::Error for ContextError {
-    fn description(&self) -> &str {
-        self.to_string()
     }
 }
 

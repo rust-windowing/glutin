@@ -10,8 +10,7 @@ fn main() {
     let el = EventLoop::new();
     let wb = WindowBuilder::new().with_title("A fantastic window!");
 
-    let windowed_context =
-        ContextBuilder::new().build_windowed(wb, &el).unwrap();
+    let windowed_context = ContextBuilder::new().build_windowed(wb, &el).unwrap();
 
     let windowed_context = unsafe { windowed_context.make_current().unwrap() };
 
@@ -31,16 +30,13 @@ fn main() {
             Event::WindowEvent { ref event, .. } => match event {
                 WindowEvent::Resized(logical_size) => {
                     let dpi_factor = windowed_context.window().hidpi_factor();
-                    windowed_context
-                        .resize(logical_size.to_physical(dpi_factor));
+                    windowed_context.resize(logical_size.to_physical(dpi_factor));
                 }
                 WindowEvent::RedrawRequested => {
                     gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
                     windowed_context.swap_buffers().unwrap();
                 }
-                WindowEvent::CloseRequested => {
-                    *control_flow = ControlFlow::Exit
-                }
+                WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                 _ => (),
             },
             _ => (),

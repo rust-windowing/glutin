@@ -30,8 +30,7 @@ impl LighterSurfaceOrNothing for () {
     #[inline]
     unsafe fn make_not_current(
         self,
-    ) -> Result<Self::NotInUseType, (Self::PossiblyInUseType, ContextError)>
-    {
+    ) -> Result<Self::NotInUseType, (Self::PossiblyInUseType, ContextError)> {
         Ok(())
     }
 }
@@ -52,8 +51,7 @@ impl<T: LighterSurface> LighterSurfaceOrNothing for T {
     #[inline]
     unsafe fn make_not_current(
         self,
-    ) -> Result<Self::NotInUseType, (Self::PossiblyInUseType, ContextError)>
-    {
+    ) -> Result<Self::NotInUseType, (Self::PossiblyInUseType, ContextError)> {
         self.make_not_current()
     }
 }
@@ -110,13 +108,7 @@ impl<
     pub unsafe fn make_not_current(
         self,
     ) -> Result<
-        UnifiedContext<
-            ContextIsCurrent::No,
-            PBT,
-            WST,
-            ST,
-            SURFACE::NotInUseType,
-        >,
+        UnifiedContext<ContextIsCurrent::No, PBT, WST, ST, SURFACE::NotInUseType>,
         (
             UnifiedContext<
                 ContextIsCurrent::PossiblyAndSurfaceBound,
@@ -142,9 +134,7 @@ impl<
             Err((context, err)) => Err((
                 UnifiedContext {
                     context,
-                    surface: LighterSurfaceOrNothing::treat_as_current(
-                        self.surface,
-                    ),
+                    surface: LighterSurfaceOrNothing::treat_as_current(self.surface),
                 },
                 err,
             )),
@@ -196,9 +186,7 @@ impl<
     > {
         match self.context.make_current_pbuffer(self.surface) {
             Ok((context, surface)) => Ok(UnifiedContext { context, surface }),
-            Err((context, surface, err)) => {
-                Err((UnifiedContext { context, surface }, err))
-            }
+            Err((context, surface, err)) => Err((UnifiedContext { context, surface }, err)),
         }
     }
 }
@@ -209,14 +197,7 @@ impl<
         ST: SupportsSurfacelessTrait,
         IU: SurfaceInUseTrait,
         W,
-    >
-    UnifiedContext<
-        IC,
-        PBT,
-        SupportsWindowSurfaces::Yes,
-        ST,
-        LighterWindowSurfaceWrapper<W, IU>,
-    >
+    > UnifiedContext<IC, PBT, SupportsWindowSurfaces::Yes, ST, LighterWindowSurfaceWrapper<W, IU>>
 {
     #[inline]
     pub unsafe fn make_current(
@@ -242,30 +223,19 @@ impl<
     > {
         match self.context.make_current_surface(self.surface) {
             Ok((context, surface)) => Ok(UnifiedContext { context, surface }),
-            Err((context, surface, err)) => {
-                Err((UnifiedContext { context, surface }, err))
-            }
+            Err((context, surface, err)) => Err((UnifiedContext { context, surface }, err)),
         }
     }
 }
 
-impl<
-        IC: ContextIsCurrentTrait,
-        PBT: SupportsPBuffersTrait,
-        WST: SupportsWindowSurfacesTrait,
-    > UnifiedContext<IC, PBT, WST, SupportsSurfaceless::Yes, ()>
+impl<IC: ContextIsCurrentTrait, PBT: SupportsPBuffersTrait, WST: SupportsWindowSurfacesTrait>
+    UnifiedContext<IC, PBT, WST, SupportsSurfaceless::Yes, ()>
 {
     #[inline]
     pub unsafe fn make_current(
         self,
     ) -> Result<
-        UnifiedContext<
-            ContextIsCurrent::Possibly,
-            PBT,
-            WST,
-            SupportsSurfaceless::Yes,
-            (),
-        >,
+        UnifiedContext<ContextIsCurrent::Possibly, PBT, WST, SupportsSurfaceless::Yes, ()>,
         (
             UnifiedContext<
                 ContextIsCurrent::PossiblyAndSurfaceBound,

@@ -1,9 +1,9 @@
 use crate::api::osmesa;
-use crate::context::{ContextBuilderWrapper, ContextError};
-use crate::CreationError;
 use crate::config::{Api, GlRequest};
+use crate::context::ContextBuilderWrapper;
 
-use winit::dpi;
+use winit_types::dpi;
+use winit_types::error::Error;
 
 use std::ffi::c_void;
 
@@ -13,14 +13,14 @@ pub struct OsMesaContext {
 }
 
 pub trait OsMesaContextExt {
-    fn build_osmesa(self, version: GlRequest) -> Result<OsMesaContext, CreationError>
+    fn build_osmesa(self, version: GlRequest) -> Result<OsMesaContext, Error>
     where
         Self: Sized;
 }
 
 impl<'a> OsMesaContextExt for OsMesaContextBuilder<'a> {
     #[inline]
-    fn build_osmesa(self, version: GlRequest) -> Result<OsMesaContext, CreationError>
+    fn build_osmesa(self, version: GlRequest) -> Result<OsMesaContext, Error>
     where
         Self: Sized,
     {
@@ -50,14 +50,11 @@ impl OsMesaContext {
         self.context.get_api()
     }
 
-    pub unsafe fn make_current_osmesa_buffer(
-        &self,
-        buffer: &OsMesaBuffer,
-    ) -> Result<(), ContextError> {
+    pub unsafe fn make_current_osmesa_buffer(&self, buffer: &OsMesaBuffer) -> Result<(), Error> {
         self.context.make_current_osmesa_buffer(buffer.inner())
     }
 
-    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
+    pub unsafe fn make_not_current(&self) -> Result<(), Error> {
         self.context.make_not_current()
     }
 
@@ -71,12 +68,8 @@ impl OsMesaBuffer {
         &self.buffer
     }
 
-    pub fn new(
-        ctx: &OsMesaContext,
-        size: dpi::PhysicalSize,
-    ) -> Result<OsMesaBuffer, CreationError> {
+    pub fn new(ctx: &OsMesaContext, size: dpi::PhysicalSize) -> Result<OsMesaBuffer, Error> {
         let ctx = ctx.inner();
-        osmesa::OsMesaBuffer::new(ctx, size)
-            .map(|buffer| OsMesaBuffer { buffer })
+        osmesa::OsMesaBuffer::new(ctx, size).map(|buffer| OsMesaBuffer { buffer })
     }
 }

@@ -1,7 +1,7 @@
 [package]
 name = "glutin_lighter"
 version = "0.1.0-alpha1"
-authors = ["The glutin contributors", "Hal Gentz <zegentzy@protonmail.com>"]
+authors = ["The glutin contributors", "Freya Gentz <zegentzy@protonmail.com>"]
 description = "A thin abstraction layer for glutin that hopes to stop users from falling into common pitfalls."
 repository = "https://github.com/rust-windowing/glutin"
 license = "Apache-2.0"

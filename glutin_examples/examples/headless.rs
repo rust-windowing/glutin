@@ -3,8 +3,7 @@ mod support;
 use glutin::dpi::PhysicalSize;
 use glutin::event_loop::EventLoop;
 use glutin::{
-    Context, ContextBuilder, ContextCurrentState, CreationError, GlProfile,
-    GlRequest, NotCurrent,
+    Context, ContextBuilder, ContextCurrentState, CreationError, GlProfile, GlRequest, NotCurrent,
 };
 use std::path::Path;
 use support::gl;

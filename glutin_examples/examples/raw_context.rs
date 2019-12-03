@@ -40,9 +40,7 @@ mod this_example {
 
             #[cfg(target_os = "linux")]
             unsafe {
-                use glutin::platform::unix::{
-                    EventLoopExtUnix, RawContextExt, WindowExtUnix,
-                };
+                use glutin::platform::unix::{EventLoopExtUnix, RawContextExt, WindowExtUnix};
 
                 if el.is_wayland() {
                     let win = wb.build(&el).unwrap();
@@ -50,17 +48,11 @@ mod this_example {
                     let size = win.inner_size().to_physical(dpi_factor);
                     let (width, height): (u32, u32) = size.into();
 
-                    let display_ptr =
-                        win.wayland_display().unwrap() as *const _;
+                    let display_ptr = win.wayland_display().unwrap() as *const _;
                     let surface = win.wayland_surface().unwrap();
 
                     let raw_context = ContextBuilder::new()
-                        .build_raw_wayland_context(
-                            display_ptr,
-                            surface,
-                            width,
-                            height,
-                        )
+                        .build_raw_wayland_context(display_ptr, surface, width, height)
                         .unwrap();
 
                     (raw_context, el, win)
@@ -98,13 +90,10 @@ File a PR if you are interested in implementing the latter.
             #[cfg(target_os = "windows")]
             unsafe {
                 let win = wb.build(&el).unwrap();
-                use glutin::platform::windows::{
-                    RawContextExt, WindowExtWindows,
-                };
+                use glutin::platform::windows::{RawContextExt, WindowExtWindows};
 
                 let hwnd = win.hwnd();
-                let raw_context =
-                    ContextBuilder::new().build_raw_context(hwnd).unwrap();
+                let raw_context = ContextBuilder::new().build_raw_context(hwnd).unwrap();
 
                 (raw_context, el, win)
             }
@@ -132,8 +121,7 @@ File a PR if you are interested in implementing the latter.
                 Event::WindowEvent { ref event, .. } => match event {
                     WindowEvent::Resized(logical_size) => {
                         let dpi_factor = win.hidpi_factor();
-                        raw_context
-                            .resize(logical_size.to_physical(dpi_factor));
+                        raw_context.resize(logical_size.to_physical(dpi_factor));
                     }
                     WindowEvent::RedrawRequested => {
                         gl.draw_frame(if transparency {
@@ -143,9 +131,7 @@ File a PR if you are interested in implementing the latter.
                         });
                         raw_context.swap_buffers().unwrap();
                     }
-                    WindowEvent::CloseRequested => {
-                        *control_flow = ControlFlow::Exit
-                    }
+                    WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                     _ => (),
                 },
                 _ => (),

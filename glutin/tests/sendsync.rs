@@ -9,8 +9,7 @@ impl<
         PBT: SupportsPBuffersTrait,
         WST: SupportsWindowSurfacesTrait,
         ST: SupportsSurfacelessTrait,
-    > FailToCompileIfNotSendSync
-    for SplitContext<ContextIsCurrent::No, PBT, WST, ST>
+    > FailToCompileIfNotSendSync for SplitContext<ContextIsCurrent::No, PBT, WST, ST>
 {
 }
 impl FailToCompileIfNotSendSync for WindowSurface<SurfaceInUse::No> {}
@@ -21,8 +20,7 @@ impl<
         WST: SupportsWindowSurfacesTrait,
         ST: SupportsSurfacelessTrait,
         SURFACE: Surface + Send + Sync,
-    > FailToCompileIfNotSendSync
-    for Context<ContextIsCurrent::No, PBT, WST, ST, SURFACE>
+    > FailToCompileIfNotSendSync for Context<ContextIsCurrent::No, PBT, WST, ST, SURFACE>
 {
 }
 
@@ -33,10 +31,7 @@ impl<
     target_os = "netbsd",
     target_os = "openbsd",
 ))]
-impl FailToCompileIfNotSendSync
-    for glutin::platform::unix::osmesa::OsMesaBuffer<SurfaceInUse::No>
-{
-}
+impl FailToCompileIfNotSendSync for glutin::platform::unix::osmesa::OsMesaBuffer<SurfaceInUse::No> {}
 
 #[cfg(any(
     target_os = "linux",
@@ -46,10 +41,7 @@ impl FailToCompileIfNotSendSync
     target_os = "openbsd",
 ))]
 impl FailToCompileIfNotSendSync
-    for glutin::platform::unix::osmesa::OsMesaContext<
-        ContextIsCurrent::No,
-        SurfaceInUse::No,
-    >
+    for glutin::platform::unix::osmesa::OsMesaContext<ContextIsCurrent::No, SurfaceInUse::No>
 {
 }
 

@@ -91,11 +91,8 @@ after_success:
         [ $TRAVIS_BRANCH = master ] &&
         [ $TRAVIS_PULL_REQUEST = false ] && {
             cd glutin
-            for crate in ../glutin_*_sys; do
-                cd "$crate"
-                cargo publish --token ${CRATESIO_TOKEN_GENTZ}
-            done
-
-            cd ../glutin
             cargo publish --token ${CRATESIO_TOKEN}
+
+            cd ../glutin-lighter
+            cargo publish --token ${CRATESIO_TOKEN_GENTZ}
         }
