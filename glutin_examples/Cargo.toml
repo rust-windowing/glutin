@@ -12,7 +12,7 @@ publish = false
 
 [dependencies]
 glutin = { path = "../glutin" }
-winit = "0.20.0-alpha4"
+winit = { git = "https://github.com/dvc94ch/winit", branch = "android" }
 takeable-option = "0.4"
 image = "0.21"
 

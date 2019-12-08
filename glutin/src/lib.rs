@@ -744,7 +744,10 @@ impl<S> Default for GlAttributes<S> {
     fn default() -> GlAttributes<S> {
         GlAttributes {
             sharing: None,
+            #[cfg(not(target_os = "android"))]
             version: GlRequest::Latest,
+            #[cfg(target_os = "android")]
+            version: GlRequest::Specific(Api::OpenGlEs, (2, 0)),
             profile: None,
             debug: cfg!(debug_assertions),
             robustness: Robustness::NotRobust,

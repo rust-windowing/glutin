@@ -186,6 +186,8 @@ pub struct Context {
     pixel_format: PixelFormat,
     #[cfg(target_os = "android")]
     config_id: ffi::egl::types::EGLConfig,
+    #[cfg(target_os = "android")]
+    vsync: bool,
 }
 
 #[cfg(target_os = "android")]
@@ -621,6 +623,14 @@ impl Context {
                 egl.GetError()
             )
         }
+        if !self.vsync {
+            if egl.SwapInterval(self.display, 0) == ffi::egl::FALSE {
+                panic!(
+                    "on_surface_created: eglSwapInterval failed: 0x{:x}",
+                    egl.GetError()
+                )
+            }
+        }
     }
 
     // Handle Android Life Cycle.
@@ -691,7 +701,7 @@ impl Context {
     ) -> Result<(), ContextError> {
         let egl = EGL.as_ref().unwrap();
 
-        if !egl.SwapBuffersWithDamageKHR.is_loaded() {
+        if !self.swap_buffers_with_damage_supported() {
             return Err(ContextError::FunctionUnavailable);
         }
 
@@ -734,10 +744,18 @@ impl Context {
         }
     }
 
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     #[inline]
     pub fn swap_buffers_with_damage_supported(&self) -> bool {
         let egl = EGL.as_ref().unwrap();
         egl.SwapBuffersWithDamageKHR.is_loaded()
+    }
+
+    // On android and ios the `gl_generator::StaticStructGenerator` is used.
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    #[inline]
+    pub fn swap_buffers_with_damage_supported(&self) -> bool {
+        true
     }
 
     #[inline]
@@ -898,6 +916,7 @@ impl<'a> ContextPrototype<'a> {
         get_native_visual_id(self.display, self.config_id)
     }
 
+    #[cfg(not(target_os = "android"))]
     pub fn finish(
         self,
         nwin: ffi::EGLNativeWindowType,
@@ -919,6 +938,11 @@ impl<'a> ContextPrototype<'a> {
         };
 
         self.finish_impl(Some(surface))
+    }
+
+    #[cfg(target_os = "android")]
+    pub fn finish(self) -> Result<Context, CreationError> {
+        self.finish_impl(Some(ffi::egl::NO_SURFACE))
     }
 
     #[cfg(any(
@@ -1095,10 +1119,13 @@ impl<'a> ContextPrototype<'a> {
                 )
                 .map_err(|err| CreationError::OsError(err))?;
 
-                let egl = EGL.as_ref().unwrap();
-                unsafe {
-                    if egl.SwapInterval(self.display, 0) == ffi::egl::FALSE {
-                        panic!("finish_impl: eglSwapInterval failed: 0x{:x}", egl.GetError());
+                #[cfg(not(target_os = "android"))]
+                {
+                    let egl = EGL.as_ref().unwrap();
+                    unsafe {
+                        if egl.SwapInterval(self.display, 0) == ffi::egl::FALSE {
+                            panic!("finish_impl: eglSwapInterval failed: 0x{:x}", egl.GetError());
+                        }
                     }
                 }
             }
@@ -1112,6 +1139,8 @@ impl<'a> ContextPrototype<'a> {
             pixel_format: self.pixel_format,
             #[cfg(target_os = "android")]
             config_id: self.config_id,
+            #[cfg(target_os = "android")]
+            vsync: self.opengl.vsync,
         })
     }
 }
