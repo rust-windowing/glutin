@@ -34,6 +34,10 @@ cd glutin
 cargo run --example window
 ```
 
+## Common issues
+
+Please refer to [ISSUES.md.](ISSUES.md)
+
 ### Usage
 
 Glutin is an OpenGL context creation library and doesn't directly provide OpenGL bindings for you.
@@ -54,37 +58,12 @@ See [the `android-rs-glue` repository](https://github.com/rust-windowing/android
 
 ### Emscripten with asmjs
 
-In order to use glutin with emscripten, start by compiling your code with `--target=asmjs-unknown-emscripten`.
-
-Then create an HTML document that contains this:
-
-```html
-<canvas id="canvas"></canvas>
-<script type="text/javascript">
-var Module = {
-    canvas: document.getElementById('canvas')
-};
-</script>
-<script type="text/javascript" src="target/asmjs-unknown-emscripten/debug/..." async></script>
-```
-
-*Note: adjust the `src` element of the script to point to the .js file that was produced by the compilation.*
-
-The `Module` object is the link between emscripten and the HTML page.
-See also [this documentation](https://kripken.github.io/emscripten-site/docs/api_reference/module.html).
+Emscripten support has been deprecated in favor of platforms like stdweb. To get an OpenGL context on these platforms, please use crates like [glow](https://crates.io/crates/glow) instead.
 
 ### X11
 
-The plan is that glutin tries to dynamically link-to and use wayland if possible. If it doesn't work, it will try xlib instead. This is work-in-progress.
+The plan is that glutin tries to dynamically link-to and use Wayland w/EGL if possible. If it doesn't work, it will try Xlib w/GLX follow by Xlib w/EGL instead. This is work-in-progress.
 
 ### Wayland
 
-Due to an issue with how mesa and Wayland play together, all shared contexts must use the same events pool as each other.
-
-## Common issues
-
-Help! I'm receiving `NoAvailablePixelFormat`!
-
- - See: https://github.com/rust-windowing/glutin/issues/952#issuecomment-467228004
- - If you are on Windows w/ an AMD gpu and are requesting a non-srgb non-floating point surface, see: https://github.com/rust-windowing/glutin/issues/1219
-
+Due to an issue with how Mesa and Wayland play together, all shared contexts must use the same events pool as each other.
