@@ -34,6 +34,10 @@ cd glutin
 cargo run --example window
 ```
 
+## Common issues
+
+Please refer to [ISSUES.md.](ISSUES.md)
+
 ### Usage
 
 Glutin is an OpenGL context creation library and doesn't directly provide OpenGL bindings for you.
@@ -52,18 +56,14 @@ To compile the examples for android, you have to use the `cargo apk` utility.
 
 See [the `android-rs-glue` repository](https://github.com/rust-windowing/android-rs-glue) for instructions.
 
+### Emscripten with asmjs
+
+Emscripten support has been deprecated in favor of platforms like stdweb. To get an OpenGL context on these platforms, please use crates like [glow](https://crates.io/crates/glow) instead.
+
 ### X11
 
-The plan is that glutin tries to dynamically link-to and use wayland if possible. If it doesn't work, it will try xlib instead. This is work-in-progress.
+The plan is that glutin tries to dynamically link-to and use Wayland w/EGL if possible. If it doesn't work, it will try Xlib w/GLX followed by Xlib w/EGL instead. This is work-in-progress.
 
 ### Wayland
 
-Due to an issue with how mesa and Wayland play together, all shared contexts must use the same events pool as each other.
-
-## Common issues
-
-Help! I'm receiving `NoAvailablePixelFormat`!
-
- - See: https://github.com/rust-windowing/glutin/issues/952#issuecomment-467228004
- - If you are on Windows w/ an AMD gpu and are requesting a non-srgb non-floating point surface, see: https://github.com/rust-windowing/glutin/issues/1219
-
+Due to an issue with how Mesa and Wayland play together, all shared contexts must use the same events pool as each other.
