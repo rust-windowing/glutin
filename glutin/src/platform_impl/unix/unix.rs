@@ -16,7 +16,7 @@ use crate::surface::{PBuffer, Pixmap, Rect, SurfaceTypeTrait, Window};
 
 // pub use self::x11::utils as x11_utils;
 
-use glutin_winit_interface::{NativeDisplaySource, NativePixmapSource, NativeWindowSource};
+use glutin_winit_interface::{NativeDisplay, NativePixmapSource, NativeWindowSource, RawDisplay};
 use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
 use winit_types::platform::OsError;
@@ -48,10 +48,10 @@ pub enum Display {
 }
 
 impl Display {
-    pub fn new<NDS: NativeDisplaySource>(nds: &NDS) -> Result<Self, Error> {
-        match nds.is_wayland() {
-            true => wayland::Display::new(nds).map(Display::Wayland),
-            false => unimplemented!(),
+    pub fn new<NDS: NativeDisplay>(nds: &NDS) -> Result<Self, Error> {
+        match nds.display() {
+            RawDisplay::Wayland(_) => wayland::Display::new(nds).map(Display::Wayland),
+            _ => unimplemented!(),
         }
     }
 
@@ -126,13 +126,11 @@ impl Context {
     pub(crate) fn new(
         disp: &Display,
         cb: ContextBuilderWrapper<&Context>,
-        supports_surfaceless: bool,
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
     ) -> Result<Self, Error> {
         wayland::Context::new(
             Display::inner_wayland(disp),
             Context::inner_cb_wayland(cb),
-            supports_surfaceless,
             Config::inner_wayland(conf),
         )
         .map(Context::Wayland)
@@ -254,7 +252,7 @@ impl Surface<Pixmap> {
     pub unsafe fn new<NPS: NativePixmapSource>(
         disp: &Display,
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        nps: &NPS,
+        nps: NPS,
     ) -> Result<(NPS::Pixmap, Self), Error> {
         match disp {
             Display::Wayland(_) => wayland::Surface::<Pixmap>::new(
@@ -272,7 +270,7 @@ impl Surface<Window> {
     pub unsafe fn new<NWS: NativeWindowSource>(
         disp: &Display,
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        nws: &NWS,
+        nws: NWS,
     ) -> Result<(NWS::Window, Self), Error> {
         match disp {
             Display::Wayland(_) => wayland::Surface::<Window>::new(

@@ -134,7 +134,7 @@ use parking_lot::Mutex;
 use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
 use winit_types::platform::OsError;
-use glutin_winit_interface::{NativeDisplay, NativeDisplaySource};
+use glutin_winit_interface::{RawDisplay, NativeDisplay};
 
 use std::ffi::{c_void, CStr, CString};
 use std::marker::PhantomData;
@@ -163,7 +163,7 @@ lazy_static! {
 #[derive(Debug)]
 pub struct DisplayInternal {
     display: ffi::egl::types::EGLDisplay,
-    native_display: NativeDisplay,
+    native_display: RawDisplay,
     egl_version: EGLVersion,
     extensions: Vec<String>,
 }
@@ -172,10 +172,10 @@ pub struct DisplayInternal {
 pub struct Display(Arc<DisplayInternal>);
 
 impl Display {
-    pub fn new<NDS: NativeDisplaySource>(nds: &NDS) -> Result<Self, Error> {
+    pub fn new<NDS: NativeDisplay>(nds: &NDS) -> Result<Self, Error> {
         let egl = EGL.as_ref().unwrap();
         // calling `eglGetDisplay` or equivalent
-        let disp = get_native_display(&nds.display());
+        let disp = get_native_display(&nds.display())?;
 
         if disp.is_null() {
             return Err(make_oserror!(OsError::Misc(
@@ -249,6 +249,22 @@ impl Config {
         ) -> Result<ffi::egl::types::EGLConfig, ()>,
     {
         let egl = EGL.as_ref().unwrap();
+
+        // TODO: Alternatively, allow EGL_MESA_platform_surfaceless.
+        // FIXME: Also check for the GL_OES_surfaceless_context *CONTEXT*
+        // extension
+        if cb.surfaceless_support
+            && disp
+                .extensions
+                .iter()
+                .find(|s| s == &"EGL_KHR_surfaceless_context")
+                .is_none()
+        {
+            return Err(make_error!(ErrorType::NotSupported(
+                "EGL surfaceless not supported".to_string(),
+            )));
+        }
+
         // binding the right API and choosing the version
         let (version, api) = unsafe { bind_and_get_api(&cb.version, disp.egl_version)? };
 
@@ -265,13 +281,6 @@ impl Config {
             },
         ))
     }
-}
-
-#[cfg(target_os = "android")]
-#[inline]
-fn get_native_display(ndisp: &NativeDisplay) -> *const raw::c_void {
-    let egl = EGL.as_ref().unwrap();
-    unsafe { egl.GetDisplay(ffi::egl::DEFAULT_DISPLAY as *mut _) }
 }
 
 fn get_egl_version(disp: ffi::egl::types::EGLDisplay) -> Result<EGLVersion, Error> {
@@ -365,8 +374,7 @@ unsafe fn bind_and_get_api(
     }
 }
 
-#[cfg(not(target_os = "android"))]
-fn get_native_display(ndisp: &NativeDisplay) -> *const raw::c_void {
+fn get_native_display(ndisp: &RawDisplay) -> Result<*const raw::c_void, Error> {
     let egl = EGL.as_ref().unwrap();
     // the first step is to query the list of extensions without any display, if
     // supported
@@ -393,115 +401,120 @@ fn get_native_display(ndisp: &NativeDisplay) -> *const raw::c_void {
         // `EGL_EXT_platform_base`. I'm pretty sure this is a bug.
         //       Therefore we detect whether the symbol is loaded in addition to
         // checking for       extensions.
-        NativeDisplay::X11(display)
+        RawDisplay::Xlib(display)
             if has_dp_extension("EGL_KHR_platform_x11") && egl.GetPlatformDisplay.is_loaded() =>
         {
             let d = display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _);
             // TODO: `PLATFORM_X11_SCREEN_KHR`
             unsafe {
-                egl.GetPlatformDisplay(ffi::egl::PLATFORM_X11_KHR, d as *mut _, std::ptr::null())
+                Ok(egl.GetPlatformDisplay(ffi::egl::PLATFORM_X11_KHR, d as *mut _, std::ptr::null()))
             }
         }
 
-        NativeDisplay::X11(display)
+        RawDisplay::Xlib(display)
             if has_dp_extension("EGL_EXT_platform_x11")
                 && egl.GetPlatformDisplayEXT.is_loaded() =>
         {
             let d = display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _);
             // TODO: `PLATFORM_X11_SCREEN_EXT`
             unsafe {
-                egl.GetPlatformDisplayEXT(ffi::egl::PLATFORM_X11_EXT, d as *mut _, std::ptr::null())
+                Ok(egl.GetPlatformDisplayEXT(ffi::egl::PLATFORM_X11_EXT, d as *mut _, std::ptr::null()))
             }
         }
 
-        NativeDisplay::Gbm(display)
+        RawDisplay::Gbm(display)
             if has_dp_extension("EGL_KHR_platform_gbm") && egl.GetPlatformDisplay.is_loaded() =>
         {
             let d = display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _);
             unsafe {
-                egl.GetPlatformDisplay(ffi::egl::PLATFORM_GBM_KHR, d as *mut _, std::ptr::null())
+                Ok(egl.GetPlatformDisplay(ffi::egl::PLATFORM_GBM_KHR, d as *mut _, std::ptr::null()))
             }
         }
 
-        NativeDisplay::Gbm(display)
+        RawDisplay::Gbm(display)
             if has_dp_extension("EGL_MESA_platform_gbm")
                 && egl.GetPlatformDisplayEXT.is_loaded() =>
         {
             let d = display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _);
             unsafe {
-                egl.GetPlatformDisplayEXT(ffi::egl::PLATFORM_GBM_KHR, d as *mut _, std::ptr::null())
+                Ok(egl.GetPlatformDisplayEXT(ffi::egl::PLATFORM_GBM_KHR, d as *mut _, std::ptr::null()))
             }
         }
 
-        NativeDisplay::Wayland(display)
+        RawDisplay::Wayland(display)
             if has_dp_extension("EGL_KHR_platform_wayland")
                 && egl.GetPlatformDisplay.is_loaded() =>
         {
             let d = display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _);
             unsafe {
-                egl.GetPlatformDisplay(
+                Ok(egl.GetPlatformDisplay(
                     ffi::egl::PLATFORM_WAYLAND_KHR,
                     d as *mut _,
                     std::ptr::null(),
-                )
+                ))
             }
         }
 
-        NativeDisplay::Wayland(display)
+        RawDisplay::Wayland(display)
             if has_dp_extension("EGL_EXT_platform_wayland")
                 && egl.GetPlatformDisplayEXT.is_loaded() =>
         {
             let d = display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _);
             unsafe {
-                egl.GetPlatformDisplayEXT(
+                Ok(egl.GetPlatformDisplayEXT(
                     ffi::egl::PLATFORM_WAYLAND_EXT,
                     d as *mut _,
                     std::ptr::null(),
-                )
+                ))
             }
         }
 
         // TODO: This will never be reached right now, as the android egl
         // bindings use the static generator, so can't rely on
         // GetPlatformDisplay(EXT).
-        NativeDisplay::Android
+        RawDisplay::Android
             if has_dp_extension("EGL_KHR_platform_android")
                 && egl.GetPlatformDisplay.is_loaded() =>
         unsafe {
-            egl.GetPlatformDisplay(
+            Ok(egl.GetPlatformDisplay(
                 ffi::egl::PLATFORM_ANDROID_KHR,
                 ffi::egl::DEFAULT_DISPLAY as *mut _,
                 std::ptr::null(),
-            )
+            ))
         }
 
-        NativeDisplay::Device(display)
+        RawDisplay::Device(display)
             if has_dp_extension("EGL_EXT_platform_device")
                 && egl.GetPlatformDisplay.is_loaded() =>
         unsafe {
-            egl.GetPlatformDisplay(
+            Ok(egl.GetPlatformDisplay(
                 ffi::egl::PLATFORM_DEVICE_EXT,
                 display as *mut _,
                 std::ptr::null(),
-            )
+            ))
         }
 
-        NativeDisplay::X11(Some(display))
-        | NativeDisplay::Gbm(Some(display))
-        | NativeDisplay::Wayland(Some(display))
-        | NativeDisplay::Device(display)
-        | NativeDisplay::Windows(Some(display))
-        | NativeDisplay::Other(Some(display))
-        => unsafe { egl.GetDisplay(display as *mut _) },
+        RawDisplay::Xlib(Some(display))
+        | RawDisplay::Gbm(Some(display))
+        | RawDisplay::Wayland(Some(display))
+        | RawDisplay::Device(display)
+        | RawDisplay::Other(Some(display))
+        => unsafe { Ok(egl.GetDisplay(display as *mut _)) },
 
-        NativeDisplay::X11(None)
-        | NativeDisplay::Gbm(None)
-        | NativeDisplay::Wayland(None)
-        | NativeDisplay::Android
-        | NativeDisplay::Windows(None)
-        | NativeDisplay::Other(None) => unsafe {
-            egl.GetDisplay(ffi::egl::DEFAULT_DISPLAY as *mut _)
+        | RawDisplay::Xlib(None)
+        | RawDisplay::Gbm(None)
+        | RawDisplay::Wayland(None)
+        | RawDisplay::Android
+        | RawDisplay::Windows
+        | RawDisplay::Other(None) => unsafe {
+            Ok(egl.GetDisplay(ffi::egl::DEFAULT_DISPLAY as *mut _))
         },
+
+        RawDisplay::XCB(_) => {
+            return Err(make_error!(ErrorType::NotSupported(
+                "Can't use OpenGL with XCB.".to_string(),
+            )));
+        }
     }
 }
 
@@ -512,10 +525,10 @@ impl Context {
     ///
     /// To finish the process, you must call `.finish(window)` on the
     /// `ContextPrototype`.
-    pub(crate) fn new<'a>(
+    ///
+    pub(crate) fn new(
         disp: &Display,
-        cb: &'a ContextBuilderWrapper<&'a Context>,
-        supports_surfaceless: bool,
+        cb: ContextBuilderWrapper<&Context>,
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
     ) -> Result<Context, Error> {
         let egl = EGL.as_ref().unwrap();
@@ -525,20 +538,6 @@ impl Context {
             rebind_api(conf.config.api, disp.egl_version)?;
         }
 
-        // FIXME: Also check for the GL_OES_surfaceless_context *CONTEXT*
-        // extension
-        if supports_surfaceless
-            && disp
-                .extensions
-                .iter()
-                .find(|s| s == &"EGL_KHR_surfaceless_context")
-                .is_none()
-        {
-            return Err(make_error!(ErrorType::NotSupported(
-                "EGL surfaceless not supported".to_string(),
-            )));
-        }
-
         let share = match cb.sharing {
             Some(ctx) => ctx.context,
             None => std::ptr::null(),
@@ -546,21 +545,21 @@ impl Context {
 
         let context = unsafe {
             if let Some(version) = conf.attribs.version {
-                create_context(disp, cb, &conf, version, share)?
+                create_context(disp, &cb, &conf, version, share)?
             } else if conf.attribs.api == Api::OpenGlEs {
-                if let Ok(ctx) = create_context(disp, cb, &conf, GlVersion(2, 0), share) {
+                if let Ok(ctx) = create_context(disp, &cb, &conf, GlVersion(2, 0), share) {
                     ctx
-                } else if let Ok(ctx) = create_context(disp, cb, &conf, GlVersion(1, 0), share) {
+                } else if let Ok(ctx) = create_context(disp, &cb, &conf, GlVersion(1, 0), share) {
                     ctx
                 } else {
                     return Err(make_error!(ErrorType::OpenGlVersionNotSupported));
                 }
             } else {
-                if let Ok(ctx) = create_context(disp, cb, &conf, GlVersion(3, 2), share) {
+                if let Ok(ctx) = create_context(disp, &cb, &conf, GlVersion(3, 2), share) {
                     ctx
-                } else if let Ok(ctx) = create_context(disp, cb, &conf, GlVersion(3, 1), share) {
+                } else if let Ok(ctx) = create_context(disp, &cb, &conf, GlVersion(3, 1), share) {
                     ctx
-                } else if let Ok(ctx) = create_context(disp, cb, &conf, GlVersion(1, 0), share) {
+                } else if let Ok(ctx) = create_context(disp, &cb, &conf, GlVersion(1, 0), share) {
                     ctx
                 } else {
                     return Err(make_error!(ErrorType::OpenGlVersionNotSupported));
@@ -984,7 +983,7 @@ impl Surface<Window> {
 
 impl Surface<PBuffer> {
     #[inline]
-    pub fn new<T>(
+    pub fn new(
         disp: &Display,
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         size: dpi::PhysicalSize,
@@ -1329,6 +1328,7 @@ where
         window_surface_support: cb.window_surface_support,
         pbuffer_surface_support: cb.pbuffer_surface_support,
         pixmap_surface_support: cb.pixmap_surface_support,
+        surfaceless_support: cb.surfaceless_support,
         hardware_accelerated: attrib!(egl, disp, conf_id, ffi::egl::CONFIG_CAVEAT,)?
             != ffi::egl::SLOW_CONFIG as i32,
         color_bits: attrib!(egl, disp, conf_id, ffi::egl::RED_SIZE)? as u8
@@ -1349,9 +1349,9 @@ where
     Ok((conf_id, desc))
 }
 
-unsafe fn create_context<'a>(
+unsafe fn create_context(
     disp: &Display,
-    cb: &'a ContextBuilderWrapper<&'a Context>,
+    cb: &ContextBuilderWrapper<&Context>,
     conf: &ConfigWrapper<&Config, &ConfigAttribs>,
     version: GlVersion,
     share: ffi::EGLContext,

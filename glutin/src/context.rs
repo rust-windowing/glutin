@@ -59,11 +59,10 @@ impl<'a> ContextBuilder<'a> {
     pub fn build(
         self,
         disp: &Display,
-        supports_surfaceless: bool,
         conf: &Config,
     ) -> Result<Context, Error> {
         let cb = self.map_sharing(|ctx| &ctx.0);
-        platform_impl::Context::new(&disp.0, cb, supports_surfaceless, conf.as_ref())
+        platform_impl::Context::new(&disp.0, cb, conf.as_ref())
             .map(Context)
     }
 }

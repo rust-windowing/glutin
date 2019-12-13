@@ -59,7 +59,7 @@ impl Surface<Pixmap> {
     pub unsafe fn new<NPS: NativePixmapSource>(
         disp: &Display,
         conf: &Config,
-        nps: &NPS,
+        nps: NPS,
     ) -> Result<(NPS::Pixmap, Self), Error> {
         platform_impl::Surface::<Pixmap>::new(&disp.0, conf.as_ref(), nps)
             .map(|(pix, surf)| (pix, Surface(surf)))
@@ -83,7 +83,7 @@ impl Surface<Window> {
     pub unsafe fn new<NWS: NativeWindowSource>(
         disp: &Display,
         conf: &Config,
-        nws: &NWS,
+        nws: NWS,
     ) -> Result<(NWS::Window, Self), Error> {
         platform_impl::Surface::<Window>::new(&disp.0, conf.as_ref(), nws)
             .map(|(win, surf)| (win, Surface(surf)))
@@ -108,6 +108,8 @@ impl Surface<Window> {
         self.0.swap_buffers_with_damage(rects)
     }
 
+    // FIXME: As discussed with Osspial, kill me please. Should talk with vberger about best
+    // method.
     #[inline]
     pub fn update_after_resize(&self, size: dpi::PhysicalSize) {
         #![cfg(any(

@@ -6,7 +6,7 @@ use crate::surface::{PBuffer, Pixmap, Rect, SurfaceTypeTrait, Window};
 use crate::utils::NoPrint;
 
 use glutin_egl_sys as ffi;
-use glutin_winit_interface::{NativeDisplaySource, NativePixmapSource, NativeWindowSource};
+use glutin_winit_interface::{NativeDisplay, NativePixmapSource, NativeWindowSource, NativeWindow, RawWindow};
 use wayland_client::egl as wegl;
 pub use wayland_client::sys::client::wl_display;
 use winit_types::dpi;
@@ -21,7 +21,7 @@ use std::sync::Arc;
 pub struct Display(egl::Display);
 
 impl Display {
-    pub fn new<NDS: NativeDisplaySource>(nds: &NDS) -> Result<Self, Error> {
+    pub fn new<NDS: NativeDisplay>(nds: &NDS) -> Result<Self, Error> {
         egl::Display::new(nds).map(Display)
     }
 }
@@ -36,12 +36,6 @@ impl Config {
     ) -> Result<(ConfigAttribs, Config), Error> {
         egl::Config::new(&disp.0, cb, |confs, _| Ok(confs[0]))
             .map(|(attribs, conf)| (attribs, Config(conf)))
-    }
-
-    fn inner<'a, 'b>(
-        conf: ConfigWrapper<&'a Config, &'b ConfigAttribs>,
-    ) -> ConfigWrapper<&'a egl::Config, &'b ConfigAttribs> {
-        conf.map_config(|conf| &conf.0)
     }
 }
 
@@ -73,20 +67,18 @@ impl Surface<Window> {
     pub unsafe fn new<NWS: NativeWindowSource>(
         disp: &Display,
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        nws: &NWS,
+        nws: NWS,
     ) -> Result<(NWS::Window, Self), Error> {
         let win = nws.build_wayland()?;
 
-        let dpi_factor = win.hidpi_factor();
-        let size = win.inner_size().to_physical(dpi_factor);
-        let (width, height): (u32, u32) = size.into();
+        let (width, height): (u32, u32) = win.size().into();
 
-        let surface = win.wayland_surface();
+        let surface = win.raw_window();
         let surface = match surface {
-            Some(s) => s,
-            None => {
+            RawWindow::Wayland(s) => s,
+            _ => {
                 return Err(make_error!(ErrorType::NotSupported(
-                    "Wayland not found".to_string(),
+                    "Wayland surface not found".to_string(),
                 )));
             }
         };
@@ -101,7 +93,7 @@ impl Surface<Window> {
 
         egl::Surface::<Window>::new(
             &disp.0,
-            Config::inner(conf),
+            conf.map_config(|conf| &conf.0),
             wsurface.ptr() as *const _,
         )
         .map(|surface| (win, Surface { wsurface: Some(NoPrint(wsurface)), surface }))
@@ -110,7 +102,7 @@ impl Surface<Window> {
     #[inline]
     pub fn update_after_resize(&self, size: dpi::PhysicalSize) {
         let (width, height): (u32, u32) = size.into();
-        self.wsurface.unwrap().resize(width as i32, height as i32, 0, 0)
+        self.wsurface.as_ref().unwrap().resize(width as i32, height as i32, 0, 0)
     }
 
     #[inline]
@@ -131,7 +123,12 @@ impl Surface<PBuffer> {
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         size: dpi::PhysicalSize,
     ) -> Result<Self, Error> {
-        unimplemented!()
+        egl::Surface::<PBuffer>::new(
+            &disp.0,
+            conf.map_config(|conf| &conf.0),
+            size,
+        )
+        .map(|surface| Surface { wsurface: None, surface })
     }
 }
 
@@ -140,9 +137,11 @@ impl Surface<Pixmap> {
     pub unsafe fn new<NPS: NativePixmapSource>(
         disp: &Display,
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        nps: &NPS,
+        nps: NPS,
     ) -> Result<(NPS::Pixmap, Self), Error> {
-        unimplemented!()
+        return Err(make_error!(ErrorType::NotSupported(
+            "Wayland does not support pixmaps.".to_string(),
+        )));
     }
 }
 
@@ -154,20 +153,13 @@ impl Context {
     pub(crate) fn new(
         disp: &Display,
         cb: ContextBuilderWrapper<&Context>,
-        supports_surfaceless: bool,
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
     ) -> Result<Self, Error> {
-        unimplemented!()
-        //let context = {
-        //    let cb = cb.map_sharing(|c| &c.context);
-        //    egl::Context::new(
-        //        &cb,
-        //        supports_surfaceless,
-        //        |c, _| Ok(c[0]),
-        //        conf.with_config(conf.config),
-        //    )?
-        //};
-        //Ok(Context { context })
+        egl::Context::new(
+            &disp.0,
+            cb.map_sharing(|ctx| &ctx.0),
+            conf.map_config(|conf| &conf.0),
+        ).map(Context)
     }
 
     #[inline]

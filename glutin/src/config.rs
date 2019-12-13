@@ -90,6 +90,7 @@ pub struct ConfigAttribs {
     pub pbuffer_surface_support: bool,
     pub pixmap_surface_support: bool,
     pub window_surface_support: bool,
+    pub surfaceless_support: bool,
 }
 
 /// Describes a possible format.
@@ -212,6 +213,7 @@ pub struct ConfigBuilder {
     pub window_surface_support: bool,
     /// FIXME: missing docs
     pub pixmap_surface_support: bool,
+    pub surfaceless_support: bool,
 
     pub plat_attr: platform_impl::SurfacePlatformAttributes,
 }
@@ -233,6 +235,7 @@ impl Default for ConfigBuilder {
             srgb: None,
             vsync: None,
             pbuffer_surface_support: false,
+            surfaceless_support: false,
             pixmap_surface_support: false,
             window_surface_support: true,
             release_behavior: ReleaseBehavior::Flush,
@@ -333,6 +336,12 @@ impl ConfigBuilder {
     #[inline]
     pub fn with_window_surface_support(mut self, wss: bool) -> Self {
         self.window_surface_support = wss;
+        self
+    }
+
+    #[inline]
+    pub fn with_surfaceless_support(mut self, ss: bool) -> Self {
+        self.surfaceless_support = ss;
         self
     }
 
