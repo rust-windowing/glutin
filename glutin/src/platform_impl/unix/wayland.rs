@@ -6,7 +6,7 @@ use crate::surface::{PBuffer, Pixmap, Rect, SurfaceTypeTrait, Window};
 use crate::utils::NoPrint;
 
 use glutin_egl_sys as ffi;
-use glutin_winit_interface::{NativeDisplay, NativePixmapSource, NativeWindowSource, NativeWindow, RawWindow};
+use glutin_interface::{NativeDisplay, NativePixmapSource, NativeWindowSource, NativeWindow, RawWindow};
 use wayland_client::egl as wegl;
 pub use wayland_client::sys::client::wl_display;
 use winit_types::dpi;
@@ -75,7 +75,7 @@ impl Surface<Window> {
 
         let surface = win.raw_window();
         let surface = match surface {
-            RawWindow::Wayland(s) => s,
+            RawWindow::Wayland{ wl_surface } => wl_surface,
             _ => {
                 return Err(make_error!(ErrorType::NotSupported(
                     "Wayland surface not found".to_string(),

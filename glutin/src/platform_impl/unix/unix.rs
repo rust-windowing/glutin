@@ -16,7 +16,7 @@ use crate::surface::{PBuffer, Pixmap, Rect, SurfaceTypeTrait, Window};
 
 // pub use self::x11::utils as x11_utils;
 
-use glutin_winit_interface::{NativeDisplay, NativePixmapSource, NativeWindowSource, RawDisplay};
+use glutin_interface::{NativeDisplay, NativePixmapSource, NativeWindowSource, RawDisplay};
 use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
 use winit_types::platform::OsError;
@@ -50,7 +50,7 @@ pub enum Display {
 impl Display {
     pub fn new<NDS: NativeDisplay>(nds: &NDS) -> Result<Self, Error> {
         match nds.display() {
-            RawDisplay::Wayland(_) => wayland::Display::new(nds).map(Display::Wayland),
+            RawDisplay::Wayland { .. } => wayland::Display::new(nds).map(Display::Wayland),
             _ => unimplemented!(),
         }
     }

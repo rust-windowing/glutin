@@ -14,7 +14,7 @@ edition = "2018"
 lazy_static = "1.3"
 bitflags = "1.1"
 winit_types = { version = "0.1.0", path = "../../winit_types" }
-glutin_winit_interface = { version = "0.1.0", path = "../../glutin_winit_interface" }
+glutin_interface = { version = "0.1.0", path = "../../glutin_interface" }
 
 [target.'cfg(target_os = "android")'.dependencies]
 android_glue = "0.2"

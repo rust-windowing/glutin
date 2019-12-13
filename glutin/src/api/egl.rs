@@ -134,7 +134,7 @@ use parking_lot::Mutex;
 use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
 use winit_types::platform::OsError;
-use glutin_winit_interface::{RawDisplay, NativeDisplay};
+use glutin_interface::{RawDisplay, NativeDisplay};
 
 use std::ffi::{c_void, CStr, CString};
 use std::marker::PhantomData;
@@ -401,7 +401,7 @@ fn get_native_display(ndisp: &RawDisplay) -> Result<*const raw::c_void, Error> {
         // `EGL_EXT_platform_base`. I'm pretty sure this is a bug.
         //       Therefore we detect whether the symbol is loaded in addition to
         // checking for       extensions.
-        RawDisplay::Xlib(display)
+        RawDisplay::Xlib { display }
             if has_dp_extension("EGL_KHR_platform_x11") && egl.GetPlatformDisplay.is_loaded() =>
         {
             let d = display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _);
@@ -411,7 +411,7 @@ fn get_native_display(ndisp: &RawDisplay) -> Result<*const raw::c_void, Error> {
             }
         }
 
-        RawDisplay::Xlib(display)
+        RawDisplay::Xlib { display }
             if has_dp_extension("EGL_EXT_platform_x11")
                 && egl.GetPlatformDisplayEXT.is_loaded() =>
         {
@@ -422,30 +422,30 @@ fn get_native_display(ndisp: &RawDisplay) -> Result<*const raw::c_void, Error> {
             }
         }
 
-        RawDisplay::Gbm(display)
+        RawDisplay::Gbm { gbm_device }
             if has_dp_extension("EGL_KHR_platform_gbm") && egl.GetPlatformDisplay.is_loaded() =>
         {
-            let d = display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _);
+            let d = gbm_device.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _);
             unsafe {
                 Ok(egl.GetPlatformDisplay(ffi::egl::PLATFORM_GBM_KHR, d as *mut _, std::ptr::null()))
             }
         }
 
-        RawDisplay::Gbm(display)
+        RawDisplay::Gbm { gbm_device }
             if has_dp_extension("EGL_MESA_platform_gbm")
                 && egl.GetPlatformDisplayEXT.is_loaded() =>
         {
-            let d = display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _);
+            let d = gbm_device.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _);
             unsafe {
                 Ok(egl.GetPlatformDisplayEXT(ffi::egl::PLATFORM_GBM_KHR, d as *mut _, std::ptr::null()))
             }
         }
 
-        RawDisplay::Wayland(display)
+        RawDisplay::Wayland { wl_display }
             if has_dp_extension("EGL_KHR_platform_wayland")
                 && egl.GetPlatformDisplay.is_loaded() =>
         {
-            let d = display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _);
+            let d = wl_display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _);
             unsafe {
                 Ok(egl.GetPlatformDisplay(
                     ffi::egl::PLATFORM_WAYLAND_KHR,
@@ -455,11 +455,11 @@ fn get_native_display(ndisp: &RawDisplay) -> Result<*const raw::c_void, Error> {
             }
         }
 
-        RawDisplay::Wayland(display)
+        RawDisplay::Wayland { wl_display }
             if has_dp_extension("EGL_EXT_platform_wayland")
                 && egl.GetPlatformDisplayEXT.is_loaded() =>
         {
-            let d = display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _);
+            let d = wl_display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _);
             unsafe {
                 Ok(egl.GetPlatformDisplayEXT(
                     ffi::egl::PLATFORM_WAYLAND_EXT,
@@ -483,36 +483,37 @@ fn get_native_display(ndisp: &RawDisplay) -> Result<*const raw::c_void, Error> {
             ))
         }
 
-        RawDisplay::Device(display)
+        RawDisplay::Device { egl_device_ext }
             if has_dp_extension("EGL_EXT_platform_device")
                 && egl.GetPlatformDisplay.is_loaded() =>
         unsafe {
             Ok(egl.GetPlatformDisplay(
                 ffi::egl::PLATFORM_DEVICE_EXT,
-                display as *mut _,
+                egl_device_ext as *mut _,
                 std::ptr::null(),
             ))
         }
 
-        RawDisplay::Xlib(Some(display))
-        | RawDisplay::Gbm(Some(display))
-        | RawDisplay::Wayland(Some(display))
-        | RawDisplay::Device(display)
+        RawDisplay::Xlib { display: Some(display) }
+        | RawDisplay::Gbm { gbm_device: Some(display) }
+        | RawDisplay::Wayland { wl_display: Some(display) }
+        | RawDisplay::Device { egl_device_ext: display }
         | RawDisplay::Other(Some(display))
+        | RawDisplay::Windows { hwnd: Some(display) }
         => unsafe { Ok(egl.GetDisplay(display as *mut _)) },
 
-        | RawDisplay::Xlib(None)
-        | RawDisplay::Gbm(None)
-        | RawDisplay::Wayland(None)
+        RawDisplay::Xlib { display: None }
+        | RawDisplay::Gbm { gbm_device: None }
+        | RawDisplay::Wayland { wl_display: None }
         | RawDisplay::Android
-        | RawDisplay::Windows
+        | RawDisplay::Windows { hwnd: None }
         | RawDisplay::Other(None) => unsafe {
             Ok(egl.GetDisplay(ffi::egl::DEFAULT_DISPLAY as *mut _))
         },
 
-        RawDisplay::XCB(_) => {
+        _ => {
             return Err(make_error!(ErrorType::NotSupported(
-                "Can't use OpenGL with XCB.".to_string(),
+                "Display type unsupported by glutin.".to_string(),
             )));
         }
     }
