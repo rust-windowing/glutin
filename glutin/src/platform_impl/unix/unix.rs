@@ -7,14 +7,11 @@
 ))]
 
 mod wayland;
-//mod x11;
+mod x11;
 
-// use self::x11::X11Context;
 use crate::config::{Api, ConfigAttribs, ConfigBuilder, ConfigWrapper};
 use crate::context::ContextBuilderWrapper;
 use crate::surface::{PBuffer, Pixmap, Rect, SurfaceTypeTrait, Window};
-
-// pub use self::x11::utils as x11_utils;
 
 use glutin_interface::{NativeDisplay, NativePixmapSource, NativeWindowSource, RawDisplay};
 use winit_types::dpi;
@@ -43,7 +40,7 @@ pub enum ContextType {
 
 #[derive(Debug)]
 pub enum Display {
-    // X11(x11::Display),
+    X11(x11::Display),
     Wayland(wayland::Display),
 }
 
@@ -51,6 +48,7 @@ impl Display {
     pub fn new<NDS: NativeDisplay>(nds: &NDS) -> Result<Self, Error> {
         match nds.display() {
             RawDisplay::Wayland { .. } => wayland::Display::new(nds).map(Display::Wayland),
+            RawDisplay::Xlib { .. } => x11::Display::new(nds).map(Display::X11),
             _ => unimplemented!(),
         }
     }
@@ -58,6 +56,13 @@ impl Display {
     fn inner_wayland(disp: &Display) -> &wayland::Display {
         match disp {
             Display::Wayland(disp) => disp,
+            _ => unreachable!(),
+        }
+    }
+
+    fn inner_x11(disp: &Display) -> &x11::Display {
+        match disp {
+            Display::X11(disp) => disp,
             _ => unreachable!(),
         }
     }

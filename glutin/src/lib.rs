@@ -96,6 +96,15 @@ extern crate log;
 extern crate bitflags;
 #[macro_use]
 extern crate winit_types;
+#[cfg(any(
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+))]
+#[macro_use]
+extern crate glutin_x11_sym;
 
 pub mod platform;
 

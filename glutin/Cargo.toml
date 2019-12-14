@@ -55,3 +55,4 @@ glutin_glx_sys = { version = "0.2.0", path = "../../glutin_sys/glutin_glx_sys" }
 parking_lot = "0.9"
 log = "0.4"
 glutin_x11_sym = { version = "0.1.0", path = "../../glutin_x11_sym" }
+x11-dl = "2.18.3"

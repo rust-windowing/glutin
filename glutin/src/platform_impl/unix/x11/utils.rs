@@ -1,34 +1,37 @@
-use crate::platform::unix::x11::XConnection;
-use glutin_glx_sys as ffi;
+use super::Display;
+
+use x11_dl::xlib::{VisualID, VisualIDMask, XVisualInfo};
 
 use std::sync::Arc;
 
 pub fn get_visual_info_from_xid(
-    xconn: &Arc<XConnection>,
-    xid: ffi::VisualID,
-) -> ffi::XVisualInfo {
+    disp: &Display,
+    xid: VisualID,
+) -> XVisualInfo {
+    let xlib = syms!(XLIB);
+
     assert_ne!(xid, 0);
-    let mut template: ffi::XVisualInfo = unsafe { std::mem::zeroed() };
+    let mut template: XVisualInfo = unsafe { std::mem::zeroed() };
     template.visualid = xid;
 
     let mut num_visuals = 0;
     let vi = unsafe {
-        (xconn.xlib.XGetVisualInfo)(
-            xconn.display,
-            ffi::VisualIDMask,
+        (xlib.XGetVisualInfo)(
+            **disp.display,
+            VisualIDMask,
             &mut template,
             &mut num_visuals,
         )
     };
-    xconn
+    disp
+        .display
         .check_errors()
         .expect("Failed to call `XGetVisualInfo`");
     assert!(!vi.is_null());
     assert!(num_visuals == 1);
 
     let vi_copy = unsafe { std::ptr::read(vi as *const _) };
-    unsafe {
-        (xconn.xlib.XFree)(vi as *mut _);
+    unsafe { (xlib.XFree)(vi as *mut _);
     }
     vi_copy
 }
@@ -41,10 +44,10 @@ pub enum Lacks {
 
 /// Should always check for lack of xid before lack of transparency.
 pub fn examine_visual_info(
-    xconn: &Arc<XConnection>,
-    visual_infos: ffi::XVisualInfo,
+    disp: &Display,
+    visual_infos: XVisualInfo,
     want_transparency: bool,
-    want_xid: Option<ffi::VisualID>,
+    want_xid: Option<VisualID>,
 ) -> Result<(), Lacks> {
     if let Some(want_xid) = want_xid {
         if visual_infos.visualid != want_xid {
@@ -54,8 +57,8 @@ pub fn examine_visual_info(
 
     unsafe {
         if want_transparency {
-            let pict_format = (xconn.xrender.XRenderFindVisualFormat)(
-                xconn.display as *mut _,
+            let pict_format = (syms!(XRENDER).XRenderFindVisualFormat)(
+                **disp.display as *mut _,
                 visual_infos.visual,
             );
             if pict_format.is_null() {
@@ -70,6 +73,3 @@ pub fn examine_visual_info(
 
     return Ok(());
 }
-
-pub use super::select_config;
-pub use crate::api::egl::SurfaceType;
