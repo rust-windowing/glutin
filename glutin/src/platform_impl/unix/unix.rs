@@ -13,7 +13,7 @@ use crate::config::{Api, ConfigAttribs, ConfigBuilder, ConfigWrapper};
 use crate::context::ContextBuilderWrapper;
 use crate::surface::{PBuffer, Pixmap, Rect, SurfaceTypeTrait, Window};
 
-use glutin_interface::{NativeDisplay, NativePixmapSource, NativeWindowSource, RawDisplay};
+use glutin_interface::{NativeDisplay, NativePixmapBuilder, NativeWindowBuilder, RawDisplay, NativePixmap, NativeWindow};
 use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
 use winit_types::platform::OsError;
@@ -254,36 +254,68 @@ impl Surface<PBuffer> {
 
 impl Surface<Pixmap> {
     #[inline]
-    pub unsafe fn new<NPS: NativePixmapSource>(
+    pub unsafe fn new<NPB: NativePixmapBuilder>(
         disp: &Display,
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        nps: NPS,
-    ) -> Result<(NPS::Pixmap, Self), Error> {
+        npb: NPB,
+    ) -> Result<(NPB::Pixmap, Self), Error> {
         match disp {
             Display::Wayland(_) => wayland::Surface::<Pixmap>::new(
                 Display::inner_wayland(disp),
                 Config::inner_wayland(conf),
-                nps,
+                npb,
             )
             .map(|(pix, surf)| (pix, Surface::Wayland(surf))),
+        }
+    }
+
+    #[inline]
+    pub unsafe fn new_existing<NP: NativePixmap>(
+        disp: &Display,
+        conf: ConfigWrapper<&Config, &ConfigAttribs>,
+        np: &NP,
+    ) -> Result<Self, Error> {
+        match disp {
+            Display::Wayland(_) => wayland::Surface::<Pixmap>::new_existing(
+                Display::inner_wayland(disp),
+                Config::inner_wayland(conf),
+                np,
+            )
+            .map(Surface::Wayland),
         }
     }
 }
 
 impl Surface<Window> {
     #[inline]
-    pub unsafe fn new<NWS: NativeWindowSource>(
+    pub unsafe fn new<NWB: NativeWindowBuilder>(
         disp: &Display,
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        nws: NWS,
-    ) -> Result<(NWS::Window, Self), Error> {
+        nwb: NWB,
+    ) -> Result<(NWB::Window, Self), Error> {
         match disp {
             Display::Wayland(_) => wayland::Surface::<Window>::new(
                 Display::inner_wayland(disp),
                 Config::inner_wayland(conf),
-                nws,
+                nwb,
             )
             .map(|(win, surf)| (win, Surface::Wayland(surf))),
+        }
+    }
+
+    #[inline]
+    pub unsafe fn new_existing<NW: NativeWindow>(
+        disp: &Display,
+        conf: ConfigWrapper<&Config, &ConfigAttribs>,
+        nw: &NW,
+    ) -> Result<Self, Error> {
+        match disp {
+            Display::Wayland(_) => wayland::Surface::<Window>::new_existing(
+                Display::inner_wayland(disp),
+                Config::inner_wayland(conf),
+                nw,
+            )
+            .map(Surface::Wayland),
         }
     }
 

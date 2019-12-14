@@ -6,7 +6,7 @@ use crate::surface::{PBuffer, Pixmap, Rect, SurfaceTypeTrait, Window};
 use crate::utils::NoPrint;
 
 use glutin_egl_sys as ffi;
-use glutin_interface::{NativeDisplay, NativePixmapSource, NativeWindowSource, NativeWindow, RawWindow};
+use glutin_interface::{NativeDisplay, NativePixmapBuilder, NativeWindowBuilder, NativeWindow, RawWindow, NativePixmap};
 use wayland_client::egl as wegl;
 pub use wayland_client::sys::client::wl_display;
 use winit_types::dpi;
@@ -64,16 +64,25 @@ impl<T: SurfaceTypeTrait> Surface<T> {
 
 impl Surface<Window> {
     #[inline]
-    pub unsafe fn new<NWS: NativeWindowSource>(
+    pub unsafe fn new<NWB: NativeWindowBuilder>(
         disp: &Display,
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        nws: NWS,
-    ) -> Result<(NWS::Window, Self), Error> {
-        let win = nws.build_wayland()?;
+        nwb: NWB,
+    ) -> Result<(NWB::Window, Self), Error> {
+        let win = nwb.build_wayland()?;
+        Self::new_existing(disp, conf, &win)
+            .map(|surf| (win, surf))
+    }
 
-        let (width, height): (u32, u32) = win.size().into();
+    #[inline]
+    pub unsafe fn new_existing<NW: NativeWindow>(
+        disp: &Display,
+        conf: ConfigWrapper<&Config, &ConfigAttribs>,
+        nw: &NW,
+    ) -> Result<Self, Error> {
+        let (width, height): (u32, u32) = nw.size().into();
 
-        let surface = win.raw_window();
+        let surface = nw.raw_window();
         let surface = match surface {
             RawWindow::Wayland{ wl_surface } => wl_surface,
             _ => {
@@ -96,7 +105,7 @@ impl Surface<Window> {
             conf.map_config(|conf| &conf.0),
             wsurface.ptr() as *const _,
         )
-        .map(|surface| (win, Surface { wsurface: Some(NoPrint(wsurface)), surface }))
+        .map(|surface| Surface { wsurface: Some(NoPrint(wsurface)), surface })
     }
 
     #[inline]
@@ -134,11 +143,22 @@ impl Surface<PBuffer> {
 
 impl Surface<Pixmap> {
     #[inline]
-    pub unsafe fn new<NPS: NativePixmapSource>(
+    pub unsafe fn new_existing<NP: NativePixmap>(
         disp: &Display,
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        nps: NPS,
-    ) -> Result<(NPS::Pixmap, Self), Error> {
+        np: &NP,
+    ) -> Result<Self, Error> {
+        return Err(make_error!(ErrorType::NotSupported(
+            "Wayland does not support pixmaps.".to_string(),
+        )));
+    }
+
+    #[inline]
+    pub unsafe fn new<NPB: NativePixmapBuilder>(
+        disp: &Display,
+        conf: ConfigWrapper<&Config, &ConfigAttribs>,
+        npb: NPB,
+    ) -> Result<(NPB::Pixmap, Self), Error> {
         return Err(make_error!(ErrorType::NotSupported(
             "Wayland does not support pixmaps.".to_string(),
         )));

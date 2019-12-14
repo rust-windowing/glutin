@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::display::Display;
 use crate::platform_impl;
 
-use glutin_interface::{NativePixmapSource, NativeWindowSource};
+use glutin_interface::{NativePixmapBuilder, NativeWindowBuilder, NativePixmap, NativeWindow};
 use winit_types::dpi;
 use winit_types::error::Error;
 
@@ -56,13 +56,23 @@ impl<T: SurfaceTypeTrait> Surface<T> {
 
 impl Surface<Pixmap> {
     #[inline]
-    pub unsafe fn new<NPS: NativePixmapSource>(
+    pub unsafe fn new<NPB: NativePixmapBuilder>(
         disp: &Display,
         conf: &Config,
-        nps: NPS,
-    ) -> Result<(NPS::Pixmap, Self), Error> {
-        platform_impl::Surface::<Pixmap>::new(&disp.0, conf.as_ref(), nps)
+        npb: NPB,
+    ) -> Result<(NPB::Pixmap, Self), Error> {
+        platform_impl::Surface::<Pixmap>::new(&disp.0, conf.as_ref(), npb)
             .map(|(pix, surf)| (pix, Surface(surf)))
+    }
+
+    #[inline]
+    pub unsafe fn new_existing<NP: NativePixmap>(
+        disp: &Display,
+        conf: &Config,
+        np: &NP,
+    ) -> Result<Self, Error> {
+        platform_impl::Surface::<Pixmap>::new_existing(&disp.0, conf.as_ref(), np)
+            .map(Surface)
     }
 }
 
@@ -80,13 +90,23 @@ impl Surface<PBuffer> {
 
 impl Surface<Window> {
     #[inline]
-    pub unsafe fn new<NWS: NativeWindowSource>(
+    pub unsafe fn new<NWB: NativeWindowBuilder>(
         disp: &Display,
         conf: &Config,
-        nws: NWS,
-    ) -> Result<(NWS::Window, Self), Error> {
-        platform_impl::Surface::<Window>::new(&disp.0, conf.as_ref(), nws)
+        nwb: NWB,
+    ) -> Result<(NWB::Window, Self), Error> {
+        platform_impl::Surface::<Window>::new(&disp.0, conf.as_ref(), nwb)
             .map(|(win, surf)| (win, Surface(surf)))
+    }
+
+    #[inline]
+    pub unsafe fn new_existing<NW: NativeWindow>(
+        disp: &Display,
+        conf: &Config,
+        nw: &NW,
+    ) -> Result<Self, Error> {
+        platform_impl::Surface::<Window>::new_existing(&disp.0, conf.as_ref(), nw)
+            .map(Surface)
     }
 
     #[inline]

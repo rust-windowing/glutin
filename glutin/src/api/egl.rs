@@ -483,7 +483,7 @@ fn get_native_display(ndisp: &RawDisplay) -> Result<*const raw::c_void, Error> {
             ))
         }
 
-        RawDisplay::Device { egl_device_ext }
+        RawDisplay::EGLExtDevice { egl_device_ext }
             if has_dp_extension("EGL_EXT_platform_device")
                 && egl.GetPlatformDisplay.is_loaded() =>
         unsafe {
@@ -497,8 +497,7 @@ fn get_native_display(ndisp: &RawDisplay) -> Result<*const raw::c_void, Error> {
         RawDisplay::Xlib { display: Some(display) }
         | RawDisplay::Gbm { gbm_device: Some(display) }
         | RawDisplay::Wayland { wl_display: Some(display) }
-        | RawDisplay::Device { egl_device_ext: display }
-        | RawDisplay::Other(Some(display))
+        | RawDisplay::EGLExtDevice { egl_device_ext: display }
         | RawDisplay::Windows { hwnd: Some(display) }
         => unsafe { Ok(egl.GetDisplay(display as *mut _)) },
 
@@ -506,8 +505,7 @@ fn get_native_display(ndisp: &RawDisplay) -> Result<*const raw::c_void, Error> {
         | RawDisplay::Gbm { gbm_device: None }
         | RawDisplay::Wayland { wl_display: None }
         | RawDisplay::Android
-        | RawDisplay::Windows { hwnd: None }
-        | RawDisplay::Other(None) => unsafe {
+        | RawDisplay::Windows { hwnd: None } => unsafe {
             Ok(egl.GetDisplay(ffi::egl::DEFAULT_DISPLAY as *mut _))
         },
 
