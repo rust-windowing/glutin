@@ -13,10 +13,9 @@ pub mod osmesa;
 
 use crate::context::Context;
 use crate::platform::ContextTraitExt;
-pub use crate::platform_impl::{ContextPlatformAttributes, RawHandle, SurfacePlatformAttributes};
-
-pub use glutin_egl_sys::EGLContext;
-pub use glutin_glx_sys::glx::types::GLXContext;
+pub use crate::platform_impl::{ContextPlatformAttributes, RawHandle, SurfacePlatformAttributes, DisplayPlatformAttributes, BackingApi};
+pub use crate::api::egl::ffi::EGLContext;
+pub use crate::api::glx::ffi::glx::types::GLXContext;
 
 use std::os::raw;
 

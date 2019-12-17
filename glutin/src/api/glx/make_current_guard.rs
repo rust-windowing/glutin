@@ -1,5 +1,5 @@
 use crate::platform::unix::x11::XConnection;
-use glutin_glx_sys as ffi;
+use super::ffi;
 
 use std::sync::Arc;
 
@@ -16,14 +16,14 @@ pub struct MakeCurrentGuard {
 #[derive(Debug)]
 struct MakeCurrentGuardInner {
     old_drawable: ffi::glx::types::GLXDrawable,
-    old_context: ffi::GLXContext,
+    old_context: ffi::glx::types::GLXContext,
 }
 
 impl MakeCurrentGuard {
     pub fn new(
         xconn: &Arc<XConnection>,
         drawable: ffi::glx::types::GLXDrawable,
-        context: ffi::GLXContext,
+        context: ffi::glx::types::GLXContext,
     ) -> Result<Self, String> {
         unsafe {
             let glx = super::GLX.as_ref().unwrap();
@@ -50,7 +50,7 @@ impl MakeCurrentGuard {
         }
     }
 
-    pub fn old_context(&mut self) -> Option<ffi::GLXContext> {
+    pub fn old_context(&mut self) -> Option<ffi::glx::types::GLXContext> {
         self.possibly_invalid.as_ref().map(|pi| pi.old_context)
     }
 

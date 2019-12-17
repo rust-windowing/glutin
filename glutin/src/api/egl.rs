@@ -8,109 +8,9 @@
     target_os = "openbsd",
 ))]
 
-#[cfg(not(target_os = "android"))]
-mod egl {
-    use super::ffi;
-    use crate::api::dlloader::{SymTrait, SymWrapper};
-    use libloading;
-    use parking_lot::Mutex;
-    use std::sync::Arc;
-
-    #[cfg(unix)]
-    use libloading::os::unix as libloading_os;
-    #[cfg(windows)]
-    use libloading::os::windows as libloading_os;
-
-    #[derive(Clone)]
-    pub struct Egl(pub SymWrapper<ffi::egl::Egl>);
-
-    /// Because `*const raw::c_void` doesn't implement `Sync`.
-    unsafe impl Sync for Egl {}
-
-    type EglGetProcAddressType = libloading_os::Symbol<
-        unsafe extern "C" fn(*const std::os::raw::c_void) -> *const std::os::raw::c_void,
-    >;
-
-    lazy_static! {
-        static ref EGL_GET_PROC_ADDRESS: Arc<Mutex<Option<EglGetProcAddressType>>> =
-            Arc::new(Mutex::new(None));
-    }
-
-    impl SymTrait for ffi::egl::Egl {
-        fn load_with(lib: &libloading::Library) -> Self {
-            let f = move |s: &'static str| -> *const std::os::raw::c_void {
-                // Check if the symbol is available in the library directly. If
-                // it is, just return it.
-                match unsafe {
-                    lib.get(
-                        std::ffi::CString::new(s.as_bytes())
-                            .unwrap()
-                            .as_bytes_with_nul(),
-                    )
-                } {
-                    Ok(sym) => return *sym,
-                    Err(_) => (),
-                };
-
-                let mut egl_get_proc_address = (*EGL_GET_PROC_ADDRESS).lock();
-                if egl_get_proc_address.is_none() {
-                    unsafe {
-                        let sym: libloading::Symbol<
-                            unsafe extern "C" fn(
-                                *const std::os::raw::c_void,
-                            )
-                                -> *const std::os::raw::c_void,
-                        > = lib.get(b"eglGetProcAddress").unwrap();
-                        *egl_get_proc_address = Some(sym.into_raw());
-                    }
-                }
-
-                // The symbol was not available in the library, so ask
-                // eglGetProcAddress for it. Note that eglGetProcAddress was
-                // only able to look up extension functions prior to EGL 1.5,
-                // hence this two-part dance.
-                unsafe {
-                    (egl_get_proc_address.as_ref().unwrap())(
-                        std::ffi::CString::new(s.as_bytes())
-                            .unwrap()
-                            .as_bytes_with_nul()
-                            .as_ptr() as *const std::os::raw::c_void,
-                    )
-                }
-            };
-
-            Self::load_with(f)
-        }
-    }
-
-    impl Egl {
-        pub fn new() -> Result<Self, ()> {
-            #[cfg(target_os = "windows")]
-            let paths = vec!["libEGL.dll", "atioglxx.dll"];
-
-            #[cfg(not(target_os = "windows"))]
-            let paths = vec!["libEGL.so.1", "libEGL.so"];
-
-            SymWrapper::new(paths).map(|i| Egl(i))
-        }
-    }
-}
-
-#[cfg(target_os = "android")]
-mod egl {
-    use super::ffi;
-
-    #[derive(Clone)]
-    pub struct Egl(pub ffi::egl::Egl);
-
-    impl Egl {
-        pub fn new() -> Result<Self, ()> {
-            Ok(Egl(ffi::egl::Egl))
-        }
-    }
-}
-
+mod egl;
 mod make_current_guard;
+pub mod ffi;
 
 pub use self::egl::Egl;
 use self::make_current_guard::MakeCurrentGuard;
@@ -120,7 +20,6 @@ use crate::context::{ContextBuilderWrapper, Robustness};
 use crate::surface::{Rect, SurfaceTypeTrait, SurfaceType, Window, Pixmap, PBuffer};
 use crate::platform_impl::RawHandle;
 
-use glutin_egl_sys as ffi;
 use parking_lot::Mutex;
 #[cfg(any(
     target_os = "android",
@@ -172,10 +71,10 @@ pub struct DisplayInternal {
 pub struct Display(Arc<DisplayInternal>);
 
 impl Display {
-    pub fn new<NDS: NativeDisplay>(nds: &NDS) -> Result<Self, Error> {
+    pub fn new<ND: NativeDisplay>(nd: &ND) -> Result<Self, Error> {
         let egl = EGL.as_ref().unwrap();
         // calling `eglGetDisplay` or equivalent
-        let disp = get_native_display(&nds.display())?;
+        let disp = get_native_display(&nd.display())?;
 
         if disp.is_null() {
             return Err(make_oserror!(OsError::Misc(
@@ -199,7 +98,7 @@ impl Display {
             display: disp,
             extensions,
             egl_version,
-            native_display: nds.display(),
+            native_display: nd.display(),
         })))
     }
 }
@@ -596,7 +495,7 @@ impl Context {
                     unsafe {
                         if egl.SwapInterval(**surf.display, 0) == ffi::egl::FALSE {
                             panic!(
-                                "finish_impl: eglSwapInterval failed: 0x{:x}",
+                                "[glutin] finish_impl: eglSwapInterval failed: 0x{:x}",
                                 egl.GetError()
                             );
                         }
@@ -690,7 +589,7 @@ impl Context {
     //     );
     //     if surface.is_null() {
     //         panic!(
-    //             "on_surface_created: eglCreateWindowSurface failed with
+    //             "[glutin] on_surface_created: eglCreateWindowSurface failed with
     // 0x{:x}",             egl.GetError()
     //         )
     //     }
@@ -698,7 +597,7 @@ impl Context {
     //         egl.MakeCurrent(**self.display, *surface, *surface,
     // self.context);     if ret == 0 {
     //         panic!(
-    //             "on_surface_created: eglMakeCurrent failed with 0x{:x}",
+    //             "[glutin] on_surface_created: eglMakeCurrent failed with 0x{:x}",
     //             egl.GetError()
     //         )
     //     }
@@ -723,7 +622,7 @@ impl Context {
     //     );
     //     if ret == 0 {
     //         panic!(
-    //             "on_surface_destroyed: eglMakeCurrent failed with 0x{:x}",
+    //             "[glutin] on_surface_destroyed: eglMakeCurrent failed with 0x{:x}",
     //             egl.GetError()
     //         )
     //     }
@@ -752,7 +651,7 @@ unsafe fn check_make_current(ret: Option<u32>) -> Result<(), Error> {
         match egl.GetError() as u32 {
             ffi::egl::CONTEXT_LOST => Err(make_error!(ErrorType::ContextLost)),
             err => panic!(
-                "make_current: eglMakeCurrent failed (eglGetError returned 0x{:x})",
+                "[glutin] make_current: eglMakeCurrent failed (eglGetError returned 0x{:x})",
                 err
             ),
         }
@@ -863,7 +762,7 @@ pub fn get_native_visual_id(
     };
     if ret == 0 {
         panic!(
-            "get_native_visual_id: eglGetConfigAttrib failed with 0x{:x}",
+            "[glutin] get_native_visual_id: eglGetConfigAttrib failed with 0x{:x}",
             unsafe { egl.GetError() }
         )
     };
@@ -923,7 +822,7 @@ impl Surface<Window> {
                     return Err(make_error!(ErrorType::ContextLost));
                 }
                 err => panic!(
-                    "swap_buffers: eglSwapBuffers failed (eglGetError returned 0x{:x})",
+                    "[glutin] swap_buffers: eglSwapBuffers failed (eglGetError returned 0x{:x})",
                     err
                 ),
             }
@@ -970,7 +869,7 @@ impl Surface<Window> {
                     return Err(make_error!(ErrorType::ContextLost));
                 }
                 err => panic!(
-                    "swap_buffers: eglSwapBuffers failed (eglGetError returned 0x{:x})",
+                    "[glutin] swap_buffers: eglSwapBuffers failed (eglGetError returned 0x{:x})",
                     err
                 ),
             }
@@ -1485,7 +1384,7 @@ unsafe fn create_context(
             ffi::egl::BAD_MATCH | ffi::egl::BAD_ATTRIBUTE => {
                 return Err(make_error!(ErrorType::OpenGlVersionNotSupported));
             }
-            e => panic!("create_context: eglCreateContext failed: 0x{:x}", e),
+            e => panic!("[glutin] create_context: eglCreateContext failed: 0x{:x}", e),
         }
     }
 

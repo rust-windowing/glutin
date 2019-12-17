@@ -1,4 +1,4 @@
-use glutin_egl_sys as ffi;
+use super::ffi;
 use winit_types::error::Error;
 use winit_types::platform::OsError;
 
@@ -134,7 +134,7 @@ impl Drop for MakeCurrentGuard {
 
             if res == 0 {
                 let err = egl.GetError();
-                panic!("`eglMakeCurrent` failed: 0x{:x}", err)
+                panic!("[glutin] `eglMakeCurrent` failed: 0x{:x}", err)
             }
         }
     }

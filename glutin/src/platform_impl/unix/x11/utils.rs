@@ -17,16 +17,16 @@ pub fn get_visual_info_from_xid(
     let mut num_visuals = 0;
     let vi = unsafe {
         (xlib.XGetVisualInfo)(
-            **disp.display,
+            **disp.native_display,
             VisualIDMask,
             &mut template,
             &mut num_visuals,
         )
     };
     disp
-        .display
+        .native_display
         .check_errors()
-        .expect("Failed to call `XGetVisualInfo`");
+        .expect("[glutin] Failed to call `XGetVisualInfo`");
     assert!(!vi.is_null());
     assert!(num_visuals == 1);
 
@@ -58,7 +58,7 @@ pub fn examine_visual_info(
     unsafe {
         if want_transparency {
             let pict_format = (syms!(XRENDER).XRenderFindVisualFormat)(
-                **disp.display as *mut _,
+                **disp.native_display as *mut _,
                 visual_infos.visual,
             );
             if pict_format.is_null() {

@@ -40,7 +40,7 @@ impl OsMesaContext {
             .map_err(|err| make_oserror!(OsError::OsMesaLoadingError(err)))?;
 
         if cb.sharing.is_some() {
-            panic!("Context sharing not possible with OsMesa")
+            panic!("[glutin] Context sharing not possible with OsMesa")
         }
 
         match cb.robustness {
@@ -121,7 +121,7 @@ impl OsMesaContext {
         // an error can only happen in case of invalid parameter, which would
         // indicate a bug in glutin
         if ret == 0 {
-            panic!("OSMesaMakeCurrent failed");
+            panic!("[glutin] OSMesaMakeCurrent failed");
         }
 
         Ok(())

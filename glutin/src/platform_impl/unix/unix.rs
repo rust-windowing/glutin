@@ -12,6 +12,7 @@ mod x11;
 use crate::config::{Api, ConfigAttribs, ConfigBuilder, ConfigWrapper};
 use crate::context::ContextBuilderWrapper;
 use crate::surface::{PBuffer, Pixmap, Rect, SurfaceTypeTrait, Window};
+use crate::display::DisplayBuilder;
 
 use glutin_interface::{NativeDisplay, NativePixmapBuilder, NativeWindowBuilder, RawDisplay, NativePixmap, NativeWindow};
 use winit_types::dpi;
@@ -45,10 +46,10 @@ pub enum Display {
 }
 
 impl Display {
-    pub fn new<NDS: NativeDisplay>(nds: &NDS) -> Result<Self, Error> {
-        match nds.display() {
-            RawDisplay::Wayland { .. } => wayland::Display::new(nds).map(Display::Wayland),
-            RawDisplay::Xlib { .. } => x11::Display::new(nds).map(Display::X11),
+    pub fn new<ND: NativeDisplay>(db: DisplayBuilder, nd: &ND) -> Result<Self, Error> {
+        match nd.display() {
+            RawDisplay::Wayland { .. } => wayland::Display::new(db, nd).map(Display::Wayland),
+            RawDisplay::Xlib { .. } => x11::Display::new(db, nd).map(Display::X11),
             _ => unimplemented!(),
         }
     }
@@ -340,14 +341,12 @@ impl Surface<Window> {
     }
 }
 
+// FIXME: Add SurfaceBuilder type
 #[derive(Default, Debug, Clone)]
 pub struct SurfacePlatformAttributes {
     /// X11 only: set internally to insure a certain visual xid is used when
     /// choosing the fbconfig.
     pub(crate) x11_visual_xid: Option<std::os::raw::c_ulong>,
-
-    /// Ignored by surfaceless, which is always egl.
-    pub backing_api: BackingApi,
 }
 
 #[derive(Default, Debug, Clone)]
@@ -356,16 +355,21 @@ pub struct ContextPlatformAttributes {
     pub glx_transparency: Option<bool>,
 }
 
+#[derive(Default, Debug, Clone)]
+pub struct DisplayPlatformAttributes {
+    pub backing_api: BackingApi,
+}
+
 #[derive(Debug, Clone)]
 pub enum BackingApi {
-    GlxThenEgl,
-    EglThenGlx,
-    Egl,
-    Glx,
+    GLXThenEGL,
+    EGLThenGLX,
+    EGL,
+    GLX,
 }
 
 impl Default for BackingApi {
     fn default() -> Self {
-        BackingApi::GlxThenEgl
+        BackingApi::GLXThenEGL
     }
 }

@@ -1,11 +1,12 @@
 use crate::api::egl;
 use crate::config::{Api, ConfigAttribs, ConfigBuilder, ConfigWrapper};
 use crate::context::ContextBuilderWrapper;
-use crate::platform_impl::RawHandle;
+use crate::platform_impl::{RawHandle, BackingApi};
 use crate::surface::{PBuffer, Pixmap, Rect, SurfaceTypeTrait, Window};
 use crate::utils::NoPrint;
+use crate::display::DisplayBuilder;
+use crate::api::egl::ffi;
 
-use glutin_egl_sys as ffi;
 use glutin_interface::{NativeDisplay, NativePixmapBuilder, NativeWindowBuilder, NativeWindow, RawWindow, NativePixmap};
 use wayland_client::egl as wegl;
 pub use wayland_client::sys::client::wl_display;
@@ -21,8 +22,20 @@ use std::sync::Arc;
 pub struct Display(egl::Display);
 
 impl Display {
-    pub fn new<NDS: NativeDisplay>(nds: &NDS) -> Result<Self, Error> {
-        egl::Display::new(nds).map(Display)
+    pub fn new<ND: NativeDisplay>(db: DisplayBuilder, nd: &ND) -> Result<Self, Error> {
+        let glx_not_supported_error = make_error!(ErrorType::NotSupported(
+                "GLX not supported by Wayland".to_string(),
+            ));
+        match db.plat_attr.backing_api {
+            BackingApi::GLX => return Err(glx_not_supported_error),
+            BackingApi::GLXThenEGL => warn!("[glutin] Not trying GLX with Wayland, as not supported by Wayland."),
+            _ => (),
+        }
+
+        egl::Display::new(nd).map(Display).map_err(|err| match db.plat_attr.backing_api {
+            BackingApi::GLXThenEGL => append_errors!(err, glx_not_supported_error),
+            _ => err,
+        })
     }
 }
 
