@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::display::Display;
 use crate::platform_impl;
 
-use glutin_interface::{NativePixmapBuilder, NativeWindowBuilder, NativePixmap, NativeWindow};
+use glutin_interface::{NativePixmap, NativePixmapBuilder, NativeWindow, NativeWindowBuilder};
 use winit_types::dpi;
 use winit_types::error::Error;
 
@@ -25,13 +25,19 @@ pub enum PBuffer {}
 pub enum Pixmap {}
 
 impl SurfaceTypeTrait for Window {
-    fn surface_type() -> SurfaceType { SurfaceType::Window }
+    fn surface_type() -> SurfaceType {
+        SurfaceType::Window
+    }
 }
 impl SurfaceTypeTrait for PBuffer {
-    fn surface_type() -> SurfaceType { SurfaceType::PBuffer }
+    fn surface_type() -> SurfaceType {
+        SurfaceType::PBuffer
+    }
 }
 impl SurfaceTypeTrait for Pixmap {
-    fn surface_type() -> SurfaceType { SurfaceType::Pixmap }
+    fn surface_type() -> SurfaceType {
+        SurfaceType::Pixmap
+    }
 }
 
 #[derive(Debug)]
@@ -71,8 +77,7 @@ impl Surface<Pixmap> {
         conf: &Config,
         np: &NP,
     ) -> Result<Self, Error> {
-        platform_impl::Surface::<Pixmap>::new_existing(&disp.0, conf.as_ref(), np)
-            .map(Surface)
+        platform_impl::Surface::<Pixmap>::new_existing(&disp.0, conf.as_ref(), np).map(Surface)
     }
 }
 
@@ -83,8 +88,7 @@ impl Surface<PBuffer> {
         conf: &Config,
         size: dpi::PhysicalSize,
     ) -> Result<Self, Error> {
-        platform_impl::Surface::<PBuffer>::new(&disp.0, conf.as_ref(), size)
-            .map(Surface)
+        platform_impl::Surface::<PBuffer>::new(&disp.0, conf.as_ref(), size).map(Surface)
     }
 }
 
@@ -105,8 +109,7 @@ impl Surface<Window> {
         conf: &Config,
         nw: &NW,
     ) -> Result<Self, Error> {
-        platform_impl::Surface::<Window>::new_existing(&disp.0, conf.as_ref(), nw)
-            .map(Surface)
+        platform_impl::Surface::<Window>::new_existing(&disp.0, conf.as_ref(), nw).map(Surface)
     }
 
     #[inline]

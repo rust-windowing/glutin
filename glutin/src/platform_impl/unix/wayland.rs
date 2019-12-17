@@ -1,13 +1,15 @@
 use crate::api::egl;
+use crate::api::egl::ffi;
 use crate::config::{Api, ConfigAttribs, ConfigBuilder, ConfigWrapper};
 use crate::context::ContextBuilderWrapper;
-use crate::platform_impl::{RawHandle, BackingApi};
+use crate::display::DisplayBuilder;
+use crate::platform_impl::{BackingApi, RawHandle};
 use crate::surface::{PBuffer, Pixmap, Rect, SurfaceTypeTrait, Window};
 use crate::utils::NoPrint;
-use crate::display::DisplayBuilder;
-use crate::api::egl::ffi;
 
-use glutin_interface::{NativeDisplay, NativePixmapBuilder, NativeWindowBuilder, NativeWindow, RawWindow, NativePixmap};
+use glutin_interface::{
+    NativeDisplay, NativePixmap, NativePixmapBuilder, NativeWindow, NativeWindowBuilder, RawWindow,
+};
 use wayland_client::egl as wegl;
 pub use wayland_client::sys::client::wl_display;
 use winit_types::dpi;
@@ -24,18 +26,22 @@ pub struct Display(egl::Display);
 impl Display {
     pub fn new<ND: NativeDisplay>(db: DisplayBuilder, nd: &ND) -> Result<Self, Error> {
         let glx_not_supported_error = make_error!(ErrorType::NotSupported(
-                "GLX not supported by Wayland".to_string(),
-            ));
+            "GLX not supported by Wayland".to_string(),
+        ));
         match db.plat_attr.backing_api {
             BackingApi::GLX => return Err(glx_not_supported_error),
-            BackingApi::GLXThenEGL => warn!("[glutin] Not trying GLX with Wayland, as not supported by Wayland."),
+            BackingApi::GLXThenEGL => {
+                warn!("[glutin] Not trying GLX with Wayland, as not supported by Wayland.")
+            }
             _ => (),
         }
 
-        egl::Display::new(nd).map(Display).map_err(|err| match db.plat_attr.backing_api {
-            BackingApi::GLXThenEGL => append_errors!(err, glx_not_supported_error),
-            _ => err,
-        })
+        egl::Display::new(nd)
+            .map(Display)
+            .map_err(|err| match db.plat_attr.backing_api {
+                BackingApi::GLXThenEGL => append_errors!(err, glx_not_supported_error),
+                _ => err,
+            })
     }
 }
 
@@ -43,10 +49,7 @@ impl Display {
 pub struct Config(egl::Config);
 
 impl Config {
-    pub fn new(
-        disp: &Display,
-        cb: ConfigBuilder,
-    ) -> Result<(ConfigAttribs, Config), Error> {
+    pub fn new(disp: &Display, cb: ConfigBuilder) -> Result<(ConfigAttribs, Config), Error> {
         egl::Config::new(&disp.0, cb, |confs, _| Ok(confs[0]))
             .map(|(attribs, conf)| (attribs, Config(conf)))
     }
@@ -83,8 +86,7 @@ impl Surface<Window> {
         nwb: NWB,
     ) -> Result<(NWB::Window, Self), Error> {
         let win = nwb.build_wayland()?;
-        Self::new_existing(disp, conf, &win)
-            .map(|surf| (win, surf))
+        Self::new_existing(disp, conf, &win).map(|surf| (win, surf))
     }
 
     #[inline]
@@ -97,7 +99,7 @@ impl Surface<Window> {
 
         let surface = nw.raw_window();
         let surface = match surface {
-            RawWindow::Wayland{ wl_surface } => wl_surface,
+            RawWindow::Wayland { wl_surface } => wl_surface,
             _ => {
                 return Err(make_error!(ErrorType::NotSupported(
                     "Wayland surface not found".to_string(),
@@ -106,11 +108,7 @@ impl Surface<Window> {
         };
 
         let wsurface = unsafe {
-            wegl::WlEglSurface::new_from_raw(
-                surface as *mut _,
-                width as i32,
-                height as i32,
-            )
+            wegl::WlEglSurface::new_from_raw(surface as *mut _, width as i32, height as i32)
         };
 
         egl::Surface::<Window>::new(
@@ -118,13 +116,19 @@ impl Surface<Window> {
             conf.map_config(|conf| &conf.0),
             wsurface.ptr() as *const _,
         )
-        .map(|surface| Surface { wsurface: Some(NoPrint(wsurface)), surface })
+        .map(|surface| Surface {
+            wsurface: Some(NoPrint(wsurface)),
+            surface,
+        })
     }
 
     #[inline]
     pub fn update_after_resize(&self, size: dpi::PhysicalSize) {
         let (width, height): (u32, u32) = size.into();
-        self.wsurface.as_ref().unwrap().resize(width as i32, height as i32, 0, 0)
+        self.wsurface
+            .as_ref()
+            .unwrap()
+            .resize(width as i32, height as i32, 0, 0)
     }
 
     #[inline]
@@ -145,12 +149,12 @@ impl Surface<PBuffer> {
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         size: dpi::PhysicalSize,
     ) -> Result<Self, Error> {
-        egl::Surface::<PBuffer>::new(
-            &disp.0,
-            conf.map_config(|conf| &conf.0),
-            size,
+        egl::Surface::<PBuffer>::new(&disp.0, conf.map_config(|conf| &conf.0), size).map(
+            |surface| Surface {
+                wsurface: None,
+                surface,
+            },
         )
-        .map(|surface| Surface { wsurface: None, surface })
     }
 }
 
@@ -192,7 +196,8 @@ impl Context {
             &disp.0,
             cb.map_sharing(|ctx| &ctx.0),
             conf.map_config(|conf| &conf.0),
-        ).map(Context)
+        )
+        .map(Context)
     }
 
     #[inline]

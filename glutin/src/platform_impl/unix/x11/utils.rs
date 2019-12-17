@@ -4,10 +4,7 @@ use x11_dl::xlib::{VisualID, VisualIDMask, XVisualInfo};
 
 use std::sync::Arc;
 
-pub fn get_visual_info_from_xid(
-    disp: &Display,
-    xid: VisualID,
-) -> XVisualInfo {
+pub fn get_visual_info_from_xid(disp: &Display, xid: VisualID) -> XVisualInfo {
     let xlib = syms!(XLIB);
 
     assert_ne!(xid, 0);
@@ -23,15 +20,15 @@ pub fn get_visual_info_from_xid(
             &mut num_visuals,
         )
     };
-    disp
-        .native_display
+    disp.native_display
         .check_errors()
         .expect("[glutin] Failed to call `XGetVisualInfo`");
     assert!(!vi.is_null());
     assert!(num_visuals == 1);
 
     let vi_copy = unsafe { std::ptr::read(vi as *const _) };
-    unsafe { (xlib.XFree)(vi as *mut _);
+    unsafe {
+        (xlib.XFree)(vi as *mut _);
     }
     vi_copy
 }

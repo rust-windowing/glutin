@@ -11,10 +11,12 @@ mod x11;
 
 use crate::config::{Api, ConfigAttribs, ConfigBuilder, ConfigWrapper};
 use crate::context::ContextBuilderWrapper;
-use crate::surface::{PBuffer, Pixmap, Rect, SurfaceTypeTrait, Window};
 use crate::display::DisplayBuilder;
+use crate::surface::{PBuffer, Pixmap, Rect, SurfaceTypeTrait, Window};
 
-use glutin_interface::{NativeDisplay, NativePixmapBuilder, NativeWindowBuilder, RawDisplay, NativePixmap, NativeWindow};
+use glutin_interface::{
+    NativeDisplay, NativePixmap, NativePixmapBuilder, NativeWindow, NativeWindowBuilder, RawDisplay,
+};
 use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
 use winit_types::platform::OsError;
@@ -77,10 +79,7 @@ pub enum Config {
 
 impl Config {
     #[inline]
-    pub fn new(
-        disp: &Display,
-        cb: ConfigBuilder,
-    ) -> Result<(ConfigAttribs, Config), Error> {
+    pub fn new(disp: &Display, cb: ConfigBuilder) -> Result<(ConfigAttribs, Config), Error> {
         wayland::Config::new(Display::inner_wayland(disp), cb)
             .map(|(attribs, config)| (attribs, Config::Wayland(config)))
     }

@@ -1,7 +1,7 @@
 #[cfg(not(target_os = "android"))]
 mod egl {
-    use crate::api::egl::ffi;
     use crate::api::dlloader::{SymTrait, SymWrapper};
+    use crate::api::egl::ffi;
     use libloading;
     use parking_lot::Mutex;
     use std::sync::Arc;

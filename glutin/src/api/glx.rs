@@ -6,21 +6,19 @@
     target_os = "openbsd",
 ))]
 
-mod make_current_guard;
-mod glx;
 pub mod ffi;
+mod glx;
+mod make_current_guard;
 
 pub use self::glx::Glx;
 use self::make_current_guard::MakeCurrentGuard;
 
-use crate::context::{ContextBuilderWrapper, Robustness, GlProfile};
-use crate::config::{Api, GlRequest, ReleaseBehavior, GlVersion};
-use crate::platform::unix::x11::XConnection;
-use crate::platform_impl::x11_utils::SurfaceType;
+use crate::config::{Api, GlRequest, GlVersion, ReleaseBehavior};
+use crate::context::{ContextBuilderWrapper, GlProfile, Robustness};
 
+use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
 use winit_types::platform::OsError;
-use winit_types::dpi;
 
 use std::ffi::{CStr, CString};
 use std::os::raw;

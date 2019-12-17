@@ -9,17 +9,20 @@
 ))]
 
 mod egl;
-mod make_current_guard;
 pub mod ffi;
+mod make_current_guard;
 
 pub use self::egl::Egl;
 use self::make_current_guard::MakeCurrentGuard;
 
-use crate::config::{Api, GlRequest, GlVersion, ReleaseBehavior, ConfigAttribs, ConfigBuilder, ConfigWrapper};
+use crate::config::{
+    Api, ConfigAttribs, ConfigBuilder, ConfigWrapper, GlRequest, GlVersion, ReleaseBehavior,
+};
 use crate::context::{ContextBuilderWrapper, Robustness};
-use crate::surface::{Rect, SurfaceTypeTrait, SurfaceType, Window, Pixmap, PBuffer};
 use crate::platform_impl::RawHandle;
+use crate::surface::{PBuffer, Pixmap, Rect, SurfaceType, SurfaceTypeTrait, Window};
 
+use glutin_interface::{NativeDisplay, RawDisplay};
 use parking_lot::Mutex;
 #[cfg(any(
     target_os = "android",
@@ -33,7 +36,6 @@ use parking_lot::Mutex;
 use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
 use winit_types::platform::OsError;
-use glutin_interface::{RawDisplay, NativeDisplay};
 
 use std::ffi::{c_void, CStr, CString};
 use std::marker::PhantomData;
@@ -306,7 +308,11 @@ fn get_native_display(ndisp: &RawDisplay) -> Result<*const raw::c_void, Error> {
             let d = display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _);
             // TODO: `PLATFORM_X11_SCREEN_KHR`
             unsafe {
-                Ok(egl.GetPlatformDisplay(ffi::egl::PLATFORM_X11_KHR, d as *mut _, std::ptr::null()))
+                Ok(egl.GetPlatformDisplay(
+                    ffi::egl::PLATFORM_X11_KHR,
+                    d as *mut _,
+                    std::ptr::null(),
+                ))
             }
         }
 
@@ -317,7 +323,11 @@ fn get_native_display(ndisp: &RawDisplay) -> Result<*const raw::c_void, Error> {
             let d = display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _);
             // TODO: `PLATFORM_X11_SCREEN_EXT`
             unsafe {
-                Ok(egl.GetPlatformDisplayEXT(ffi::egl::PLATFORM_X11_EXT, d as *mut _, std::ptr::null()))
+                Ok(egl.GetPlatformDisplayEXT(
+                    ffi::egl::PLATFORM_X11_EXT,
+                    d as *mut _,
+                    std::ptr::null(),
+                ))
             }
         }
 
@@ -326,7 +336,11 @@ fn get_native_display(ndisp: &RawDisplay) -> Result<*const raw::c_void, Error> {
         {
             let d = gbm_device.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _);
             unsafe {
-                Ok(egl.GetPlatformDisplay(ffi::egl::PLATFORM_GBM_KHR, d as *mut _, std::ptr::null()))
+                Ok(egl.GetPlatformDisplay(
+                    ffi::egl::PLATFORM_GBM_KHR,
+                    d as *mut _,
+                    std::ptr::null(),
+                ))
             }
         }
 
@@ -336,7 +350,11 @@ fn get_native_display(ndisp: &RawDisplay) -> Result<*const raw::c_void, Error> {
         {
             let d = gbm_device.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _);
             unsafe {
-                Ok(egl.GetPlatformDisplayEXT(ffi::egl::PLATFORM_GBM_KHR, d as *mut _, std::ptr::null()))
+                Ok(egl.GetPlatformDisplayEXT(
+                    ffi::egl::PLATFORM_GBM_KHR,
+                    d as *mut _,
+                    std::ptr::null(),
+                ))
             }
         }
 
@@ -393,12 +411,21 @@ fn get_native_display(ndisp: &RawDisplay) -> Result<*const raw::c_void, Error> {
             ))
         }
 
-        RawDisplay::Xlib { display: Some(display) }
-        | RawDisplay::Gbm { gbm_device: Some(display) }
-        | RawDisplay::Wayland { wl_display: Some(display) }
-        | RawDisplay::EGLExtDevice { egl_device_ext: display }
-        | RawDisplay::Windows { hwnd: Some(display) }
-        => unsafe { Ok(egl.GetDisplay(display as *mut _)) },
+        RawDisplay::Xlib {
+            display: Some(display),
+        }
+        | RawDisplay::Gbm {
+            gbm_device: Some(display),
+        }
+        | RawDisplay::Wayland {
+            wl_display: Some(display),
+        }
+        | RawDisplay::EGLExtDevice {
+            egl_device_ext: display,
+        }
+        | RawDisplay::Windows {
+            hwnd: Some(display),
+        } => unsafe { Ok(egl.GetDisplay(display as *mut _)) },
 
         RawDisplay::Xlib { display: None }
         | RawDisplay::Gbm { gbm_device: None }
@@ -983,10 +1010,7 @@ unsafe fn choose_fbconfig<F>(
     mut conf_selector: F,
 ) -> Result<(ffi::egl::types::EGLConfig, ConfigAttribs), Error>
 where
-    F: FnMut(
-        Vec<ffi::egl::types::EGLConfig>,
-        &Display,
-    ) -> Result<ffi::egl::types::EGLConfig, ()>,
+    F: FnMut(Vec<ffi::egl::types::EGLConfig>, &Display) -> Result<ffi::egl::types::EGLConfig, ()>,
 {
     let egl = EGL.as_ref().unwrap();
 
@@ -1177,8 +1201,7 @@ where
         conf_ids
             .into_iter()
             .filter_map(|conf_id| {
-                let min_swap_interval =
-                    attrib!(egl, disp, conf_id, ffi::egl::MIN_SWAP_INTERVAL,);
+                let min_swap_interval = attrib!(egl, disp, conf_id, ffi::egl::MIN_SWAP_INTERVAL,);
 
                 if let Err(min_swap_interval) = min_swap_interval {
                     return Some(Err(min_swap_interval));
@@ -1188,8 +1211,7 @@ where
                     return None;
                 }
 
-                let max_swap_interval =
-                    attrib!(egl, disp, conf_id, ffi::egl::MAX_SWAP_INTERVAL,);
+                let max_swap_interval = attrib!(egl, disp, conf_id, ffi::egl::MAX_SWAP_INTERVAL,);
 
                 if let Err(max_swap_interval) = max_swap_interval {
                     return Some(Err(max_swap_interval));
@@ -1210,8 +1232,8 @@ where
         return Err(make_error!(ErrorType::NoAvailableConfig));
     }
 
-    let conf_id = conf_selector(conf_ids, disp)
-        .map_err(|_| make_error!(ErrorType::NoAvailableConfig))?;
+    let conf_id =
+        conf_selector(conf_ids, disp).map_err(|_| make_error!(ErrorType::NoAvailableConfig))?;
 
     let mut min_swap_interval = attrib!(egl, disp, conf_id, ffi::egl::MIN_SWAP_INTERVAL,)?;
 
@@ -1384,7 +1406,10 @@ unsafe fn create_context(
             ffi::egl::BAD_MATCH | ffi::egl::BAD_ATTRIBUTE => {
                 return Err(make_error!(ErrorType::OpenGlVersionNotSupported));
             }
-            e => panic!("[glutin] create_context: eglCreateContext failed: 0x{:x}", e),
+            e => panic!(
+                "[glutin] create_context: eglCreateContext failed: 0x{:x}",
+                e
+            ),
         }
     }
 

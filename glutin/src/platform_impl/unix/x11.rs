@@ -1,11 +1,11 @@
 use crate::api::egl::{self, EGL};
+use crate::api::glx::{self, ffi, GLX};
 use crate::display::DisplayBuilder;
-use crate::api::glx::{self, GLX, ffi};
 
-use winit_types::dpi;
-use winit_types::error::Error;
 use glutin_interface::NativeDisplay;
 use glutin_x11_sym::Display as X11Display;
+use winit_types::dpi;
+use winit_types::error::Error;
 
 use std::ops::{Deref, DerefMut};
 use std::os::raw;

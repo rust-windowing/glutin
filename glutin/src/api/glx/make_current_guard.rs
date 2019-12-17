@@ -1,5 +1,6 @@
-use crate::platform::unix::x11::XConnection;
 use super::ffi;
+
+use glutin_x11_sym::Display;
 
 use std::sync::Arc;
 
@@ -9,7 +10,7 @@ use std::sync::Arc;
 pub struct MakeCurrentGuard {
     old_display: *mut ffi::Display,
     display: *mut ffi::Display,
-    xconn: Arc<XConnection>,
+    x11_display: Arc<Display>,
     possibly_invalid: Option<MakeCurrentGuardInner>,
 }
 
@@ -21,7 +22,7 @@ struct MakeCurrentGuardInner {
 
 impl MakeCurrentGuard {
     pub fn new(
-        xconn: &Arc<XConnection>,
+        x11_display: &Arc<Display>,
         drawable: ffi::glx::types::GLXDrawable,
         context: ffi::glx::types::GLXContext,
     ) -> Result<Self, String> {
@@ -30,19 +31,18 @@ impl MakeCurrentGuard {
 
             let ret = MakeCurrentGuard {
                 old_display: glx.GetCurrentDisplay() as *mut _,
-                display: xconn.display as *mut _,
-                xconn: Arc::clone(xconn),
+                display: x11_display.display as *mut _,
+                x11_display: Arc::clone(x11_display),
                 possibly_invalid: Some(MakeCurrentGuardInner {
                     old_drawable: glx.GetCurrentDrawable(),
                     old_context: glx.GetCurrentContext(),
                 }),
             };
 
-            let res =
-                glx.MakeCurrent(xconn.display as *mut _, drawable, context);
+            let res = glx.MakeCurrent(x11_display.display as *mut _, drawable, context);
 
             if res == 0 {
-                let err = xconn.check_errors();
+                let err = x11_display.check_errors();
                 Err(format!("`glXMakeCurrent` failed: {:?}", err))
             } else {
                 Ok(ret)
@@ -72,11 +72,10 @@ impl Drop for MakeCurrentGuard {
             old_display => old_display,
         };
 
-        let res =
-            unsafe { glx.MakeCurrent(display as *mut _, drawable, context) };
+        let res = unsafe { glx.MakeCurrent(display as *mut _, drawable, context) };
 
         if res == 0 {
-            let err = self.xconn.check_errors();
+            let err = self.x11_display.check_errors();
             panic!("`glXMakeCurrent` failed: {:?}", err);
         }
     }

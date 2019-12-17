@@ -1,7 +1,7 @@
 use crate::platform_impl;
 
-use winit_types::error::Error;
 use glutin_interface::NativeDisplay;
+use winit_types::error::Error;
 
 #[derive(Debug)]
 pub struct Display(pub(crate) platform_impl::Display);

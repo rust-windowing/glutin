@@ -1,5 +1,5 @@
-use crate::api::dlloader::{SymTrait, SymWrapper};
 use super::ffi;
+use crate::api::dlloader::{SymTrait, SymWrapper};
 use std::ops::{Deref, DerefMut};
 
 #[derive(Clone)]
@@ -12,12 +12,12 @@ impl SymTrait for ffi::glx::Glx {
     fn load_with(lib: &libloading::Library) -> Self {
         Self::load_with(|sym| unsafe {
             lib.get(
-                    std::ffi::CString::new(sym.as_bytes())
-                        .unwrap()
-                        .as_bytes_with_nul(),
-                )
-                .map(|sym| *sym)
-                .unwrap_or(std::ptr::null_mut())
+                std::ffi::CString::new(sym.as_bytes())
+                    .unwrap()
+                    .as_bytes_with_nul(),
+            )
+            .map(|sym| *sym)
+            .unwrap_or(std::ptr::null_mut())
         })
     }
 }

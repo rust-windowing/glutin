@@ -56,14 +56,9 @@ impl Context {
 
 impl<'a> ContextBuilder<'a> {
     #[inline]
-    pub fn build(
-        self,
-        disp: &Display,
-        conf: &Config,
-    ) -> Result<Context, Error> {
+    pub fn build(self, disp: &Display, conf: &Config) -> Result<Context, Error> {
         let cb = self.map_sharing(|ctx| &ctx.0);
-        platform_impl::Context::new(&disp.0, cb, conf.as_ref())
-            .map(Context)
+        platform_impl::Context::new(&disp.0, cb, conf.as_ref()).map(Context)
     }
 }
 
