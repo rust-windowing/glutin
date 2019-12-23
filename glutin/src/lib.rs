@@ -628,7 +628,7 @@ pub struct PixelFormatRequirements {
     pub stereoscopy: bool,
 
     /// If true, only sRGB-capable formats will be considered. If false, don't
-    /// care. The default is `false`.
+    /// care. The default is `true`.
     pub srgb: bool,
 
     /// The behavior when changing the current context. Default is `Flush`.
