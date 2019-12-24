@@ -69,6 +69,9 @@
     //missing_docs,
 )]
 
+// FIXME: Remove before 0.23
+#![allow(unused_imports)]
+
 #[cfg(any(
     target_os = "windows",
     target_os = "linux",

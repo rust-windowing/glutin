@@ -3,7 +3,7 @@ use crate::api::egl::ffi;
 use crate::config::{Api, ConfigAttribs, ConfigBuilder, ConfigWrapper};
 use crate::context::ContextBuilderWrapper;
 use crate::display::DisplayBuilder;
-use crate::platform_impl::{BackingApi, RawHandle};
+use crate::platform_impl::BackingApi;
 use crate::surface::{PBuffer, Pixmap, Rect, SurfaceTypeTrait, Window};
 use crate::utils::NoPrint;
 
@@ -36,7 +36,7 @@ impl Display {
             _ => (),
         }
 
-        egl::Display::new(nd)
+        egl::Display::new(db, nd)
             .map(Display)
             .map_err(|err| match db.plat_attr.backing_api {
                 BackingApi::GLXThenEGL => append_errors!(err, glx_not_supported_error),
@@ -85,8 +85,8 @@ impl Surface<Window> {
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         nwb: NWB,
     ) -> Result<(NWB::Window, Self), Error> {
-        let win = nwb.build_wayland()?;
-        Self::new_existing(disp, conf, &win).map(|surf| (win, surf))
+        let nw = nwb.build_wayland()?;
+        Self::new_existing(disp, conf, &nw).map(|surf| (nw, surf))
     }
 
     #[inline]
@@ -223,16 +223,6 @@ impl Context {
     #[inline]
     pub fn get_api(&self) -> Api {
         self.0.get_api()
-    }
-
-    #[inline]
-    pub unsafe fn raw_handle(&self) -> RawHandle {
-        self.0.raw_handle()
-    }
-
-    #[inline]
-    pub unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
-        Some(self.0.get_egl_display())
     }
 
     #[inline]

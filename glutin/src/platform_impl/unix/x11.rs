@@ -1,8 +1,11 @@
 use crate::api::egl::{self, EGL};
 use crate::api::glx::{self, ffi, GLX};
 use crate::display::DisplayBuilder;
+use crate::surface::SurfaceTypeTrait;
+use crate::config::{ConfigBuilder, ConfigAttribs};
+use crate::platform_impl::BackingApi;
 
-use glutin_interface::NativeDisplay;
+use glutin_interface::{NativeDisplay, RawDisplay};
 use glutin_x11_sym::Display as X11Display;
 use winit_types::dpi;
 use winit_types::error::Error;
@@ -22,15 +25,84 @@ pub struct Display {
 #[derive(Debug)]
 pub enum BackendDisplay {
     Egl(egl::Display),
-    Glx(glx::Display),
+    //Glx(glx::Display),
 }
 
 impl Display {
     pub fn new<ND: NativeDisplay>(db: DisplayBuilder, nd: &ND) -> Result<Self, Error> {
-        unimplemented!()
-        //egl::Display::new(nd).map(Display)
+        let native_display = match nd.display() {
+            RawDisplay::Xlib { display, .. } => X11Display::from_raw(display),
+            _ => unreachable!(),
+        };
+
+        let display = BackendDisplay::new(db, nd)?;
+        Ok(Display {
+            display,
+            native_display,
+        })
     }
 }
+
+impl BackendDisplay {
+    fn new<ND: NativeDisplay>(db: DisplayBuilder, nd: &ND) -> Result<Self, Error> {
+        let disp = match db.plat_attr.backing_api {
+            BackingApi::GLX | BackingApi::GLXThenEGL => unimplemented!(),
+            BackingApi::EGL | BackingApi::EGLThenGLX => egl::Display::new(db, nd).map(BackendDisplay::Egl),
+        };
+
+        match (disp, db.plat_attr.backing_api) {
+            (_, BackingApi::GLX) | (_, BackingApi::EGL) |(Ok(_), _) => return disp,
+            _ => (),
+        }
+
+        let disp2 = match db.plat_attr.backing_api {
+            BackingApi::EGLThenGLX => unimplemented!(),
+            BackingApi::GLXThenEGL => egl::Display::new(db, nd).map(BackendDisplay::Egl),
+        };
+
+        match (disp, disp2) {
+            (_, Ok(disp2)) => Ok(disp2),
+            (Err(err1), Err(err2)) => Err(append_errors!(err1, err2))
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum Config {
+    Egl(egl::Config),
+    //Glx(glx::Display),
+}
+
+impl Config {
+    pub fn new(disp: &Display, cb: ConfigBuilder) -> Result<(ConfigAttribs, Config), Error> {
+        match disp.display {
+            BackendDisplay::Egl(ref disp) => egl::Config::new(disp, cb, |confs, _| Ok(confs[0]))
+                .map(|(attribs, conf)| (attribs, Config::Egl(conf))),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum Context {
+    Egl(egl::Context),
+    //Glx(glx::Display),
+}
+
+#[derive(Debug)]
+pub enum Surface<T: SurfaceTypeTrait> {
+    Egl(egl::Surface<T>),
+    //Glx(glx::Display),
+}
+
+
+
+
+
+
+
+
+
+
 
 //#[derive(Debug)]
 //struct NoX11Connection;

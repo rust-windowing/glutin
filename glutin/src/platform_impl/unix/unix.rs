@@ -26,15 +26,6 @@ use std::marker::PhantomData;
 use std::os::raw;
 use std::sync::Arc;
 
-/// Context handles available on Unix-like platforms.
-#[derive(Clone, Debug)]
-pub enum RawHandle {
-    /// Context handle for a glx context.
-    Glx(glutin_glx_sys::glx::types::GLXContext),
-    /// Context handle for a egl context.
-    Egl(glutin_egl_sys::EGLContext),
-}
-
 #[derive(Debug)]
 pub enum ContextType {
     // X11,
@@ -52,79 +43,70 @@ impl Display {
         match nd.display() {
             RawDisplay::Wayland { .. } => wayland::Display::new(db, nd).map(Display::Wayland),
             RawDisplay::Xlib { .. } => x11::Display::new(db, nd).map(Display::X11),
+            RawDisplay::XCB { .. } => return Err(make_error!(ErrorType::NotSupported(
+                "Making an OpenGL context with XCB is not supported. If you are using Xlib/XCB, please pass in the Xlib handles.".to_string(),
+            ))),
+            // FIXME: GBM/EGLExtDevice/EGLMesaSurfaceles backends.
             _ => unimplemented!(),
-        }
-    }
-
-    fn inner_wayland(disp: &Display) -> &wayland::Display {
-        match disp {
-            Display::Wayland(disp) => disp,
-            _ => unreachable!(),
-        }
-    }
-
-    fn inner_x11(disp: &Display) -> &x11::Display {
-        match disp {
-            Display::X11(disp) => disp,
-            _ => unreachable!(),
         }
     }
 }
 
 #[derive(Debug)]
 pub enum Config {
-    // X11(x11::Config),
+    X11(x11::Config),
     Wayland(wayland::Config),
 }
 
 impl Config {
     #[inline]
     pub fn new(disp: &Display, cb: ConfigBuilder) -> Result<(ConfigAttribs, Config), Error> {
-        wayland::Config::new(Display::inner_wayland(disp), cb)
-            .map(|(attribs, config)| (attribs, Config::Wayland(config)))
-    }
-
-    fn inner_wayland<'a, 'b>(
-        conf: ConfigWrapper<&'a Config, &'b ConfigAttribs>,
-    ) -> ConfigWrapper<&'a wayland::Config, &'b ConfigAttribs> {
-        conf.map_config(|conf| match conf {
-            Config::Wayland(conf) => conf,
-            _ => unreachable!(),
-        })
+        match disp {
+            Display::Wayland(disp) => wayland::Config::new(disp, cb)
+                .map(|(attribs, config)| (attribs, Config::Wayland(config))),
+            Display::X11(disp) => x11::Config::new(disp, cb)
+                .map(|(attribs, config)| (attribs, Config::X11(config))),
+        }
     }
 }
 
 #[derive(Debug)]
 pub enum Context {
-    // X11(x11::Context),
+    X11(x11::Context),
     Wayland(wayland::Context),
 }
 
 impl Context {
     fn inner_cb_wayland(
         cb: ContextBuilderWrapper<&Context>,
-    ) -> ContextBuilderWrapper<&wayland::Context> {
-        cb.map_sharing(|ctx| match ctx {
+    ) -> Result<ContextBuilderWrapper<&wayland::Context>, Error> {
+        match cb.sharing {
+            Some(Context::Wayland(_)) | None => (),
+            _ => return Err(make_error!(ErrorType::BadApiUsage(
+                "Cannot share a Wayland context with a non-Wayland context".to_string()
+            ))),
+        }
+
+        Ok(cb.map_sharing(|ctx| match ctx {
             Context::Wayland(ctx) => ctx,
             _ => unreachable!(),
-        })
+        }))
     }
 
-    fn is_compatible(c: &Option<&Context>, ct: ContextType) -> Result<(), Error> {
-        if let Some(c) = *c {
-            match ct {
-                ContextType::Wayland => match *c {
-                    Context::Wayland(_) => Ok(()),
-                    _ => {
-                        return Err(make_error!(ErrorType::BadApiUsage(
-                            "Cannot share a Wayland context with a non-Wayland context".to_string()
-                        )));
-                    }
-                },
-            }
-        } else {
-            Ok(())
+    fn inner_cb_x11(
+        cb: ContextBuilderWrapper<&Context>,
+    ) -> Result<ContextBuilderWrapper<&x11::Context>, Error> {
+        match cb.sharing {
+            Some(Context::X11(_)) | None => (),
+            _ => return Err(make_error!(ErrorType::BadApiUsage(
+                "Cannot share a X11 context with a non-X11 context".to_string()
+            ))),
         }
+
+        Ok(cb.map_sharing(|ctx| match ctx {
+            Context::X11(ctx) => ctx,
+            _ => unreachable!(),
+        }))
     }
 
     #[inline]
@@ -133,18 +115,34 @@ impl Context {
         cb: ContextBuilderWrapper<&Context>,
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
     ) -> Result<Self, Error> {
-        wayland::Context::new(
-            Display::inner_wayland(disp),
-            Context::inner_cb_wayland(cb),
-            Config::inner_wayland(conf),
-        )
-        .map(Context::Wayland)
+        match (disp, conf.config) {
+            (Display::Wayland(disp), Config::Wayland(config)) => {
+                wayland::Context::new(
+                    disp,
+                    Context::inner_cb_wayland(cb)?,
+                    conf.map_config(|_| config),
+                )
+                .map(Context::Wayland)
+            },
+            (Display::X11(disp), Config::X11(config)) => {
+                x11::Context::new(
+                    disp,
+                    Context::inner_cb_x11(cb)?,
+                    conf.map_config(|_| config),
+                )
+                .map(Context::X11)
+            },
+            (_, _) => Err(make_error!(ErrorType::BadApiUsage(
+                "Incompatible display and config backends.".to_string()
+            ))),
+        }
     }
 
     #[inline]
     pub unsafe fn make_current_surfaceless(&self) -> Result<(), Error> {
         match self {
             Context::Wayland(ref ctx) => ctx.make_current_surfaceless(),
+            Context::X11(ref ctx) => ctx.make_current_surfaceless(),
         }
     }
 
@@ -152,6 +150,10 @@ impl Context {
     pub unsafe fn make_current<T: SurfaceTypeTrait>(&self, surf: &Surface<T>) -> Result<(), Error> {
         match (self, surf) {
             (Context::Wayland(ref ctx), Surface::Wayland(ref surf)) => ctx.make_current(surf),
+            (Context::X11(ref ctx), Surface::X11(ref surf)) => ctx.make_current(surf),
+            (_, _) => Err(make_error!(ErrorType::BadApiUsage(
+                "Incompatible context and surface backends.".to_string()
+            ))),
         }
     }
 
@@ -159,6 +161,7 @@ impl Context {
     pub unsafe fn make_not_current(&self) -> Result<(), Error> {
         match self {
             Context::Wayland(ref ctx) => ctx.make_not_current(),
+            Context::X11(ref ctx) => ctx.make_not_current(),
         }
     }
 
@@ -166,6 +169,7 @@ impl Context {
     pub fn is_current(&self) -> bool {
         match self {
             Context::Wayland(ref ctx) => ctx.is_current(),
+            Context::X11(ref ctx) => ctx.is_current(),
         }
     }
 
@@ -173,20 +177,7 @@ impl Context {
     pub fn get_api(&self) -> Api {
         match self {
             Context::Wayland(ref ctx) => ctx.get_api(),
-        }
-    }
-
-    #[inline]
-    pub unsafe fn raw_handle(&self) -> RawHandle {
-        match self {
-            Context::Wayland(ref ctx) => ctx.raw_handle(),
-        }
-    }
-
-    #[inline]
-    pub unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
-        match self {
-            Context::Wayland(ref ctx) => ctx.get_egl_display(),
+            Context::X11(ref ctx) => ctx.get_api(),
         }
     }
 
@@ -194,6 +185,7 @@ impl Context {
     pub fn get_proc_address(&self, addr: &str) -> *const c_void {
         match self {
             Context::Wayland(ref ctx) => ctx.get_proc_address(addr),
+            Context::X11(ref ctx) => ctx.get_proc_address(addr),
         }
     }
 
@@ -201,13 +193,14 @@ impl Context {
     pub fn get_config(&self) -> ConfigWrapper<Config, ConfigAttribs> {
         match self {
             Context::Wayland(ref ctx) => ctx.get_config().map_config(Config::Wayland),
+            Context::X11(ref ctx) => ctx.get_config().map_config(Config::X11),
         }
     }
 }
 
 #[derive(Debug)]
 pub enum Surface<T: SurfaceTypeTrait> {
-    // X11(x11::Surface<T>),
+    X11(x11::Surface<T>),
     Wayland(wayland::Surface<T>),
 }
 
@@ -216,6 +209,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     pub fn is_current(&self) -> bool {
         match self {
             Surface::Wayland(ref surf) => surf.is_current(),
+            Surface::X11(ref surf) => surf.is_current(),
         }
     }
 
@@ -223,6 +217,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     pub fn get_config(&self) -> ConfigWrapper<Config, ConfigAttribs> {
         match self {
             Surface::Wayland(ref surf) => surf.get_config().map_config(Config::Wayland),
+            Surface::X11(ref surf) => surf.get_config().map_config(Config::X11),
         }
     }
 
@@ -230,6 +225,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     pub unsafe fn make_not_current(&self) -> Result<(), Error> {
         match self {
             Surface::Wayland(ref surf) => surf.make_not_current(),
+            Surface::X11(ref surf) => surf.make_not_current(),
         }
     }
 }
@@ -241,13 +237,26 @@ impl Surface<PBuffer> {
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         size: dpi::PhysicalSize,
     ) -> Result<Self, Error> {
-        match disp {
-            Display::Wayland(_) => wayland::Surface::<PBuffer>::new(
-                Display::inner_wayland(disp),
-                Config::inner_wayland(conf),
-                size,
-            )
-            .map(Surface::Wayland),
+        match (disp, conf.config) {
+            (Display::Wayland(disp), Config::Wayland(config)) => {
+                wayland::Surface::<PBuffer>::new(
+                    disp,
+                    conf.map_config(|_| config),
+                    size,
+                )
+                .map(Surface::Wayland)
+            },
+            (Display::X11(disp), Config::X11(config)) => {
+                x11::Surface::<PBuffer>::new(
+                    disp,
+                    conf.map_config(|_| config),
+                    size,
+                )
+                .map(Surface::X11)
+            },
+            (_, _) => Err(make_error!(ErrorType::BadApiUsage(
+                "Incompatible display and config backends.".to_string()
+            )))
         }
     }
 }
@@ -259,13 +268,26 @@ impl Surface<Pixmap> {
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         npb: NPB,
     ) -> Result<(NPB::Pixmap, Self), Error> {
-        match disp {
-            Display::Wayland(_) => wayland::Surface::<Pixmap>::new(
-                Display::inner_wayland(disp),
-                Config::inner_wayland(conf),
-                npb,
-            )
-            .map(|(pix, surf)| (pix, Surface::Wayland(surf))),
+        match (disp, conf.config) {
+            (Display::Wayland(disp), Config::Wayland(config)) => {
+                wayland::Surface::<Pixmap>::new(
+                    disp,
+                    conf.map_config(|_| config),
+                    npb,
+                )
+                .map(|(pix, surf)| (pix, Surface::Wayland(surf)))
+            },
+            (Display::X11(disp), Config::X11(config)) => {
+                x11::Surface::<Pixmap>::new(
+                    disp,
+                    conf.map_config(|_| config),
+                    npb,
+                )
+                .map(|(pix, surf)| (pix, Surface::X11(surf)))
+            },
+            (_, _) => Err(make_error!(ErrorType::BadApiUsage(
+                "Incompatible display and config backends.".to_string()
+            )))
         }
     }
 
@@ -275,13 +297,26 @@ impl Surface<Pixmap> {
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         np: &NP,
     ) -> Result<Self, Error> {
-        match disp {
-            Display::Wayland(_) => wayland::Surface::<Pixmap>::new_existing(
-                Display::inner_wayland(disp),
-                Config::inner_wayland(conf),
-                np,
-            )
-            .map(Surface::Wayland),
+        match (disp, conf.config) {
+            (Display::Wayland(disp), Config::Wayland(config)) => {
+                wayland::Surface::<Pixmap>::new_existing(
+                    disp,
+                    conf.map_config(|_| config),
+                    np,
+                )
+                .map(Surface::Wayland)
+            },
+            (Display::X11(disp), Config::X11(config)) => {
+                x11::Surface::<Pixmap>::new_existing(
+                    disp,
+                    conf.map_config(|_| config),
+                    np,
+                )
+                .map(Surface::X11)
+            },
+            (_, _) => Err(make_error!(ErrorType::BadApiUsage(
+                "Incompatible display and config backends.".to_string()
+            )))
         }
     }
 }
@@ -293,13 +328,26 @@ impl Surface<Window> {
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         nwb: NWB,
     ) -> Result<(NWB::Window, Self), Error> {
-        match disp {
-            Display::Wayland(_) => wayland::Surface::<Window>::new(
-                Display::inner_wayland(disp),
-                Config::inner_wayland(conf),
-                nwb,
-            )
-            .map(|(win, surf)| (win, Surface::Wayland(surf))),
+        match (disp, conf.config) {
+            (Display::Wayland(disp), Config::Wayland(config)) => {
+                wayland::Surface::<Window>::new(
+                    disp,
+                    conf.map_config(|_| config),
+                    nwb,
+                )
+                .map(|(win, surf)| (win, Surface::Wayland(surf)))
+            },
+            (Display::X11(disp), Config::X11(config)) => {
+                x11::Surface::<Window>::new(
+                    disp,
+                    conf.map_config(|_| config),
+                    nwb,
+                )
+                .map(|(win, surf)| (win, Surface::X11(surf)))
+            },
+            (_, _) => Err(make_error!(ErrorType::BadApiUsage(
+                "Incompatible display and config backends.".to_string()
+            )))
         }
     }
 
@@ -309,13 +357,26 @@ impl Surface<Window> {
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         nw: &NW,
     ) -> Result<Self, Error> {
-        match disp {
-            Display::Wayland(_) => wayland::Surface::<Window>::new_existing(
-                Display::inner_wayland(disp),
-                Config::inner_wayland(conf),
-                nw,
-            )
-            .map(Surface::Wayland),
+        match (disp, conf.config) {
+            (Display::Wayland(disp), Config::Wayland(config)) => {
+                wayland::Surface::<Window>::new_existing(
+                    disp,
+                    conf.map_config(|_| config),
+                    nw,
+                )
+                .map(Surface::Wayland)
+            },
+            (Display::X11(disp), Config::X11(config)) => {
+                x11::Surface::<Window>::new_existing(
+                    disp,
+                    conf.map_config(|_| config),
+                    nw,
+                )
+                .map(Surface::X11)
+            },
+            (_, _) => Err(make_error!(ErrorType::BadApiUsage(
+                "Incompatible display and config backends.".to_string()
+            )))
         }
     }
 
@@ -323,12 +384,14 @@ impl Surface<Window> {
     pub fn swap_buffers(&self) -> Result<(), Error> {
         match self {
             Surface::Wayland(ref surf) => surf.swap_buffers(),
+            Surface::X11(ref surf) => surf.swap_buffers(),
         }
     }
 
     pub fn swap_buffers_with_damage(&self, rects: &[Rect]) -> Result<(), Error> {
         match self {
             Surface::Wayland(ref surf) => surf.swap_buffers_with_damage(rects),
+            Surface::X11(ref surf) => surf.swap_buffers_with_damage(rects),
         }
     }
 
@@ -336,13 +399,13 @@ impl Surface<Window> {
     pub fn update_after_resize(&self, size: dpi::PhysicalSize) {
         match self {
             Surface::Wayland(ref surf) => surf.update_after_resize(size),
+            Surface::X11(ref surf) => surf.update_after_resize(size),
         }
     }
 }
 
-// FIXME: Add SurfaceBuilder type
 #[derive(Default, Debug, Clone)]
-pub struct SurfacePlatformAttributes {
+pub struct ConfigPlatformAttributes {
     /// X11 only: set internally to insure a certain visual xid is used when
     /// choosing the fbconfig.
     pub(crate) x11_visual_xid: Option<std::os::raw::c_ulong>,

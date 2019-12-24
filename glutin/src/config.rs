@@ -207,15 +207,12 @@ pub struct ConfigBuilder {
     /// The default is `None`.
     pub vsync: Option<bool>,
 
-    /// FIXME: missing docs
     pub pbuffer_surface_support: bool,
-    /// FIXME: missing docs
     pub window_surface_support: bool,
-    /// FIXME: missing docs
     pub pixmap_surface_support: bool,
     pub surfaceless_support: bool,
 
-    pub plat_attr: platform_impl::SurfacePlatformAttributes,
+    pub plat_attr: platform_impl::ConfigPlatformAttributes,
 }
 
 impl Default for ConfigBuilder {
@@ -386,3 +383,5 @@ impl ConfigBuilder {
             .map(|(attribs, config)| Config { attribs, config })
     }
 }
+
+// FIXME: Raw handles how?

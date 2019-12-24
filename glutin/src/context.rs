@@ -256,3 +256,5 @@ pub enum GlProfile {
     /// Include all the future-compatible functions and definitions.
     Core,
 }
+
+// FIXME: Raw handles how?

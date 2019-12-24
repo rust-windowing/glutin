@@ -19,8 +19,8 @@ use crate::config::{
     Api, ConfigAttribs, ConfigBuilder, ConfigWrapper, GlRequest, GlVersion, ReleaseBehavior,
 };
 use crate::context::{ContextBuilderWrapper, Robustness};
-use crate::platform_impl::RawHandle;
 use crate::surface::{PBuffer, Pixmap, Rect, SurfaceType, SurfaceTypeTrait, Window};
+use crate::display::DisplayBuilder;
 
 use glutin_interface::{NativeDisplay, RawDisplay};
 use parking_lot::Mutex;
@@ -73,7 +73,7 @@ pub struct DisplayInternal {
 pub struct Display(Arc<DisplayInternal>);
 
 impl Display {
-    pub fn new<ND: NativeDisplay>(nd: &ND) -> Result<Self, Error> {
+    pub fn new<ND: NativeDisplay>(_: DisplayBuilder, nd: &ND) -> Result<Self, Error> {
         let egl = EGL.as_ref().unwrap();
         // calling `eglGetDisplay` or equivalent
         let disp = get_native_display(&nd.display())?;
@@ -582,16 +582,6 @@ impl Context {
     #[inline]
     pub fn get_api(&self) -> Api {
         self.config.config.api
-    }
-
-    #[inline]
-    pub unsafe fn raw_handle(&self) -> RawHandle {
-        RawHandle::Egl(self.context)
-    }
-
-    #[inline]
-    pub unsafe fn get_egl_display(&self) -> ffi::egl::types::EGLDisplay {
-        **self.display
     }
 
     // FIXME: Needed for android support.
