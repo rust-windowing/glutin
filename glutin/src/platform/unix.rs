@@ -7,9 +7,6 @@
 ))]
 
 pub mod osmesa;
-// mod rawext;
-
-// pub use self::rawext::*;
 
 pub use crate::api::egl::ffi::EGLContext;
 pub use crate::api::glx::ffi::glx::types::GLXContext;
