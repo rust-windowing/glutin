@@ -384,6 +384,7 @@ impl Surface<Window> {
         }
     }
 
+    #[inline]
     pub fn swap_buffers_with_damage(&self, rects: &[dpi::Rect]) -> Result<(), Error> {
         match self {
             Surface::Wayland(ref surf) => surf.swap_buffers_with_damage(rects),
@@ -395,7 +396,7 @@ impl Surface<Window> {
     pub fn update_after_resize(&self, size: dpi::PhysicalSize) {
         match self {
             Surface::Wayland(ref surf) => surf.update_after_resize(size),
-            Surface::X11(ref surf) => surf.update_after_resize(size),
+            Surface::X11(_) => (),
         }
     }
 }
@@ -404,7 +405,7 @@ impl Surface<Window> {
 pub struct ConfigPlatformAttributes {
     /// X11 only: set internally to insure a certain visual xid is used when
     /// choosing the fbconfig.
-    pub(crate) x11_visual_xid: Option<std::os::raw::c_ulong>,
+    pub(crate) x11_visual_xid: Option<raw::c_ulong>,
 }
 
 #[derive(Default, Debug, Clone)]
@@ -419,7 +420,7 @@ pub struct DisplayPlatformAttributes {
     pub backing_api: BackingApi,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum BackingApi {
     GlxThenEgl,
     EglThenGlx,

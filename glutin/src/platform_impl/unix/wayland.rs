@@ -27,7 +27,8 @@ impl Display {
         let glx_not_supported_error = make_error!(ErrorType::NotSupported(
             "GLX not supported by Wayland".to_string(),
         ));
-        match db.plat_attr.backing_api {
+        let backing_api = db.plat_attr.backing_api;
+        match backing_api {
             BackingApi::Glx => return Err(glx_not_supported_error),
             BackingApi::GlxThenEgl => {
                 warn!("[glutin] Not trying GLX with Wayland, as not supported by Wayland.")
@@ -37,7 +38,7 @@ impl Display {
 
         egl::Display::new(db, nd)
             .map(Display)
-            .map_err(|err| match db.plat_attr.backing_api {
+            .map_err(|err| match backing_api {
                 BackingApi::GlxThenEgl => append_errors!(err, glx_not_supported_error),
                 _ => err,
             })
@@ -49,7 +50,7 @@ pub struct Config(egl::Config);
 
 impl Config {
     pub fn new(disp: &Display, cb: ConfigBuilder) -> Result<(ConfigAttribs, Config), Error> {
-        egl::Config::new(&disp.0, cb, |confs, _| Ok(confs[0]))
+        egl::Config::new(&disp.0, cb, |confs| Ok(confs[0]))
             .map(|(attribs, conf)| (attribs, Config(conf)))
     }
 }
@@ -99,11 +100,7 @@ impl Surface<Window> {
         let surface = nw.raw_window();
         let surface = match surface {
             RawWindow::Wayland { wl_surface, .. } => wl_surface,
-            _ => {
-                return Err(make_error!(ErrorType::NotSupported(
-                    "Wayland surface not found".to_string(),
-                )));
-            }
+            _ => unreachable!(),
         };
 
         let wsurface = unsafe {

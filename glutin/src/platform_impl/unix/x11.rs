@@ -1,12 +1,12 @@
 use crate::api::egl::{self, EGL};
 use crate::api::glx::{self, ffi, GLX};
 use crate::display::DisplayBuilder;
-use crate::surface::SurfaceTypeTrait;
+use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
 use crate::config::{ConfigBuilder, ConfigAttribs, Api, ConfigWrapper};
 use crate::platform_impl::BackingApi;
 use crate::context::ContextBuilderWrapper;
 
-use glutin_interface::inputs::{NativeDisplay, RawDisplay};
+use glutin_interface::inputs::{NativeDisplay, RawDisplay, NativeWindow, NativePixmap, NativeWindowBuilder, NativePixmapBuilder};
 use glutin_x11_sym::Display as X11Display;
 use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
@@ -48,22 +48,25 @@ impl Display {
 
 impl BackendDisplay {
     fn new<ND: NativeDisplay>(db: DisplayBuilder, nd: &ND) -> Result<Self, Error> {
-        let disp = match db.plat_attr.backing_api {
+        let backing_api = db.plat_attr.backing_api;
+        let disp = match backing_api {
             BackingApi::Glx | BackingApi::GlxThenEgl => unimplemented!(),
-            BackingApi::Egl | BackingApi::EglThenGlx => egl::Display::new(db, nd).map(BackendDisplay::Egl),
+            BackingApi::Egl | BackingApi::EglThenGlx => egl::Display::new(db.clone(), nd).map(BackendDisplay::Egl),
         };
 
-        match (disp, db.plat_attr.backing_api) {
-            (_, BackingApi::Glx) | (_, BackingApi::Egl) |(Ok(_), _) => return disp,
+        match (&disp, backing_api) {
+            (_, BackingApi::Glx) | (_, BackingApi::Egl) | (Ok(_), _) => return disp,
             _ => (),
         }
 
-        let disp2 = match db.plat_attr.backing_api {
+        let disp2 = match backing_api {
             BackingApi::EglThenGlx => unimplemented!(),
             BackingApi::GlxThenEgl => egl::Display::new(db, nd).map(BackendDisplay::Egl),
+            _ => unreachable!(),
         };
 
         match (disp, disp2) {
+            (Ok(_), _) => unreachable!(),
             (_, Ok(disp2)) => Ok(disp2),
             (Err(err1), Err(err2)) => Err(append_errors!(err1, err2))
         }
@@ -71,61 +74,102 @@ impl BackendDisplay {
 }
 
 #[derive(Debug)]
-pub enum Config {
+pub struct Config {
+    native_display: Arc<X11Display>,
+    config: BackendConfig,
+}
+
+#[derive(Debug)]
+pub enum BackendConfig {
     Egl(egl::Config),
     //Glx(glx::Display),
 }
 
-impl Config {
-    pub fn new(disp: &Display, cb: ConfigBuilder) -> Result<(ConfigAttribs, Config), Error> {
+impl BackendConfig {
+    pub fn new(disp: &Display, cb: ConfigBuilder) -> Result<(ConfigAttribs, Self), Error> {
         match disp.display {
-            BackendDisplay::Egl(ref disp) => egl::Config::new(disp, cb, |confs, _| Ok(confs[0]))
-                .map(|(attribs, conf)| (attribs, Config::Egl(conf))),
+            BackendDisplay::Egl(ref disp) => egl::Config::new(disp, cb, |confs| Ok(confs[0]))
+                .map(|(attribs, conf)| (attribs, BackendConfig::Egl(conf))),
+        }
+    }
+}
+
+impl Config {
+    pub fn new(disp: &Display, cb: ConfigBuilder) -> Result<(ConfigAttribs, Self), Error> {
+        let (attribs, config) = BackendConfig::new(disp, cb)?;
+        Ok((attribs, Config {
+            config,
+            native_display: Arc::clone(&disp.native_display),
+        }))
+    }
+
+    #[inline]
+    pub fn get_visual_info(&self) -> ffi::XVisualInfo {
+        match self.config {
+            BackendConfig::Egl(conf) => utils::get_visual_info_from_xid(&self.native_display, conf.get_native_visual_id() as ffi::VisualID),
         }
     }
 }
 
 #[derive(Debug)]
-pub enum Context {
+pub struct Context {
+    native_display: Arc<X11Display>,
+    context: BackendContext,
+}
+
+#[derive(Debug)]
+pub enum BackendContext {
     Egl(egl::Context),
     //Glx(glx::Display),
 }
 
-
-
+impl BackendContext {
+    #[inline]
+    pub(crate) fn new(
+        disp: &Display,
+        cb: ContextBuilderWrapper<&Context>,
+        conf: ConfigWrapper<&Config, &ConfigAttribs>,
+    ) -> Result<Self, Error> {
+        match (&disp.display, &conf.config.config) {
+            (BackendDisplay::Egl(disp), BackendConfig::Egl(config)) => {
+                egl::Context::new(
+                    disp,
+                    Context::inner_cb_egl(cb)?,
+                    conf.map_config(|_| config),
+                )
+                .map(BackendContext::Egl)
+            },
+            //(BackendDisplay::Glx(disp), Config::Glx(config)) => {
+            //    glx::Context::new(
+            //        disp,
+            //        Context::inner_cb_glx(cb)?,
+            //        conf.map_config(|_| config),
+            //    )
+            //    .map(BackendContext::Glx)
+            //},
+            (_, _) => Err(make_error!(ErrorType::BadApiUsage(
+                "Incompatible display and config backends.".to_string()
+            ))),
+        }
+    }
+}
 
 impl Context {
     fn inner_cb_egl(
         cb: ContextBuilderWrapper<&Context>,
     ) -> Result<ContextBuilderWrapper<&egl::Context>, Error> {
         match cb.sharing {
-            Some(Context::Egl(_)) | None => (),
+            Some(Context { context: BackendContext::Egl(_), .. }) | None => (),
             _ => return Err(make_error!(ErrorType::BadApiUsage(
                 "Cannot share a EGL context with a non-EGL context".to_string()
             ))),
         }
 
         Ok(cb.map_sharing(|ctx| match ctx {
-            Context::Egl(ctx) => ctx,
+            Context { context: BackendContext::Egl(ctx), .. } => ctx,
             _ => unreachable!(),
         }))
     }
-
-    //fn inner_cb_glx(
-    //    cb: ContextBuilderWrapper<&Context>,
-    //) -> Result<ContextBuilderWrapper<&glx::Context>, Error> {
-    //    match cb.sharing {
-    //        Some(Context::Glx(_)) | None => (),
-    //        _ => return Err(make_error!(ErrorType::BadApiUsage(
-    //            "Cannot share a GLX context with a non-GLX context".to_string()
-    //        ))),
-    //    }
-
-    //    Ok(cb.map_sharing(|ctx| match ctx {
-    //        Context::Glx(ctx) => ctx,
-    //        _ => unreachable!(),
-    //    }))
-    //}
 
     #[inline]
     pub(crate) fn new(
@@ -133,41 +177,25 @@ impl Context {
         cb: ContextBuilderWrapper<&Context>,
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
     ) -> Result<Self, Error> {
-        match (disp.display, conf.config) {
-            (BackendDisplay::Egl(ref disp), Config::Egl(config)) => {
-                egl::Context::new(
-                    disp,
-                    Context::inner_cb_egl(cb)?,
-                    conf.map_config(|_| config),
-                )
-                .map(Context::Egl)
-            },
-            //(BackendDisplay::Glx(ref disp), Config::Glx(config)) => {
-            //    glx::Context::new(
-            //        disp,
-            //        Context::inner_cb_glx(cb)?,
-            //        conf.map_config(|_| config),
-            //    )
-            //    .map(Context::Glx)
-            //},
-            (_, _) => Err(make_error!(ErrorType::BadApiUsage(
-                "Incompatible display and config backends.".to_string()
-            ))),
-        }
+        let context = BackendContext::new(disp, cb, conf)?;
+        Ok(Context {
+            context,
+            native_display: Arc::clone(&disp.native_display),
+        })
     }
 
     #[inline]
     pub unsafe fn make_current_surfaceless(&self) -> Result<(), Error> {
-        match self {
-            Context::Egl(ref ctx) => ctx.make_current_surfaceless(),
+        match &self.context {
+            BackendContext::Egl(ref ctx) => ctx.make_current_surfaceless(),
             //Context::Glx(ref ctx) => ctx.make_current_surfaceless(),
         }
     }
 
     #[inline]
     pub unsafe fn make_current<T: SurfaceTypeTrait>(&self, surf: &Surface<T>) -> Result<(), Error> {
-        match (self, surf) {
-            (Context::Egl(ref ctx), Surface::Egl(ref surf)) => ctx.make_current(surf),
+        match (&self.context, &surf.surface) {
+            (BackendContext::Egl(ref ctx), BackendSurface::Egl(ref surf)) => ctx.make_current(surf),
             //(Context::Glx(ref ctx), Surface::Glx(ref surf)) => ctx.make_current(surf),
             (_, _) => Err(make_error!(ErrorType::BadApiUsage(
                 "Incompatible context and surface backends.".to_string()
@@ -177,271 +205,389 @@ impl Context {
 
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), Error> {
-        match self {
-            Context::Egl(ref ctx) => ctx.make_not_current(),
+        match &self.context {
+            BackendContext::Egl(ref ctx) => ctx.make_not_current(),
             //Context::Glx(ref ctx) => ctx.make_not_current(),
         }
     }
 
     #[inline]
     pub fn is_current(&self) -> bool {
-        match self {
-            Context::Egl(ref ctx) => ctx.is_current(),
+        match &self.context {
+            BackendContext::Egl(ref ctx) => ctx.is_current(),
             //Context::Glx(ref ctx) => ctx.is_current(),
         }
     }
 
     #[inline]
     pub fn get_api(&self) -> Api {
-        match self {
-            Context::Egl(ref ctx) => ctx.get_api(),
+        match &self.context {
+            BackendContext::Egl(ref ctx) => ctx.get_api(),
             //Context::Glx(ref ctx) => ctx.get_api(),
         }
     }
 
     #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const raw::c_void {
-        match self {
-            Context::Egl(ref ctx) => ctx.get_proc_address(addr),
+        match &self.context {
+            BackendContext::Egl(ref ctx) => ctx.get_proc_address(addr),
             //Context::Glx(ref ctx) => ctx.get_proc_address(addr),
         }
     }
 
     #[inline]
     pub fn get_config(&self) -> ConfigWrapper<Config, ConfigAttribs> {
-        match self {
-            Context::Egl(ref ctx) => ctx.get_config().map_config(Config::Egl),
-            //Context::Glx(ref ctx) => ctx.get_config().map_config(Config::Glx),
-        }
+        match &self.context {
+            BackendContext::Egl(ref ctx) => ctx.get_config().map_config(BackendConfig::Egl),
+            //Context::Glx(ref ctx) => ctx.get_config().map_config(BackendConfig::Glx),
+        }.map_config(|config| Config {
+            config,
+            native_display: Arc::clone(&self.native_display),
+        })
     }
 }
 
-
-
+#[derive(Debug)]
+pub struct Surface<T: SurfaceTypeTrait> {
+    native_display: Arc<X11Display>,
+    surface: BackendSurface<T>,
+}
 
 #[derive(Debug)]
-pub enum Surface<T: SurfaceTypeTrait> {
+pub enum BackendSurface<T: SurfaceTypeTrait> {
     Egl(egl::Surface<T>),
     //Glx(glx::Display),
 }
 
+impl<T: SurfaceTypeTrait> Surface<T> {
+    #[inline]
+    pub fn is_current(&self) -> bool {
+        match &self.surface {
+            BackendSurface::Egl(ref surf) => surf.is_current(),
+            //Surface::Glx(ref surf) => surf.is_current(),
+        }
+    }
+
+    #[inline]
+    pub fn get_config(&self) -> ConfigWrapper<Config, ConfigAttribs> {
+        match &self.surface {
+            BackendSurface::Egl(ref ctx) => ctx.get_config().map_config(BackendConfig::Egl),
+            //Context::Glx(ref ctx) => ctx.get_config().map_config(BackendConfig::Glx),
+        }.map_config(|config| Config {
+            config,
+            native_display: Arc::clone(&self.native_display),
+        })
+    }
+
+    #[inline]
+    pub unsafe fn make_not_current(&self) -> Result<(), Error> {
+        match &self.surface {
+            BackendSurface::Egl(ref surf) => surf.make_not_current(),
+            //Surface::Glx(ref surf) => surf.make_not_current(),
+        }
+    }
+}
+
+impl BackendSurface<PBuffer> {
+    #[inline]
+    pub fn new(
+        disp: &Display,
+        conf: ConfigWrapper<&Config, &ConfigAttribs>,
+        size: dpi::PhysicalSize,
+    ) -> Result<Self, Error> {
+        match (&disp.display, &conf.config.config) {
+            (BackendDisplay::Egl(disp), BackendConfig::Egl(config)) => {
+                egl::Surface::<PBuffer>::new(
+                    disp,
+                    conf.map_config(|_| config),
+                    size,
+                )
+                .map(BackendSurface::Egl)
+            },
+            //(BackendDisplay::Glx(disp), Config::Glx(config)) => {
+            //    glx::Surface::<PBuffer>::new(
+            //        disp,
+            //        conf.map_config(|_| config),
+            //        size,
+            //    )
+            //    .map(Surface::Glx)
+            //},
+            (_, _) => Err(make_error!(ErrorType::BadApiUsage(
+                "Incompatible display and config backends.".to_string()
+            )))
+        }
+    }
+}
+
+impl Surface<PBuffer> {
+    #[inline]
+    pub(crate) fn new(
+        disp: &Display,
+        conf: ConfigWrapper<&Config, &ConfigAttribs>,
+        size: dpi::PhysicalSize,
+    ) -> Result<Self, Error> {
+        let surface = BackendSurface::<PBuffer>::new(disp, conf, size)?;
+        Ok(Surface {
+            surface,
+            native_display: Arc::clone(&disp.native_display),
+        })
+    }
+}
+
+impl Surface<Pixmap> {
+    #[inline]
+    pub fn new<NPB: NativePixmapBuilder>(
+        disp: &Display,
+        conf: ConfigWrapper<&Config, &ConfigAttribs>,
+        npb: NPB,
+    ) -> Result<(NPB::Pixmap, Self), Error> {
+        unimplemented!()
+        //match (disp, conf.config) {
+        //    (Display::Egl(disp), Config::Egl(config)) => {
+        //        egl::Surface::<Pixmap>::new(
+        //            disp,
+        //            conf.map_config(|_| config),
+        //            npb,
+        //        )
+        //        .map(|(pix, surf)| (pix, Surface::Egl(surf)))
+        //    },
+        //    (Display::Glx(disp), Config::Glx(config)) => {
+        //        glx::Surface::<Pixmap>::new(
+        //            disp,
+        //            conf.map_config(|_| config),
+        //            npb,
+        //        )
+        //        .map(|(pix, surf)| (pix, Surface::Glx(surf)))
+        //    },
+        //    (_, _) => Err(make_error!(ErrorType::BadApiUsage(
+        //        "Incompatible display and config backends.".to_string()
+        //    )))
+        //}
+    }
+
+    #[inline]
+    pub fn new_existing<NP: NativePixmap>(
+        disp: &Display,
+        conf: ConfigWrapper<&Config, &ConfigAttribs>,
+        np: &NP,
+    ) -> Result<Self, Error> {
+        unimplemented!()
+        //match (disp, conf.config) {
+        //    (Display::Egl(disp), Config::Egl(config)) => {
+        //        egl::Surface::<Pixmap>::new_existing(
+        //            disp,
+        //            conf.map_config(|_| config),
+        //            np,
+        //        )
+        //        .map(Surface::Egl)
+        //    },
+        //    (Display::Glx(disp), Config::Glx(config)) => {
+        //        glx::Surface::<Pixmap>::new_existing(
+        //            disp,
+        //            conf.map_config(|_| config),
+        //            np,
+        //        )
+        //        .map(Surface::Glx)
+        //    },
+        //    (_, _) => Err(make_error!(ErrorType::BadApiUsage(
+        //        "Incompatible display and config backends.".to_string()
+        //    )))
+        //}
+    }
+}
+
+impl BackendSurface<Window> {
+    #[inline]
+    pub fn new<NWB: NativeWindowBuilder>(
+        disp: &Display,
+        conf: ConfigWrapper<&Config, &ConfigAttribs>,
+        nwb: NWB,
+    ) -> Result<(NWB::Window, Self), Error> {
+        let xlib = syms!(XLIB);
+        // Get the screen_id for the window being built.
+        let screen = disp.screen.unwrap_or(unsafe { (xlib.XDefaultScreen)(**disp.native_display) });
+        let visual_info = conf.config.get_visual_info();
+
+        let win = nwb.build_x11(&mut visual_info as *mut _ as *mut _, screen)?;
+        match (&disp.display, &conf.config.config) {
+            (BackendDisplay::Egl(disp), BackendConfig::Egl(config)) => {
+                egl::Surface::<Window>::new(
+                    disp,
+                    conf.map_config(|_| config),
+                    nwb,
+                )
+                .map(|surf| (win, BackendSurface::Egl(surf)))
+            },
+            //(Display::Glx(disp), Config::Glx(config)) => {
+            //    glx::Surface::<Window>::new(
+            //        disp,
+            //        conf.map_config(|_| config),
+            //        nwb,
+            //    )
+            //    .map(|surf| (win, Surface::Glx(surf)))
+            //},
+            (_, _) => Err(make_error!(ErrorType::BadApiUsage(
+                "Incompatible display and config backends.".to_string()
+            )))
+        }
+    }
+
+    #[inline]
+    pub fn new_existing<NW: NativeWindow>(
+        disp: &Display,
+        conf: ConfigWrapper<&Config, &ConfigAttribs>,
+        nw: &NW,
+    ) -> Result<Self, Error> {
+        unimplemented!()
+        //match (disp, conf.config) {
+        //    (Display::Egl(disp), Config::Egl(config)) => {
+        //        egl::Surface::<Window>::new_existing(
+        //            disp,
+        //            conf.map_config(|_| config),
+        //            nw,
+        //        )
+        //        .map(Surface::Egl)
+        //    },
+        //    (Display::Glx(disp), Config::Glx(config)) => {
+        //        glx::Surface::<Window>::new_existing(
+        //            disp,
+        //            conf.map_config(|_| config),
+        //            nw,
+        //        )
+        //        .map(Surface::Glx)
+        //    },
+        //    (_, _) => Err(make_error!(ErrorType::BadApiUsage(
+        //        "Incompatible display and config backends.".to_string()
+        //    )))
+        //}
+    }
+}
+
+impl Surface<Window> {
+    #[inline]
+    pub fn new<NWB: NativeWindowBuilder>(
+        disp: &Display,
+        conf: ConfigWrapper<&Config, &ConfigAttribs>,
+        nwb: NWB,
+    ) -> Result<(NWB::Window, Self), Error> {
+        let (win, surface) = BackendSurface::<Window>::new(disp, conf, nwb)?;
+        Ok((win, Surface {
+            surface,
+            native_display: Arc::clone(&disp.native_display),
+        }))
+    }
+
+    #[inline]
+    pub fn new_existing<NW: NativeWindow>(
+        disp: &Display,
+        conf: ConfigWrapper<&Config, &ConfigAttribs>,
+        nw: &NW,
+    ) -> Result<Self, Error> {
+        let surface = BackendSurface::<Window>::new_existing(disp, conf, nw)?;
+        Ok(Surface {
+            surface,
+            native_display: Arc::clone(&disp.native_display),
+        })
+    }
+
+    #[inline]
+    pub fn swap_buffers(&self) -> Result<(), Error> {
+        match &self.surface {
+            BackendSurface::Egl(ref surf) => surf.swap_buffers(),
+            //Surface::Glx(ref surf) => surf.swap_buffers(),
+        }
+    }
+
+    #[inline]
+    pub fn swap_buffers_with_damage(&self, rects: &[dpi::Rect]) -> Result<(), Error> {
+        match &self.surface {
+            BackendSurface::Egl(ref surf) => surf.swap_buffers_with_damage(rects),
+            //Surface::Glx(ref surf) => surf.swap_buffers_with_damage(rects),
+        }
+    }
+}
+
+// FIXME:
+// When using egl, all the configs will not support transparency, even if
+// transparency does work with glx.
+//
+// https://bugs.freedesktop.org/show_bug.cgi?id=67676
+// I'm working on a patch.
+pub fn select_config<'a, T, F, CTX>(
+    native_disp: &Arc<X11Display>,
+    target_transparency: Option<bool>,
+    target_visual_xid: Option<raw::c_ulong>,
+    conf_ids: Vec<T>,
+    mut convert_to_xvisualinfo: F,
+) -> Result<(T, ffi::XVisualInfo), ()>
+where
+    F: FnMut(&T) -> Option<ffi::XVisualInfo>,
+{
+    use utils::Lacks;
+    let mut chosen_conf_id = None;
+    let mut lacks_what = None;
+
+    for conf_id in conf_ids {
+        let visual_infos = match convert_to_xvisualinfo(&conf_id) {
+            Some(vi) => vi,
+            None => continue,
+        };
+
+        let this_lacks_what = utils::examine_visual_info(
+            native_disp,
+            visual_infos,
+            target_transparency == Some(true),
+            target_visual_xid,
+        );
+
+        match (lacks_what, &this_lacks_what) {
+            (Some(Ok(())), _) => unreachable!(),
+
+            // Found it.
+            (_, Ok(())) => {
+                chosen_conf_id = Some((conf_id, visual_infos));
+                lacks_what = Some(this_lacks_what);
+                break;
+            }
+
+            // Better have something than nothing.
+            (None, _) => {
+                chosen_conf_id = Some((conf_id, visual_infos));
+                lacks_what = Some(this_lacks_what);
+            }
+
+            // Stick with the earlier.
+            (Some(Err(Lacks::Transparency)), Err(Lacks::Transparency)) => (),
+            (Some(Err(_)), Err(Lacks::XID)) => (),
+
+            // Lacking transparency is better than lacking the xid.
+            (Some(Err(Lacks::XID)), Err(Lacks::Transparency)) => {
+                chosen_conf_id = Some((conf_id, visual_infos));
+                lacks_what = Some(this_lacks_what);
+            }
+        }
+    }
+
+    match lacks_what {
+        Some(Ok(())) => (),
+        Some(Err(Lacks::Transparency)) => warn!("[glutin] could not a find fb config with an alpha mask. Transparency may be broken."),
+        Some(Err(Lacks::XID)) => panic!(),
+        None => warn!("[glutin] no configs were found. Period."),
+    }
+
+    chosen_conf_id.ok_or(())
+}
 
 
 
 
 
 
-
-
-
-
-//#[derive(Debug)]
-//struct NoX11Connection;
-//
-//impl std::error::Error for NoX11Connection {
-//    fn description(&self) -> &str {
-//        "failed to get x11 connection"
-//    }
-//}
-//
-//impl std::fmt::Display for NoX11Connection {
-//    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-//        f.write_str(std::error::Error::description(self))
-//    }
-//}
-//
-//#[derive(Debug)]
-//pub enum X11Context {
-//    Glx(GlxContext),
-//    Egl(EglContext),
-//}
-//
-//#[derive(Debug)]
-//pub struct ContextInner {
-//    xconn: Arc<XConnection>,
-//    context: X11Context,
-//}
-//
-//enum Prototype<'a> {
-//    Glx(crate::api::glx::ContextPrototype<'a>),
-//    Egl(crate::api::egl::ContextPrototype<'a>),
-//}
-//
-//#[derive(Debug)]
-//pub enum Context {
-//    Surfaceless(ContextInner),
-//    PBuffer(ContextInner),
-//    Windowed(ContextInner),
-//}
-//
-//impl Deref for Context {
-//    type Target = ContextInner;
-//
-//    fn deref(&self) -> &Self::Target {
-//        match self {
-//            Context::Surfaceless(ctx) => ctx,
-//            Context::PBuffer(ctx) => ctx,
-//            Context::Windowed(ctx) => ctx,
-//        }
-//    }
-//}
-//
-//impl DerefMut for Context {
-//    fn deref_mut(&mut self) -> &mut ContextInner {
-//        match self {
-//            Context::Surfaceless(ctx) => ctx,
-//            Context::PBuffer(ctx) => ctx,
-//            Context::Windowed(ctx) => ctx,
-//        }
-//    }
-//}
-//
-//unsafe impl Send for Context {}
-//unsafe impl Sync for Context {}
-//
-//// FIXME:
-//// When using egl, all the configs will not support transparency, even if
-//// transparency does work with glx.
-////
-//// https://bugs.freedesktop.org/show_bug.cgi?id=67676<Paste>
-//// I'm on a patch.
-//pub fn select_config<'a, T, F, CTX>(
-//    xconn: &Arc<XConnection>,
-//    transparent: Option<bool>,
-//    cb: &'a ContextBuilderWrapper<&'a CTX>,
-//    conf_ids: Vec<T>,
-//    mut convert_to_xvisualinfo: F,
-//) -> Result<(T, ffi::XVisualInfo), ()>
-//where
-//    F: FnMut(&T) -> Option<ffi::XVisualInfo>,
-//{
-//    use crate::platform_impl::x11_utils::Lacks;
-//    let mut chosen_conf_id = None;
-//    let mut lacks_what = None;
-//
-//    for conf_id in conf_ids {
-//        let visual_infos = match convert_to_xvisualinfo(&conf_id) {
-//            Some(vi) => vi,
-//            None => continue,
-//        };
-//
-//        let this_lacks_what = x11_utils::examine_visual_info(
-//            &xconn,
-//            visual_infos,
-//            transparent == Some(true),
-//            cb.plat_attr.x11_visual_xid,
-//        );
-//
-//        match (lacks_what, &this_lacks_what) {
-//            (Some(Ok(())), _) => unreachable!(),
-//
-//            // Found it.
-//            (_, Ok(())) => {
-//                chosen_conf_id = Some((conf_id, visual_infos));
-//                lacks_what = Some(this_lacks_what);
-//                break;
-//            }
-//
-//            // Better have something than nothing.
-//            (None, _) => {
-//                chosen_conf_id = Some((conf_id, visual_infos));
-//                lacks_what = Some(this_lacks_what);
-//            }
-//
-//            // Stick with the earlier.
-//            (Some(Err(Lacks::Transparency)), Err(Lacks::Transparency)) => (),
-//            (Some(Err(_)), Err(Lacks::XID)) => (),
-//
-//            // Lacking transparency is better than lacking the xid.
-//            (Some(Err(Lacks::XID)), Err(Lacks::Transparency)) => {
-//                chosen_conf_id = Some((conf_id, visual_infos));
-//                lacks_what = Some(this_lacks_what);
-//            }
-//        }
-//    }
-//
-//    match lacks_what {
-//        Some(Ok(())) => (),
-//        Some(Err(Lacks::Transparency)) => warn!("[glutin] could not a find fb config with an alpha mask. Transparency may be broken."),
-//        Some(Err(Lacks::XID)) => panic!(),
-//        None => warn!("[glutin] no configs were found. Period."),
-//    }
-//
-//    chosen_conf_id.ok_or(())
-//}
-//
-//impl Context {
-//    fn try_then_fallback<F, T>(mut f: F) -> Result<T, CreationError>
-//    where
-//        F: FnMut(bool) -> Result<T, CreationError>,
-//    {
-//        match f(false) {
-//            Ok(ok) => Ok(ok),
-//            Err(err1) => match f(true) {
-//                Ok(ok) => Ok(ok),
-//                Err(err2) => Err(err1.append(err2)),
-//            },
-//        }
-//    }
-//
-//    #[inline]
-//    pub fn new_headless<T>(
-//    el: &EventLoopWindowTarget<T>,
-//    pf_reqs: &PixelFormatRequirements,
-//    gl_attr: &GlAttributes<&Context>,
-//    plat_attr: &ContextPlatformAttributes,
-//    size: Option<dpi::PhysicalSize>,
-//    ) -> Result<Self, CreationError> {
-//    Self::try_then_fallback(|fallback| {
-//    Self::new_headless_impl(
-//    el,
-//    pf_reqs,
-//    gl_attr,
-//    plat_attr,
-//    size.clone(),
-//    fallback,
-//    )
-//    })
-//    }
-//
-//    fn new_headless_impl<T>(
-//    el: &EventLoopWindowTarget<T>,
-//    pf_reqs: &PixelFormatRequirements,
-//    gl_attr: &GlAttributes<&Context>,
-//    plat_attr: &ContextPlatformAttributes,
-//    size: Option<dpi::PhysicalSize>,
-//    fallback: bool,
-//    ) -> Result<Self, CreationError> {
-//    let xconn = match el.xlib_xconnection() {
-//    Some(xconn) => xconn,
-//    None => {
-//    return Err(CreationError::NoBackendAvailable(Box::new(
-//    NoX11Connection,
-//    )));
-//    }
-//    };
-//
 //    Get the screen_id for the window being built.
 //    let screen_id = unsafe { (xconn.xlib.XDefaultScreen)(xconn.display) };
 //
 //    let mut builder_glx_u = None;
 //    let mut builder_egl_u = None;
-//
-//    start the context building process
-//    if let Some(size) = size {
-//    let context = Self::new_first_stage(
-//    &xconn,
-//    pf_reqs,
-//    gl_attr,
-//    plat_attr,
-//    screen_id,
-//    &mut builder_glx_u,
-//    &mut builder_egl_u,
-//    EglSurfaceType::PBuffer,
-//    fallback,
-//    fallback,
-//    Some(false),
-//    )?;
 //
 //    finish creating the OpenGL context
 //    let context = match context {
@@ -458,42 +604,6 @@ pub enum Surface<T: SurfaceTypeTrait> {
 //    context,
 //    });
 //
-//    Ok(context)
-//    } else {
-//    Surfaceless
-//    let context = Self::new_first_stage(
-//    &xconn,
-//    pf_reqs,
-//    gl_attr,
-//    plat_attr,
-//    screen_id,
-//    &mut builder_glx_u,
-//    &mut builder_egl_u,
-//    EglSurfaceType::Surfaceless,
-//    !fallback,
-//    fallback,
-//    Some(false),
-//    )?;
-//
-//    // finish creating the OpenGL context
-//    let context = match context {
-//    // TODO: glx impl
-//    //
-//    // According to GLX_EXT_no_config_context
-//    // > 2) Are no-config contexts constrained to those GL & ES
-//    // > implementations which can support them?
-//    // >
-//    // > RESOLVED: Yes. ES2 + OES_surfaceless_context, ES 3.0, and
-//    // > GL 3.0 all support binding a context without a drawable.
-//    // > This implies that they don't need to know drawable
-//    // > attributes at context creation time.
-//    // >
-//    // > In principle, equivalent functionality could be possible
-//    // > with ES 1.x + OES_surfaceless_context. This extension
-//    // > makes no promises about that. An implementation wishing to
-//    // > reliably support this combination, or a similarly
-//    // > permissive combination for GL < 3.0, should indicate so
-//    // > with an additional GLX extension.
 //
 //    Prototype::Glx(ctx) =>
 //    X11Context::Glx(ctx.finish_surfaceless(xwin)?),
@@ -503,27 +613,6 @@ pub enum Surface<T: SurfaceTypeTrait> {
 //    _ => unimplemented!(),
 //    };
 //
-//    let context = Context::Surfaceless(ContextInner {
-//    xconn: Arc::clone(&xconn),
-//    context,
-//    });
-//
-//    Ok(context)
-//    }
-//    }
-//
-//    #[inline]
-//    fn new_first_stage<'a>(
-//        xconn: &Arc<XConnection>,
-//        cb: &'a ContextBuilderWrapper<&'a Context>,
-//        screen_id: raw::c_int,
-//        builder_glx_u: &'a mut Option<ContextBuilderWrapper<&'a GlxContext>>,
-//        builder_egl_u: &'a mut Option<ContextBuilderWrapper<&'a EglContext>>,
-//        surface_type: EglSurfaceType,
-//        prefer_egl: bool,
-//        force_prefer_unless_only: bool,
-//        transparent: Option<bool>,
-//    ) -> Result<Prototype<'a>, CreationError> {
 //        let select_conf = |cs, display| {
 //            select_conf(&xconn, transparent, cb, cs, |conf_id| {
 //                let xid = egl::get_native_visual_id(display, *conf_id)
@@ -577,132 +666,11 @@ pub enum Surface<T: SurfaceTypeTrait> {
 //                    )?))
 //                };
 //
-//                // force_prefer_unless_only does what it says on the tin, it
-//                // forces only the prefered method to happen unless it's the
-//                // only method available.
-//                //
-//                // Users of this function should first call with `prefer_egl`
-//                // as `<status of their choice>`, with
-//                // `force_prefer_unless_only` as `false`.
-//                //
-//                // Then, if those users want to fallback and try the other
-//                // method, they should call us with `prefer_egl` equal to
-//                // `!<status of their choice>` and `force_prefer_unless_only`
-//                // as true.
-//                //
-//                // That way, they'll try their fallback if available, unless
-//                // it was their only option and they have already tried it.
-//                if !force_prefer_unless_only {
-//                    match (&*GLX, &*EGL, prefer_egl) {
-//                        (Some(_), _, false) => return glx(builder_glx_u),
-//                        (_, Some(_), true) => return egl(builder_egl_u),
-//                        _ => (),
-//                    }
 //
-//                    match (&*GLX, &*EGL, prefer_egl) {
-//                        (_, Some(_), false) => return egl(builder_egl_u),
-//                        (Some(_), _, true) => return glx(builder_glx_u),
-//                        _ => (),
-//                    }
-//
-//                    return Err(CreationError::NotSupported(
-//                        "both libGL and libEGL are not present".to_string(),
-//                    ));
-//                } else {
-//                    match (&*GLX, &*EGL, prefer_egl) {
-//                        (Some(_), Some(_), true) => return egl(builder_egl_u),
-//                        (Some(_), Some(_), false) => return glx(builder_glx_u),
-//                        _ => (),
-//                    }
-//
-//                    return Err(CreationError::NotSupported(
-//                        "lacking either libGL or libEGL so could not fallback to other".to_string(),
-//                    ));
-//                }
-//            }
-//            GlRequest::Specific(Api::OpenGlEs, _) => {
-//                if let Some(_) = *EGL {
-//                    let builder = cb.clone();
-//                    *builder_egl_u =
-//                        Some(builder.map_sharing(|c| match c.context {
-//                            X11Context::Egl(ref c) => c,
-//                            _ => panic!(),
-//                        }));
-//                    Prototype::Egl(EglContext::new(
-//                        builder_egl_u.as_ref().unwrap(),
-//                        NativeDisplay::X11(Some(xconn.display as *const _)),
-//                        surface_type,
-//                        select_conf,
-//                    )?)
-//                } else {
-//                    return Err(CreationError::NotSupported(
-//                        "libEGL not present".to_string(),
-//                    ));
-//                }
-//            }
-//            GlRequest::Specific(_, _) => {
-//                return Err(CreationError::NotSupported(
-//                    "requested specific without gl or gles".to_string(),
-//                ));
-//            }
-//        })
-//    }
-//
-//    #[inline]
-//    pub fn new<T>(
-//        el: &EventLoopWindowTarget<T>,
-//        cb: ContextBuilderWrapper<&Context>,
-//        pbuffer_support: bool,
-//        window_surface_support: bool,
-//        surfaceless_support: bool,
-//    ) -> Result<Self, CreationError> {
-//        Self::try_then_fallback(|fallback| {
-//            Self::new_impl(
-//                el,
-//                &cb,
-//                pbuffer_support,
-//                window_surface_support,
-//                surfaceless_support,
-//                fallback,
-//            )
-//        })
-//    }
-//
-//    fn new_impl<T>(
-//        el: &EventLoopWindowTarget<T>,
-//        cb: &ContextBuilderWrapper<&Context>,
-//        pbuffer_support: bool,
-//        window_surface_support: bool,
-//        surfaceless_support: bool,
-//        fallback: bool,
-//    ) -> Result<Self, CreationError> {
-//        let xconn = match el.xlib_xconnection() {
-//            Some(xconn) => xconn,
-//            None => {
-//                return Err(CreationError::NoBackendAvailable(Box::new(
-//                    NoX11Connection,
-//                )));
-//            }
-//        };
 //
 //        // Get the screen_id for the window being built.
 //        let screen_id = unsafe { (syms!(XLIB).XDefaultScreen)(xconn.display) };
 //
-//        let mut builder_glx_u = None;
-//        let mut builder_egl_u = None;
-//
-//        // start the context building process
-//        let context = Self::new_first_stage(
-//            &xconn,
-//            cb,
-//            screen_id,
-//            &mut builder_glx_u,
-//            &mut builder_egl_u,
-//            EglSurfaceType::Window,
-//            fallback,
-//            fallback,
-//            cb.plat_attr.glx_transparency,
-//        )?;
 //
 //        // getting the `visual_infos` (a struct that contains information about
 //        // the visual to use)
@@ -732,19 +700,6 @@ pub enum Surface<T: SurfaceTypeTrait> {
 //        });
 //
 //        Ok((win, context))
-//    }
-//
-//    #[inline]
-//    pub fn new_raw_context(
-//    xconn: Arc<XConnection>,
-//    xwin: raw::c_ulong,
-//    pf_reqs: &PixelFormatRequirements,
-//    gl_attr: &GlAttributes<&Context>,
-//    plat_attr: &ContextPlatformAttributes,
-//    ) -> Result<Self, CreationError> {
-//    Self::try_then_fallback(|fallback| {
-//    Self::new_raw_context_impl(&xconn, xwin, pf_reqs, gl_attr, plat_attr,
-//    fallback) })
 //    }
 //
 //    fn new_raw_context_impl(
@@ -790,117 +745,3 @@ pub enum Surface<T: SurfaceTypeTrait> {
 //    plat_attr.x11_visual_xid = Some(visual_xid);
 //    pf_reqs.depth_bits = Some(attrs.depth as _);
 //
-//    let mut builder_glx_u = None;
-//    let mut builder_egl_u = None;
-//
-//    // start the context building process
-//    let context = Self::new_first_stage(
-//    &xconn,
-//    &pf_reqs,
-//    gl_attr,
-//    &plat_attr,
-//    screen_id,
-//    &mut builder_glx_u,
-//    &mut builder_egl_u,
-//    EglSurfaceType::Window,
-//    fallback,
-//    fallback,
-//    None,
-//    )?;
-//
-//    // finish creating the OpenGL context
-//    let context = match context {
-//    Prototype::Glx(ctx) => X11Context::Glx(ctx.finish(xwin)?),
-//    Prototype::Egl(ctx) => X11Context::Egl(ctx.finish(xwin as _)?),
-//    };
-//
-//    let context = Context::Windowed(ContextInner {
-//    xconn: Arc::clone(&xconn),
-//    context,
-//    });
-//
-//    Ok(context)
-//    }
-//
-//    #[inline]
-//    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-//        match self.context {
-//            X11Context::Glx(ref ctx) => ctx.make_current(),
-//            X11Context::Egl(ref ctx) => ctx.make_current(),
-//        }
-//    }
-//
-//    #[inline]
-//    pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
-//        match self.context {
-//            X11Context::Glx(ref ctx) => ctx.make_not_current(),
-//            X11Context::Egl(ref ctx) => ctx.make_not_current(),
-//        }
-//    }
-//
-//    #[inline]
-//    pub fn is_current(&self) -> bool {
-//        match self.context {
-//            X11Context::Glx(ref ctx) => ctx.is_current(),
-//            X11Context::Egl(ref ctx) => ctx.is_current(),
-//        }
-//    }
-//
-//    #[inline]
-//    pub fn get_api(&self) -> Api {
-//        match self.context {
-//            X11Context::Glx(ref ctx) => ctx.get_api(),
-//            X11Context::Egl(ref ctx) => ctx.get_api(),
-//        }
-//    }
-//
-//    #[inline]
-//    pub unsafe fn raw_handle(&self) -> &X11Context {
-//        &self.context
-//    }
-//
-//    #[inline]
-//    pub unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
-//        match self.context {
-//            X11Context::Egl(ref ctx) => Some(ctx.get_egl_display()),
-//            _ => None,
-//        }
-//    }
-//
-//    #[inline]
-//    pub fn get_proc_address(&self, addr: &str) -> *const () {
-//        match self.context {
-//            X11Context::Glx(ref ctx) => ctx.get_proc_address(addr),
-//            X11Context::Egl(ref ctx) => ctx.get_proc_address(addr),
-//        }
-//    }
-//
-//    #[inline]
-//    pub fn swap_buffers(&self) -> Result<(), ContextError> {
-//        match self.context {
-//            X11Context::Glx(ref ctx) => ctx.swap_buffers(),
-//            X11Context::Egl(ref ctx) => ctx.swap_buffers(),
-//        }
-//    }
-//
-//    #[inline]
-//    pub fn swap_buffers_with_damage(
-//        &self,
-//        rects: &[dpi::Rect],
-//    ) -> Result<(), ContextError> {
-//        match self.context {
-//            X11Context::Glx(_) => Err(ContextError::OsError(
-//                "buffer damage not suported".to_string(),
-//            )),
-//            X11Context::Egl(ref ctx) => ctx.swap_buffers_with_damage(rects),
-//        }
-//    }
-//
-//    #[inline]
-//    pub fn get_pixel_format(&self) -> PixelFormat {
-//        match self.context {
-//            X11Context::Glx(ref ctx) => ctx.get_pixel_format(),
-//            X11Context::Egl(ref ctx) => ctx.get_pixel_format(),
-//        }
-//    }
-//}

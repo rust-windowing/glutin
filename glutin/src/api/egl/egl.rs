@@ -5,6 +5,8 @@ mod egl {
 
     use libloading;
     use parking_lot::Mutex;
+    use winit_types::error::Error;
+    use winit_types::platform::OsError;
 
     use std::sync::Arc;
     use std::os::raw;
@@ -77,14 +79,19 @@ mod egl {
     }
 
     impl Egl {
-        pub fn new() -> Result<Self, ()> {
+        pub fn new() -> Result<Self, Error> {
             #[cfg(target_os = "windows")]
             let paths = vec!["libEGL.dll", "atioglxx.dll"];
 
             #[cfg(not(target_os = "windows"))]
             let paths = vec!["libEGL.so.1", "libEGL.so"];
 
-            SymWrapper::new(paths).map(|i| Egl(i))
+            SymWrapper::new(paths).map(|i| Egl(i)).map_err(|_|
+
+            make_oserror!(OsError::Misc(
+                "Could not load EGL symbols".to_string()
+            ))
+                )
         }
     }
 }
@@ -93,13 +100,31 @@ mod egl {
 mod egl {
     use crate::api::egl::ffi;
 
+    use winit_types::error::Error;
+
     #[derive(Clone)]
     pub struct Egl(pub ffi::egl::Egl);
 
     impl Egl {
-        pub fn new() -> Result<Self, ()> {
+        pub fn new() -> Result<Self, Error> {
             Ok(Egl(ffi::egl::Egl))
         }
+    }
+}
+
+use std::ops::{Deref, DerefMut};
+
+impl Deref for Egl {
+    type Target = super::ffi::egl::Egl;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Egl {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 

@@ -1,10 +1,13 @@
-use super::Display;
-
 use x11_dl::xlib::{VisualID, VisualIDMask, XVisualInfo};
+use glutin_x11_sym::Display;
 
+use std::os::raw;
 use std::sync::Arc;
 
-pub fn get_visual_info_from_xid(disp: &Display, xid: VisualID) -> XVisualInfo {
+pub fn get_visual_info_from_xid(
+    disp: &Arc<Display>,
+    xid: VisualID,
+) -> XVisualInfo {
     let xlib = syms!(XLIB);
 
     assert_ne!(xid, 0);
@@ -14,13 +17,13 @@ pub fn get_visual_info_from_xid(disp: &Display, xid: VisualID) -> XVisualInfo {
     let mut num_visuals = 0;
     let vi = unsafe {
         (xlib.XGetVisualInfo)(
-            **disp.native_display,
+            ***disp,
             VisualIDMask,
             &mut template,
             &mut num_visuals,
         )
     };
-    disp.native_display
+    disp
         .check_errors()
         .expect("[glutin] Failed to call `XGetVisualInfo`");
     assert!(!vi.is_null());
@@ -41,21 +44,21 @@ pub enum Lacks {
 
 /// Should always check for lack of xid before lack of transparency.
 pub fn examine_visual_info(
-    disp: &Display,
+    disp: &Arc<Display>,
     visual_infos: XVisualInfo,
-    want_transparency: bool,
-    want_xid: Option<VisualID>,
+    wants_transparency: bool,
+    target_visual_xid: Option<raw::c_ulong>,
 ) -> Result<(), Lacks> {
-    if let Some(want_xid) = want_xid {
-        if visual_infos.visualid != want_xid {
+    if let Some(target_visual_xid) = target_visual_xid {
+        if visual_infos.visualid != target_visual_xid {
             return Err(Lacks::XID);
         }
     }
 
     unsafe {
-        if want_transparency {
+        if wants_transparency {
             let pict_format = (syms!(XRENDER).XRenderFindVisualFormat)(
-                **disp.native_display as *mut _,
+                ***disp,
                 visual_infos.visual,
             );
             if pict_format.is_null() {

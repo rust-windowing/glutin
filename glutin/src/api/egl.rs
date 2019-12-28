@@ -43,22 +43,8 @@ use std::ops::{Deref, DerefMut};
 use std::os::raw;
 use std::sync::Arc;
 
-impl Deref for Egl {
-    type Target = ffi::egl::Egl;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for Egl {
-    fn deref_mut(&mut self) -> &mut ffi::egl::Egl {
-        &mut self.0
-    }
-}
-
 lazy_static! {
-    pub static ref EGL: Option<Egl> = Egl::new().ok();
+    pub static ref EGL: Result<Egl, Error> = Egl::new();
 }
 
 fn get_native_display(dp_extensions: &[String], ndisp: &RawDisplay) -> Result<*const raw::c_void, Error> {
@@ -248,7 +234,7 @@ pub struct Display(Arc<DisplayInternal>);
 
 impl Display {
     pub fn new<ND: NativeDisplay>(_: DisplayBuilder, nd: &ND) -> Result<Self, Error> {
-        let egl = EGL.as_ref().unwrap();
+        let egl = EGL.as_ref().map_err(|err| err.clone())?;
 
         // the first step is to query the list of extensions without any display, if
         // supported
@@ -339,7 +325,6 @@ impl Config {
     where
         F: FnMut(
             Vec<ffi::egl::types::EGLConfig>,
-            &Display,
         ) -> Result<ffi::egl::types::EGLConfig, ()>,
     {
         let egl = EGL.as_ref().unwrap();
@@ -374,6 +359,11 @@ impl Config {
                 config_id,
             },
         ))
+    }
+
+    #[inline]
+    pub fn get_native_visual_id(&self) -> ffi::egl::types::EGLint {
+        get_native_visual_id(**self.display, self.config_id)
     }
 }
 
@@ -1009,7 +999,7 @@ unsafe fn choose_fbconfig<F>(
     mut conf_selector: F,
 ) -> Result<(ffi::egl::types::EGLConfig, ConfigAttribs), Error>
 where
-    F: FnMut(Vec<ffi::egl::types::EGLConfig>, &Display) -> Result<ffi::egl::types::EGLConfig, ()>,
+    F: FnMut(Vec<ffi::egl::types::EGLConfig>) -> Result<ffi::egl::types::EGLConfig, ()>,
 {
     let egl = EGL.as_ref().unwrap();
 
@@ -1232,11 +1222,10 @@ where
     }
 
     let conf_id =
-        conf_selector(conf_ids, disp).map_err(|_| make_error!(ErrorType::NoAvailableConfig))?;
+        conf_selector(conf_ids).map_err(|_| make_error!(ErrorType::NoAvailableConfig))?;
 
-    let mut min_swap_interval = attrib!(egl, disp, conf_id, ffi::egl::MIN_SWAP_INTERVAL,)?;
-
-    let mut max_swap_interval = attrib!(egl, disp, conf_id, ffi::egl::MAX_SWAP_INTERVAL,)?;
+    let min_swap_interval = attrib!(egl, disp, conf_id, ffi::egl::MIN_SWAP_INTERVAL)?;
+    let max_swap_interval = attrib!(egl, disp, conf_id, ffi::egl::MAX_SWAP_INTERVAL)?;
 
     assert!(min_swap_interval >= 0);
 
