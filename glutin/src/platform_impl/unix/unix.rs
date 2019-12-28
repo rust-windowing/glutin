@@ -12,9 +12,9 @@ mod x11;
 use crate::config::{Api, ConfigAttribs, ConfigBuilder, ConfigWrapper};
 use crate::context::ContextBuilderWrapper;
 use crate::display::DisplayBuilder;
-use crate::surface::{PBuffer, Pixmap, Rect, SurfaceTypeTrait, Window};
+use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
 
-use glutin_interface::{
+use glutin_interface::inputs::{
     NativeDisplay, NativePixmap, NativePixmapBuilder, NativeWindow, NativeWindowBuilder, RawDisplay,
 };
 use winit_types::dpi;
@@ -43,9 +43,6 @@ impl Display {
         match nd.display() {
             RawDisplay::Wayland { .. } => wayland::Display::new(db, nd).map(Display::Wayland),
             RawDisplay::Xlib { .. } => x11::Display::new(db, nd).map(Display::X11),
-            RawDisplay::XCB { .. } => return Err(make_error!(ErrorType::NotSupported(
-                "Making an OpenGL context with XCB is not supported. If you are using Xlib/XCB, please pass in the Xlib handles.".to_string(),
-            ))),
             // FIXME: GBM/EGLExtDevice/EGLMesaSurfaceles backends.
             _ => unimplemented!(),
         }
@@ -388,7 +385,7 @@ impl Surface<Window> {
         }
     }
 
-    pub fn swap_buffers_with_damage(&self, rects: &[Rect]) -> Result<(), Error> {
+    pub fn swap_buffers_with_damage(&self, rects: &[dpi::Rect]) -> Result<(), Error> {
         match self {
             Surface::Wayland(ref surf) => surf.swap_buffers_with_damage(rects),
             Surface::X11(ref surf) => surf.swap_buffers_with_damage(rects),
@@ -419,6 +416,7 @@ pub struct ContextPlatformAttributes {
 
 #[derive(Default, Debug, Clone)]
 pub struct DisplayPlatformAttributes {
+    /// Wayland/X11 only.
     pub backing_api: BackingApi,
 }
 

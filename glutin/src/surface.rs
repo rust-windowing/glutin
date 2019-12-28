@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::display::Display;
 use crate::platform_impl;
 
-use glutin_interface::{NativePixmap, NativePixmapBuilder, NativeWindow, NativeWindowBuilder};
+use glutin_interface::inputs::{NativePixmap, NativePixmapBuilder, NativeWindow, NativeWindowBuilder};
 use winit_types::dpi;
 use winit_types::error::Error;
 
@@ -127,12 +127,10 @@ impl Surface<Window> {
     /// next time the screen is refreshed. However drivers can choose to
     /// override your vsync settings, which means that you can't know in
     /// advance whether `swap_buffers` will block or not.
-    pub fn swap_buffers_with_damage(&self, rects: &[Rect]) -> Result<(), Error> {
+    pub fn swap_buffers_with_damage(&self, rects: &[dpi::Rect]) -> Result<(), Error> {
         self.0.swap_buffers_with_damage(rects)
     }
 
-    // FIXME: As discussed with Osspial, kill me please. Should talk with vberger about best
-    // method.
     #[inline]
     pub fn update_after_resize(&self, size: dpi::PhysicalSize) {
         #![cfg(any(
@@ -144,15 +142,6 @@ impl Surface<Window> {
         ))]
         self.0.update_after_resize(size);
     }
-}
-
-// Rectangles to submit as buffer damage.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Rect {
-    pub x: u32,
-    pub y: u32,
-    pub width: u32,
-    pub height: u32,
 }
 
 // FIXME: Raw handles how?

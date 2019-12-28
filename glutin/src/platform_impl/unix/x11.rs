@@ -5,7 +5,7 @@ use crate::surface::SurfaceTypeTrait;
 use crate::config::{ConfigBuilder, ConfigAttribs};
 use crate::platform_impl::BackingApi;
 
-use glutin_interface::{NativeDisplay, RawDisplay};
+use glutin_interface::inputs::{NativeDisplay, RawDisplay};
 use glutin_x11_sym::Display as X11Display;
 use winit_types::dpi;
 use winit_types::error::Error;
@@ -20,6 +20,7 @@ pub mod utils;
 pub struct Display {
     native_display: Arc<X11Display>,
     display: BackendDisplay,
+    screen: Option<raw::c_int>,
 }
 
 #[derive(Debug)]
@@ -30,8 +31,8 @@ pub enum BackendDisplay {
 
 impl Display {
     pub fn new<ND: NativeDisplay>(db: DisplayBuilder, nd: &ND) -> Result<Self, Error> {
-        let native_display = match nd.display() {
-            RawDisplay::Xlib { display, .. } => X11Display::from_raw(display),
+        let (native_display, screen) = match nd.display() {
+            RawDisplay::Xlib { display, screen, .. } => (X11Display::from_raw(display), screen),
             _ => unreachable!(),
         };
 
@@ -39,6 +40,7 @@ impl Display {
         Ok(Display {
             display,
             native_display,
+            screen,
         })
     }
 }
@@ -755,7 +757,7 @@ pub enum Surface<T: SurfaceTypeTrait> {
 //    #[inline]
 //    pub fn swap_buffers_with_damage(
 //        &self,
-//        rects: &[Rect],
+//        rects: &[dpi::Rect],
 //    ) -> Result<(), ContextError> {
 //        match self.context {
 //            X11Context::Glx(_) => Err(ContextError::OsError(

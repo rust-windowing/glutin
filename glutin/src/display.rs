@@ -1,6 +1,6 @@
 use crate::platform_impl;
 
-use glutin_interface::NativeDisplay;
+use glutin_interface::inputs::NativeDisplay;
 use winit_types::error::Error;
 
 #[derive(Debug)]

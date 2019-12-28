@@ -4,10 +4,10 @@ use crate::config::{Api, ConfigAttribs, ConfigBuilder, ConfigWrapper};
 use crate::context::ContextBuilderWrapper;
 use crate::display::DisplayBuilder;
 use crate::platform_impl::BackingApi;
-use crate::surface::{PBuffer, Pixmap, Rect, SurfaceTypeTrait, Window};
+use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
 use crate::utils::NoPrint;
 
-use glutin_interface::{
+use glutin_interface::inputs::{
     NativeDisplay, NativePixmap, NativePixmapBuilder, NativeWindow, NativeWindowBuilder, RawWindow,
 };
 use wayland_client::egl as wegl;
@@ -99,7 +99,7 @@ impl Surface<Window> {
 
         let surface = nw.raw_window();
         let surface = match surface {
-            RawWindow::Wayland { wl_surface } => wl_surface,
+            RawWindow::Wayland { wl_surface, .. } => wl_surface,
             _ => {
                 return Err(make_error!(ErrorType::NotSupported(
                     "Wayland surface not found".to_string(),
@@ -137,7 +137,7 @@ impl Surface<Window> {
     }
 
     #[inline]
-    pub fn swap_buffers_with_damage(&self, rects: &[Rect]) -> Result<(), Error> {
+    pub fn swap_buffers_with_damage(&self, rects: &[dpi::Rect]) -> Result<(), Error> {
         self.surface.swap_buffers_with_damage(rects)
     }
 }
