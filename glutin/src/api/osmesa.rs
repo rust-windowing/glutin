@@ -15,7 +15,7 @@ use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
 use winit_types::platform::OsError;
 
-use std::ffi::{c_void, CString};
+use std::ffi::{CString};
 use std::mem::MaybeUninit;
 use std::os::raw;
 
@@ -175,7 +175,7 @@ impl OsMesaContext {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const c_void {
+    pub fn get_proc_address(&self, addr: &str) -> *const raw::c_void {
         unsafe {
             let c_str = CString::new(addr.as_bytes().to_vec()).unwrap();
             std::mem::transmute(glutin_osmesa_sys::OSMesaGetProcAddress(c_str.as_ptr()))

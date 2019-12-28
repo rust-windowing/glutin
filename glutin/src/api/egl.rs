@@ -37,7 +37,7 @@ use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
 use winit_types::platform::OsError;
 
-use std::ffi::{c_void, CStr, CString};
+use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::os::raw;
@@ -218,7 +218,7 @@ fn get_native_display(dp_extensions: &[String], ndisp: &RawDisplay) -> Result<*c
     }
 }
 
-fn get_egl_version(disp: ffi::egl::types::EGLDisplay) -> Result<EGLVersion, Error> {
+fn get_egl_version(disp: ffi::egl::types::EGLDisplay) -> Result<EglVersion, Error> {
     unsafe {
         let egl = EGL.as_ref().unwrap();
         let mut major: ffi::egl::types::EGLint = 0;
@@ -238,7 +238,7 @@ fn get_egl_version(disp: ffi::egl::types::EGLDisplay) -> Result<EGLVersion, Erro
 pub struct DisplayInternal {
     display: ffi::egl::types::EGLDisplay,
     native_display: RawDisplay,
-    egl_version: EGLVersion,
+    egl_version: EglVersion,
     extensions: Vec<String>,
     dp_extensions: Vec<String>,
 }
@@ -377,9 +377,9 @@ impl Config {
     }
 }
 
-type EGLVersion = (ffi::egl::types::EGLint, ffi::egl::types::EGLint);
+type EglVersion = (ffi::egl::types::EGLint, ffi::egl::types::EGLint);
 
-unsafe fn rebind_api(api: Api, egl_version: EGLVersion) -> Result<(), Error> {
+unsafe fn rebind_api(api: Api, egl_version: EglVersion) -> Result<(), Error> {
     let egl = EGL.as_ref().unwrap();
     if egl_version >= (1, 2) {
         if match api {
@@ -397,7 +397,7 @@ unsafe fn rebind_api(api: Api, egl_version: EGLVersion) -> Result<(), Error> {
 
 unsafe fn bind_and_get_api(
     version: &GlRequest,
-    egl_version: EGLVersion,
+    egl_version: EglVersion,
 ) -> Result<(Option<GlVersion>, Api), Error> {
     let egl = EGL.as_ref().unwrap();
     match version {
@@ -658,7 +658,7 @@ impl Context {
     // }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const c_void {
+    pub fn get_proc_address(&self, addr: &str) -> *const raw::c_void {
         let egl = EGL.as_ref().unwrap();
         let addr = CString::new(addr.as_bytes()).unwrap();
         let addr = addr.as_ptr();

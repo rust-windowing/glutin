@@ -15,7 +15,6 @@ pub use wayland_client::sys::client::wl_display;
 use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
 
-use std::ffi::c_void;
 use std::ops::Deref;
 use std::os::raw;
 use std::sync::Arc;
@@ -29,8 +28,8 @@ impl Display {
             "GLX not supported by Wayland".to_string(),
         ));
         match db.plat_attr.backing_api {
-            BackingApi::GLX => return Err(glx_not_supported_error),
-            BackingApi::GLXThenEGL => {
+            BackingApi::Glx => return Err(glx_not_supported_error),
+            BackingApi::GlxThenEgl => {
                 warn!("[glutin] Not trying GLX with Wayland, as not supported by Wayland.")
             }
             _ => (),
@@ -39,7 +38,7 @@ impl Display {
         egl::Display::new(db, nd)
             .map(Display)
             .map_err(|err| match db.plat_attr.backing_api {
-                BackingApi::GLXThenEGL => append_errors!(err, glx_not_supported_error),
+                BackingApi::GlxThenEgl => append_errors!(err, glx_not_supported_error),
                 _ => err,
             })
     }
@@ -226,7 +225,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const c_void {
+    pub fn get_proc_address(&self, addr: &str) -> *const raw::c_void {
         self.0.get_proc_address(addr)
     }
 

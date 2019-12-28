@@ -2,13 +2,14 @@ use crate::api::egl::{self, EGL};
 use crate::api::glx::{self, ffi, GLX};
 use crate::display::DisplayBuilder;
 use crate::surface::SurfaceTypeTrait;
-use crate::config::{ConfigBuilder, ConfigAttribs};
+use crate::config::{ConfigBuilder, ConfigAttribs, Api, ConfigWrapper};
 use crate::platform_impl::BackingApi;
+use crate::context::ContextBuilderWrapper;
 
 use glutin_interface::inputs::{NativeDisplay, RawDisplay};
 use glutin_x11_sym::Display as X11Display;
 use winit_types::dpi;
-use winit_types::error::Error;
+use winit_types::error::{Error, ErrorType};
 
 use std::ops::{Deref, DerefMut};
 use std::os::raw;
@@ -48,18 +49,18 @@ impl Display {
 impl BackendDisplay {
     fn new<ND: NativeDisplay>(db: DisplayBuilder, nd: &ND) -> Result<Self, Error> {
         let disp = match db.plat_attr.backing_api {
-            BackingApi::GLX | BackingApi::GLXThenEGL => unimplemented!(),
-            BackingApi::EGL | BackingApi::EGLThenGLX => egl::Display::new(db, nd).map(BackendDisplay::Egl),
+            BackingApi::Glx | BackingApi::GlxThenEgl => unimplemented!(),
+            BackingApi::Egl | BackingApi::EglThenGlx => egl::Display::new(db, nd).map(BackendDisplay::Egl),
         };
 
         match (disp, db.plat_attr.backing_api) {
-            (_, BackingApi::GLX) | (_, BackingApi::EGL) |(Ok(_), _) => return disp,
+            (_, BackingApi::Glx) | (_, BackingApi::Egl) |(Ok(_), _) => return disp,
             _ => (),
         }
 
         let disp2 = match db.plat_attr.backing_api {
-            BackingApi::EGLThenGLX => unimplemented!(),
-            BackingApi::GLXThenEGL => egl::Display::new(db, nd).map(BackendDisplay::Egl),
+            BackingApi::EglThenGlx => unimplemented!(),
+            BackingApi::GlxThenEgl => egl::Display::new(db, nd).map(BackendDisplay::Egl),
         };
 
         match (disp, disp2) {
@@ -89,6 +90,134 @@ pub enum Context {
     Egl(egl::Context),
     //Glx(glx::Display),
 }
+
+
+
+
+impl Context {
+    fn inner_cb_egl(
+        cb: ContextBuilderWrapper<&Context>,
+    ) -> Result<ContextBuilderWrapper<&egl::Context>, Error> {
+        match cb.sharing {
+            Some(Context::Egl(_)) | None => (),
+            _ => return Err(make_error!(ErrorType::BadApiUsage(
+                "Cannot share a EGL context with a non-EGL context".to_string()
+            ))),
+        }
+
+        Ok(cb.map_sharing(|ctx| match ctx {
+            Context::Egl(ctx) => ctx,
+            _ => unreachable!(),
+        }))
+    }
+
+    //fn inner_cb_glx(
+    //    cb: ContextBuilderWrapper<&Context>,
+    //) -> Result<ContextBuilderWrapper<&glx::Context>, Error> {
+    //    match cb.sharing {
+    //        Some(Context::Glx(_)) | None => (),
+    //        _ => return Err(make_error!(ErrorType::BadApiUsage(
+    //            "Cannot share a GLX context with a non-GLX context".to_string()
+    //        ))),
+    //    }
+
+    //    Ok(cb.map_sharing(|ctx| match ctx {
+    //        Context::Glx(ctx) => ctx,
+    //        _ => unreachable!(),
+    //    }))
+    //}
+
+    #[inline]
+    pub(crate) fn new(
+        disp: &Display,
+        cb: ContextBuilderWrapper<&Context>,
+        conf: ConfigWrapper<&Config, &ConfigAttribs>,
+    ) -> Result<Self, Error> {
+        match (disp.display, conf.config) {
+            (BackendDisplay::Egl(ref disp), Config::Egl(config)) => {
+                egl::Context::new(
+                    disp,
+                    Context::inner_cb_egl(cb)?,
+                    conf.map_config(|_| config),
+                )
+                .map(Context::Egl)
+            },
+            //(BackendDisplay::Glx(ref disp), Config::Glx(config)) => {
+            //    glx::Context::new(
+            //        disp,
+            //        Context::inner_cb_glx(cb)?,
+            //        conf.map_config(|_| config),
+            //    )
+            //    .map(Context::Glx)
+            //},
+            (_, _) => Err(make_error!(ErrorType::BadApiUsage(
+                "Incompatible display and config backends.".to_string()
+            ))),
+        }
+    }
+
+    #[inline]
+    pub unsafe fn make_current_surfaceless(&self) -> Result<(), Error> {
+        match self {
+            Context::Egl(ref ctx) => ctx.make_current_surfaceless(),
+            //Context::Glx(ref ctx) => ctx.make_current_surfaceless(),
+        }
+    }
+
+    #[inline]
+    pub unsafe fn make_current<T: SurfaceTypeTrait>(&self, surf: &Surface<T>) -> Result<(), Error> {
+        match (self, surf) {
+            (Context::Egl(ref ctx), Surface::Egl(ref surf)) => ctx.make_current(surf),
+            //(Context::Glx(ref ctx), Surface::Glx(ref surf)) => ctx.make_current(surf),
+            (_, _) => Err(make_error!(ErrorType::BadApiUsage(
+                "Incompatible context and surface backends.".to_string()
+            ))),
+        }
+    }
+
+    #[inline]
+    pub unsafe fn make_not_current(&self) -> Result<(), Error> {
+        match self {
+            Context::Egl(ref ctx) => ctx.make_not_current(),
+            //Context::Glx(ref ctx) => ctx.make_not_current(),
+        }
+    }
+
+    #[inline]
+    pub fn is_current(&self) -> bool {
+        match self {
+            Context::Egl(ref ctx) => ctx.is_current(),
+            //Context::Glx(ref ctx) => ctx.is_current(),
+        }
+    }
+
+    #[inline]
+    pub fn get_api(&self) -> Api {
+        match self {
+            Context::Egl(ref ctx) => ctx.get_api(),
+            //Context::Glx(ref ctx) => ctx.get_api(),
+        }
+    }
+
+    #[inline]
+    pub fn get_proc_address(&self, addr: &str) -> *const raw::c_void {
+        match self {
+            Context::Egl(ref ctx) => ctx.get_proc_address(addr),
+            //Context::Glx(ref ctx) => ctx.get_proc_address(addr),
+        }
+    }
+
+    #[inline]
+    pub fn get_config(&self) -> ConfigWrapper<Config, ConfigAttribs> {
+        match self {
+            Context::Egl(ref ctx) => ctx.get_config().map_config(Config::Egl),
+            //Context::Glx(ref ctx) => ctx.get_config().map_config(Config::Glx),
+        }
+    }
+}
+
+
+
 
 #[derive(Debug)]
 pub enum Surface<T: SurfaceTypeTrait> {

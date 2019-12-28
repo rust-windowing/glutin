@@ -2,9 +2,12 @@
 mod egl {
     use crate::api::dlloader::{SymTrait, SymWrapper};
     use crate::api::egl::ffi;
+
     use libloading;
     use parking_lot::Mutex;
+
     use std::sync::Arc;
+    use std::os::raw;
 
     #[cfg(unix)]
     use libloading::os::unix as libloading_os;
@@ -18,7 +21,7 @@ mod egl {
     unsafe impl Sync for Egl {}
 
     type EglGetProcAddressType = libloading_os::Symbol<
-        unsafe extern "C" fn(*const std::os::raw::c_void) -> *const std::os::raw::c_void,
+        unsafe extern "C" fn(*const raw::c_void) -> *const raw::c_void,
     >;
 
     lazy_static! {
@@ -28,7 +31,7 @@ mod egl {
 
     impl SymTrait for ffi::egl::Egl {
         fn load_with(lib: &libloading::Library) -> Self {
-            let f = move |s: &'static str| -> *const std::os::raw::c_void {
+            let f = move |s: &'static str| -> *const raw::c_void {
                 // Check if the symbol is available in the library directly. If
                 // it is, just return it.
                 match unsafe {
@@ -47,9 +50,9 @@ mod egl {
                     unsafe {
                         let sym: libloading::Symbol<
                             unsafe extern "C" fn(
-                                *const std::os::raw::c_void,
+                                *const raw::c_void,
                             )
-                                -> *const std::os::raw::c_void,
+                                -> *const raw::c_void,
                         > = lib.get(b"eglGetProcAddress").unwrap();
                         *egl_get_proc_address = Some(sym.into_raw());
                     }
@@ -64,7 +67,7 @@ mod egl {
                         std::ffi::CString::new(s.as_bytes())
                             .unwrap()
                             .as_bytes_with_nul()
-                            .as_ptr() as *const std::os::raw::c_void,
+                            .as_ptr() as *const raw::c_void,
                     )
                 }
             };

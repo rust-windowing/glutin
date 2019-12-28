@@ -4,9 +4,9 @@ use crate::display::Display;
 use crate::platform_impl;
 use crate::surface::{Surface, SurfaceTypeTrait};
 
-use std::ffi::c_void;
-
 use winit_types::error::Error;
+
+use std::os::raw;
 
 #[derive(Debug)]
 pub struct Context(pub(crate) platform_impl::Context);
@@ -43,7 +43,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const c_void {
+    pub fn get_proc_address(&self, addr: &str) -> *const raw::c_void {
         self.0.get_proc_address(addr)
     }
 

@@ -21,7 +21,6 @@ use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
 use winit_types::platform::OsError;
 
-use std::ffi::c_void;
 use std::marker::PhantomData;
 use std::os::raw;
 use std::sync::Arc;
@@ -179,7 +178,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const c_void {
+    pub fn get_proc_address(&self, addr: &str) -> *const raw::c_void {
         match self {
             Context::Wayland(ref ctx) => ctx.get_proc_address(addr),
             Context::X11(ref ctx) => ctx.get_proc_address(addr),
@@ -422,14 +421,14 @@ pub struct DisplayPlatformAttributes {
 
 #[derive(Debug, Clone)]
 pub enum BackingApi {
-    GLXThenEGL,
-    EGLThenGLX,
-    EGL,
-    GLX,
+    GlxThenEgl,
+    EglThenGlx,
+    Egl,
+    Glx,
 }
 
 impl Default for BackingApi {
     fn default() -> Self {
-        BackingApi::GLXThenEGL
+        BackingApi::GlxThenEgl
     }
 }
