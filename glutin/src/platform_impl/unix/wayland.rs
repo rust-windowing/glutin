@@ -49,9 +49,9 @@ impl Display {
 pub struct Config(egl::Config);
 
 impl Config {
-    pub fn new(disp: &Display, cb: ConfigBuilder) -> Result<(ConfigAttribs, Config), Error> {
+    pub fn new(disp: &Display, cb: ConfigBuilder) -> Result<Box<dyn Iterator<Item = (ConfigAttribs, Config)>>, Error> {
         egl::Config::new(&disp.0, cb, |confs| Ok(confs[0]))
-            .map(|(attribs, conf)| (attribs, Config(conf)))
+            .map(|configs| Box::new(configs.map(|(attribs, config)| (attribs, Config(config)))) as Box<_>)
     }
 }
 

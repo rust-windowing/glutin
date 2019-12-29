@@ -324,7 +324,7 @@ impl Config {
         disp: &Display,
         cb: ConfigBuilder,
         conf_selector: F,
-    ) -> Result<(ConfigAttribs, Config), Error>
+    ) -> Result<Box<dyn Iterator<Item = (ConfigAttribs, Config)>>, Error>
     where
         F: FnMut(Vec<ffi::egl::types::EGLConfig>) -> Result<ffi::egl::types::EGLConfig, Error>,
     {

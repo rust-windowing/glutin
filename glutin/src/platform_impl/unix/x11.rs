@@ -18,6 +18,7 @@ use winit_types::platform::OsError;
 use std::ops::{Deref, DerefMut};
 use std::os::raw;
 use std::sync::Arc;
+use std::fmt::Debug;
 
 pub mod utils;
 
@@ -89,7 +90,7 @@ pub enum Config {
 
 impl Config {
     #[inline]
-    pub fn new(disp: &Display, cb: ConfigBuilder) -> Result<(ConfigAttribs, Self), Error> {
+    pub fn new(disp: &Display, cb: ConfigBuilder) -> Result<Box<dyn Iterator<Item = (ConfigAttribs, Self)>>, Error> {
         let plat_attr = cb.plat_attr.clone();
         match disp.display {
             BackendDisplay::Egl(ref bdisp) => egl::Config::new(bdisp, cb, |confs| {
@@ -107,7 +108,7 @@ impl Config {
                 )
                 .map(|(conf, _)| conf)
             })
-            .map(|(attribs, conf)| (attribs, Config::Egl(conf))),
+            .map(|configs| configs.map(|(attribs, config)| (attribs, Config::Egl(config))) as Box<_>)
         }
     }
 
@@ -381,11 +382,34 @@ impl Surface<Window> {
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         nw: &NW,
     ) -> Result<Self, Error> {
+        let xlib = syms!(XLIB);
         let surface = nw.raw_window();
         let surface = match surface {
             RawWindow::Xlib { window, .. } => window,
             _ => unreachable!(),
         };
+
+        let visual_info = conf.config.get_visual_info(&disp.native_display)?;
+        let window_attrs = {
+            let mut window_attrs = unsafe { std::mem::zeroed() };
+            let window_attr_error = make_oserror!(OsError::Misc(
+                "Glutin failed to query for a window's window attributes.".to_string()
+            ));
+            disp.native_display.check_errors().map_err(|err| append_errors!(err, window_attr_error.clone()))?;
+            if unsafe { (xlib.XGetWindowAttributes)(**disp.native_display, surface, &mut window_attrs) } == 0 {
+                return Err(window_attr_error);
+            }
+            window_attrs
+        };
+
+        fn assemble_non_match_error<T: Debug + PartialEq>(name: &str, a: T, b: T) -> Result<(), Error> {
+            if a != b {
+                return Err(make_oserror!(OsError::Misc(format!("Config's {} and window's {} do not match, {:?} != {:?}", name, name, a, b))));
+            }
+            Ok(())
+        }
+        assemble_non_match_error("visual", visual_info.visual, window_attrs.visual)?;
+        assemble_non_match_error("depth", visual_info.depth, window_attrs.depth)?;
 
         match (&disp.display, &conf.config) {
             (BackendDisplay::Egl(disp), Config::Egl(config)) => {
