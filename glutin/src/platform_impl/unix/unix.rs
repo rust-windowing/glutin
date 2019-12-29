@@ -26,12 +26,6 @@ use std::os::raw;
 use std::sync::Arc;
 
 #[derive(Debug)]
-pub enum ContextType {
-    // X11,
-    Wayland,
-}
-
-#[derive(Debug)]
 pub enum Display {
     X11(x11::Display),
     Wayland(wayland::Display),
