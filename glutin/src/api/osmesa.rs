@@ -15,7 +15,7 @@ use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
 use winit_types::platform::OsError;
 
-use std::ffi::{CString};
+use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::os::raw;
 

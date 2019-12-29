@@ -11,6 +11,5 @@ pub mod osmesa;
 pub use crate::api::egl::ffi::EGLContext;
 pub use crate::api::glx::ffi::glx::types::GLXContext;
 pub use crate::platform_impl::{
-    BackingApi, ContextPlatformAttributes, DisplayPlatformAttributes,
-    ConfigPlatformAttributes,
+    BackingApi, ConfigPlatformAttributes, ContextPlatformAttributes, DisplayPlatformAttributes,
 };

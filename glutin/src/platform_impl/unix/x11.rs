@@ -1,15 +1,18 @@
 use crate::api::egl::{self, EGL};
 use crate::api::glx::{self, ffi, GLX};
-use crate::display::DisplayBuilder;
-use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
-use crate::config::{ConfigBuilder, ConfigAttribs, Api, ConfigWrapper};
-use crate::platform_impl::BackingApi;
+use crate::config::{Api, ConfigAttribs, ConfigBuilder, ConfigWrapper};
 use crate::context::ContextBuilderWrapper;
+use crate::display::DisplayBuilder;
+use crate::platform_impl::BackingApi;
+use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
 
-use glutin_interface::inputs::{NativeDisplay, RawDisplay, NativeWindow, NativePixmap, NativeWindowBuilder, NativePixmapBuilder};
+use glutin_interface::inputs::{
+    NativeDisplay, NativePixmap, NativePixmapBuilder, NativeWindow, NativeWindowBuilder, RawDisplay,
+};
 use glutin_x11_sym::Display as X11Display;
 use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
+use winit_types::platform::OsError;
 
 use std::ops::{Deref, DerefMut};
 use std::os::raw;
@@ -33,7 +36,9 @@ pub enum BackendDisplay {
 impl Display {
     pub fn new<ND: NativeDisplay>(db: DisplayBuilder, nd: &ND) -> Result<Self, Error> {
         let (native_display, screen) = match nd.display() {
-            RawDisplay::Xlib { display, screen, .. } => (X11Display::from_raw(display), screen),
+            RawDisplay::Xlib {
+                display, screen, ..
+            } => (X11Display::from_raw(display), screen),
             _ => unreachable!(),
         };
 
@@ -51,7 +56,9 @@ impl BackendDisplay {
         let backing_api = db.plat_attr.backing_api;
         let disp = match backing_api {
             BackingApi::Glx | BackingApi::GlxThenEgl => unimplemented!(),
-            BackingApi::Egl | BackingApi::EglThenGlx => egl::Display::new(db.clone(), nd).map(BackendDisplay::Egl),
+            BackingApi::Egl | BackingApi::EglThenGlx => {
+                egl::Display::new(db.clone(), nd).map(BackendDisplay::Egl)
+            }
         };
 
         match (&disp, backing_api) {
@@ -68,7 +75,7 @@ impl BackendDisplay {
         match (disp, disp2) {
             (Ok(_), _) => unreachable!(),
             (_, Ok(disp2)) => Ok(disp2),
-            (Err(err1), Err(err2)) => Err(append_errors!(err1, err2))
+            (Err(err1), Err(err2)) => Err(append_errors!(err1, err2)),
         }
     }
 }
@@ -88,8 +95,22 @@ pub enum BackendConfig {
 impl BackendConfig {
     pub fn new(disp: &Display, cb: ConfigBuilder) -> Result<(ConfigAttribs, Self), Error> {
         match disp.display {
-            BackendDisplay::Egl(ref disp) => egl::Config::new(disp, cb, |confs| Ok(confs[0]))
-                .map(|(attribs, conf)| (attribs, BackendConfig::Egl(conf))),
+            BackendDisplay::Egl(ref bdisp) => egl::Config::new(bdisp, cb, |confs| {
+                select_config(
+                    &disp.native_display,
+                    cb.plat_attr.x11_transparency,
+                    cb.plat_attr.x11_visual_xid,
+                    confs,
+                    |config_id| {
+                        utils::get_visual_info_from_xid(
+                            &disp.native_display,
+                            egl::get_native_visual_id(***bdisp, *config_id) as ffi::VisualID,
+                        )
+                    },
+                )
+                .map(|(conf, _)| conf)
+            })
+            .map(|(attribs, conf)| (attribs, BackendConfig::Egl(conf))),
         }
     }
 }
@@ -97,16 +118,22 @@ impl BackendConfig {
 impl Config {
     pub fn new(disp: &Display, cb: ConfigBuilder) -> Result<(ConfigAttribs, Self), Error> {
         let (attribs, config) = BackendConfig::new(disp, cb)?;
-        Ok((attribs, Config {
-            config,
-            native_display: Arc::clone(&disp.native_display),
-        }))
+        Ok((
+            attribs,
+            Config {
+                config,
+                native_display: Arc::clone(&disp.native_display),
+            },
+        ))
     }
 
     #[inline]
-    pub fn get_visual_info(&self) -> ffi::XVisualInfo {
+    pub fn get_visual_info(&self) -> Result<ffi::XVisualInfo, Error> {
         match self.config {
-            BackendConfig::Egl(conf) => utils::get_visual_info_from_xid(&self.native_display, conf.get_native_visual_id() as ffi::VisualID),
+            BackendConfig::Egl(conf) => utils::get_visual_info_from_xid(
+                &self.native_display,
+                conf.get_native_visual_id() as ffi::VisualID,
+            ),
         }
     }
 }
@@ -131,14 +158,12 @@ impl BackendContext {
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
     ) -> Result<Self, Error> {
         match (&disp.display, &conf.config.config) {
-            (BackendDisplay::Egl(disp), BackendConfig::Egl(config)) => {
-                egl::Context::new(
-                    disp,
-                    Context::inner_cb_egl(cb)?,
-                    conf.map_config(|_| config),
-                )
-                .map(BackendContext::Egl)
-            },
+            (BackendDisplay::Egl(disp), BackendConfig::Egl(config)) => egl::Context::new(
+                disp,
+                Context::inner_cb_egl(cb)?,
+                conf.map_config(|_| config),
+            )
+            .map(BackendContext::Egl),
             //(BackendDisplay::Glx(disp), Config::Glx(config)) => {
             //    glx::Context::new(
             //        disp,
@@ -159,14 +184,23 @@ impl Context {
         cb: ContextBuilderWrapper<&Context>,
     ) -> Result<ContextBuilderWrapper<&egl::Context>, Error> {
         match cb.sharing {
-            Some(Context { context: BackendContext::Egl(_), .. }) | None => (),
-            _ => return Err(make_error!(ErrorType::BadApiUsage(
-                "Cannot share a EGL context with a non-EGL context".to_string()
-            ))),
+            Some(Context {
+                context: BackendContext::Egl(_),
+                ..
+            })
+            | None => (),
+            _ => {
+                return Err(make_error!(ErrorType::BadApiUsage(
+                    "Cannot share a EGL context with a non-EGL context".to_string()
+                )))
+            }
         }
 
         Ok(cb.map_sharing(|ctx| match ctx {
-            Context { context: BackendContext::Egl(ctx), .. } => ctx,
+            Context {
+                context: BackendContext::Egl(ctx),
+                ..
+            } => ctx,
             _ => unreachable!(),
         }))
     }
@@ -240,7 +274,8 @@ impl Context {
         match &self.context {
             BackendContext::Egl(ref ctx) => ctx.get_config().map_config(BackendConfig::Egl),
             //Context::Glx(ref ctx) => ctx.get_config().map_config(BackendConfig::Glx),
-        }.map_config(|config| Config {
+        }
+        .map_config(|config| Config {
             config,
             native_display: Arc::clone(&self.native_display),
         })
@@ -273,7 +308,8 @@ impl<T: SurfaceTypeTrait> Surface<T> {
         match &self.surface {
             BackendSurface::Egl(ref ctx) => ctx.get_config().map_config(BackendConfig::Egl),
             //Context::Glx(ref ctx) => ctx.get_config().map_config(BackendConfig::Glx),
-        }.map_config(|config| Config {
+        }
+        .map_config(|config| Config {
             config,
             native_display: Arc::clone(&self.native_display),
         })
@@ -297,13 +333,9 @@ impl BackendSurface<PBuffer> {
     ) -> Result<Self, Error> {
         match (&disp.display, &conf.config.config) {
             (BackendDisplay::Egl(disp), BackendConfig::Egl(config)) => {
-                egl::Surface::<PBuffer>::new(
-                    disp,
-                    conf.map_config(|_| config),
-                    size,
-                )
-                .map(BackendSurface::Egl)
-            },
+                egl::Surface::<PBuffer>::new(disp, conf.map_config(|_| config), size)
+                    .map(BackendSurface::Egl)
+            }
             //(BackendDisplay::Glx(disp), Config::Glx(config)) => {
             //    glx::Surface::<PBuffer>::new(
             //        disp,
@@ -314,7 +346,7 @@ impl BackendSurface<PBuffer> {
             //},
             (_, _) => Err(make_error!(ErrorType::BadApiUsage(
                 "Incompatible display and config backends.".to_string()
-            )))
+            ))),
         }
     }
 }
@@ -405,19 +437,17 @@ impl BackendSurface<Window> {
     ) -> Result<(NWB::Window, Self), Error> {
         let xlib = syms!(XLIB);
         // Get the screen_id for the window being built.
-        let screen = disp.screen.unwrap_or(unsafe { (xlib.XDefaultScreen)(**disp.native_display) });
+        let screen = disp
+            .screen
+            .unwrap_or(unsafe { (xlib.XDefaultScreen)(**disp.native_display) });
         let visual_info = conf.config.get_visual_info();
 
         let win = nwb.build_x11(&mut visual_info as *mut _ as *mut _, screen)?;
         match (&disp.display, &conf.config.config) {
             (BackendDisplay::Egl(disp), BackendConfig::Egl(config)) => {
-                egl::Surface::<Window>::new(
-                    disp,
-                    conf.map_config(|_| config),
-                    nwb,
-                )
-                .map(|surf| (win, BackendSurface::Egl(surf)))
-            },
+                egl::Surface::<Window>::new(disp, conf.map_config(|_| config), nwb)
+                    .map(|surf| (win, BackendSurface::Egl(surf)))
+            }
             //(Display::Glx(disp), Config::Glx(config)) => {
             //    glx::Surface::<Window>::new(
             //        disp,
@@ -428,7 +458,7 @@ impl BackendSurface<Window> {
             //},
             (_, _) => Err(make_error!(ErrorType::BadApiUsage(
                 "Incompatible display and config backends.".to_string()
-            )))
+            ))),
         }
     }
 
@@ -471,10 +501,13 @@ impl Surface<Window> {
         nwb: NWB,
     ) -> Result<(NWB::Window, Self), Error> {
         let (win, surface) = BackendSurface::<Window>::new(disp, conf, nwb)?;
-        Ok((win, Surface {
-            surface,
-            native_display: Arc::clone(&disp.native_display),
-        }))
+        Ok((
+            win,
+            Surface {
+                surface,
+                native_display: Arc::clone(&disp.native_display),
+            },
+        ))
     }
 
     #[inline]
@@ -513,24 +546,32 @@ impl Surface<Window> {
 //
 // https://bugs.freedesktop.org/show_bug.cgi?id=67676
 // I'm working on a patch.
-pub fn select_config<'a, T, F, CTX>(
+pub fn select_config<'a, T, F>(
     native_disp: &Arc<X11Display>,
     target_transparency: Option<bool>,
     target_visual_xid: Option<raw::c_ulong>,
     conf_ids: Vec<T>,
     mut convert_to_xvisualinfo: F,
-) -> Result<(T, ffi::XVisualInfo), ()>
+) -> Result<(T, ffi::XVisualInfo), Error>
 where
-    F: FnMut(&T) -> Option<ffi::XVisualInfo>,
+    F: FnMut(&T) -> Result<ffi::XVisualInfo, Error>,
 {
     use utils::Lacks;
     let mut chosen_conf_id = None;
     let mut lacks_what = None;
 
+    let mut errors = make_oserror!(OsError::Misc(
+        "Glutin failed to choose a config because none of them (if any) had a valid XVisualInfo."
+            .to_string()
+    ));
+
     for conf_id in conf_ids {
         let visual_infos = match convert_to_xvisualinfo(&conf_id) {
-            Some(vi) => vi,
-            None => continue,
+            Ok(vi) => vi,
+            Err(err) => {
+                errors = append_errors!(err, errors);
+                continue;
+            },
         };
 
         let this_lacks_what = utils::examine_visual_info(
@@ -570,18 +611,15 @@ where
 
     match lacks_what {
         Some(Ok(())) => (),
-        Some(Err(Lacks::Transparency)) => warn!("[glutin] could not a find fb config with an alpha mask. Transparency may be broken."),
+        Some(Err(Lacks::Transparency)) => warn!(
+            "[glutin] could not a find fb config with an alpha mask. Transparency may be broken."
+        ),
         Some(Err(Lacks::XID)) => panic!(),
         None => warn!("[glutin] no configs were found. Period."),
     }
 
-    chosen_conf_id.ok_or(())
+    chosen_conf_id.ok_or(errors)
 }
-
-
-
-
-
 
 //    Get the screen_id for the window being built.
 //    let screen_id = unsafe { (xconn.xlib.XDefaultScreen)(xconn.display) };

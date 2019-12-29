@@ -1,33 +1,40 @@
-use x11_dl::xlib::{VisualID, VisualIDMask, XVisualInfo};
 use glutin_x11_sym::Display;
+use winit_types::error::Error;
+use winit_types::platform::OsError;
+use x11_dl::xlib::{VisualID, VisualIDMask, XVisualInfo};
 
 use std::os::raw;
 use std::sync::Arc;
 
-pub fn get_visual_info_from_xid(
-    disp: &Arc<Display>,
-    xid: VisualID,
-) -> XVisualInfo {
+pub fn get_visual_info_from_xid(disp: &Arc<Display>, xid: VisualID) -> Result<XVisualInfo, Error> {
     let xlib = syms!(XLIB);
 
-    assert_ne!(xid, 0);
+    if xid == 0 {
+        return Err(make_oserror!(OsError::Misc(
+            "Can not get XVisualInfo of xid 0".to_string()
+        )));
+    }
+
     let mut template: XVisualInfo = unsafe { std::mem::zeroed() };
     template.visualid = xid;
 
     let mut num_visuals = 0;
-    let vi = unsafe {
-        (xlib.XGetVisualInfo)(
-            ***disp,
-            VisualIDMask,
-            &mut template,
-            &mut num_visuals,
-        )
-    };
-    disp
-        .check_errors()
-        .expect("[glutin] Failed to call `XGetVisualInfo`");
-    assert!(!vi.is_null());
-    assert!(num_visuals == 1);
+    let vi =
+        unsafe { (xlib.XGetVisualInfo)(***disp, VisualIDMask, &mut template, &mut num_visuals) };
+    disp.check_errors()?;
+
+    if vi.is_null() {
+        return Err(make_oserror!(OsError::Misc(format!(
+            "Tried to get XVisualInfo of xid {:?} but got NULL",
+            xid
+        ))));
+    }
+    if num_visuals != 1 {
+        return Err(make_oserror!(OsError::Misc(format!(
+            "Tried to get XVisualInfo of xid {:?} but got returned {:?} visuals",
+            xid, num_visuals
+        ))));
+    }
 
     let vi_copy = unsafe { std::ptr::read(vi as *const _) };
     unsafe {
@@ -57,10 +64,8 @@ pub fn examine_visual_info(
 
     unsafe {
         if wants_transparency {
-            let pict_format = (syms!(XRENDER).XRenderFindVisualFormat)(
-                ***disp,
-                visual_infos.visual,
-            );
+            let pict_format =
+                (syms!(XRENDER).XRenderFindVisualFormat)(***disp, visual_infos.visual);
             if pict_format.is_null() {
                 return Err(Lacks::Transparency);
             }

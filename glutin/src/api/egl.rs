@@ -19,8 +19,8 @@ use crate::config::{
     Api, ConfigAttribs, ConfigBuilder, ConfigWrapper, GlRequest, GlVersion, ReleaseBehavior,
 };
 use crate::context::{ContextBuilderWrapper, Robustness};
-use crate::surface::{PBuffer, Pixmap, SurfaceType, SurfaceTypeTrait, Window};
 use crate::display::DisplayBuilder;
+use crate::surface::{PBuffer, Pixmap, SurfaceType, SurfaceTypeTrait, Window};
 
 use glutin_interface::inputs::{NativeDisplay, RawDisplay};
 use parking_lot::Mutex;
@@ -47,7 +47,10 @@ lazy_static! {
     pub static ref EGL: Result<Egl, Error> = Egl::new();
 }
 
-fn get_native_display(dp_extensions: &[String], ndisp: &RawDisplay) -> Result<*const raw::c_void, Error> {
+fn get_native_display(
+    dp_extensions: &[String],
+    ndisp: &RawDisplay,
+) -> Result<*const raw::c_void, Error> {
     let egl = EGL.as_ref().unwrap();
 
     let has_dp_extension = |e: &str| dp_extensions.iter().find(|s| s == &e).is_some();
@@ -58,90 +61,91 @@ fn get_native_display(dp_extensions: &[String], ndisp: &RawDisplay) -> Result<*c
         // `EGL_EXT_platform_base`. I'm pretty sure this is a bug. Therefore we
         // detect whether the symbol is loaded in addition to checking for
         // extensions.
-        RawDisplay::Xlib { display, screen, .. }
-            if has_dp_extension("EGL_KHR_platform_x11") && egl.GetPlatformDisplay.is_loaded() =>
-        {
-            let attrib_list = screen.map(|screen| [
-                ffi::egl::PLATFORM_X11_SCREEN_KHR as ffi::egl::types::EGLAttrib,
-                screen as ffi::egl::types::EGLAttrib,
-                ffi::egl::NONE as ffi::egl::types::EGLAttrib,
-            ]);
+        RawDisplay::Xlib {
+            display, screen, ..
+        } if has_dp_extension("EGL_KHR_platform_x11") && egl.GetPlatformDisplay.is_loaded() => {
+            let attrib_list = screen.map(|screen| {
+                [
+                    ffi::egl::PLATFORM_X11_SCREEN_KHR as ffi::egl::types::EGLAttrib,
+                    screen as ffi::egl::types::EGLAttrib,
+                    ffi::egl::NONE as ffi::egl::types::EGLAttrib,
+                ]
+            });
             unsafe {
                 Ok(egl.GetPlatformDisplay(
                     ffi::egl::PLATFORM_X11_KHR,
                     display as *mut _,
-                    attrib_list.as_ref().map(|list| list.as_ptr()).unwrap_or(std::ptr::null()),
+                    attrib_list
+                        .as_ref()
+                        .map(|list| list.as_ptr())
+                        .unwrap_or(std::ptr::null()),
                 ))
             }
         }
 
-        RawDisplay::Xlib { display, screen, .. }
-            if has_dp_extension("EGL_EXT_platform_x11")
-                && egl.GetPlatformDisplayEXT.is_loaded() =>
-        {
-            let attrib_list = screen.map(|screen| [
-                ffi::egl::PLATFORM_X11_SCREEN_EXT as ffi::egl::types::EGLint,
-                screen as ffi::egl::types::EGLint,
-                ffi::egl::NONE as ffi::egl::types::EGLint,
-            ]);
+        RawDisplay::Xlib {
+            display, screen, ..
+        } if has_dp_extension("EGL_EXT_platform_x11") && egl.GetPlatformDisplayEXT.is_loaded() => {
+            let attrib_list = screen.map(|screen| {
+                [
+                    ffi::egl::PLATFORM_X11_SCREEN_EXT as ffi::egl::types::EGLint,
+                    screen as ffi::egl::types::EGLint,
+                    ffi::egl::NONE as ffi::egl::types::EGLint,
+                ]
+            });
             unsafe {
                 Ok(egl.GetPlatformDisplayEXT(
                     ffi::egl::PLATFORM_X11_EXT,
                     display as *mut _,
-                    attrib_list.as_ref().map(|list| list.as_ptr()).unwrap_or(std::ptr::null()),
+                    attrib_list
+                        .as_ref()
+                        .map(|list| list.as_ptr())
+                        .unwrap_or(std::ptr::null()),
                 ))
             }
         }
 
         RawDisplay::Gbm { gbm_device, .. }
             if has_dp_extension("EGL_KHR_platform_gbm") && egl.GetPlatformDisplay.is_loaded() =>
-        {
-            unsafe {
-                Ok(egl.GetPlatformDisplay(
-                    ffi::egl::PLATFORM_GBM_KHR,
-                    gbm_device as *mut _,
-                    std::ptr::null(),
-                ))
-            }
+        unsafe {
+            Ok(egl.GetPlatformDisplay(
+                ffi::egl::PLATFORM_GBM_KHR,
+                gbm_device as *mut _,
+                std::ptr::null(),
+            ))
         }
 
         RawDisplay::Gbm { gbm_device, .. }
             if has_dp_extension("EGL_MESA_platform_gbm")
                 && egl.GetPlatformDisplayEXT.is_loaded() =>
-        {
-            unsafe {
-                Ok(egl.GetPlatformDisplayEXT(
-                    ffi::egl::PLATFORM_GBM_KHR,
-                    gbm_device as *mut _,
-                    std::ptr::null(),
-                ))
-            }
+        unsafe {
+            Ok(egl.GetPlatformDisplayEXT(
+                ffi::egl::PLATFORM_GBM_KHR,
+                gbm_device as *mut _,
+                std::ptr::null(),
+            ))
         }
 
         RawDisplay::Wayland { wl_display, .. }
             if has_dp_extension("EGL_KHR_platform_wayland")
                 && egl.GetPlatformDisplay.is_loaded() =>
-        {
-            unsafe {
-                Ok(egl.GetPlatformDisplay(
-                    ffi::egl::PLATFORM_WAYLAND_KHR,
-                    wl_display as *mut _,
-                    std::ptr::null(),
-                ))
-            }
+        unsafe {
+            Ok(egl.GetPlatformDisplay(
+                ffi::egl::PLATFORM_WAYLAND_KHR,
+                wl_display as *mut _,
+                std::ptr::null(),
+            ))
         }
 
         RawDisplay::Wayland { wl_display, .. }
             if has_dp_extension("EGL_EXT_platform_wayland")
                 && egl.GetPlatformDisplayEXT.is_loaded() =>
-        {
-            unsafe {
-                Ok(egl.GetPlatformDisplayEXT(
-                    ffi::egl::PLATFORM_WAYLAND_EXT,
-                    wl_display as *mut _,
-                    std::ptr::null(),
-                ))
-            }
+        unsafe {
+            Ok(egl.GetPlatformDisplayEXT(
+                ffi::egl::PLATFORM_WAYLAND_EXT,
+                wl_display as *mut _,
+                std::ptr::null(),
+            ))
         }
 
         // TODO: This will never be reached right now, as the android egl
@@ -191,8 +195,7 @@ fn get_native_display(dp_extensions: &[String], ndisp: &RawDisplay) -> Result<*c
             ..
         } => unsafe { Ok(egl.GetDisplay(display as *mut _)) },
 
-        RawDisplay::Android { .. }
-        | RawDisplay::Windows { hwnd: None, .. } => unsafe {
+        RawDisplay::Android { .. } | RawDisplay::Windows { hwnd: None, .. } => unsafe {
             Ok(egl.GetDisplay(ffi::egl::DEFAULT_DISPLAY as *mut _))
         },
 
@@ -323,9 +326,7 @@ impl Config {
         conf_selector: F,
     ) -> Result<(ConfigAttribs, Config), Error>
     where
-        F: FnMut(
-            Vec<ffi::egl::types::EGLConfig>,
-        ) -> Result<ffi::egl::types::EGLConfig, ()>,
+        F: FnMut(Vec<ffi::egl::types::EGLConfig>) -> Result<ffi::egl::types::EGLConfig, Error>,
     {
         let egl = EGL.as_ref().unwrap();
 
@@ -999,7 +1000,7 @@ unsafe fn choose_fbconfig<F>(
     mut conf_selector: F,
 ) -> Result<(ffi::egl::types::EGLConfig, ConfigAttribs), Error>
 where
-    F: FnMut(Vec<ffi::egl::types::EGLConfig>) -> Result<ffi::egl::types::EGLConfig, ()>,
+    F: FnMut(Vec<ffi::egl::types::EGLConfig>) -> Result<ffi::egl::types::EGLConfig, Error>,
 {
     let egl = EGL.as_ref().unwrap();
 
@@ -1221,8 +1222,8 @@ where
         return Err(make_error!(ErrorType::NoAvailableConfig));
     }
 
-    let conf_id =
-        conf_selector(conf_ids).map_err(|_| make_error!(ErrorType::NoAvailableConfig))?;
+    let conf_id = conf_selector(conf_ids)
+        .map_err(|err| append_errors!(err, make_error!(ErrorType::NoAvailableConfig)))?;
 
     let min_swap_interval = attrib!(egl, disp, conf_id, ffi::egl::MIN_SWAP_INTERVAL)?;
     let max_swap_interval = attrib!(egl, disp, conf_id, ffi::egl::MAX_SWAP_INTERVAL)?;

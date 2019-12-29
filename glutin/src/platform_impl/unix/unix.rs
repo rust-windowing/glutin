@@ -60,8 +60,9 @@ impl Config {
         match disp {
             Display::Wayland(disp) => wayland::Config::new(disp, cb)
                 .map(|(attribs, config)| (attribs, Config::Wayland(config))),
-            Display::X11(disp) => x11::Config::new(disp, cb)
-                .map(|(attribs, config)| (attribs, Config::X11(config))),
+            Display::X11(disp) => {
+                x11::Config::new(disp, cb).map(|(attribs, config)| (attribs, Config::X11(config)))
+            }
         }
     }
 }
@@ -78,9 +79,11 @@ impl Context {
     ) -> Result<ContextBuilderWrapper<&wayland::Context>, Error> {
         match cb.sharing {
             Some(Context::Wayland(_)) | None => (),
-            _ => return Err(make_error!(ErrorType::BadApiUsage(
-                "Cannot share a Wayland context with a non-Wayland context".to_string()
-            ))),
+            _ => {
+                return Err(make_error!(ErrorType::BadApiUsage(
+                    "Cannot share a Wayland context with a non-Wayland context".to_string()
+                )))
+            }
         }
 
         Ok(cb.map_sharing(|ctx| match ctx {
@@ -94,9 +97,11 @@ impl Context {
     ) -> Result<ContextBuilderWrapper<&x11::Context>, Error> {
         match cb.sharing {
             Some(Context::X11(_)) | None => (),
-            _ => return Err(make_error!(ErrorType::BadApiUsage(
-                "Cannot share a X11 context with a non-X11 context".to_string()
-            ))),
+            _ => {
+                return Err(make_error!(ErrorType::BadApiUsage(
+                    "Cannot share a X11 context with a non-X11 context".to_string()
+                )))
+            }
         }
 
         Ok(cb.map_sharing(|ctx| match ctx {
@@ -112,22 +117,18 @@ impl Context {
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
     ) -> Result<Self, Error> {
         match (disp, conf.config) {
-            (Display::Wayland(disp), Config::Wayland(config)) => {
-                wayland::Context::new(
-                    disp,
-                    Context::inner_cb_wayland(cb)?,
-                    conf.map_config(|_| config),
-                )
-                .map(Context::Wayland)
-            },
-            (Display::X11(disp), Config::X11(config)) => {
-                x11::Context::new(
-                    disp,
-                    Context::inner_cb_x11(cb)?,
-                    conf.map_config(|_| config),
-                )
-                .map(Context::X11)
-            },
+            (Display::Wayland(disp), Config::Wayland(config)) => wayland::Context::new(
+                disp,
+                Context::inner_cb_wayland(cb)?,
+                conf.map_config(|_| config),
+            )
+            .map(Context::Wayland),
+            (Display::X11(disp), Config::X11(config)) => x11::Context::new(
+                disp,
+                Context::inner_cb_x11(cb)?,
+                conf.map_config(|_| config),
+            )
+            .map(Context::X11),
             (_, _) => Err(make_error!(ErrorType::BadApiUsage(
                 "Incompatible display and config backends.".to_string()
             ))),
@@ -235,24 +236,16 @@ impl Surface<PBuffer> {
     ) -> Result<Self, Error> {
         match (disp, conf.config) {
             (Display::Wayland(disp), Config::Wayland(config)) => {
-                wayland::Surface::<PBuffer>::new(
-                    disp,
-                    conf.map_config(|_| config),
-                    size,
-                )
-                .map(Surface::Wayland)
-            },
+                wayland::Surface::<PBuffer>::new(disp, conf.map_config(|_| config), size)
+                    .map(Surface::Wayland)
+            }
             (Display::X11(disp), Config::X11(config)) => {
-                x11::Surface::<PBuffer>::new(
-                    disp,
-                    conf.map_config(|_| config),
-                    size,
-                )
-                .map(Surface::X11)
-            },
+                x11::Surface::<PBuffer>::new(disp, conf.map_config(|_| config), size)
+                    .map(Surface::X11)
+            }
             (_, _) => Err(make_error!(ErrorType::BadApiUsage(
                 "Incompatible display and config backends.".to_string()
-            )))
+            ))),
         }
     }
 }
@@ -266,24 +259,16 @@ impl Surface<Pixmap> {
     ) -> Result<(NPB::Pixmap, Self), Error> {
         match (disp, conf.config) {
             (Display::Wayland(disp), Config::Wayland(config)) => {
-                wayland::Surface::<Pixmap>::new(
-                    disp,
-                    conf.map_config(|_| config),
-                    npb,
-                )
-                .map(|(pix, surf)| (pix, Surface::Wayland(surf)))
-            },
+                wayland::Surface::<Pixmap>::new(disp, conf.map_config(|_| config), npb)
+                    .map(|(pix, surf)| (pix, Surface::Wayland(surf)))
+            }
             (Display::X11(disp), Config::X11(config)) => {
-                x11::Surface::<Pixmap>::new(
-                    disp,
-                    conf.map_config(|_| config),
-                    npb,
-                )
-                .map(|(pix, surf)| (pix, Surface::X11(surf)))
-            },
+                x11::Surface::<Pixmap>::new(disp, conf.map_config(|_| config), npb)
+                    .map(|(pix, surf)| (pix, Surface::X11(surf)))
+            }
             (_, _) => Err(make_error!(ErrorType::BadApiUsage(
                 "Incompatible display and config backends.".to_string()
-            )))
+            ))),
         }
     }
 
@@ -295,24 +280,16 @@ impl Surface<Pixmap> {
     ) -> Result<Self, Error> {
         match (disp, conf.config) {
             (Display::Wayland(disp), Config::Wayland(config)) => {
-                wayland::Surface::<Pixmap>::new_existing(
-                    disp,
-                    conf.map_config(|_| config),
-                    np,
-                )
-                .map(Surface::Wayland)
-            },
+                wayland::Surface::<Pixmap>::new_existing(disp, conf.map_config(|_| config), np)
+                    .map(Surface::Wayland)
+            }
             (Display::X11(disp), Config::X11(config)) => {
-                x11::Surface::<Pixmap>::new_existing(
-                    disp,
-                    conf.map_config(|_| config),
-                    np,
-                )
-                .map(Surface::X11)
-            },
+                x11::Surface::<Pixmap>::new_existing(disp, conf.map_config(|_| config), np)
+                    .map(Surface::X11)
+            }
             (_, _) => Err(make_error!(ErrorType::BadApiUsage(
                 "Incompatible display and config backends.".to_string()
-            )))
+            ))),
         }
     }
 }
@@ -326,24 +303,16 @@ impl Surface<Window> {
     ) -> Result<(NWB::Window, Self), Error> {
         match (disp, conf.config) {
             (Display::Wayland(disp), Config::Wayland(config)) => {
-                wayland::Surface::<Window>::new(
-                    disp,
-                    conf.map_config(|_| config),
-                    nwb,
-                )
-                .map(|(win, surf)| (win, Surface::Wayland(surf)))
-            },
+                wayland::Surface::<Window>::new(disp, conf.map_config(|_| config), nwb)
+                    .map(|(win, surf)| (win, Surface::Wayland(surf)))
+            }
             (Display::X11(disp), Config::X11(config)) => {
-                x11::Surface::<Window>::new(
-                    disp,
-                    conf.map_config(|_| config),
-                    nwb,
-                )
-                .map(|(win, surf)| (win, Surface::X11(surf)))
-            },
+                x11::Surface::<Window>::new(disp, conf.map_config(|_| config), nwb)
+                    .map(|(win, surf)| (win, Surface::X11(surf)))
+            }
             (_, _) => Err(make_error!(ErrorType::BadApiUsage(
                 "Incompatible display and config backends.".to_string()
-            )))
+            ))),
         }
     }
 
@@ -355,24 +324,16 @@ impl Surface<Window> {
     ) -> Result<Self, Error> {
         match (disp, conf.config) {
             (Display::Wayland(disp), Config::Wayland(config)) => {
-                wayland::Surface::<Window>::new_existing(
-                    disp,
-                    conf.map_config(|_| config),
-                    nw,
-                )
-                .map(Surface::Wayland)
-            },
+                wayland::Surface::<Window>::new_existing(disp, conf.map_config(|_| config), nw)
+                    .map(Surface::Wayland)
+            }
             (Display::X11(disp), Config::X11(config)) => {
-                x11::Surface::<Window>::new_existing(
-                    disp,
-                    conf.map_config(|_| config),
-                    nw,
-                )
-                .map(Surface::X11)
-            },
+                x11::Surface::<Window>::new_existing(disp, conf.map_config(|_| config), nw)
+                    .map(Surface::X11)
+            }
             (_, _) => Err(make_error!(ErrorType::BadApiUsage(
                 "Incompatible display and config backends.".to_string()
-            )))
+            ))),
         }
     }
 
@@ -403,16 +364,16 @@ impl Surface<Window> {
 
 #[derive(Default, Debug, Clone)]
 pub struct ConfigPlatformAttributes {
-    /// X11 only: set internally to insure a certain visual xid is used when
+    /// X11 only: set to insure a certain visual xid is used when
     /// choosing the fbconfig.
-    pub(crate) x11_visual_xid: Option<raw::c_ulong>,
+    pub x11_visual_xid: Option<raw::c_ulong>,
+
+    /// Whether the X11 Visual will have transparency support.
+    pub x11_transparency: Option<bool>,
 }
 
 #[derive(Default, Debug, Clone)]
-pub struct ContextPlatformAttributes {
-    /// GLX only: Whether the context will have transparency support.
-    pub glx_transparency: Option<bool>,
-}
+pub struct ContextPlatformAttributes {}
 
 #[derive(Default, Debug, Clone)]
 pub struct DisplayPlatformAttributes {

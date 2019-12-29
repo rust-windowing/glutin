@@ -8,8 +8,8 @@ mod egl {
     use winit_types::error::Error;
     use winit_types::platform::OsError;
 
-    use std::sync::Arc;
     use std::os::raw;
+    use std::sync::Arc;
 
     #[cfg(unix)]
     use libloading::os::unix as libloading_os;
@@ -22,9 +22,8 @@ mod egl {
     /// Because `*const raw::c_void` doesn't implement `Sync`.
     unsafe impl Sync for Egl {}
 
-    type EglGetProcAddressType = libloading_os::Symbol<
-        unsafe extern "C" fn(*const raw::c_void) -> *const raw::c_void,
-    >;
+    type EglGetProcAddressType =
+        libloading_os::Symbol<unsafe extern "C" fn(*const raw::c_void) -> *const raw::c_void>;
 
     lazy_static! {
         static ref EGL_GET_PROC_ADDRESS: Arc<Mutex<Option<EglGetProcAddressType>>> =
@@ -51,10 +50,7 @@ mod egl {
                 if egl_get_proc_address.is_none() {
                     unsafe {
                         let sym: libloading::Symbol<
-                            unsafe extern "C" fn(
-                                *const raw::c_void,
-                            )
-                                -> *const raw::c_void,
+                            unsafe extern "C" fn(*const raw::c_void) -> *const raw::c_void,
                         > = lib.get(b"eglGetProcAddress").unwrap();
                         *egl_get_proc_address = Some(sym.into_raw());
                     }
@@ -86,12 +82,9 @@ mod egl {
             #[cfg(not(target_os = "windows"))]
             let paths = vec!["libEGL.so.1", "libEGL.so"];
 
-            SymWrapper::new(paths).map(|i| Egl(i)).map_err(|_|
-
-            make_oserror!(OsError::Misc(
-                "Could not load EGL symbols".to_string()
-            ))
-                )
+            SymWrapper::new(paths)
+                .map(|i| Egl(i))
+                .map_err(|_| make_oserror!(OsError::Misc("Could not load EGL symbols".to_string())))
         }
     }
 }

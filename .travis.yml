@@ -92,7 +92,4 @@ after_success:
         [ $TRAVIS_PULL_REQUEST = false ] && {
             cd glutin
             cargo publish --token ${CRATESIO_TOKEN}
-
-            cd ../glutin-lighter
-            cargo publish --token ${CRATESIO_TOKEN_GENTZ}
         }
