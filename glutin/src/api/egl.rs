@@ -1008,7 +1008,7 @@ where
     F: FnMut(Vec<ffi::egl::types::EGLConfig>) -> Vec<Result<ffi::egl::types::EGLConfig, Error>>,
 {
     let egl = EGL.as_ref().unwrap();
-    let mut error = make_error!(ErrorType::NoAvailableConfig);
+    let mut errors = make_error!(ErrorType::NoAvailableConfig);
 
     let descriptor = {
         let mut out: Vec<raw::c_int> = Vec::with_capacity(37);
@@ -1146,14 +1146,12 @@ where
         &mut num_confs,
     ) == 0
     {
-        return Err(append_errors!(
-            error,
-            make_oserror!(OsError::Misc("eglChooseConfig failed".to_string(),))
-        ));
+        errors.append(make_oserror!(OsError::Misc("eglChooseConfig failed".to_string())));
+        return Err(errors);
     }
 
     if num_confs == 0 {
-        return Err(error);
+        return Err(errors);
     }
 
     let mut conf_ids = Vec::with_capacity(num_confs as usize);
@@ -1166,10 +1164,8 @@ where
         &mut num_confs,
     ) == 0
     {
-        return Err(append_errors!(
-            error,
-            make_oserror!(OsError::Misc("eglChooseConfig failed".to_string(),))
-        ));
+        errors.append(make_oserror!(OsError::Misc("eglChooseConfig failed".to_string())));
+        return Err(errors);
     }
 
     // analyzing each config
@@ -1202,12 +1198,11 @@ where
                 let min_swap_interval = attrib!(egl, disp, conf_id, ffi::egl::MIN_SWAP_INTERVAL,);
                 match min_swap_interval {
                     Err(err) => {
-                        error = append_errors!(error, err);
+                        errors.append(err);
                         return None;
                     }
                     Ok(min) if desired_swap_interval < min => {
-                        error = append_errors!(
-                            error,
+                        errors.append(
                             make_oserror!(OsError::Misc(format!(
                                 "Desired swap interval smaller than minimum for {:?}",
                                 conf_id
@@ -1221,12 +1216,11 @@ where
                 let max_swap_interval = attrib!(egl, disp, conf_id, ffi::egl::MAX_SWAP_INTERVAL,);
                 match max_swap_interval {
                     Err(err) => {
-                        error = append_errors!(error, err);
+                        errors.append(err);
                         return None;
                     }
                     Ok(max) if desired_swap_interval > max => {
-                        error = append_errors!(
-                            error,
+                        errors.append(
                             make_oserror!(OsError::Misc(format!(
                                 "Desired swap interval bigger than maximum for {:?}",
                                 conf_id
@@ -1245,14 +1239,14 @@ where
     };
 
     if conf_ids.is_empty() {
-        return Err(error);
+        return Err(errors);
     }
 
     let conf_ids: Vec<_> = conf_selector(conf_ids)
         .into_iter()
         .filter_map(|conf_id| match conf_id {
             Err(err) => {
-                error = append_errors!(error, err);
+                errors.append(err);
                 return None;
             }
             Ok(conf_id) => Some(conf_id),
@@ -1290,9 +1284,12 @@ where
 
             Ok((attribs, conf_id))
         })
+        // FIXME: Pleasing borrowck. Lokathor demands unrolling this loop.
+        .collect::<Vec<_>>()
+        .into_iter()
         .filter_map(|conf_id| match conf_id {
             Err(err) => {
-                error = append_errors!(error, err);
+                errors.append(err);
                 return None;
             }
             Ok(conf_id) => Some(conf_id),
@@ -1300,7 +1297,7 @@ where
         .collect();
 
     if conf_ids.is_empty() {
-        return Err(error);
+        return Err(errors);
     }
 
     Ok(conf_ids)

@@ -77,7 +77,7 @@ impl BackendDisplay {
         match (disp, disp2) {
             (Ok(_), _) => unreachable!(),
             (_, Ok(disp2)) => Ok(disp2),
-            (Err(err1), Err(err2)) => Err(append_errors!(err1, err2)),
+            (Err(mut err1), Err(err2)) => Err({ err1.append(err2); err1 }),
         }
     }
 }
@@ -404,7 +404,7 @@ impl Surface<Window> {
             ));
             disp.native_display
                 .check_errors()
-                .map_err(|err| append_errors!(err, window_attr_error.clone()))?;
+                .map_err(|mut err| { err.append(window_attr_error.clone()); err})?;
             if unsafe {
                 (xlib.XGetWindowAttributes)(**disp.native_display, surface, &mut window_attrs)
             } == 0
