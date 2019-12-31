@@ -50,19 +50,23 @@ pub enum Config {
 
 impl Config {
     #[inline]
-    pub fn new(
-        disp: &Display,
-        cb: ConfigBuilder,
-    ) -> Result<Box<dyn Iterator<Item = (ConfigAttribs, Config)>>, Error> {
-        match disp {
-            Display::Wayland(disp) => wayland::Config::new(disp, cb).map(|configs| {
-                Box::new(configs.map(|(attribs, config)| (attribs, Config::Wayland(config))))
-                    as Box<_>
-            }),
-            Display::X11(disp) => x11::Config::new(disp, cb).map(|configs| {
-                Box::new(configs.map(|(attribs, config)| (attribs, Config::X11(config)))) as Box<_>
-            }),
-        }
+    pub fn new(disp: &Display, cb: ConfigBuilder) -> Result<Vec<(ConfigAttribs, Config)>, Error> {
+        Ok(match disp {
+            Display::Wayland(disp) => {
+                let configs = wayland::Config::new(disp, cb)?;
+                configs
+                    .into_iter()
+                    .map(|(attribs, config)| (attribs, Config::Wayland(config)))
+                    .collect()
+            }
+            Display::X11(disp) => {
+                let configs = x11::Config::new(disp, cb)?;
+                configs
+                    .into_iter()
+                    .map(|(attribs, config)| (attribs, Config::X11(config)))
+                    .collect()
+            }
+        })
     }
 }
 

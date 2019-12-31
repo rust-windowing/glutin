@@ -49,13 +49,14 @@ impl Display {
 pub struct Config(egl::Config);
 
 impl Config {
-    pub fn new(
-        disp: &Display,
-        cb: ConfigBuilder,
-    ) -> Result<Box<dyn Iterator<Item = (ConfigAttribs, Config)>>, Error> {
-        egl::Config::new(&disp.0, cb, |confs| Ok(confs)).map(|configs| {
-            Box::new(configs.map(|(attribs, config)| (attribs, Config(config)))) as Box<_>
-        })
+    pub fn new(disp: &Display, cb: ConfigBuilder) -> Result<Vec<(ConfigAttribs, Config)>, Error> {
+        let configs = egl::Config::new(&disp.0, cb, |confs| {
+            confs.into_iter().map(|config| Ok(config)).collect()
+        })?;
+        Ok(configs
+            .into_iter()
+            .map(|(attribs, config)| (attribs, Config(config)))
+            .collect())
     }
 }
 

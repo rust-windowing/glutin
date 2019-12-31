@@ -381,6 +381,7 @@ impl ConfigBuilder {
     pub fn build(self, disp: &Display) -> Result<Vec<Config>, Error> {
         platform_impl::Config::new(&disp.0, self).map(|configs| {
             configs
+                .into_iter()
                 .map(|(attribs, config)| Config { attribs, config })
                 .collect()
         })

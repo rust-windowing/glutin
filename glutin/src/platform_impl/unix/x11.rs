@@ -90,30 +90,33 @@ pub enum Config {
 
 impl Config {
     #[inline]
-    pub fn new(
-        disp: &Display,
-        cb: ConfigBuilder,
-    ) -> Result<Box<dyn Iterator<Item = (ConfigAttribs, Self)>>, Error> {
+    pub fn new(disp: &Display, cb: ConfigBuilder) -> Result<Vec<(ConfigAttribs, Self)>, Error> {
         let plat_attr = cb.plat_attr.clone();
-        match disp.display {
-            BackendDisplay::Egl(ref bdisp) => egl::Config::new(bdisp, cb, |confs| {
-                select_configs(
-                    &disp.native_display,
-                    plat_attr.x11_transparency,
-                    plat_attr.x11_visual_xid,
-                    confs,
-                    |config_id| {
-                        let xid = egl::get_native_visual_id(***bdisp, *config_id) as ffi::VisualID;
-                        utils::get_visual_info_from_xid(&disp.native_display, xid)
-                            .map(|vis| (vis, xid))
-                    },
-                )
-                .map(|configs| configs.into_iter().map(|(conf, _)| conf).collect())
-            })
-            .map(|configs| {
-                Box::new(configs.map(|(attribs, config)| (attribs, Config::Egl(config)))) as Box<_>
-            }),
-        }
+        Ok(match disp.display {
+            BackendDisplay::Egl(ref bdisp) => {
+                let configs = egl::Config::new(bdisp, cb, |confs| {
+                    select_configs(
+                        &disp.native_display,
+                        plat_attr.x11_transparency,
+                        plat_attr.x11_visual_xid,
+                        confs,
+                        |config_id| {
+                            let xid =
+                                egl::get_native_visual_id(***bdisp, *config_id) as ffi::VisualID;
+                            utils::get_visual_info_from_xid(&disp.native_display, xid)
+                                .map(|vis| (vis, xid))
+                        },
+                    )
+                    .into_iter()
+                    .map(|config| config.map(|(conf, _)| conf))
+                    .collect()
+                })?;
+                configs
+                    .into_iter()
+                    .map(|(attribs, config)| (attribs, Config::Egl(config)))
+                    .collect()
+            }
+        })
     }
 
     #[inline]
@@ -469,32 +472,22 @@ impl Surface<Window> {
 //
 // https://bugs.freedesktop.org/show_bug.cgi?id=67676
 // I'm working on a patch.
-pub fn select_configs<'a, T, F>(
+pub fn select_configs<'a, T, I: IntoIterator<Item = T>, F>(
     native_disp: &Arc<X11Display>,
     target_transparency: Option<bool>,
     target_visual_xid: Option<raw::c_ulong>,
-    conf_ids: Vec<T>,
+    conf_ids: I,
     mut convert_to_xvisualinfo: F,
-) -> Result<Vec<(T, ffi::XVisualInfo)>, Error>
+) -> Vec<Result<(T, ffi::XVisualInfo), Error>>
 where
     F: FnMut(&T) -> Result<(ffi::XVisualInfo, ffi::VisualID), Error>,
 {
     use utils::Lacks;
 
-    let mut errors = make_oserror!(OsError::Misc(
-        "X11's `select_configs` found no valid configs.".to_string()
-    ));
-
-    let configs: Vec<_> = conf_ids
+    conf_ids
         .into_iter()
-        .filter_map(|conf_id| {
-            let (visual_infos, xid) = match convert_to_xvisualinfo(&conf_id) {
-                Ok(vi) => vi,
-                Err(err) => {
-                    errors = append_errors!(err, errors);
-                    return None;
-                }
-            };
+        .map(|conf_id| {
+            let (visual_infos, xid) = convert_to_xvisualinfo(&conf_id)?;
 
             match utils::examine_visual_info(
                 native_disp,
@@ -502,26 +495,14 @@ where
                 target_transparency,
                 target_visual_xid,
             ) {
-                Ok(()) => Some((conf_id, visual_infos)),
-                Err(lacks) => {
-                    errors = append_errors!(
-                        errors,
-                        make_oserror!(OsError::Misc(format!(
-                            "X11 xid {:?} is lacking {:?}",
-                            xid, lacks
-                        )))
-                    );
-                    None
-                }
+                Ok(()) => Ok((conf_id, visual_infos)),
+                Err(lacks) => Err(make_oserror!(OsError::Misc(format!(
+                    "X11 xid {:?} is lacking {:?}",
+                    xid, lacks
+                )))),
             }
         })
-        .collect();
-
-    if configs.is_empty() {
-        return Err(errors);
-    }
-
-    Ok(configs)
+        .collect()
 }
 
 //    Get the screen_id for the window being built.

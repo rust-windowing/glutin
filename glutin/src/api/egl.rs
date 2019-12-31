@@ -324,9 +324,9 @@ impl Config {
         disp: &Display,
         cb: ConfigBuilder,
         conf_selector: F,
-    ) -> Result<Box<dyn Iterator<Item = (ConfigAttribs, Config)>>, Error>
+    ) -> Result<Vec<(ConfigAttribs, Config)>, Error>
     where
-        F: FnMut(Vec<ffi::egl::types::EGLConfig>) -> Result<Vec<ffi::egl::types::EGLConfig>, Error>,
+        F: FnMut(Vec<ffi::egl::types::EGLConfig>) -> Vec<Result<ffi::egl::types::EGLConfig, Error>>,
     {
         let egl = EGL.as_ref().unwrap();
 
@@ -348,18 +348,23 @@ impl Config {
         // binding the right API and choosing the version
         let (version, api) = unsafe { bind_and_get_api(&cb.version, disp.egl_version)? };
 
-        let (config_id, attribs) =
-            unsafe { choose_fbconfig(disp, api, version, cb, conf_selector)? };
+        let configs = unsafe { choose_fbconfig(disp, api, version, cb, conf_selector)? };
 
-        Ok((
-            attribs,
-            Config {
-                display: Arc::clone(&disp.0),
-                api,
-                version,
-                config_id,
-            },
-        ))
+        let disp = Arc::clone(&disp.0);
+        Ok(configs
+            .into_iter()
+            .map(|(attribs, config_id)| {
+                (
+                    attribs,
+                    Config {
+                        display: Arc::clone(&disp),
+                        api,
+                        version,
+                        config_id,
+                    },
+                )
+            })
+            .collect())
     }
 
     #[inline]
@@ -998,11 +1003,12 @@ unsafe fn choose_fbconfig<F>(
     version: Option<GlVersion>,
     cb: ConfigBuilder,
     mut conf_selector: F,
-) -> Result<Vec<(ffi::egl::types::EGLConfig, ConfigAttribs)>, Error>
+) -> Result<Vec<(ConfigAttribs, ffi::egl::types::EGLConfig)>, Error>
 where
-    F: FnMut(Vec<ffi::egl::types::EGLConfig>) -> Result<Vec<ffi::egl::types::EGLConfig>, Error>,
+    F: FnMut(Vec<ffi::egl::types::EGLConfig>) -> Vec<Result<ffi::egl::types::EGLConfig, Error>>,
 {
     let egl = EGL.as_ref().unwrap();
+    let mut error = make_error!(ErrorType::NoAvailableConfig);
 
     let descriptor = {
         let mut out: Vec<raw::c_int> = Vec::with_capacity(37);
@@ -1140,13 +1146,14 @@ where
         &mut num_confs,
     ) == 0
     {
-        return Err(make_oserror!(OsError::Misc(
-            "eglChooseConfig failed".to_string(),
-        )));
+        return Err(append_errors!(
+            error,
+            make_oserror!(OsError::Misc("eglChooseConfig failed".to_string(),))
+        ));
     }
 
     if num_confs == 0 {
-        return Err(make_error!(ErrorType::NoAvailableConfig));
+        return Err(error);
     }
 
     let mut conf_ids = Vec::with_capacity(num_confs as usize);
@@ -1159,9 +1166,10 @@ where
         &mut num_confs,
     ) == 0
     {
-        return Err(make_oserror!(OsError::Misc(
-            "eglChooseConfig failed".to_string(),
-        )));
+        return Err(append_errors!(
+            error,
+            make_oserror!(OsError::Misc("eglChooseConfig failed".to_string(),))
+        ));
     }
 
     // analyzing each config
@@ -1174,12 +1182,12 @@ where
                 $attr as ffi::egl::types::EGLint,
                 &mut value,
             );
-            if res == 0 {
-                Err(make_oserror!(OsError::Misc(
-                    "eglGetConfigAttrib failed".to_string(),
-                )))
-            } else {
-                Ok(value)
+            match res {
+                0 => Err(make_oserror!(OsError::Misc(format!(
+                    "eglGetConfigAttrib failed for {:?}",
+                    $conf
+                )))),
+                _ => Ok(value),
             }
         }};
     };
@@ -1192,70 +1200,110 @@ where
             .into_iter()
             .filter_map(|conf_id| {
                 let min_swap_interval = attrib!(egl, disp, conf_id, ffi::egl::MIN_SWAP_INTERVAL,);
-
-                if let Err(min_swap_interval) = min_swap_interval {
-                    return Some(Err(min_swap_interval));
-                }
-
-                if desired_swap_interval < min_swap_interval.unwrap() {
-                    return None;
+                match min_swap_interval {
+                    Err(err) => {
+                        error = append_errors!(error, err);
+                        return None;
+                    }
+                    Ok(min) if desired_swap_interval < min => {
+                        error = append_errors!(
+                            error,
+                            make_oserror!(OsError::Misc(format!(
+                                "Desired swap interval smaller than minimum for {:?}",
+                                conf_id
+                            )))
+                        );
+                        return None;
+                    }
+                    _ => (),
                 }
 
                 let max_swap_interval = attrib!(egl, disp, conf_id, ffi::egl::MAX_SWAP_INTERVAL,);
-
-                if let Err(max_swap_interval) = max_swap_interval {
-                    return Some(Err(max_swap_interval));
+                match max_swap_interval {
+                    Err(err) => {
+                        error = append_errors!(error, err);
+                        return None;
+                    }
+                    Ok(max) if desired_swap_interval > max => {
+                        error = append_errors!(
+                            error,
+                            make_oserror!(OsError::Misc(format!(
+                                "Desired swap interval bigger than maximum for {:?}",
+                                conf_id
+                            )))
+                        );
+                        return None;
+                    }
+                    _ => (),
                 }
 
-                if desired_swap_interval > max_swap_interval.unwrap() {
-                    return None;
-                }
-
-                Some(Ok(conf_id))
+                Some(conf_id)
             })
-            .collect::<Result<Vec<_>, _>>()?
+            .collect()
     } else {
         conf_ids
     };
 
     if conf_ids.is_empty() {
-        return Err(make_error!(ErrorType::NoAvailableConfig));
+        return Err(error);
     }
 
-    let conf_id = conf_selector(conf_ids)
-        .map_err(|err| append_errors!(err, make_error!(ErrorType::NoAvailableConfig)))?;
+    let conf_ids: Vec<_> = conf_selector(conf_ids)
+        .into_iter()
+        .filter_map(|conf_id| match conf_id {
+            Err(err) => {
+                error = append_errors!(error, err);
+                return None;
+            }
+            Ok(conf_id) => Some(conf_id),
+        })
+        .map(|conf_id| {
+            let min_swap_interval = attrib!(egl, disp, conf_id, ffi::egl::MIN_SWAP_INTERVAL)?;
+            let max_swap_interval = attrib!(egl, disp, conf_id, ffi::egl::MAX_SWAP_INTERVAL)?;
 
-    let min_swap_interval = attrib!(egl, disp, conf_id, ffi::egl::MIN_SWAP_INTERVAL)?;
-    let max_swap_interval = attrib!(egl, disp, conf_id, ffi::egl::MAX_SWAP_INTERVAL)?;
+            assert!(min_swap_interval >= 0);
 
-    assert!(min_swap_interval >= 0);
+            let attribs = ConfigAttribs {
+                api,
+                version,
+                vsync: min_swap_interval <= 1 && max_swap_interval >= 1,
+                window_surface_support: cb.window_surface_support,
+                pbuffer_surface_support: cb.pbuffer_surface_support,
+                pixmap_surface_support: cb.pixmap_surface_support,
+                surfaceless_support: cb.surfaceless_support,
+                hardware_accelerated: attrib!(egl, disp, conf_id, ffi::egl::CONFIG_CAVEAT,)?
+                    != ffi::egl::SLOW_CONFIG as i32,
+                color_bits: attrib!(egl, disp, conf_id, ffi::egl::RED_SIZE)? as u8
+                    + attrib!(egl, disp, conf_id, ffi::egl::BLUE_SIZE)? as u8
+                    + attrib!(egl, disp, conf_id, ffi::egl::GREEN_SIZE)? as u8,
+                alpha_bits: attrib!(egl, disp, conf_id, ffi::egl::ALPHA_SIZE)? as u8,
+                depth_bits: attrib!(egl, disp, conf_id, ffi::egl::DEPTH_SIZE)? as u8,
+                stencil_bits: attrib!(egl, disp, conf_id, ffi::egl::STENCIL_SIZE)? as u8,
+                stereoscopy: false,
+                double_buffer: true,
+                multisampling: match attrib!(egl, disp, conf_id, ffi::egl::SAMPLES)? {
+                    0 | 1 => None,
+                    a => Some(a as u16),
+                },
+                srgb: false, // TODO: use EGL_KHR_gl_colorspace to know that
+            };
 
-    let desc = ConfigAttribs {
-        api,
-        version,
-        vsync: min_swap_interval <= 1 && max_swap_interval >= 1,
-        window_surface_support: cb.window_surface_support,
-        pbuffer_surface_support: cb.pbuffer_surface_support,
-        pixmap_surface_support: cb.pixmap_surface_support,
-        surfaceless_support: cb.surfaceless_support,
-        hardware_accelerated: attrib!(egl, disp, conf_id, ffi::egl::CONFIG_CAVEAT,)?
-            != ffi::egl::SLOW_CONFIG as i32,
-        color_bits: attrib!(egl, disp, conf_id, ffi::egl::RED_SIZE)? as u8
-            + attrib!(egl, disp, conf_id, ffi::egl::BLUE_SIZE)? as u8
-            + attrib!(egl, disp, conf_id, ffi::egl::GREEN_SIZE)? as u8,
-        alpha_bits: attrib!(egl, disp, conf_id, ffi::egl::ALPHA_SIZE)? as u8,
-        depth_bits: attrib!(egl, disp, conf_id, ffi::egl::DEPTH_SIZE)? as u8,
-        stencil_bits: attrib!(egl, disp, conf_id, ffi::egl::STENCIL_SIZE)? as u8,
-        stereoscopy: false,
-        double_buffer: true,
-        multisampling: match attrib!(egl, disp, conf_id, ffi::egl::SAMPLES)? {
-            0 | 1 => None,
-            a => Some(a as u16),
-        },
-        srgb: false, // TODO: use EGL_KHR_gl_colorspace to know that
-    };
+            Ok((attribs, conf_id))
+        })
+        .filter_map(|conf_id| match conf_id {
+            Err(err) => {
+                error = append_errors!(error, err);
+                return None;
+            }
+            Ok(conf_id) => Some(conf_id),
+        })
+        .collect();
 
-    Ok((conf_id, desc))
+    if conf_ids.is_empty() {
+        return Err(error);
+    }
+
+    Ok(conf_ids)
 }
 
 unsafe fn create_context(
