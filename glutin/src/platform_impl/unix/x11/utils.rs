@@ -53,7 +53,7 @@ pub enum Lacks {
 pub fn examine_visual_info(
     disp: &Arc<Display>,
     visual_infos: XVisualInfo,
-    wants_transparency: bool,
+    wants_transparency: Option<bool>,
     target_visual_xid: Option<raw::c_ulong>,
 ) -> Result<(), Lacks> {
     if let Some(target_visual_xid) = target_visual_xid {
@@ -62,16 +62,18 @@ pub fn examine_visual_info(
         }
     }
 
-    unsafe {
-        if wants_transparency {
-            let pict_format =
-                (syms!(XRENDER).XRenderFindVisualFormat)(***disp, visual_infos.visual);
-            if pict_format.is_null() {
-                return Err(Lacks::Transparency);
-            }
+    if let Some(wants_transparency) = wants_transparency {
+        unsafe {
+            if wants_transparency {
+                let pict_format =
+                    (syms!(XRENDER).XRenderFindVisualFormat)(***disp, visual_infos.visual);
+                if pict_format.is_null() {
+                    return Err(Lacks::Transparency);
+                }
 
-            if (*pict_format).direct.alphaMask == 0 {
-                return Err(Lacks::Transparency);
+                if (*pict_format).direct.alphaMask == 0 {
+                    return Err(Lacks::Transparency);
+                }
             }
         }
     }

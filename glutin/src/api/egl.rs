@@ -326,7 +326,7 @@ impl Config {
         conf_selector: F,
     ) -> Result<Box<dyn Iterator<Item = (ConfigAttribs, Config)>>, Error>
     where
-        F: FnMut(Vec<ffi::egl::types::EGLConfig>) -> Result<ffi::egl::types::EGLConfig, Error>,
+        F: FnMut(Vec<ffi::egl::types::EGLConfig>) -> Result<Vec<ffi::egl::types::EGLConfig>, Error>,
     {
         let egl = EGL.as_ref().unwrap();
 
@@ -998,9 +998,9 @@ unsafe fn choose_fbconfig<F>(
     version: Option<GlVersion>,
     cb: ConfigBuilder,
     mut conf_selector: F,
-) -> Result<(ffi::egl::types::EGLConfig, ConfigAttribs), Error>
+) -> Result<Vec<(ffi::egl::types::EGLConfig, ConfigAttribs)>, Error>
 where
-    F: FnMut(Vec<ffi::egl::types::EGLConfig>) -> Result<ffi::egl::types::EGLConfig, Error>,
+    F: FnMut(Vec<ffi::egl::types::EGLConfig>) -> Result<Vec<ffi::egl::types::EGLConfig>, Error>,
 {
     let egl = EGL.as_ref().unwrap();
 

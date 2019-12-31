@@ -15,10 +15,10 @@ use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
 use winit_types::platform::OsError;
 
+use std::fmt::Debug;
 use std::ops::{Deref, DerefMut};
 use std::os::raw;
 use std::sync::Arc;
-use std::fmt::Debug;
 
 pub mod utils;
 
@@ -90,25 +90,29 @@ pub enum Config {
 
 impl Config {
     #[inline]
-    pub fn new(disp: &Display, cb: ConfigBuilder) -> Result<Box<dyn Iterator<Item = (ConfigAttribs, Self)>>, Error> {
+    pub fn new(
+        disp: &Display,
+        cb: ConfigBuilder,
+    ) -> Result<Box<dyn Iterator<Item = (ConfigAttribs, Self)>>, Error> {
         let plat_attr = cb.plat_attr.clone();
         match disp.display {
             BackendDisplay::Egl(ref bdisp) => egl::Config::new(bdisp, cb, |confs| {
-                select_config(
+                select_configs(
                     &disp.native_display,
                     plat_attr.x11_transparency,
                     plat_attr.x11_visual_xid,
                     confs,
                     |config_id| {
-                        utils::get_visual_info_from_xid(
-                            &disp.native_display,
-                            egl::get_native_visual_id(***bdisp, *config_id) as ffi::VisualID,
-                        )
+                        let xid = egl::get_native_visual_id(***bdisp, *config_id) as ffi::VisualID;
+                        utils::get_visual_info_from_xid(&disp.native_display, xid)
+                            .map(|vis| (vis, xid))
                     },
                 )
-                .map(|(conf, _)| conf)
+                .map(|configs| configs.into_iter().map(|(conf, _)| conf).collect())
             })
-            .map(|configs| configs.map(|(attribs, config)| (attribs, Config::Egl(config))) as Box<_>)
+            .map(|configs| {
+                Box::new(configs.map(|(attribs, config)| (attribs, Config::Egl(config)))) as Box<_>
+            }),
         }
     }
 
@@ -395,16 +399,28 @@ impl Surface<Window> {
             let window_attr_error = make_oserror!(OsError::Misc(
                 "Glutin failed to query for a window's window attributes.".to_string()
             ));
-            disp.native_display.check_errors().map_err(|err| append_errors!(err, window_attr_error.clone()))?;
-            if unsafe { (xlib.XGetWindowAttributes)(**disp.native_display, surface, &mut window_attrs) } == 0 {
+            disp.native_display
+                .check_errors()
+                .map_err(|err| append_errors!(err, window_attr_error.clone()))?;
+            if unsafe {
+                (xlib.XGetWindowAttributes)(**disp.native_display, surface, &mut window_attrs)
+            } == 0
+            {
                 return Err(window_attr_error);
             }
             window_attrs
         };
 
-        fn assemble_non_match_error<T: Debug + PartialEq>(name: &str, a: T, b: T) -> Result<(), Error> {
+        fn assemble_non_match_error<T: Debug + PartialEq>(
+            name: &str,
+            a: T,
+            b: T,
+        ) -> Result<(), Error> {
             if a != b {
-                return Err(make_oserror!(OsError::Misc(format!("Config's {} and window's {} do not match, {:?} != {:?}", name, name, a, b))));
+                return Err(make_oserror!(OsError::Misc(format!(
+                    "Config's {} and window's {} do not match, {:?} != {:?}",
+                    name, name, a, b
+                ))));
             }
             Ok(())
         }
@@ -453,79 +469,59 @@ impl Surface<Window> {
 //
 // https://bugs.freedesktop.org/show_bug.cgi?id=67676
 // I'm working on a patch.
-pub fn select_config<'a, T, F>(
+pub fn select_configs<'a, T, F>(
     native_disp: &Arc<X11Display>,
     target_transparency: Option<bool>,
     target_visual_xid: Option<raw::c_ulong>,
     conf_ids: Vec<T>,
     mut convert_to_xvisualinfo: F,
-) -> Result<(T, ffi::XVisualInfo), Error>
+) -> Result<Vec<(T, ffi::XVisualInfo)>, Error>
 where
-    F: FnMut(&T) -> Result<ffi::XVisualInfo, Error>,
+    F: FnMut(&T) -> Result<(ffi::XVisualInfo, ffi::VisualID), Error>,
 {
     use utils::Lacks;
-    let mut chosen_conf_id = None;
-    let mut lacks_what = None;
 
     let mut errors = make_oserror!(OsError::Misc(
-        "Glutin failed to choose a config because none of them (if any) had a valid XVisualInfo."
-            .to_string()
+        "X11's `select_configs` found no valid configs.".to_string()
     ));
 
-    for conf_id in conf_ids {
-        let visual_infos = match convert_to_xvisualinfo(&conf_id) {
-            Ok(vi) => vi,
-            Err(err) => {
-                errors = append_errors!(err, errors);
-                continue;
+    let configs: Vec<_> = conf_ids
+        .into_iter()
+        .filter_map(|conf_id| {
+            let (visual_infos, xid) = match convert_to_xvisualinfo(&conf_id) {
+                Ok(vi) => vi,
+                Err(err) => {
+                    errors = append_errors!(err, errors);
+                    return None;
+                }
+            };
+
+            match utils::examine_visual_info(
+                native_disp,
+                visual_infos,
+                target_transparency,
+                target_visual_xid,
+            ) {
+                Ok(()) => Some((conf_id, visual_infos)),
+                Err(lacks) => {
+                    errors = append_errors!(
+                        errors,
+                        make_oserror!(OsError::Misc(format!(
+                            "X11 xid {:?} is lacking {:?}",
+                            xid, lacks
+                        )))
+                    );
+                    None
+                }
             }
-        };
+        })
+        .collect();
 
-        let this_lacks_what = utils::examine_visual_info(
-            native_disp,
-            visual_infos,
-            target_transparency == Some(true),
-            target_visual_xid,
-        );
-
-        match (lacks_what, &this_lacks_what) {
-            (Some(Ok(())), _) => unreachable!(),
-
-            // Found it.
-            (_, Ok(())) => {
-                chosen_conf_id = Some((conf_id, visual_infos));
-                lacks_what = Some(this_lacks_what);
-                break;
-            }
-
-            // Better have something than nothing.
-            (None, _) => {
-                chosen_conf_id = Some((conf_id, visual_infos));
-                lacks_what = Some(this_lacks_what);
-            }
-
-            // Stick with the earlier.
-            (Some(Err(Lacks::Transparency)), Err(Lacks::Transparency)) => (),
-            (Some(Err(_)), Err(Lacks::XID)) => (),
-
-            // Lacking transparency is better than lacking the xid.
-            (Some(Err(Lacks::XID)), Err(Lacks::Transparency)) => {
-                chosen_conf_id = Some((conf_id, visual_infos));
-                lacks_what = Some(this_lacks_what);
-            }
-        }
+    if configs.is_empty() {
+        return Err(errors);
     }
 
-    match lacks_what {
-        Some(Ok(())) => (),
-        Some(Err(Lacks::Transparency)) => warn!(
-            "[glutin] could not a find fb config with an alpha mask. Transparency may be broken."
-        ),
-        Some(Err(Lacks::XID)) => panic!(),
-        None => warn!("[glutin] no configs were found. Period."),
-    }
-
-    chosen_conf_id.ok_or(errors)
+    Ok(configs)
 }
 
 //    Get the screen_id for the window being built.
@@ -558,8 +554,8 @@ where
 //    _ => unimplemented!(),
 //    };
 //
-//        let select_conf = |cs, display| {
-//            select_conf(&xconn, transparent, cb, cs, |conf_id| {
+//        let select_configs = |cs, display| {
+//            select_configs(&xconn, transparent, cb, cs, |conf_id| {
 //                let xid = egl::get_native_visual_id(display, *conf_id)
 //                    as ffi::VisualID;
 //                if xid == 0 {
@@ -607,7 +603,7 @@ where
 //                        builder_u.as_ref().unwrap(),
 //                        native_display,
 //                        surface_type,
-//                        select_conf,
+//                        select_configs,
 //                    )?))
 //                };
 //
