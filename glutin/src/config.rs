@@ -51,11 +51,6 @@ impl Default for GlRequest {
     }
 }
 
-/// The minimum core profile GL context. Useful for getting the minimum
-/// required GL version while still running on OSX, which often forbids
-/// the compatibility profile features.
-pub static GL_CORE: GlRequest = GlRequest::Specific(Api::OpenGl, GlVersion(3, 2));
-
 /// The behavior of the driver when you change the current context.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ReleaseBehavior {
@@ -91,6 +86,7 @@ pub struct ConfigAttribs {
     pub pixmap_surface_support: bool,
     pub window_surface_support: bool,
     pub surfaceless_support: bool,
+    pub release_behavior: ReleaseBehavior,
 }
 
 /// Describes a possible format.
@@ -104,9 +100,8 @@ pub struct ConfigWrapper<T, CA> {
 pub type Config = ConfigWrapper<platform_impl::Config, ConfigAttribs>;
 
 impl<T: Clone, CA: Clone> ConfigWrapper<&T, &CA> {
-    /// Turns the `config` parameter into another type by calling a closure.
     #[inline]
-    pub(crate) fn clone(self) -> ConfigWrapper<T, CA> {
+    pub(crate) fn clone_inner(self) -> ConfigWrapper<T, CA> {
         ConfigWrapper {
             config: self.config.clone(),
             attribs: self.attribs.clone(),

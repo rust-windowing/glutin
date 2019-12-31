@@ -691,6 +691,7 @@ lazy_static! {
 //                        ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_NONE_ARB
 //                            as raw::c_int,
 //                    );
+//                    FAIL IF ABSENT
 //                }
 //            }
 //        }
