@@ -32,7 +32,7 @@ pub struct Display {
 #[derive(Debug)]
 pub enum BackendDisplay {
     Egl(egl::Display),
-    //Glx(glx::Display),
+    Glx(glx::Display),
 }
 
 impl Display {
@@ -57,7 +57,7 @@ impl BackendDisplay {
     fn new<ND: NativeDisplay>(db: DisplayBuilder, nd: &ND) -> Result<Self, Error> {
         let backing_api = db.plat_attr.backing_api;
         let disp = match backing_api {
-            BackingApi::Glx | BackingApi::GlxThenEgl => unimplemented!(),
+            BackingApi::Glx | BackingApi::GlxThenEgl => glx::Display::new(db.clone(), nd).map(BackendDisplay::Glx),
             BackingApi::Egl | BackingApi::EglThenGlx => {
                 egl::Display::new(db.clone(), nd).map(BackendDisplay::Egl)
             }
@@ -69,7 +69,7 @@ impl BackendDisplay {
         }
 
         let disp2 = match backing_api {
-            BackingApi::EglThenGlx => unimplemented!(),
+            BackingApi::EglThenGlx => glx::Display::new(db.clone(), nd).map(BackendDisplay::Glx),
             BackingApi::GlxThenEgl => egl::Display::new(db, nd).map(BackendDisplay::Egl),
             _ => unreachable!(),
         };

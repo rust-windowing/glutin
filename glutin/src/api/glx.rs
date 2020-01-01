@@ -10,7 +10,7 @@ pub mod ffi;
 mod glx;
 mod make_current_guard;
 
-pub use self::glx::Glx;
+pub use self::glx::{Glx, GlxExtra};
 use self::make_current_guard::MakeCurrentGuard;
 
 use crate::config::{Api, GlRequest, GlVersion, ReleaseBehavior};
@@ -25,7 +25,8 @@ use std::os::raw;
 use std::sync::Arc;
 
 lazy_static! {
-    pub static ref GLX: Option<Glx> = Glx::new().ok();
+    pub static ref GLX: Result<Glx, Error> = Glx::new();
+    pub static ref GLX_EXTRA: Result<GlxExtra, Error> = GLX.as_ref().map(|glx| GlxExtra::new(glx)).map_err(|err| err.clone());
 }
 
 //#[derive(Debug)]
@@ -226,14 +227,6 @@ lazy_static! {
 //            Some(ctx) => ctx.context,
 //            None => std::ptr::null(),
 //        };
-//
-//        // loading the extra GLX functions
-//        let extra_functions = ffi::glx_extra::Glx::load_with(|proc_name| {
-//            let c_str = CString::new(proc_name).unwrap();
-//            unsafe {
-//                glx.GetProcAddress(c_str.as_ptr() as *const u8) as *const _
-//            }
-//        });
 //
 //        let context = match self.gl_attr.version {
 //            GlRequest::Latest => {

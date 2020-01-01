@@ -1,6 +1,11 @@
 use super::ffi;
 use crate::api::dlloader::{SymTrait, SymWrapper};
+
 use std::ops::{Deref, DerefMut};
+use std::ffi::CString;
+
+use winit_types::error::Error;
+use winit_types::platform::OsError;
 
 #[derive(Clone)]
 pub struct Glx(SymWrapper<ffi::glx::Glx>);
@@ -12,7 +17,7 @@ impl SymTrait for ffi::glx::Glx {
     fn load_with(lib: &libloading::Library) -> Self {
         Self::load_with(|sym| unsafe {
             lib.get(
-                std::ffi::CString::new(sym.as_bytes())
+                CString::new(sym.as_bytes())
                     .unwrap()
                     .as_bytes_with_nul(),
             )
@@ -23,10 +28,12 @@ impl SymTrait for ffi::glx::Glx {
 }
 
 impl Glx {
-    pub fn new() -> Result<Self, ()> {
+    pub fn new() -> Result<Self, Error> {
         let paths = vec!["libGL.so.1", "libGL.so"];
 
-        SymWrapper::new(paths).map(|i| Glx(i))
+        SymWrapper::new(paths)
+            .map(|i| Glx(i))
+            .map_err(|_| make_oserror!(OsError::Misc("Could not load Glx symbols".to_string())))
     }
 }
 
@@ -40,6 +47,37 @@ impl Deref for Glx {
 
 impl DerefMut for Glx {
     fn deref_mut(&mut self) -> &mut ffi::glx::Glx {
+        &mut self.0
+    }
+}
+
+#[derive(Clone)]
+pub struct GlxExtra(ffi::glx_extra::Glx);
+
+/// Because `*const raw::c_void` doesn't implement `Sync`.
+unsafe impl Sync for GlxExtra {}
+
+impl GlxExtra {
+    pub fn new(glx: &Glx) -> Self {
+        GlxExtra(ffi::glx_extra::Glx::load_with(|proc_name| {
+            let c_str = CString::new(proc_name).unwrap();
+            unsafe {
+                glx.GetProcAddress(c_str.as_ptr() as *const u8) as *const _
+            }
+        }))
+    }
+}
+
+impl Deref for GlxExtra {
+    type Target = ffi::glx_extra::Glx;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for GlxExtra {
+    fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
