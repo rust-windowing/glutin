@@ -431,52 +431,52 @@ impl<'a> ContextPrototype<'a> {
         let (extra_functions, context) = self.create_context()?;
 
         // vsync
-        if self.opengl.vsync {
-            let _guard = MakeCurrentGuard::new(&self.xconn, window, context)
-                .map_err(|err| CreationError::OsError(err))?;
+        let swap_mode = if self.opengl.vsync { 1 } else { 0 };
 
-            if check_ext(&self.extensions, "GLX_EXT_swap_control")
-                && extra_functions.SwapIntervalEXT.is_loaded()
-            {
-                // this should be the most common extension
-                unsafe {
-                    extra_functions.SwapIntervalEXT(
-                        self.xconn.display as *mut _,
-                        window,
-                        1,
-                    );
-                }
+        let _guard = MakeCurrentGuard::new(&self.xconn, window, context)
+            .map_err(|err| CreationError::OsError(err))?;
 
-                let mut swap = unsafe { std::mem::uninitialized() };
-                unsafe {
-                    glx.QueryDrawable(
-                        self.xconn.display as *mut _,
-                        window,
-                        ffi::glx_extra::SWAP_INTERVAL_EXT as i32,
-                        &mut swap,
-                    );
-                }
-
-                if swap != 1 {
-                    return Err(CreationError::OsError(format!("Couldn't setup vsync: expected interval `1` but got `{}`", swap)));
-                }
-            } else if check_ext(&self.extensions, "GLX_MESA_swap_control")
-                && extra_functions.SwapIntervalMESA.is_loaded()
-            {
-                unsafe {
-                    extra_functions.SwapIntervalMESA(1);
-                }
-            } else if check_ext(&self.extensions, "GLX_SGI_swap_control")
-                && extra_functions.SwapIntervalSGI.is_loaded()
-            {
-                unsafe {
-                    extra_functions.SwapIntervalSGI(1);
-                }
-            } else {
-                return Err(CreationError::OsError(
-                    "Couldn't find any available vsync extension".to_string(),
-                ));
+        if check_ext(&self.extensions, "GLX_EXT_swap_control")
+            && extra_functions.SwapIntervalEXT.is_loaded()
+        {
+            // this should be the most common extension
+            unsafe {
+                extra_functions.SwapIntervalEXT(
+                    self.xconn.display as *mut _,
+                    window,
+                    swap_mode,
+                );
             }
+
+            let mut swap = unsafe { std::mem::uninitialized() };
+            unsafe {
+                glx.QueryDrawable(
+                    self.xconn.display as *mut _,
+                    window,
+                    ffi::glx_extra::SWAP_INTERVAL_EXT as i32,
+                    &mut swap,
+                );
+            }
+
+            if swap != swap_mode as u32 {
+                return Err(CreationError::OsError(format!("Couldn't setup vsync: expected interval `{}` but got `{}`", swap_mode, swap)));
+            }
+        } else if check_ext(&self.extensions, "GLX_MESA_swap_control")
+            && extra_functions.SwapIntervalMESA.is_loaded()
+        {
+            unsafe {
+                extra_functions.SwapIntervalMESA(swap_mode as u32);
+            }
+        } else if check_ext(&self.extensions, "GLX_SGI_swap_control")
+            && extra_functions.SwapIntervalSGI.is_loaded()
+        {
+            unsafe {
+                extra_functions.SwapIntervalSGI(swap_mode);
+            }
+        } else {
+            return Err(CreationError::OsError(
+                "Couldn't find any available vsync extension".to_string(),
+            ));
         }
 
         Ok(Context {
