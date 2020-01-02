@@ -57,7 +57,9 @@ impl BackendDisplay {
     fn new<ND: NativeDisplay>(db: DisplayBuilder, nd: &ND) -> Result<Self, Error> {
         let backing_api = db.plat_attr.backing_api;
         let disp = match backing_api {
-            BackingApi::Glx | BackingApi::GlxThenEgl => glx::Display::new(db.clone(), nd).map(BackendDisplay::Glx),
+            BackingApi::Glx | BackingApi::GlxThenEgl => {
+                glx::Display::new(db.clone(), nd).map(BackendDisplay::Glx)
+            }
             BackingApi::Egl | BackingApi::EglThenGlx => {
                 egl::Display::new(db.clone(), nd).map(BackendDisplay::Egl)
             }
@@ -77,7 +79,10 @@ impl BackendDisplay {
         match (disp, disp2) {
             (Ok(_), _) => unreachable!(),
             (_, Ok(disp2)) => Ok(disp2),
-            (Err(mut err1), Err(err2)) => Err({ err1.append(err2); err1 }),
+            (Err(mut err1), Err(err2)) => Err({
+                err1.append(err2);
+                err1
+            }),
         }
     }
 }
@@ -402,9 +407,10 @@ impl Surface<Window> {
             let window_attr_error = make_oserror!(OsError::Misc(
                 "Glutin failed to query for a window's window attributes.".to_string()
             ));
-            disp.native_display
-                .check_errors()
-                .map_err(|mut err| { err.append(window_attr_error.clone()); err})?;
+            disp.native_display.check_errors().map_err(|mut err| {
+                err.append(window_attr_error.clone());
+                err
+            })?;
             if unsafe {
                 (xlib.XGetWindowAttributes)(**disp.native_display, surface, &mut window_attrs)
             } == 0

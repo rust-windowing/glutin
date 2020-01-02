@@ -6,7 +6,7 @@
     target_os = "openbsd",
 ))]
 
-use crate::config::{Api, GlRequest, GlVersion};
+use crate::config::{Api, Version};
 use crate::context::ContextBuilderWrapper;
 use crate::context::{GlProfile, Robustness};
 use crate::utils::NoPrint;
@@ -34,7 +34,7 @@ pub struct OsMesaBuffer {
 impl OsMesaContext {
     pub fn new(
         cb: ContextBuilderWrapper<&OsMesaContext>,
-        version: GlRequest,
+        version: (Api, Version),
     ) -> Result<Self, Error> {
         glutin_osmesa_sys::OsMesa::try_loading()
             .map_err(|err| make_oserror!(OsError::OsMesaLoadingError(err)))?;
@@ -66,26 +66,16 @@ impl OsMesaContext {
         }
 
         match version {
-            GlRequest::Latest => {}
-            GlRequest::Specific(Api::OpenGl, GlVersion(major, minor)) => {
+            (Api::OpenGl, Version(major, minor)) => {
                 attribs.push(glutin_osmesa_sys::OSMESA_CONTEXT_MAJOR_VERSION);
                 attribs.push(major as raw::c_int);
                 attribs.push(glutin_osmesa_sys::OSMESA_CONTEXT_MINOR_VERSION);
                 attribs.push(minor as raw::c_int);
             }
-            GlRequest::Specific(Api::OpenGlEs, _) | GlRequest::Specific(Api::WebGl, _) => {
+            _ => {
                 return Err(make_error!(ErrorType::NotSupported(
-                    "OSMesa only supports desktop OGL, not WebGL or GLES.".to_string()
+                    "OSMesa only supports OpenGL, not WebGL or GLES.".to_string()
                 )));
-            }
-            GlRequest::GlThenGles {
-                opengl_version: GlVersion(major, minor),
-                ..
-            } => {
-                attribs.push(glutin_osmesa_sys::OSMESA_CONTEXT_MAJOR_VERSION);
-                attribs.push(major as raw::c_int);
-                attribs.push(glutin_osmesa_sys::OSMESA_CONTEXT_MINOR_VERSION);
-                attribs.push(minor as raw::c_int);
             }
         }
 

@@ -1,8 +1,8 @@
 use super::ffi;
 use crate::api::dlloader::{SymTrait, SymWrapper};
 
-use std::ops::{Deref, DerefMut};
 use std::ffi::CString;
+use std::ops::{Deref, DerefMut};
 
 use winit_types::error::Error;
 use winit_types::platform::OsError;
@@ -16,13 +16,9 @@ unsafe impl Sync for Glx {}
 impl SymTrait for ffi::glx::Glx {
     fn load_with(lib: &libloading::Library) -> Self {
         Self::load_with(|sym| unsafe {
-            lib.get(
-                CString::new(sym.as_bytes())
-                    .unwrap()
-                    .as_bytes_with_nul(),
-            )
-            .map(|sym| *sym)
-            .unwrap_or(std::ptr::null_mut())
+            lib.get(CString::new(sym.as_bytes()).unwrap().as_bytes_with_nul())
+                .map(|sym| *sym)
+                .unwrap_or(std::ptr::null_mut())
         })
     }
 }
@@ -61,9 +57,7 @@ impl GlxExtra {
     pub fn new(glx: &Glx) -> Self {
         GlxExtra(ffi::glx_extra::Glx::load_with(|proc_name| {
             let c_str = CString::new(proc_name).unwrap();
-            unsafe {
-                glx.GetProcAddress(c_str.as_ptr() as *const u8) as *const _
-            }
+            unsafe { glx.GetProcAddress(c_str.as_ptr() as *const u8) as *const _ }
         }))
     }
 }

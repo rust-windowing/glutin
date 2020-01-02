@@ -1,7 +1,9 @@
 use crate::display::Display;
 use crate::platform_impl;
 
-use winit_types::error::Error;
+use winit_types::error::{Error, ErrorType};
+
+use std::ops::Range;
 
 /// All APIs related to OpenGL that you can possibly get while using glutin.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -16,40 +18,7 @@ pub enum Api {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct GlVersion(pub u8, pub u8);
-
-/// Describes the OpenGL API and version that are being requested when a context
-/// is created.
-#[derive(Debug, Copy, Clone)]
-pub enum GlRequest {
-    /// Request the latest version of the "best" API of this platform.
-    ///
-    /// On desktop, will try OpenGL.
-    Latest,
-
-    /// Request a specific version of a specific API.
-    ///
-    /// Example: `GlRequest::Specific(Api::OpenGl, (3, 3))`.
-    Specific(Api, GlVersion),
-
-    /// If OpenGL is available, create an OpenGL [`Context`] with the specified
-    /// `opengl_version`. Else if OpenGL ES or WebGL is available, create a
-    /// context with the specified `opengles_version`.
-    ///
-    /// [`Context`]: struct.Context.html
-    GlThenGles {
-        /// The version to use for OpenGL.
-        opengl_version: GlVersion,
-        /// The version to use for OpenGL ES.
-        opengles_version: GlVersion,
-    },
-}
-
-impl Default for GlRequest {
-    fn default() -> Self {
-        GlRequest::Latest
-    }
-}
+pub struct Version(pub u8, pub u8);
 
 /// The behavior of the driver when you change the current context.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -62,13 +31,73 @@ pub enum ReleaseBehavior {
     Flush,
 }
 
+impl Default for ReleaseBehavior {
+    fn default() -> Self {
+        ReleaseBehavior::Flush
+    }
+}
+
+/// The desired swap interval.
+///
+/// If `desired_swap_interval` is `DontWait`, calling `swap_buffers` will not
+/// block.
+///
+/// When using `Wait(n)` or `AdaptiveWait(n)`, `n` may not equal zero.
+///
+/// When using `Wait(n)`, the swap is synchronized to the `n`'th video frame.
+/// This is typically set to `1` to enable vsync and prevent screen tearing.
+///
+/// When using `AdaptiveWait(n)`, the swap is synchronized to the `n`th video
+/// frame as long as the frame rate is higher than the sync rate. If the frame
+/// rate is less than the sync rate synchronization is disabled and
+/// `AdaptiveWait(n)` behaves as `DontWait`. This is only supported by WGL/GLX
+/// drivers that implement `EXT_swap_control_tear`.
+///
+/// Please note that your application's desired swap interval may be overridden
+/// by external, driver-specific configuration.
+#[derive(Debug, Clone)]
+pub enum SwapInterval {
+    DontWait,
+    Wait(u32),
+    AdaptiveWait(u32),
+}
+
+impl SwapInterval {
+    pub(crate) fn validate(&self) -> Result<(), Error> {
+        match self {
+            SwapInterval::Wait(n) | SwapInterval::AdaptiveWait(n) if *n == 0 => {
+                Err(make_error!(ErrorType::BadApiUsage(
+                    "SwapInterval of `0` not allowed. Use `SwapInterval::DontWait`.".to_string()
+                )))
+            }
+            _ => Ok(()),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum SwapIntervalRange {
+    DontWait,
+    Wait(Range<u32>),
+    AdaptiveWait(Range<u32>),
+}
+
+impl SwapIntervalRange {
+    fn contains(&self, swap_interval: &SwapInterval) -> bool {
+        match (self, swap_interval) {
+            (SwapIntervalRange::DontWait, SwapInterval::DontWait) => true,
+            (SwapIntervalRange::Wait(nr), SwapInterval::Wait(n)) => nr.contains(n),
+            (SwapIntervalRange::AdaptiveWait(nr), SwapInterval::AdaptiveWait(n)) => nr.contains(n),
+            _ => false,
+        }
+    }
+}
+
 /// Describes a possible format.
 #[allow(missing_docs)]
 #[derive(Debug, Clone)]
 pub struct ConfigAttribs {
-    pub version: Option<GlVersion>,
-    pub api: Api,
-
+    pub version: (Api, Version),
     pub hardware_accelerated: bool,
     /// The number of color bits. Does not include alpha bits.
     pub color_bits: u8,
@@ -81,7 +110,8 @@ pub struct ConfigAttribs {
     /// the multisampling level.
     pub multisampling: Option<u16>,
     pub srgb: bool,
-    pub vsync: bool,
+    pub desired_swap_interval: SwapInterval,
+    pub swap_interval_ranges: Vec<SwapIntervalRange>,
     pub pbuffer_surface_support: bool,
     pub pixmap_surface_support: bool,
     pub window_surface_support: bool,
@@ -93,7 +123,7 @@ pub struct ConfigAttribs {
 #[allow(missing_docs)]
 #[derive(Debug, Clone)]
 pub struct ConfigWrapper<T, CA> {
-    pub attribs: CA,
+    pub(crate) attribs: CA,
     pub(crate) config: T,
 }
 
@@ -124,6 +154,32 @@ impl<T, CA> ConfigWrapper<T, CA> {
 }
 
 impl Config {
+    #[inline]
+    pub fn attribs(&self) -> &ConfigAttribs {
+        &self.attribs
+    }
+
+    #[inline]
+    pub fn set_desired_swap_interval(
+        &mut self,
+        desired_swap_interval: SwapInterval,
+    ) -> Result<(), Error> {
+        if self
+            .attribs
+            .swap_interval_ranges
+            .iter()
+            .find(|r| r.contains(&desired_swap_interval))
+            .is_none()
+        {
+            return Err(make_error!(ErrorType::BadApiUsage(format!(
+                "SwapInterval of {:?} not in ranges {:?}.",
+                desired_swap_interval, self.attribs.swap_interval_ranges
+            ))));
+        }
+        self.attribs.desired_swap_interval = desired_swap_interval;
+        Ok(())
+    }
+
     /// Turns the `config` parameter into another type.
     #[inline]
     pub(crate) fn as_ref(&self) -> ConfigWrapper<&platform_impl::Config, &ConfigAttribs> {
@@ -138,13 +194,10 @@ impl Config {
 // TODO: swap method? (swap, copy)
 #[derive(Clone, Debug)]
 pub struct ConfigBuilder {
-    /// Version to try create. See [`GlRequest`] for more infos.
+    /// Version to try create.
     ///
-    /// The default is [`Latest`].
-    ///
-    /// [`Latest`]: enum.GlRequest.html#variant.Latest
-    /// [`GlRequest`]: enum.GlRequest.html
-    pub version: GlRequest,
+    /// The default is `(Api::OpenGl, (3, 3))'.
+    pub version: (Api, Version),
 
     /// If true, only hardware-accelerated formats will be considered. If
     /// false, only software renderers. `None` means "don't care". Default
@@ -195,13 +248,7 @@ pub struct ConfigBuilder {
     /// The behavior when changing the current context. Default is `Flush`.
     pub release_behavior: ReleaseBehavior,
 
-    /// Whether to use vsync. If vsync is enabled, calling `swap_buffers` will
-    /// block until the screen refreshes. This is typically used to prevent
-    /// screen tearing.
-    ///
-    /// The default is `None`.
-    pub vsync: Option<bool>,
-
+    pub desired_swap_interval: Option<SwapInterval>,
     pub pbuffer_surface_support: bool,
     pub window_surface_support: bool,
     pub pixmap_surface_support: bool,
@@ -214,7 +261,6 @@ impl Default for ConfigBuilder {
     #[inline]
     fn default() -> Self {
         ConfigBuilder {
-            version: GlRequest::Latest,
             hardware_accelerated: Some(true),
             color_bits: Some(24),
             float_color_buffer: false,
@@ -225,12 +271,13 @@ impl Default for ConfigBuilder {
             multisampling: None,
             stereoscopy: false,
             srgb: None,
-            vsync: None,
+            desired_swap_interval: None,
             pbuffer_surface_support: false,
             surfaceless_support: false,
             pixmap_surface_support: false,
             window_surface_support: true,
-            release_behavior: ReleaseBehavior::Flush,
+            version: (Api::OpenGl, Version(3, 3)),
+            release_behavior: Default::default(),
             plat_attr: Default::default(),
         }
     }
@@ -243,8 +290,8 @@ impl ConfigBuilder {
 
     /// Sets how the backend should choose the OpenGL API and version.
     #[inline]
-    pub fn with_gl(mut self, request: GlRequest) -> Self {
-        self.version = request;
+    pub fn with_gl(mut self, version: (Api, Version)) -> Self {
+        self.version = version;
         self
     }
 
@@ -304,12 +351,12 @@ impl ConfigBuilder {
         self
     }
 
-    /// Requests that the window has vsync enabled.
-    ///
-    /// By default, vsync is not enabled.
     #[inline]
-    pub fn with_vsync(mut self, vsync: Option<bool>) -> Self {
-        self.vsync = vsync;
+    pub fn with_desired_swap_interval(
+        mut self,
+        desired_swap_interval: Option<SwapInterval>,
+    ) -> Self {
+        self.desired_swap_interval = desired_swap_interval;
         self
     }
 
@@ -374,6 +421,9 @@ impl ConfigBuilder {
 
     #[inline]
     pub fn build(self, disp: &Display) -> Result<Vec<Config>, Error> {
+        self.desired_swap_interval
+            .unwrap_or(SwapInterval::DontWait)
+            .validate()?;
         platform_impl::Config::new(&disp.0, self).map(|configs| {
             configs
                 .into_iter()

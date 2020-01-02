@@ -39,7 +39,10 @@ impl Display {
         egl::Display::new(db, nd)
             .map(Display)
             .map_err(|mut err| match backing_api {
-                BackingApi::GlxThenEgl => { err.append(glx_not_supported_error); err},
+                BackingApi::GlxThenEgl => {
+                    err.append(glx_not_supported_error);
+                    err
+                }
                 _ => err,
             })
     }

@@ -13,7 +13,7 @@ mod make_current_guard;
 pub use self::glx::{Glx, GlxExtra};
 use self::make_current_guard::MakeCurrentGuard;
 
-use crate::config::{Api, GlRequest, GlVersion, ReleaseBehavior};
+use crate::config::{Api, ReleaseBehavior, Version};
 use crate::context::{ContextBuilderWrapper, GlProfile, Robustness};
 
 use winit_types::dpi;
@@ -26,7 +26,10 @@ use std::sync::Arc;
 
 lazy_static! {
     pub static ref GLX: Result<Glx, Error> = Glx::new();
-    pub static ref GLX_EXTRA: Result<GlxExtra, Error> = GLX.as_ref().map(|glx| GlxExtra::new(glx)).map_err(|err| err.clone());
+    pub static ref GLX_EXTRA: Result<GlxExtra, Error> = GLX
+        .as_ref()
+        .map(|glx| GlxExtra::new(glx))
+        .map_err(|err| err.clone());
 }
 
 //#[derive(Debug)]
