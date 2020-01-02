@@ -107,7 +107,7 @@ impl Config {
                         confs,
                         |config_id| {
                             let xid =
-                                egl::get_native_visual_id(***bdisp, *config_id) as ffi::VisualID;
+                                egl::get_native_visual_id(***bdisp, *config_id)? as ffi::VisualID;
                             utils::get_visual_info_from_xid(&disp.native_display, xid)
                                 .map(|vis| (vis, xid))
                         },
@@ -132,7 +132,7 @@ impl Config {
         match self {
             Config::Egl(conf) => utils::get_visual_info_from_xid(
                 native_display,
-                conf.get_native_visual_id() as ffi::VisualID,
+                conf.get_native_visual_id()? as ffi::VisualID,
             ),
         }
     }

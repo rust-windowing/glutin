@@ -15,7 +15,12 @@ use self::make_current_guard::MakeCurrentGuard;
 
 use crate::config::{Api, ReleaseBehavior, Version};
 use crate::context::{ContextBuilderWrapper, GlProfile, Robustness};
+use crate::display::DisplayBuilder;
 
+use glutin_interface::inputs::{
+    NativeDisplay, NativeWindow, NativeWindowBuilder, RawDisplay, RawWindow,
+};
+use glutin_x11_sym::Display as X11Display;
 use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
 use winit_types::platform::OsError;
@@ -30,6 +35,22 @@ lazy_static! {
         .as_ref()
         .map(|glx| GlxExtra::new(glx))
         .map_err(|err| err.clone());
+}
+
+#[derive(Debug)]
+pub struct Display {
+    native_display: Arc<X11Display>,
+}
+
+impl Display {
+    pub fn new<ND: NativeDisplay>(db: DisplayBuilder, nd: &ND) -> Result<Self, Error> {
+        let native_display = match nd.display() {
+            RawDisplay::Xlib { display, .. } => X11Display::from_raw(display),
+            _ => unreachable!(),
+        };
+
+        Ok(Display { native_display })
+    }
 }
 
 //#[derive(Debug)]

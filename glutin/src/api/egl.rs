@@ -214,7 +214,7 @@ fn get_native_display(
     match disp {
         ffi::egl::NO_DISPLAY => Err(make_oserror!(OsError::Misc(format!(
             "Creating EGL display failed with 0x{:x}",
-            egl.GetError()
+            unsafe { egl.GetError() },
         )))),
         disp => Ok(disp),
     }
@@ -282,11 +282,11 @@ impl Display {
         // the list of extensions supported by the client once initialized is
         // different from the list of extensions obtained earlier
         let extensions = if egl_version >= (1, 2) {
-            let p = egl.QueryString(disp, ffi::egl::EXTENSIONS as i32);
+            let p = unsafe { egl.QueryString(disp, ffi::egl::EXTENSIONS as i32) };
             if p.is_null() {
                 return Err(make_oserror!(OsError::Misc(format!(
                     "Querying for EGL extensions failed with 0x{:x}",
-                    egl.GetError()
+                    unsafe { egl.GetError() },
                 ))));
             }
 
@@ -347,8 +347,6 @@ impl Config {
     where
         F: FnMut(Vec<ffi::egl::types::EGLConfig>) -> Vec<Result<ffi::egl::types::EGLConfig, Error>>,
     {
-        let egl = EGL.as_ref().unwrap();
-
         // TODO: Alternatively, allow EGL_MESA_platform_surfaceless.
         // FIXME: Also check for the GL_OES_surfaceless_context *CONTEXT*
         // extension
@@ -367,7 +365,8 @@ impl Config {
         // binding the right API and choosing the version
         unsafe { bind_api(cb.version.0, disp.egl_version)? };
 
-        let configs = unsafe { choose_fbconfig(disp, cb.version, cb, conf_selector)? };
+        let version = cb.version;
+        let configs = unsafe { choose_fbconfig(disp, version, cb, conf_selector)? };
 
         let disp = Arc::clone(&disp.0);
         Ok(configs
@@ -377,7 +376,7 @@ impl Config {
                     attribs,
                     Config {
                         display: Arc::clone(&disp),
-                        version: cb.version,
+                        version,
                         config_id,
                     },
                 )
@@ -386,7 +385,7 @@ impl Config {
     }
 
     #[inline]
-    pub fn get_native_visual_id(&self) -> ffi::egl::types::EGLint {
+    pub fn get_native_visual_id(&self) -> Result<ffi::egl::types::EGLint, Error> {
         get_native_visual_id(**self.display, self.config_id)
     }
 }
@@ -424,8 +423,6 @@ impl Context {
         cb: ContextBuilderWrapper<&Context>,
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
     ) -> Result<Context, Error> {
-        let egl = EGL.as_ref().unwrap();
-
         // FIXME: Support mixing apis
         unsafe {
             bind_api(conf.config.version.0, disp.egl_version)?;
@@ -462,13 +459,11 @@ impl Context {
                 SwapInterval::DontWait => 0,
                 SwapInterval::AdaptiveWait(_) => unreachable!(),
             };
-            unsafe {
-                if egl.SwapInterval(**surf.display, n as i32) == ffi::egl::FALSE {
-                    return Err(make_oserror!(OsError::Misc(format!(
-                        "eglSwapInterval failed with 0x{:x}",
-                        egl.GetError()
-                    ))));
-                }
+            if egl.SwapInterval(**surf.display, n as i32) == ffi::egl::FALSE {
+                return Err(make_oserror!(OsError::Misc(format!(
+                    "eglSwapInterval failed with 0x{:x}",
+                    egl.GetError()
+                ))));
             }
             *has_been_current = true;
         }
@@ -596,7 +591,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_native_visual_id(&self) -> ffi::egl::types::EGLint {
+    pub fn get_native_visual_id(&self) -> Result<ffi::egl::types::EGLint, Error> {
         get_native_visual_id(**self.display, self.config.config.config_id)
     }
 }
@@ -606,10 +601,10 @@ unsafe fn check_make_current(ret: Option<u32>) -> Result<(), Error> {
     if ret == Some(0) {
         match egl.GetError() as u32 {
             ffi::egl::CONTEXT_LOST => Err(make_error!(ErrorType::ContextLost)),
-            err => panic!(
-                "[glutin] make_current: eglMakeCurrent failed (eglGetError returned 0x{:x})",
-                err
-            ),
+            err => Err(make_oserror!(OsError::Misc(format!(
+                "eglMakeCurrent failed (eglGetError returned 0x{:x})",
+                err,
+            )))),
         }
     } else {
         Ok(())
@@ -624,61 +619,59 @@ unsafe impl<T: SurfaceTypeTrait> Sync for Surface<T> {}
 
 impl Drop for Display {
     fn drop(&mut self) {
-        unsafe {
-            // In a reasonable world, we could uncomment the line bellow.
-            //
-            // This is no such world. Lets talk about something.
-            //
-            // You see, every call to `get_native_display` returns the exact
-            // same display, just look at the docs:
-            //
-            // "Multiple calls made to eglGetDisplay with the same display_id
-            // will return the same EGLDisplay handle."
-            //
-            // My EGL implementation does not do any ref counting, nor do the
-            // EGL docs mention ref counting anywhere. In fact, the docs state
-            // that there will be *no effect*, which, in a way, implies no ref
-            // counting:
-            //
-            // "Initializing an already initialized EGL display connection has
-            // no effect besides returning the version numbers."
-            //
-            // So, if we terminate the display, other people who are using it
-            // won't be so happy.
-            //
-            // Well, how did I stumble on this issue you might ask...
-            //
-            // In this case, the "other people" was us, for it appears my EGL
-            // implementation does not follow the docs,  or maybe I'm misreading
-            // them. You see, according to the egl docs:
-            //
-            // "To release the current context without assigning a new one, set
-            // context to EGL_NO_CONTEXT and set draw and read to
-            // EGL_NO_SURFACE.  [...] ******This is the only case where an
-            // uninitialized display may be passed to eglMakeCurrent.******"
-            // (Emphasis mine).
-            //
-            // Well, my computer returns EGL_BAD_DISPLAY if the display passed
-            // to eglMakeCurrent is uninitialized, which allowed to me to spot
-            // this issue.
-            //
-            // I would have assumed that if EGL was going to provide us with
-            // the same EGLDisplay that they'd at least do
-            // some ref counting, but they don't.
-            //
-            // FIXME: Technically we are leaking resources, not much we can do.
-            // Yeah, we could have a global static that does ref counting
-            // ourselves, but what if some other library is using the display.
-            //
-            // On unix operating systems, we could preload a little lib that
-            // does ref counting on that level, but:
-            //      A) What about other platforms?
-            //      B) Do you *really* want all glutin programs to preload a
-            //      library?
-            //      C) Who the hell is going to maintain that?
-            //
-            // egl.Terminate(**self.display);
-        }
+        // In a reasonable world, we could uncomment the line bellow.
+        //
+        // This is no such world. Lets talk about something.
+        //
+        // You see, every call to `get_native_display` returns the exact
+        // same display, just look at the docs:
+        //
+        // "Multiple calls made to eglGetDisplay with the same display_id
+        // will return the same EGLDisplay handle."
+        //
+        // My EGL implementation does not do any ref counting, nor do the
+        // EGL docs mention ref counting anywhere. In fact, the docs state
+        // that there will be *no effect*, which, in a way, implies no ref
+        // counting:
+        //
+        // "Initializing an already initialized EGL display connection has
+        // no effect besides returning the version numbers."
+        //
+        // So, if we terminate the display, other people who are using it
+        // won't be so happy.
+        //
+        // Well, how did I stumble on this issue you might ask...
+        //
+        // In this case, the "other people" was us, for it appears my EGL
+        // implementation does not follow the docs, or maybe I'm misreading
+        // them. You see, according to the egl docs:
+        //
+        // "To release the current context without assigning a new one, set
+        // context to EGL_NO_CONTEXT and set draw and read to
+        // EGL_NO_SURFACE.  [...] ******This is the only case where an
+        // uninitialized display may be passed to eglMakeCurrent.******"
+        // (Emphasis mine).
+        //
+        // Well, my computer returns EGL_BAD_DISPLAY if the display passed
+        // to eglMakeCurrent is uninitialized, which allowed to me to spot
+        // this issue.
+        //
+        // I would have assumed that if EGL was going to provide us with
+        // the same EGLDisplay that they'd at least do some ref counting,
+        // but they don't.
+        //
+        // FIXME: Technically we are leaking resources, not much we can do.
+        // Yeah, we could have a global static that does ref counting
+        // ourselves, but what if some other library is using the display.
+        //
+        // On unix operating systems, we could preload a little lib that
+        // does ref counting on that level, but:
+        //      A) What about other platforms?
+        //      B) Do you *really* want all glutin programs to preload a
+        //      library?
+        //      C) Who the hell is going to maintain that?
+        //
+        // egl.Terminate(**self.display);
     }
 }
 
@@ -705,7 +698,7 @@ impl Drop for Context {
 pub fn get_native_visual_id(
     disp: ffi::egl::types::EGLDisplay,
     conf_id: ffi::egl::types::EGLConfig,
-) -> ffi::egl::types::EGLint {
+) -> Result<ffi::egl::types::EGLint, Error> {
     let egl = EGL.as_ref().unwrap();
     let mut value = 0;
     let ret = unsafe {
@@ -717,12 +710,12 @@ pub fn get_native_visual_id(
         )
     };
     if ret == 0 {
-        panic!(
-            "[glutin] get_native_visual_id: eglGetConfigAttrib failed with 0x{:x}",
-            unsafe { egl.GetError() }
-        )
+        return Err(make_oserror!(OsError::Misc(format!(
+            "eglGetConfigAttrib failed with 0x{:x}",
+            unsafe { egl.GetError() },
+        ))));
     };
-    value
+    Ok(value)
 }
 
 #[derive(Debug)]
@@ -853,10 +846,10 @@ impl Surface<Window> {
                 ffi::egl::CONTEXT_LOST => {
                     return Err(make_error!(ErrorType::ContextLost));
                 }
-                err => panic!(
-                    "[glutin] swap_buffers: eglSwapBuffers failed (eglGetError returned 0x{:x})",
-                    err
-                ),
+                err => Err(make_oserror!(OsError::Misc(format!(
+                    "eglSwapBuffers failed with 0x{:x}",
+                    err,
+                )))),
             }
         } else {
             Ok(())
@@ -900,10 +893,10 @@ impl Surface<Window> {
                 ffi::egl::CONTEXT_LOST => {
                     return Err(make_error!(ErrorType::ContextLost));
                 }
-                err => panic!(
-                    "[glutin] swap_buffers: eglSwapBuffers failed (eglGetError returned 0x{:x})",
-                    err
-                ),
+                err => Err(make_oserror!(OsError::Misc(format!(
+                    "eglSwapBuffersWithDamageKHR failed with 0x{:x}",
+                    err,
+                )))),
             }
         } else {
             Ok(())
@@ -924,9 +917,10 @@ impl Surface<PBuffer> {
         let surf = unsafe {
             let pbuffer = egl.CreatePbufferSurface(***disp, conf.config.config_id, desc.as_ptr());
             if pbuffer.is_null() || pbuffer == ffi::egl::NO_SURFACE {
-                return Err(make_oserror!(OsError::Misc(
-                    "eglCreatePbufferSurface failed".to_string(),
-                )));
+                return Err(make_oserror!(OsError::Misc(format!(
+                    "eglCreatePbufferSurface failed with 0x{:x}",
+                    egl.GetError(),
+                ))));
             }
             pbuffer
         };
@@ -1119,9 +1113,10 @@ where
         &mut num_confs,
     ) == 0
     {
-        errors.append(make_oserror!(OsError::Misc(
-            "eglChooseConfig failed".to_string()
-        )));
+        errors.append(make_oserror!(OsError::Misc(format!(
+            "eglChooseConfig failed with 0x{:x}",
+            egl.GetError(),
+        ))));
         return Err(errors);
     }
 
@@ -1139,9 +1134,10 @@ where
         &mut num_confs,
     ) == 0
     {
-        errors.append(make_oserror!(OsError::Misc(
-            "eglChooseConfig failed".to_string()
-        )));
+        errors.append(make_oserror!(OsError::Misc(format!(
+            "eglChooseConfig failed with 0x{:x}",
+            egl.GetError(),
+        ))));
         return Err(errors);
     }
 
@@ -1157,8 +1153,9 @@ where
             );
             match res {
                 0 => Err(make_oserror!(OsError::Misc(format!(
-                    "eglGetConfigAttrib failed for {:?}",
-                    $conf
+                    "eglGetConfigAttrib failed for {:?} with 0x{:x}",
+                    $conf,
+                    egl.GetError(),
                 )))),
                 _ => Ok(value),
             }
@@ -1269,14 +1266,14 @@ where
                 },
                 release_behavior: cb.release_behavior,
                 srgb: cb.srgb.unwrap_or(false),
-                swap_interval_ranges,
-                desired_swap_interval: cb.desired_swap_interval.unwrap_or(
-                    match swap_interval_ranges[0] {
+                desired_swap_interval: cb.desired_swap_interval.clone().unwrap_or(
+                    match &swap_interval_ranges[0] {
                         SwapIntervalRange::DontWait => SwapInterval::DontWait,
                         SwapIntervalRange::Wait(n) => SwapInterval::Wait(n.start),
                         _ => unreachable!(),
                     },
                 ),
+                swap_interval_ranges,
             };
 
             Ok((attribs, conf_id))
@@ -1462,10 +1459,12 @@ unsafe fn create_context(
             ffi::egl::BAD_MATCH | ffi::egl::BAD_ATTRIBUTE => {
                 return Err(make_error!(ErrorType::OpenGlVersionNotSupported));
             }
-            e => panic!(
-                "[glutin] create_context: eglCreateContext failed: 0x{:x}",
-                e
-            ),
+            err => {
+                return Err(make_oserror!(OsError::Misc(format!(
+                    "eglCreateContext failed with 0x{:x}",
+                    err,
+                ))));
+            }
         }
     }
 

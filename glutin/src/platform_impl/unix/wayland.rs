@@ -111,9 +111,8 @@ impl Surface<Window> {
             _ => unreachable!(),
         };
 
-        let wsurface = unsafe {
-            wegl::WlEglSurface::new_from_raw(surface as *mut _, width as i32, height as i32)
-        };
+        let wsurface =
+            wegl::WlEglSurface::new_from_raw(surface as *mut _, width as i32, height as i32);
 
         egl::Surface::<Window>::new(
             &disp.0,

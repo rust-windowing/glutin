@@ -55,7 +55,7 @@ impl Default for ReleaseBehavior {
 ///
 /// Please note that your application's desired swap interval may be overridden
 /// by external, driver-specific configuration.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum SwapInterval {
     DontWait,
     Wait(u32),
