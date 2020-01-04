@@ -122,16 +122,6 @@ where
             pf_reqs.x11_visual_xid,
         );
 
-        let pict_format = unsafe {
-            (xconn.xrender.XRenderFindVisualFormat)(
-                xconn.display as *mut _,
-                visual_infos.visual,
-            )
-        };
-        if pict_format.is_null() {
-            continue;
-        }
-
         match (lacks_what, &this_lacks_what) {
             (Some(Ok(())), _) => unreachable!(),
 
