@@ -2,7 +2,7 @@ use crate::api::egl;
 use crate::api::egl::ffi;
 use crate::config::{Api, ConfigAttribs, ConfigBuilder, ConfigWrapper};
 use crate::context::ContextBuilderWrapper;
-use crate::platform_impl::BackingApi;
+use crate::platform::unix::BackingApi;
 use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
 use crate::utils::NoPrint;
 

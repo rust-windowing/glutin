@@ -408,7 +408,7 @@ impl Config {
     pub fn new<F, NB: NativeDisplay>(
         cb: &ConfigBuilder,
         nb: &NB,
-        conf_selector: F,
+        mut conf_selector: F,
     ) -> Result<Vec<(ConfigAttribs, Config)>, Error>
     where
         F: FnMut(
@@ -581,17 +581,19 @@ impl Config {
 
         // calling `eglChooseConfig`
         let mut num_confs = 0;
-        if egl.ChooseConfig(
-            **display,
-            descriptor.as_ptr(),
-            std::ptr::null_mut(),
-            0,
-            &mut num_confs,
-        ) == 0
+        if unsafe {
+            egl.ChooseConfig(
+                **display,
+                descriptor.as_ptr(),
+                std::ptr::null_mut(),
+                0,
+                &mut num_confs,
+            )
+        } == 0
         {
             errors.append(make_oserror!(OsError::Misc(format!(
                 "eglChooseConfig failed with 0x{:x}",
-                egl.GetError(),
+                unsafe { egl.GetError() },
             ))));
             return Err(errors);
         }
@@ -601,18 +603,20 @@ impl Config {
         }
 
         let mut configs = Vec::with_capacity(num_confs as usize);
-        configs.resize_with(num_confs as usize, || std::mem::zeroed());
-        if egl.ChooseConfig(
-            **display,
-            descriptor.as_ptr(),
-            configs.as_mut_ptr(),
-            num_confs,
-            &mut num_confs,
-        ) == 0
+        configs.resize_with(num_confs as usize, || unsafe { std::mem::zeroed() });
+        if unsafe {
+            egl.ChooseConfig(
+                **display,
+                descriptor.as_ptr(),
+                configs.as_mut_ptr(),
+                num_confs,
+                &mut num_confs,
+            )
+        } == 0
         {
             errors.append(make_oserror!(OsError::Misc(format!(
                 "eglChooseConfig failed with 0x{:x}",
-                egl.GetError(),
+                unsafe { egl.GetError() },
             ))));
             return Err(errors);
         }
@@ -621,17 +625,19 @@ impl Config {
         macro_rules! attrib {
             ($egl:expr, $display:expr, $conf:expr, $attr:expr $(,)?) => {{
                 let mut value = 0;
-                let res = $egl.GetConfigAttrib(
-                    **$display,
-                    $conf,
-                    $attr as ffi::egl::types::EGLint,
-                    &mut value,
-                );
+                let res = unsafe {
+                    $egl.GetConfigAttrib(
+                        **$display,
+                        $conf,
+                        $attr as ffi::egl::types::EGLint,
+                        &mut value,
+                    )
+                };
                 match res {
                     0 => Err(make_oserror!(OsError::Misc(format!(
                         "eglGetConfigAttrib failed for {:?} with 0x{:x}",
                         $conf,
-                        egl.GetError(),
+                        unsafe { egl.GetError() },
                     )))),
                     _ => Ok(value),
                 }
@@ -789,7 +795,7 @@ impl Config {
                 (
                     attribs,
                     Config {
-                        display,
+                        display: Arc::clone(&display),
                         version: cb.version,
                         config_id,
                     },
@@ -967,15 +973,17 @@ impl Context {
 
         context_attributes.push(ffi::egl::NONE as raw::c_int);
 
-        let context = egl.CreateContext(
-            **display,
-            conf.config.config_id,
-            share,
-            context_attributes.as_ptr(),
-        );
+        let context = unsafe {
+            egl.CreateContext(
+                **display,
+                conf.config.config_id,
+                share,
+                context_attributes.as_ptr(),
+            )
+        };
 
         if context.is_null() {
-            match egl.GetError() as u32 {
+            match unsafe { egl.GetError() } as u32 {
                 ffi::egl::BAD_MATCH | ffi::egl::BAD_ATTRIBUTE => {
                     return Err(make_error!(ErrorType::OpenGlVersionNotSupported));
                 }

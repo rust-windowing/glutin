@@ -115,6 +115,7 @@ impl Config {
             Vec<ffi::glx::types::GLXFBConfig>,
         ) -> Vec<Result<ffi::glx::types::GLXFBConfig, Error>>,
     {
+        unimplemented!()
     }
 
     #[inline]

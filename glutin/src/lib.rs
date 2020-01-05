@@ -111,8 +111,8 @@ extern crate glutin_x11_sym;
 pub mod platform;
 
 mod api;
-mod config;
-mod context;
+pub mod config;
+pub mod context;
 mod platform_impl;
-mod surface;
+pub mod surface;
 mod utils;

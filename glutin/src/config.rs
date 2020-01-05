@@ -37,9 +37,9 @@ impl Default for ReleaseBehavior {
     }
 }
 
-/// The desired swap interval.
+/// The swap interval.
 ///
-/// If `desired_swap_interval` is `DontWait`, calling `swap_buffers` will not
+/// If the swap interval is `DontWait`, calling `swap_buffers` will not
 /// block.
 ///
 /// When using `Wait(n)` or `AdaptiveWait(n)`, `n` may not equal zero.
@@ -54,7 +54,9 @@ impl Default for ReleaseBehavior {
 /// drivers that implement `EXT_swap_control_tear`.
 ///
 /// Please note that your application's desired swap interval may be overridden
-/// by external, driver-specific configuration.
+/// by external, driver-specific configuration, which means that you can't know 
+/// in advance whether `swap_buffers`/`swap_buffers_with_damage` will block or 
+/// not.
 #[derive(Debug, Clone, Copy)]
 pub enum SwapInterval {
     DontWait,

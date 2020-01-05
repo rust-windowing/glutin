@@ -12,6 +12,7 @@ mod x11;
 use crate::config::{Api, ConfigAttribs, ConfigBuilder, ConfigWrapper};
 use crate::context::ContextBuilderWrapper;
 use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
+pub use crate::platform::unix::ConfigPlatformAttributes;
 
 use glutin_interface::inputs::{
     NativeDisplay, NativePixmap, NativePixmapBuilder, NativeWindow, NativeWindowBuilder, RawDisplay,
@@ -51,6 +52,8 @@ impl Config {
                     .map(|(attribs, config)| (attribs, Config::X11(config)))
                     .collect()
             }
+            // FIXME: GBM/EGLExtDevice/EGLMesaSurfaceles backends.
+            _ => unimplemented!(),
         })
     }
 }
@@ -314,35 +317,5 @@ impl Surface<Window> {
             Surface::Wayland(ref surf) => surf.update_after_resize(size),
             Surface::X11(_) => (),
         }
-    }
-}
-
-#[derive(Default, Debug, Clone)]
-pub struct ConfigPlatformAttributes {
-    /// X11 only: set to insure a certain visual xid is used when
-    /// choosing the fbconfig.
-    pub x11_visual_xid: Option<raw::c_ulong>,
-
-    /// Whether the X11 Visual will have transparency support.
-    pub x11_transparency: Option<bool>,
-
-    /// Wayland/X11 only.
-    pub backing_api: BackingApi,
-}
-
-#[derive(Default, Debug, Clone)]
-pub struct ContextPlatformAttributes {}
-
-#[derive(Debug, Clone, Copy)]
-pub enum BackingApi {
-    GlxThenEgl,
-    EglThenGlx,
-    Egl,
-    Glx,
-}
-
-impl Default for BackingApi {
-    fn default() -> Self {
-        BackingApi::GlxThenEgl
     }
 }

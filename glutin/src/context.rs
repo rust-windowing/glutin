@@ -99,9 +99,6 @@ pub struct ContextBuilderWrapper<T> {
     /// [`TryRobustLoseContextOnReset`]:
     /// enum.Robustness.html#variant.TryRobustLoseContextOnReset
     pub robustness: Robustness,
-
-    /// Platform specific attributes
-    pub plat_attr: platform_impl::ContextPlatformAttributes,
 }
 
 pub type ContextBuilder<'a> = ContextBuilderWrapper<&'a Context>;
@@ -118,7 +115,6 @@ impl<T> ContextBuilderWrapper<T> {
             profile: self.profile,
             debug: self.debug,
             robustness: self.robustness,
-            plat_attr: self.plat_attr,
         }
     }
 
@@ -130,7 +126,6 @@ impl<T> ContextBuilderWrapper<T> {
             profile: self.profile,
             debug: self.debug,
             robustness: self.robustness,
-            plat_attr: self.plat_attr,
         }
     }
 }
@@ -143,7 +138,6 @@ impl<T> Default for ContextBuilderWrapper<T> {
             profile: None,
             debug: cfg!(debug_assertions),
             robustness: Robustness::NotRobust,
-            plat_attr: Default::default(),
         }
     }
 }

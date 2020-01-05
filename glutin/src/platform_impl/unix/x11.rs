@@ -2,7 +2,7 @@ use crate::api::egl::{self, EGL};
 use crate::api::glx::{self, ffi, GLX};
 use crate::config::{Api, ConfigAttribs, ConfigBuilder, ConfigWrapper};
 use crate::context::ContextBuilderWrapper;
-use crate::platform_impl::BackingApi;
+use crate::platform::unix::BackingApi;
 use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
 
 use glutin_interface::inputs::{
@@ -125,6 +125,7 @@ impl Config {
             Config::Egl(conf, disp, _) => {
                 utils::get_visual_info_from_xid(disp, conf.get_native_visual_id()? as ffi::VisualID)
             }
+            _ => unimplemented!(),
         }
     }
 
@@ -157,11 +158,12 @@ impl Context {
         cb: ContextBuilderWrapper<&Context>,
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
     ) -> Result<Self, Error> {
-        match &conf.config {
+        match conf.config {
             Config::Egl(config, disp, screen) => {
                 egl::Context::new(Context::inner_cb_egl(cb)?, conf.map_config(|_| config))
                     .map(|ctx| Context::Egl(ctx, Arc::clone(disp), *screen))
             }
+            _ => unimplemented!(),
             //(BackendDisplay::Glx(disp), Config::Glx(config)) => {
             //    glx::Context::new(
             //        disp,
@@ -298,6 +300,7 @@ impl Surface<PBuffer> {
                 egl::Surface::<PBuffer>::new(conf.map_config(|_| config), size)
                     .map(|surf| Surface::Egl(surf, Arc::clone(&disp), *screen))
             }
+            _ => unimplemented!(),
             //(BackendDisplay::Glx(disp), Config::Glx(config)) => {
             //    glx::Surface::<PBuffer>::new(
             //        disp,
@@ -376,7 +379,6 @@ impl Surface<Window> {
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         nwb: NWB,
     ) -> Result<(NWB::Window, Self), Error> {
-        let xlib = syms!(XLIB);
         // Get the screen_id for the window being built.
         let visual_info = conf.config.get_visual_info();
         let nw = nwb.build_x11(&visual_info as *const _ as *const _, conf.config.screen())?;
@@ -430,11 +432,12 @@ impl Surface<Window> {
         assemble_non_match_error("visual", visual_info.visual, window_attrs.visual)?;
         assemble_non_match_error("depth", visual_info.depth, window_attrs.depth)?;
 
-        match &conf.config {
+        match conf.config {
             Config::Egl(config, disp, screen) => {
                 egl::Surface::<Window>::new(conf.map_config(|_| config), surface as *const _)
                     .map(|surf| Surface::Egl(surf, Arc::clone(disp), *screen))
             }
+            _ => unimplemented!(),
             //(Display::Glx(disp), Config::Glx(config)) => {
             //    glx::Surface::<Window>::new(
             //        disp,
