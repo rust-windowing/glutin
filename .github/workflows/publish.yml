@@ -3,7 +3,9 @@ name: Publish
 on:
   push:
     branches: [master]
-    paths: "**/Cargo.toml"
+    paths: 
+     - '**/Cargo.toml'
+     - '.github/workflows/publish.yml'
 
 jobs:
   Publish:
@@ -16,9 +18,9 @@ jobs:
         components: rustfmt
     - name: Publish to crates.io
       run: |
-        push glutin && cargo publish --token ${{ secrets.cratesio_token }} && pop
-        push glutin_egl_sys && cargo publish --token ${{ secrets.cratesio_token }} && pop
-        push glutin_emscripten_sys && cargo publish --token ${{ secrets.cratesio_token }} && pop
-        push glutin_gres2_sys && cargo publish --token ${{ secrets.cratesio_token }} && pop
-        push glutin_glx_sys && cargo publish --token ${{ secrets.cratesio_token }} && pop
-        push glutin_wgl_sys && cargo publish --token ${{ secrets.cratesio_token }} && pop
+        cd glutin && cargo publish --token ${{ secrets.cratesio_token }} && cd ..
+        cd glutin_egl_sys && cargo publish --token ${{ secrets.cratesio_token }} && cd ..
+        cd glutin_emscripten_sys && cargo publish --token ${{ secrets.cratesio_token }} && cd ..
+        cd glutin_gres2_sys && cargo publish --token ${{ secrets.cratesio_token }} && cd ..
+        cd glutin_glx_sys && cargo publish --token ${{ secrets.cratesio_token }} && cd ..
+        cd glutin_wgl_sys && cargo publish --token ${{ secrets.cratesio_token }} && cd ..
