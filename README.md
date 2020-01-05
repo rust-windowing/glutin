@@ -3,8 +3,6 @@ A low-level library for OpenGL context creation, written in pure Rust.
 
 [![](https://meritbadge.herokuapp.com/glutin)](https://crates.io/crates/glutin)
 [![Docs.rs](https://docs.rs/glutin/badge.svg)](https://docs.rs/glutin)
-[![Build Status](https://travis-ci.org/rust-windowing/glutin.png?branch=master)](https://travis-ci.org/rust-windowing/glutin)
-[![Build status](https://ci.appveyor.com/api/projects/status/lexg1h4eyp7eg0nj/branch/master?svg=true)](https://ci.appveyor.com/project/Osspial/glutin/branch/master)
 
 ```toml
 [dependencies]
