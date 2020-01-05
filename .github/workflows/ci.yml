@@ -86,7 +86,7 @@ jobs:
       run: cd glutin && cargo $WEB build --verbose --target ${{ matrix.platform.target }} --features $FEATURES
     - name: Build all
       shell: bash
-      if: !contains(matrix.platform.target, 'wasm32')
+      if: (!contains(matrix.platform.target, 'wasm32'))
       run: cargo $WEB build --verbose --target ${{ matrix.platform.target }}
 
     - name: Build tests
@@ -94,7 +94,7 @@ jobs:
       run: cd glutin && cargo $WEB test --no-run --verbose --target ${{ matrix.platform.target }} --features $FEATURES
     - name: Build tests all
       shell: bash
-      if: !contains(matrix.platform.target, 'wasm32')
+      if: (!contains(matrix.platform.target, 'wasm32'))
       run: cargo $WEB test --no-run --verbose --target ${{ matrix.platform.target }}
     - name: Run tests
       shell: bash
