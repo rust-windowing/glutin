@@ -66,12 +66,12 @@ use crate::{
     PixelFormatRequirements, Rect,
 };
 
-use winit::window::WindowBuilder;
-use winit::event_loop::EventLoopWindowTarget;
 use glutin_gles2_sys as ffi;
 use objc::declare::ClassDecl;
 use objc::runtime::{Class, Object, Sel, BOOL, NO, YES};
 use winit::dpi;
+use winit::event_loop::EventLoopWindowTarget;
+use winit::window::WindowBuilder;
 
 use std::ffi::CString;
 use std::os::raw;
@@ -332,7 +332,9 @@ impl Context {
         &self,
         rects: &[Rect],
     ) -> Result<(), ContextError> {
-        Err(ContextError::OsError("buffer damage not suported".to_string()))
+        Err(ContextError::OsError(
+            "buffer damage not suported".to_string(),
+        ))
     }
 
     #[inline]
@@ -404,7 +406,10 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, proc_name: &str) -> *const core::ffi::c_void {
+    pub fn get_proc_address(
+        &self,
+        proc_name: &str,
+    ) -> *const core::ffi::c_void {
         let proc_name_c = CString::new(proc_name)
             .expect("proc name contained interior nul byte");
         let path = b"/System/Library/Frameworks/OpenGLES.framework/OpenGLES\0";

@@ -8,13 +8,13 @@ use crate::{
     Api, ContextError, GlAttributes, PixelFormat, PixelFormatRequirements, Rect,
 };
 
-use winit::window::WindowBuilder;
-use winit::event_loop::EventLoopWindowTarget;
 use crate::platform::android::EventLoopExtAndroid;
 use glutin_egl_sys as ffi;
 use parking_lot::Mutex;
 use winit;
 use winit::dpi;
+use winit::event_loop::EventLoopWindowTarget;
+use winit::window::WindowBuilder;
 
 use std::sync::Arc;
 
@@ -177,7 +177,10 @@ impl Context {
     }
 
     #[inline]
-    pub fn swap_buffers_with_damage(&self, rects: &[Rect]) -> Result<(), ContextError> {
+    pub fn swap_buffers_with_damage(
+        &self,
+        rects: &[Rect],
+    ) -> Result<(), ContextError> {
         if let Some(ref stopped) = self.0.stopped {
             let stopped = stopped.lock();
             if *stopped {

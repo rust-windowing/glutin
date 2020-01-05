@@ -264,7 +264,9 @@ impl Context {
         &self,
         rects: &[Rect],
     ) -> Result<(), ContextError> {
-        Err(ContextError::OsError("buffer damage not suported".to_string()))
+        Err(ContextError::OsError(
+            "buffer damage not suported".to_string(),
+        ))
     }
 
     #[inline]

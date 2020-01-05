@@ -5,11 +5,11 @@ use crate::{
     PixelFormatRequirements,
 };
 
-use winit::window::WindowBuilder;
-use winit::event_loop::EventLoopWindowTarget;
 use glutin_emscripten_sys as ffi;
 use winit;
 use winit::dpi;
+use winit::event_loop::EventLoopWindowTarget;
+use winit::window::WindowBuilder;
 
 use std::ffi::CString;
 
@@ -165,7 +165,9 @@ impl Context {
         &self,
         rects: &[Rect],
     ) -> Result<(), ContextError> {
-        Err(ContextError::OsError("buffer damage not suported".to_string()))
+        Err(ContextError::OsError(
+            "buffer damage not suported".to_string(),
+        ))
     }
 
     #[inline]
