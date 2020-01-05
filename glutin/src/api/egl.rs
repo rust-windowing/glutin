@@ -274,7 +274,7 @@ impl Display {
         };
 
         // calling `eglGetDisplay` or equivalent
-        let disp = Self::get_native_display(&client_extensions, &nd.display())?;
+        let disp = Self::get_native_display(&client_extensions, &nd.raw_display())?;
 
         let egl_version = Self::get_egl_version(disp)?;
 

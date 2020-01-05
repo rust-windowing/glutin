@@ -11,7 +11,9 @@ edition = "2018"
 publish = false
 
 [dependencies]
+# FIXME
 glutin = { path = "../glutin" }
+winit = { path = "../../winit" }
 takeable-option = "0.5"
 image = "0.21"
 env_logger = "0.6"

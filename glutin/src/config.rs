@@ -426,11 +426,12 @@ impl ConfigBuilder {
         self.desired_swap_interval
             .unwrap_or(SwapInterval::DontWait)
             .validate()?;
-        platform_impl::Config::new(&self, nd).map(|configs| {
-            configs
-                .into_iter()
-                .map(|(attribs, config)| Config { attribs, config })
-                .collect()
-        })
+        let configs = platform_impl::Config::new(&self, nd)?;
+        assert!(!configs.is_empty());
+
+        Ok(configs
+            .into_iter()
+            .map(|(attribs, config)| Config { attribs, config })
+            .collect())
     }
 }

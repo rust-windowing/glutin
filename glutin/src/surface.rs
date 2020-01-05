@@ -1,9 +1,7 @@
 use crate::config::Config;
 use crate::platform_impl;
 
-use glutin_interface::{
-    NativePixmap, NativePixmapBuilder, NativeWindow, NativeWindowBuilder,
-};
+use glutin_interface::{NativePixmap, NativePixmapSource, NativeWindow, NativeWindowSource};
 use winit_types::dpi;
 use winit_types::error::Error;
 
@@ -86,11 +84,12 @@ impl<T: SurfaceTypeTrait> Surface<T> {
 
 impl Surface<Pixmap> {
     #[inline]
-    pub unsafe fn new<NPB: NativePixmapBuilder>(
+    pub unsafe fn new<NPS: NativePixmapSource>(
         conf: &Config,
-        npb: NPB,
-    ) -> Result<(NPB::Pixmap, Self), Error> {
-        platform_impl::Surface::<Pixmap>::new(conf.as_ref(), npb)
+        nps: &NPS,
+        wb: NPS::PixmapBuilder,
+    ) -> Result<(NPS::Pixmap, Self), Error> {
+        platform_impl::Surface::<Pixmap>::new(conf.as_ref(), nps, wb)
             .map(|(pix, surf)| (pix, Surface(surf)))
     }
 
@@ -109,11 +108,12 @@ impl Surface<PBuffer> {
 
 impl Surface<Window> {
     #[inline]
-    pub unsafe fn new<NWB: NativeWindowBuilder>(
+    pub unsafe fn new<NWS: NativeWindowSource>(
         conf: &Config,
-        nwb: NWB,
-    ) -> Result<(NWB::Window, Self), Error> {
-        platform_impl::Surface::<Window>::new(conf.as_ref(), nwb)
+        nws: &NWS,
+        wb: NWS::WindowBuilder,
+    ) -> Result<(NWS::Window, Self), Error> {
+        platform_impl::Surface::<Window>::new(conf.as_ref(), nws, wb)
             .map(|(win, surf)| (win, Surface(surf)))
     }
 
@@ -127,7 +127,7 @@ impl Surface<Window> {
     /// You should call this function every time you have finished rendering, or
     /// the image may not be displayed on the screen.
     ///
-    /// **Warning**: if the swap interval when creating the surface was not 
+    /// **Warning**: if the swap interval when creating the surface was not
     /// `DontWait` or your graphics driver decided to override your requested
     /// behaviour, this function may block. Please refer to [`SwapInterval`].
     ///
@@ -137,7 +137,7 @@ impl Surface<Window> {
         self.0.swap_buffers()
     }
 
-    /// Similiar to [`Surface::swap_buffers`] but allows specifying damage 
+    /// Similiar to [`Surface::swap_buffers`] but allows specifying damage
     /// rectangles.
     ///
     /// [`Surface::swap_buffers`]: crate::surface::Surface::swap_buffers()

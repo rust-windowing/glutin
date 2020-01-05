@@ -6,8 +6,8 @@ use crate::platform::unix::BackingApi;
 use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
 
 use glutin_interface::{
-    NativeDisplay, NativePixmap, NativePixmapBuilder, NativeWindow, NativeWindowBuilder,
-    RawDisplay, RawWindow,
+    NativeDisplay, NativePixmap, NativePixmapSource, NativeWindow, NativeWindowSource, RawDisplay,
+    RawWindow, Seal, X11WindowParts,
 };
 use glutin_x11_sym::Display;
 use winit_types::dpi;
@@ -33,7 +33,7 @@ impl Config {
         nd: &ND,
     ) -> Result<Vec<(ConfigAttribs, Config)>, Error> {
         let xlib = syms!(XLIB);
-        let (disp, screen) = match nd.display() {
+        let (disp, screen) = match nd.raw_display() {
             RawDisplay::Xlib {
                 display, screen, ..
             } => (Display::from_raw(display), screen),
@@ -315,17 +315,18 @@ impl Surface<PBuffer> {
 
 impl Surface<Pixmap> {
     #[inline]
-    pub fn new<NPB: NativePixmapBuilder>(
+    pub fn new<NPS: NativePixmapSource>(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        npb: NPB,
-    ) -> Result<(NPB::Pixmap, Self), Error> {
+        nps: &NPS,
+        wb: NPS::PixmapBuilder,
+    ) -> Result<(NPS::Pixmap, Self), Error> {
         unimplemented!()
         //match (disp, conf.config) {
         //    (Display::Egl(disp), Config::Egl(config)) => {
         //        egl::Surface::<Pixmap>::new(
         //            disp,
         //            conf.map_config(|_| config),
-        //            npb,
+        //            nps,
         //        )
         //        .map(|(pix, surf)| (pix, Surface::Egl(surf)))
         //    },
@@ -333,7 +334,7 @@ impl Surface<Pixmap> {
         //        glx::Surface::<Pixmap>::new(
         //            disp,
         //            conf.map_config(|_| config),
-        //            npb,
+        //            nps,
         //        )
         //        .map(|(pix, surf)| (pix, Surface::Glx(surf)))
         //    },
@@ -375,13 +376,22 @@ impl Surface<Pixmap> {
 
 impl Surface<Window> {
     #[inline]
-    pub fn new<NWB: NativeWindowBuilder>(
+    pub fn new<NWS: NativeWindowSource>(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        nwb: NWB,
-    ) -> Result<(NWB::Window, Self), Error> {
+        nws: &NWS,
+        wb: NWS::WindowBuilder,
+    ) -> Result<(NWS::Window, Self), Error> {
         // Get the screen_id for the window being built.
         let visual_info = conf.config.get_visual_info();
-        let nw = nwb.build_x11(&visual_info as *const _ as *const _, conf.config.screen())?;
+        #[allow(deprecated)]
+        let nw = nws.build_x11(
+            wb,
+            X11WindowParts {
+                x_visual_info: &visual_info as *const _ as *const _,
+                screen: conf.config.screen(),
+                _non_exhaustive_do_not_use: Seal,
+            },
+        )?;
         Self::new_existing(conf, &nw).map(|surf| (nw, surf))
     }
 
@@ -442,7 +452,7 @@ impl Surface<Window> {
             //    glx::Surface::<Window>::new(
             //        disp,
             //        conf.map_config(|_| config),
-            //        nwb,
+            //        nws,
             //    )
             //    .map(|surf| (win, Surface::Glx(surf)))
             //},

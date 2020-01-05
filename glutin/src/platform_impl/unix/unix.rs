@@ -11,11 +11,11 @@ mod x11;
 
 use crate::config::{Api, ConfigAttribs, ConfigBuilder, ConfigWrapper};
 use crate::context::ContextBuilderWrapper;
-use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
 pub use crate::platform::unix::ConfigPlatformAttributes;
+use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
 
 use glutin_interface::{
-    NativeDisplay, NativePixmap, NativePixmapBuilder, NativeWindow, NativeWindowBuilder, RawDisplay,
+    NativeDisplay, NativePixmap, NativePixmapSource, NativeWindow, NativeWindowSource, RawDisplay,
 };
 use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
@@ -37,7 +37,7 @@ impl Config {
         cb: &ConfigBuilder,
         nd: &ND,
     ) -> Result<Vec<(ConfigAttribs, Config)>, Error> {
-        Ok(match nd.display() {
+        Ok(match nd.raw_display() {
             RawDisplay::Wayland { .. } => {
                 let configs = wayland::Config::new(cb, nd)?;
                 configs
@@ -230,16 +230,17 @@ impl Surface<PBuffer> {
 
 impl Surface<Pixmap> {
     #[inline]
-    pub unsafe fn new<NPB: NativePixmapBuilder>(
+    pub unsafe fn new<NPS: NativePixmapSource>(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        npb: NPB,
-    ) -> Result<(NPB::Pixmap, Self), Error> {
+        nps: &NPS,
+        wb: NPS::PixmapBuilder,
+    ) -> Result<(NPS::Pixmap, Self), Error> {
         match conf.config {
             Config::Wayland(config) => {
-                wayland::Surface::<Pixmap>::new(conf.map_config(|_| config), npb)
+                wayland::Surface::<Pixmap>::new(conf.map_config(|_| config), nps, wb)
                     .map(|(pix, surf)| (pix, Surface::Wayland(surf)))
             }
-            Config::X11(config) => x11::Surface::<Pixmap>::new(conf.map_config(|_| config), npb)
+            Config::X11(config) => x11::Surface::<Pixmap>::new(conf.map_config(|_| config), nps, wb)
                 .map(|(pix, surf)| (pix, Surface::X11(surf))),
         }
     }
@@ -264,17 +265,20 @@ impl Surface<Pixmap> {
 
 impl Surface<Window> {
     #[inline]
-    pub unsafe fn new<NWB: NativeWindowBuilder>(
+    pub unsafe fn new<NWS: NativeWindowSource>(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        nwb: NWB,
-    ) -> Result<(NWB::Window, Self), Error> {
+        nws: &NWS,
+        wb: NWS::WindowBuilder,
+    ) -> Result<(NWS::Window, Self), Error> {
         match conf.config {
             Config::Wayland(config) => {
-                wayland::Surface::<Window>::new(conf.map_config(|_| config), nwb)
+                wayland::Surface::<Window>::new(conf.map_config(|_| config), nws, wb)
                     .map(|(win, surf)| (win, Surface::Wayland(surf)))
             }
-            Config::X11(config) => x11::Surface::<Window>::new(conf.map_config(|_| config), nwb)
-                .map(|(win, surf)| (win, Surface::X11(surf))),
+            Config::X11(config) => {
+                x11::Surface::<Window>::new(conf.map_config(|_| config), nws, wb)
+                    .map(|(win, surf)| (win, Surface::X11(surf)))
+            }
         }
     }
 

@@ -7,7 +7,8 @@ use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
 use crate::utils::NoPrint;
 
 use glutin_interface::{
-    NativeDisplay, NativePixmap, NativePixmapBuilder, NativeWindow, NativeWindowBuilder, RawWindow,
+    NativeDisplay, NativePixmap, NativePixmapSource, NativeWindow, NativeWindowSource, RawWindow,
+    Seal, WaylandWindowParts,
 };
 use wayland_client::egl as wegl;
 pub use wayland_client::sys::client::wl_display;
@@ -80,11 +81,18 @@ impl<T: SurfaceTypeTrait> Surface<T> {
 
 impl Surface<Window> {
     #[inline]
-    pub unsafe fn new<NWB: NativeWindowBuilder>(
+    pub unsafe fn new<NWS: NativeWindowSource>(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        nwb: NWB,
-    ) -> Result<(NWB::Window, Self), Error> {
-        let nw = nwb.build_wayland()?;
+        nws: &NWS,
+        wb: NWS::WindowBuilder,
+    ) -> Result<(NWS::Window, Self), Error> {
+        #[allow(deprecated)]
+        let nw = nws.build_wayland(
+            wb,
+            WaylandWindowParts {
+                _non_exhaustive_do_not_use: Seal,
+            },
+        )?;
         Self::new_existing(conf, &nw).map(|surf| (nw, surf))
     }
 
@@ -156,10 +164,11 @@ impl Surface<Pixmap> {
     }
 
     #[inline]
-    pub unsafe fn new<NPB: NativePixmapBuilder>(
+    pub unsafe fn new<NPS: NativePixmapSource>(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        npb: NPB,
-    ) -> Result<(NPB::Pixmap, Self), Error> {
+        nps: &NPS,
+        wb: NPS::PixmapBuilder,
+    ) -> Result<(NPS::Pixmap, Self), Error> {
         return Err(make_error!(ErrorType::NotSupported(
             "Wayland does not support pixmaps.".to_string(),
         )));

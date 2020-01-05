@@ -1,9 +1,9 @@
 mod support;
 
-use glutin::event::{Event, WindowEvent};
-use glutin::event_loop::{ControlFlow, EventLoop};
-use glutin::window::WindowBuilder;
-use glutin::{ContextBuilder, ContextSupports, WindowSurface};
+use winit::event::{Event, WindowEvent};
+use winit::event_loop::{ControlFlow, EventLoop};
+use winit::window::WindowBuilder;
+use glutin::config::ConfigBuilder;
 
 fn main() {
     env_logger::init();
