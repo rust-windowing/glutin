@@ -3,7 +3,7 @@ name: Publish
 on:
   push:
     branches: [master]
-    paths: "Cargo.toml"
+    paths: "**/Cargo.toml"
 
 jobs:
   Publish:
