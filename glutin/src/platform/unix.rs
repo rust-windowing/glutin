@@ -42,9 +42,9 @@ pub struct ConfigPlatformAttributes {
 }
 
 pub trait ConfigPlatformAttributesExt {
-    fn with_x11_visual_xid(mut self, xid: Option<raw::c_ulong>) -> Self;
-    fn with_x11_transparency(mut self, trans: Option<bool>) -> Self;
-    fn with_backing_api(mut self, backing_api: BackingApi) -> Self;
+    fn with_x11_visual_xid(self, xid: Option<raw::c_ulong>) -> Self;
+    fn with_x11_transparency(self, trans: Option<bool>) -> Self;
+    fn with_backing_api(self, backing_api: BackingApi) -> Self;
 }
 
 impl ConfigPlatformAttributesExt for ConfigBuilder {

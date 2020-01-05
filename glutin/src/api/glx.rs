@@ -16,7 +16,7 @@ use self::make_current_guard::MakeCurrentGuard;
 use crate::config::{Api, ConfigAttribs, ConfigBuilder, ReleaseBehavior, Version};
 use crate::context::{ContextBuilderWrapper, GlProfile, Robustness};
 
-use glutin_interface::inputs::{
+use glutin_interface::{
     NativeDisplay, NativeWindow, NativeWindowBuilder, RawDisplay, RawWindow,
 };
 use glutin_x11_sym::Display as X11Display;

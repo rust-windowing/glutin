@@ -1,6 +1,6 @@
 use crate::platform_impl;
 
-use glutin_interface::inputs::NativeDisplay;
+use glutin_interface::NativeDisplay;
 use winit_types::error::{Error, ErrorType};
 
 use std::ops::Range;
@@ -54,8 +54,8 @@ impl Default for ReleaseBehavior {
 /// drivers that implement `EXT_swap_control_tear`.
 ///
 /// Please note that your application's desired swap interval may be overridden
-/// by external, driver-specific configuration, which means that you can't know 
-/// in advance whether `swap_buffers`/`swap_buffers_with_damage` will block or 
+/// by external, driver-specific configuration, which means that you can't know
+/// in advance whether `swap_buffers`/`swap_buffers_with_damage` will block or
 /// not.
 #[derive(Debug, Clone, Copy)]
 pub enum SwapInterval {

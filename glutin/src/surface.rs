@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::platform_impl;
 
-use glutin_interface::inputs::{
+use glutin_interface::{
     NativePixmap, NativePixmapBuilder, NativeWindow, NativeWindowBuilder,
 };
 use winit_types::dpi;

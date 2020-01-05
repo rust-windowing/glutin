@@ -6,7 +6,7 @@ use crate::platform::unix::BackingApi;
 use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
 use crate::utils::NoPrint;
 
-use glutin_interface::inputs::{
+use glutin_interface::{
     NativeDisplay, NativePixmap, NativePixmapBuilder, NativeWindow, NativeWindowBuilder, RawWindow,
 };
 use wayland_client::egl as wegl;

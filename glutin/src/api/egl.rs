@@ -22,7 +22,7 @@ use crate::config::{
 use crate::context::{ContextBuilderWrapper, Robustness};
 use crate::surface::{PBuffer, Pixmap, SurfaceType, SurfaceTypeTrait, Window};
 
-use glutin_interface::inputs::{NativeDisplay, RawDisplay};
+use glutin_interface::{NativeDisplay, RawDisplay};
 use parking_lot::Mutex;
 #[cfg(any(
     target_os = "android",

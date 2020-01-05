@@ -14,7 +14,7 @@ use crate::context::ContextBuilderWrapper;
 use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
 pub use crate::platform::unix::ConfigPlatformAttributes;
 
-use glutin_interface::inputs::{
+use glutin_interface::{
     NativeDisplay, NativePixmap, NativePixmapBuilder, NativeWindow, NativeWindowBuilder, RawDisplay,
 };
 use winit_types::dpi;

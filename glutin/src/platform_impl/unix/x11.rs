@@ -5,7 +5,7 @@ use crate::context::ContextBuilderWrapper;
 use crate::platform::unix::BackingApi;
 use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
 
-use glutin_interface::inputs::{
+use glutin_interface::{
     NativeDisplay, NativePixmap, NativePixmapBuilder, NativeWindow, NativeWindowBuilder,
     RawDisplay, RawWindow,
 };
