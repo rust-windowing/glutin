@@ -13,9 +13,8 @@ mod make_current_guard;
 pub use self::glx::{Glx, GlxExtra};
 use self::make_current_guard::MakeCurrentGuard;
 
-use crate::config::{Api, ReleaseBehavior, Version};
+use crate::config::{Api, ConfigAttribs, ConfigBuilder, ReleaseBehavior, Version};
 use crate::context::{ContextBuilderWrapper, GlProfile, Robustness};
-use crate::display::DisplayBuilder;
 
 use glutin_interface::inputs::{
     NativeDisplay, NativeWindow, NativeWindowBuilder, RawDisplay, RawWindow,
@@ -26,6 +25,7 @@ use winit_types::error::{Error, ErrorType};
 use winit_types::platform::OsError;
 
 use std::ffi::{CStr, CString};
+use std::ops::Deref;
 use std::os::raw;
 use std::sync::Arc;
 
@@ -39,17 +39,92 @@ lazy_static! {
 
 #[derive(Debug)]
 pub struct Display {
-    native_display: Arc<X11Display>,
+    display: Arc<X11Display>,
+    screen: raw::c_int,
+    extensions: String,
 }
 
 impl Display {
-    pub fn new<ND: NativeDisplay>(db: DisplayBuilder, nd: &ND) -> Result<Self, Error> {
-        let native_display = match nd.display() {
-            RawDisplay::Xlib { display, .. } => X11Display::from_raw(display),
-            _ => unreachable!(),
-        };
+    #[inline]
+    pub fn new(screen: raw::c_int, display: &Arc<X11Display>) -> Result<Arc<Self>, Error> {
+        let glx = GLX.as_ref().unwrap();
+        // This is completely ridiculous, but VirtualBox's OpenGL driver needs
+        // some call handled by *it* (i.e. not Mesa) to occur before
+        // anything else can happen. That is because VirtualBox's OpenGL
+        // driver is going to apply binary patches to Mesa in the DLL
+        // constructor and until it's loaded it won't have a chance to do that.
+        //
+        // The easiest way to do this is to just call `glXQueryVersion()` before
+        // doing anything else. See: https://www.virtualbox.org/ticket/8293
+        let (mut major, mut minor) = (0, 0);
+        unsafe {
+            glx.QueryVersion(***display as *mut _, &mut major, &mut minor);
+        }
 
-        Ok(Display { native_display })
+        // loading the list of extensions
+        let extensions = Self::load_extensions(display, screen)?;
+
+        Ok(Arc::new(Display {
+            display: Arc::clone(display),
+            screen,
+            extensions,
+        }))
+    }
+
+    #[inline]
+    fn load_extensions(disp: &Arc<X11Display>, screen: raw::c_int) -> Result<String, Error> {
+        unsafe {
+            let glx = GLX.as_ref().unwrap();
+            let extensions = glx.QueryExtensionsString(***disp as *mut _, screen);
+            if extensions.is_null() {
+                return Err(make_oserror!(OsError::Misc(
+                    "`glXQueryExtensionsString` found no glX extensions".to_string(),
+                )));
+            }
+            let extensions = CStr::from_ptr(extensions).to_bytes().to_vec();
+            Ok(String::from_utf8(extensions).unwrap())
+        }
+    }
+}
+
+impl Deref for Display {
+    type Target = Arc<X11Display>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.display
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Config {
+    display: Arc<Display>,
+    version: (Api, Version),
+    config_id: ffi::glx::types::GLXFBConfig,
+}
+
+impl Config {
+    #[inline]
+    pub fn new<F>(
+        cb: &ConfigBuilder,
+        screen: raw::c_int,
+        disp: &Arc<X11Display>,
+        conf_selector: F,
+    ) -> Result<Vec<(ConfigAttribs, Config)>, Error>
+    where
+        F: FnMut(
+            Vec<ffi::glx::types::GLXFBConfig>,
+        ) -> Vec<Result<ffi::glx::types::GLXFBConfig, Error>>,
+    {
+    }
+
+    #[inline]
+    pub fn display(&self) -> &Arc<X11Display> {
+        &*self.display
+    }
+
+    #[inline]
+    pub fn screen(&self) -> raw::c_int {
+        self.display.screen
     }
 }
 
@@ -70,23 +145,6 @@ impl Display {
 //        surface_type: SurfaceType,
 //        transparent: Option<bool>,
 //    ) -> Result<ContextPrototype<'a>, Error> {
-//        let glx = GLX.as_ref().unwrap();
-//        // This is completely ridiculous, but VirtualBox's OpenGL driver needs
-//        // some call handled by *it* (i.e. not Mesa) to occur before
-//        // anything else can happen. That is because VirtualBox's OpenGL
-//        // driver is going to apply binary patches to Mesa in the DLL
-//        // constructor and until it's loaded it won't have a chance to do that.
-//        //
-//        // The easiest way to do this is to just call `glXQueryVersion()` before
-//        // doing anything else. See: https://www.virtualbox.org/ticket/8293
-//        let (mut major, mut minor) = (0, 0);
-//        unsafe {
-//            glx.QueryVersion(xconn.display as *mut _, &mut major, &mut minor);
-//        }
-//
-//        // loading the list of extensions
-//        let extensions = load_extensions(&xconn, screen_id)?;
-//
 //        // finding the pixel format we want
 //        let (fb_config, pixel_format, visual_infos) = unsafe {
 //            choose_fbconfig(
@@ -820,21 +878,3 @@ impl Display {
 //    extensions.split(' ').find(|&s| s == ext).is_some()
 //}
 //
-//fn load_extensions(
-//    xconn: &Arc<XConnection>,
-//    screen_id: raw::c_int,
-//) -> Result<String, Error> {
-//    unsafe {
-//        let glx = GLX.as_ref().unwrap();
-//        let extensions =
-//            glx.QueryExtensionsString(xconn.display as *mut _, screen_id);
-//        if extensions.is_null() {
-//            return Err(make_oserror!(OsError::Misc(
-//                "`glXQueryExtensionsString` found no glX extensions"
-//                    .to_string(),
-//            )));
-//        }
-//        let extensions = CStr::from_ptr(extensions).to_bytes().to_vec();
-//        Ok(String::from_utf8(extensions).unwrap())
-//    }
-//}

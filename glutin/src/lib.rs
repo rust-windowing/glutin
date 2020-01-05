@@ -113,7 +113,6 @@ pub mod platform;
 mod api;
 mod config;
 mod context;
-mod display;
 mod platform_impl;
 mod surface;
 mod utils;

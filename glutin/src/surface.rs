@@ -1,5 +1,4 @@
 use crate::config::Config;
-use crate::display::Display;
 use crate::platform_impl;
 
 use glutin_interface::inputs::{
@@ -65,53 +64,39 @@ impl<T: SurfaceTypeTrait> Surface<T> {
 impl Surface<Pixmap> {
     #[inline]
     pub unsafe fn new<NPB: NativePixmapBuilder>(
-        disp: &Display,
         conf: &Config,
         npb: NPB,
     ) -> Result<(NPB::Pixmap, Self), Error> {
-        platform_impl::Surface::<Pixmap>::new(&disp.0, conf.as_ref(), npb)
+        platform_impl::Surface::<Pixmap>::new(conf.as_ref(), npb)
             .map(|(pix, surf)| (pix, Surface(surf)))
     }
 
     #[inline]
-    pub unsafe fn new_existing<NP: NativePixmap>(
-        disp: &Display,
-        conf: &Config,
-        np: &NP,
-    ) -> Result<Self, Error> {
-        platform_impl::Surface::<Pixmap>::new_existing(&disp.0, conf.as_ref(), np).map(Surface)
+    pub unsafe fn new_existing<NP: NativePixmap>(conf: &Config, np: &NP) -> Result<Self, Error> {
+        platform_impl::Surface::<Pixmap>::new_existing(conf.as_ref(), np).map(Surface)
     }
 }
 
 impl Surface<PBuffer> {
     #[inline]
-    pub unsafe fn new(
-        disp: &Display,
-        conf: &Config,
-        size: dpi::PhysicalSize,
-    ) -> Result<Self, Error> {
-        platform_impl::Surface::<PBuffer>::new(&disp.0, conf.as_ref(), size).map(Surface)
+    pub unsafe fn new(conf: &Config, size: dpi::PhysicalSize) -> Result<Self, Error> {
+        platform_impl::Surface::<PBuffer>::new(conf.as_ref(), size).map(Surface)
     }
 }
 
 impl Surface<Window> {
     #[inline]
     pub unsafe fn new<NWB: NativeWindowBuilder>(
-        disp: &Display,
         conf: &Config,
         nwb: NWB,
     ) -> Result<(NWB::Window, Self), Error> {
-        platform_impl::Surface::<Window>::new(&disp.0, conf.as_ref(), nwb)
+        platform_impl::Surface::<Window>::new(conf.as_ref(), nwb)
             .map(|(win, surf)| (win, Surface(surf)))
     }
 
     #[inline]
-    pub unsafe fn new_existing<NW: NativeWindow>(
-        disp: &Display,
-        conf: &Config,
-        nw: &NW,
-    ) -> Result<Self, Error> {
-        platform_impl::Surface::<Window>::new_existing(&disp.0, conf.as_ref(), nw).map(Surface)
+    pub unsafe fn new_existing<NW: NativeWindow>(conf: &Config, nw: &NW) -> Result<Self, Error> {
+        platform_impl::Surface::<Window>::new_existing(conf.as_ref(), nw).map(Surface)
     }
 
     #[inline]
@@ -145,5 +130,3 @@ impl Surface<Window> {
         self.0.update_after_resize(size);
     }
 }
-
-// FIXME: Raw handles how?

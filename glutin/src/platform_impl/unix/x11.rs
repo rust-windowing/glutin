@@ -2,7 +2,6 @@ use crate::api::egl::{self, EGL};
 use crate::api::glx::{self, ffi, GLX};
 use crate::config::{Api, ConfigAttribs, ConfigBuilder, ConfigWrapper};
 use crate::context::ContextBuilderWrapper;
-use crate::display::DisplayBuilder;
 use crate::platform_impl::BackingApi;
 use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
 
@@ -10,7 +9,7 @@ use glutin_interface::inputs::{
     NativeDisplay, NativePixmap, NativePixmapBuilder, NativeWindow, NativeWindowBuilder,
     RawDisplay, RawWindow,
 };
-use glutin_x11_sym::Display as X11Display;
+use glutin_x11_sym::Display;
 use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
 use winit_types::platform::OsError;
@@ -23,141 +22,146 @@ use std::sync::Arc;
 pub mod utils;
 
 #[derive(Debug)]
-pub struct Display {
-    native_display: Arc<X11Display>,
-    display: BackendDisplay,
-    screen: Option<raw::c_int>,
+pub enum Config {
+    Egl(egl::Config, Arc<Display>, raw::c_int),
+    Glx(glx::Config),
 }
 
-#[derive(Debug)]
-pub enum BackendDisplay {
-    Egl(egl::Display),
-    Glx(glx::Display),
-}
-
-impl Display {
-    pub fn new<ND: NativeDisplay>(db: DisplayBuilder, nd: &ND) -> Result<Self, Error> {
-        let (native_display, screen) = match nd.display() {
+impl Config {
+    pub fn new<ND: NativeDisplay>(
+        cb: &ConfigBuilder,
+        nd: &ND,
+    ) -> Result<Vec<(ConfigAttribs, Config)>, Error> {
+        let xlib = syms!(XLIB);
+        let (disp, screen) = match nd.display() {
             RawDisplay::Xlib {
                 display, screen, ..
-            } => (X11Display::from_raw(display), screen),
+            } => (Display::from_raw(display), screen),
             _ => unreachable!(),
         };
+        let screen = unsafe { screen.unwrap_or_else(|| (xlib.XDefaultScreen)(**disp)) };
 
-        let display = BackendDisplay::new(db, nd)?;
-        Ok(Display {
-            display,
-            native_display,
-            screen,
-        })
-    }
-}
-
-impl BackendDisplay {
-    fn new<ND: NativeDisplay>(db: DisplayBuilder, nd: &ND) -> Result<Self, Error> {
-        let backing_api = db.plat_attr.backing_api;
-        let disp = match backing_api {
-            BackingApi::Glx | BackingApi::GlxThenEgl => {
-                glx::Display::new(db.clone(), nd).map(BackendDisplay::Glx)
-            }
-            BackingApi::Egl | BackingApi::EglThenGlx => {
-                egl::Display::new(db.clone(), nd).map(BackendDisplay::Egl)
-            }
+        let conf = match cb.plat_attr.backing_api {
+            BackingApi::Glx | BackingApi::GlxThenEgl => Self::new_glx(cb, screen, &disp),
+            BackingApi::Egl | BackingApi::EglThenGlx => Self::new_egl(cb, nd, screen, &disp),
         };
 
-        match (&disp, backing_api) {
-            (_, BackingApi::Glx) | (_, BackingApi::Egl) | (Ok(_), _) => return disp,
+        match (&conf, cb.plat_attr.backing_api) {
+            (_, BackingApi::Glx) | (_, BackingApi::Egl) | (Ok(_), _) => return conf,
             _ => (),
         }
 
-        let disp2 = match backing_api {
-            BackingApi::EglThenGlx => glx::Display::new(db.clone(), nd).map(BackendDisplay::Glx),
-            BackingApi::GlxThenEgl => egl::Display::new(db, nd).map(BackendDisplay::Egl),
+        let conf2 = match cb.plat_attr.backing_api {
+            BackingApi::EglThenGlx => Self::new_glx(cb, screen, &disp),
+            BackingApi::GlxThenEgl => Self::new_egl(cb, nd, screen, &disp),
             _ => unreachable!(),
         };
 
-        match (disp, disp2) {
+        match (conf, conf2) {
             (Ok(_), _) => unreachable!(),
-            (_, Ok(disp2)) => Ok(disp2),
+            (_, Ok(conf2)) => Ok(conf2),
             (Err(mut err1), Err(err2)) => Err({
                 err1.append(err2);
                 err1
             }),
         }
     }
-}
 
-#[derive(Debug)]
-pub enum Config {
-    Egl(egl::Config),
-    //Glx(glx::Display),
-}
-
-impl Config {
     #[inline]
-    pub fn new(disp: &Display, cb: ConfigBuilder) -> Result<Vec<(ConfigAttribs, Self)>, Error> {
-        let plat_attr = cb.plat_attr.clone();
-        Ok(match disp.display {
-            BackendDisplay::Egl(ref bdisp) => {
-                let configs = egl::Config::new(bdisp, cb, |confs| {
-                    select_configs(
-                        &disp.native_display,
-                        plat_attr.x11_transparency,
-                        plat_attr.x11_visual_xid,
-                        confs,
-                        |config_id| {
-                            let xid =
-                                egl::get_native_visual_id(***bdisp, *config_id)? as ffi::VisualID;
-                            utils::get_visual_info_from_xid(&disp.native_display, xid)
-                                .map(|vis| (vis, xid))
-                        },
-                    )
-                    .into_iter()
-                    .map(|config| config.map(|(conf, _)| conf))
-                    .collect()
-                })?;
-                configs
-                    .into_iter()
-                    .map(|(attribs, config)| (attribs, Config::Egl(config)))
-                    .collect()
-            }
-        })
+    fn new_glx(
+        cb: &ConfigBuilder,
+        screen: raw::c_int,
+        disp: &Arc<Display>,
+    ) -> Result<Vec<(ConfigAttribs, Config)>, Error> {
+        let configs = glx::Config::new(cb, screen, disp, |confs| {
+            select_configs(
+                disp,
+                cb.plat_attr.x11_transparency,
+                cb.plat_attr.x11_visual_xid,
+                confs,
+                |config_id| unimplemented!(),
+            )
+            .into_iter()
+            .map(|config| config.map(|(conf, _)| conf))
+            .collect()
+        })?;
+        Ok(configs
+            .into_iter()
+            .map(|(attribs, config)| (attribs, Config::Glx(config)))
+            .collect())
     }
 
     #[inline]
-    pub fn get_visual_info(
-        &self,
-        native_display: &Arc<X11Display>,
-    ) -> Result<ffi::XVisualInfo, Error> {
+    fn new_egl<ND: NativeDisplay>(
+        cb: &ConfigBuilder,
+        nd: &ND,
+        screen: raw::c_int,
+        disp: &Arc<Display>,
+    ) -> Result<Vec<(ConfigAttribs, Config)>, Error> {
+        let configs = egl::Config::new(cb, nd, |confs, egl_disp| {
+            select_configs(
+                disp,
+                cb.plat_attr.x11_transparency,
+                cb.plat_attr.x11_visual_xid,
+                confs,
+                |config_id| {
+                    let xid = egl::get_native_visual_id(***egl_disp, *config_id)? as ffi::VisualID;
+                    utils::get_visual_info_from_xid(disp, xid).map(|vis| (vis, xid))
+                },
+            )
+            .into_iter()
+            .map(|config| config.map(|(conf, _)| conf))
+            .collect()
+        })?;
+        Ok(configs
+            .into_iter()
+            .map(|(attribs, config)| (attribs, Config::Egl(config, Arc::clone(disp), screen)))
+            .collect())
+    }
+
+    #[inline]
+    fn get_visual_info(&self) -> Result<ffi::XVisualInfo, Error> {
         match self {
-            Config::Egl(conf) => utils::get_visual_info_from_xid(
-                native_display,
-                conf.get_native_visual_id()? as ffi::VisualID,
-            ),
+            Config::Egl(conf, disp, _) => {
+                utils::get_visual_info_from_xid(disp, conf.get_native_visual_id()? as ffi::VisualID)
+            }
+        }
+    }
+
+    #[inline]
+    fn display(&self) -> &Arc<Display> {
+        match self {
+            Config::Egl(_, disp, _) => disp,
+            Config::Glx(conf) => conf.display(),
+        }
+    }
+
+    #[inline]
+    fn screen(&self) -> raw::c_int {
+        match self {
+            Config::Egl(_, _, screen) => *screen,
+            Config::Glx(conf) => conf.screen(),
         }
     }
 }
 
 #[derive(Debug)]
 pub enum Context {
-    Egl(egl::Context),
+    Egl(egl::Context, Arc<Display>, raw::c_int),
     //Glx(glx::Display),
 }
 
 impl Context {
     #[inline]
     pub(crate) fn new(
-        disp: &Display,
         cb: ContextBuilderWrapper<&Context>,
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
     ) -> Result<Self, Error> {
-        match (&disp.display, &conf.config) {
-            (BackendDisplay::Egl(disp), Config::Egl(config)) => egl::Context::new(
-                disp,
-                Context::inner_cb_egl(cb)?,
-                conf.map_config(|_| config),
-            )
-            .map(Context::Egl),
+        match &conf.config {
+            Config::Egl(config, disp, screen) => {
+                egl::Context::new(Context::inner_cb_egl(cb)?, conf.map_config(|_| config))
+                    .map(|ctx| Context::Egl(ctx, Arc::clone(disp), *screen))
+            }
             //(BackendDisplay::Glx(disp), Config::Glx(config)) => {
             //    glx::Context::new(
             //        disp,
@@ -166,9 +170,6 @@ impl Context {
             //    )
             //    .map(Context::Glx)
             //},
-            (_, _) => Err(make_error!(ErrorType::BadApiUsage(
-                "Incompatible display and config backends.".to_string()
-            ))),
         }
     }
 
@@ -176,7 +177,7 @@ impl Context {
         cb: ContextBuilderWrapper<&Context>,
     ) -> Result<ContextBuilderWrapper<&egl::Context>, Error> {
         match cb.sharing {
-            Some(Context::Egl(_)) | None => (),
+            Some(Context::Egl(_, _, _)) | None => (),
             _ => {
                 return Err(make_error!(ErrorType::BadApiUsage(
                     "Cannot share a EGL context with a non-EGL context".to_string()
@@ -185,7 +186,7 @@ impl Context {
         }
 
         Ok(cb.map_sharing(|ctx| match ctx {
-            Context::Egl(ctx) => ctx,
+            Context::Egl(ctx, _, _) => ctx,
             _ => unreachable!(),
         }))
     }
@@ -193,7 +194,7 @@ impl Context {
     #[inline]
     pub unsafe fn make_current_surfaceless(&self) -> Result<(), Error> {
         match self {
-            Context::Egl(ref ctx) => ctx.make_current_surfaceless(),
+            Context::Egl(ref ctx, _, _) => ctx.make_current_surfaceless(),
             //Context::Glx(ref ctx) => ctx.make_current_surfaceless(),
         }
     }
@@ -201,7 +202,7 @@ impl Context {
     #[inline]
     pub unsafe fn make_current<T: SurfaceTypeTrait>(&self, surf: &Surface<T>) -> Result<(), Error> {
         match (self, surf) {
-            (Context::Egl(ref ctx), Surface::Egl(ref surf)) => ctx.make_current(surf),
+            (Context::Egl(ref ctx, _, _), Surface::Egl(ref surf, _, _)) => ctx.make_current(surf),
             //(Context::Glx(ref ctx), Surface::Glx(ref surf)) => ctx.make_current(surf),
             (_, _) => Err(make_error!(ErrorType::BadApiUsage(
                 "Incompatible context and surface backends.".to_string()
@@ -212,7 +213,7 @@ impl Context {
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), Error> {
         match self {
-            Context::Egl(ref ctx) => ctx.make_not_current(),
+            Context::Egl(ref ctx, _, _) => ctx.make_not_current(),
             //Context::Glx(ref ctx) => ctx.make_not_current(),
         }
     }
@@ -220,7 +221,7 @@ impl Context {
     #[inline]
     pub fn is_current(&self) -> bool {
         match self {
-            Context::Egl(ref ctx) => ctx.is_current(),
+            Context::Egl(ref ctx, _, _) => ctx.is_current(),
             //Context::Glx(ref ctx) => ctx.is_current(),
         }
     }
@@ -228,7 +229,7 @@ impl Context {
     #[inline]
     pub fn get_api(&self) -> Api {
         match self {
-            Context::Egl(ref ctx) => ctx.get_api(),
+            Context::Egl(ref ctx, _, _) => ctx.get_api(),
             //Context::Glx(ref ctx) => ctx.get_api(),
         }
     }
@@ -236,7 +237,7 @@ impl Context {
     #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const raw::c_void {
         match self {
-            Context::Egl(ref ctx) => ctx.get_proc_address(addr),
+            Context::Egl(ref ctx, _, _) => ctx.get_proc_address(addr),
             //Context::Glx(ref ctx) => ctx.get_proc_address(addr),
         }
     }
@@ -244,7 +245,9 @@ impl Context {
     #[inline]
     pub fn get_config(&self) -> ConfigWrapper<Config, ConfigAttribs> {
         match self {
-            Context::Egl(ref ctx) => ctx.get_config().map_config(Config::Egl),
+            Context::Egl(ref ctx, disp, screen) => ctx
+                .get_config()
+                .map_config(|conf| Config::Egl(conf, Arc::clone(disp), *screen)),
             //Context::Glx(ref ctx) => ctx.get_config().map_config(Config::Glx),
         }
     }
@@ -252,7 +255,7 @@ impl Context {
 
 #[derive(Debug)]
 pub enum Surface<T: SurfaceTypeTrait> {
-    Egl(egl::Surface<T>),
+    Egl(egl::Surface<T>, Arc<Display>, raw::c_int),
     //Glx(glx::Display),
 }
 
@@ -260,7 +263,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     #[inline]
     pub fn is_current(&self) -> bool {
         match self {
-            Surface::Egl(ref surf) => surf.is_current(),
+            Surface::Egl(ref surf, _, _) => surf.is_current(),
             //Surface::Glx(ref surf) => surf.is_current(),
         }
     }
@@ -268,7 +271,9 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     #[inline]
     pub fn get_config(&self) -> ConfigWrapper<Config, ConfigAttribs> {
         match self {
-            Surface::Egl(ref ctx) => ctx.get_config().map_config(Config::Egl),
+            Surface::Egl(ref surf, disp, screen) => surf
+                .get_config()
+                .map_config(|conf| Config::Egl(conf, Arc::clone(disp), *screen)),
             //Context::Glx(ref ctx) => ctx.get_config().map_config(Config::Glx),
         }
     }
@@ -276,7 +281,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), Error> {
         match self {
-            Surface::Egl(ref surf) => surf.make_not_current(),
+            Surface::Egl(ref surf, _, _) => surf.make_not_current(),
             //Surface::Glx(ref surf) => surf.make_not_current(),
         }
     }
@@ -285,14 +290,13 @@ impl<T: SurfaceTypeTrait> Surface<T> {
 impl Surface<PBuffer> {
     #[inline]
     pub fn new(
-        disp: &Display,
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         size: dpi::PhysicalSize,
     ) -> Result<Self, Error> {
-        match (&disp.display, conf.config) {
-            (BackendDisplay::Egl(disp), Config::Egl(config)) => {
-                egl::Surface::<PBuffer>::new(disp, conf.map_config(|_| config), size)
-                    .map(Surface::Egl)
+        match conf.config {
+            Config::Egl(config, disp, screen) => {
+                egl::Surface::<PBuffer>::new(conf.map_config(|_| config), size)
+                    .map(|surf| Surface::Egl(surf, Arc::clone(&disp), *screen))
             }
             //(BackendDisplay::Glx(disp), Config::Glx(config)) => {
             //    glx::Surface::<PBuffer>::new(
@@ -302,9 +306,6 @@ impl Surface<PBuffer> {
             //    )
             //    .map(Surface::Glx)
             //},
-            (_, _) => Err(make_error!(ErrorType::BadApiUsage(
-                "Incompatible display and config backends.".to_string()
-            ))),
         }
     }
 }
@@ -312,7 +313,6 @@ impl Surface<PBuffer> {
 impl Surface<Pixmap> {
     #[inline]
     pub fn new<NPB: NativePixmapBuilder>(
-        disp: &Display,
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         npb: NPB,
     ) -> Result<(NPB::Pixmap, Self), Error> {
@@ -342,7 +342,6 @@ impl Surface<Pixmap> {
 
     #[inline]
     pub fn new_existing<NP: NativePixmap>(
-        disp: &Display,
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         np: &NP,
     ) -> Result<Self, Error> {
@@ -374,23 +373,18 @@ impl Surface<Pixmap> {
 impl Surface<Window> {
     #[inline]
     pub fn new<NWB: NativeWindowBuilder>(
-        disp: &Display,
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         nwb: NWB,
     ) -> Result<(NWB::Window, Self), Error> {
         let xlib = syms!(XLIB);
         // Get the screen_id for the window being built.
-        let screen = disp
-            .screen
-            .unwrap_or(unsafe { (xlib.XDefaultScreen)(**disp.native_display) });
-        let visual_info = conf.config.get_visual_info(&disp.native_display);
-        let nw = nwb.build_x11(&visual_info as *const _ as *const _, screen)?;
-        Self::new_existing(disp, conf, &nw).map(|surf| (nw, surf))
+        let visual_info = conf.config.get_visual_info();
+        let nw = nwb.build_x11(&visual_info as *const _ as *const _, conf.config.screen())?;
+        Self::new_existing(conf, &nw).map(|surf| (nw, surf))
     }
 
     #[inline]
     pub fn new_existing<NW: NativeWindow>(
-        disp: &Display,
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         nw: &NW,
     ) -> Result<Self, Error> {
@@ -401,18 +395,18 @@ impl Surface<Window> {
             _ => unreachable!(),
         };
 
-        let visual_info = conf.config.get_visual_info(&disp.native_display)?;
+        let visual_info = conf.config.get_visual_info()?;
         let window_attrs = {
             let mut window_attrs = unsafe { std::mem::zeroed() };
             let window_attr_error = make_oserror!(OsError::Misc(
                 "Glutin failed to query for a window's window attributes.".to_string()
             ));
-            disp.native_display.check_errors().map_err(|mut err| {
+            conf.config.display().check_errors().map_err(|mut err| {
                 err.append(window_attr_error.clone());
                 err
             })?;
             if unsafe {
-                (xlib.XGetWindowAttributes)(**disp.native_display, surface, &mut window_attrs)
+                (xlib.XGetWindowAttributes)(***conf.config.display(), surface, &mut window_attrs)
             } == 0
             {
                 return Err(window_attr_error);
@@ -436,10 +430,10 @@ impl Surface<Window> {
         assemble_non_match_error("visual", visual_info.visual, window_attrs.visual)?;
         assemble_non_match_error("depth", visual_info.depth, window_attrs.depth)?;
 
-        match (&disp.display, &conf.config) {
-            (BackendDisplay::Egl(disp), Config::Egl(config)) => {
-                egl::Surface::<Window>::new(disp, conf.map_config(|_| config), surface as *const _)
-                    .map(|surf| Surface::Egl(surf))
+        match &conf.config {
+            Config::Egl(config, disp, screen) => {
+                egl::Surface::<Window>::new(conf.map_config(|_| config), surface as *const _)
+                    .map(|surf| Surface::Egl(surf, Arc::clone(disp), *screen))
             }
             //(Display::Glx(disp), Config::Glx(config)) => {
             //    glx::Surface::<Window>::new(
@@ -449,16 +443,13 @@ impl Surface<Window> {
             //    )
             //    .map(|surf| (win, Surface::Glx(surf)))
             //},
-            (_, _) => Err(make_error!(ErrorType::BadApiUsage(
-                "Incompatible display and config backends.".to_string()
-            ))),
         }
     }
 
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), Error> {
         match self {
-            Surface::Egl(ref surf) => surf.swap_buffers(),
+            Surface::Egl(ref surf, _, _) => surf.swap_buffers(),
             //Surface::Glx(ref surf) => surf.swap_buffers(),
         }
     }
@@ -466,7 +457,7 @@ impl Surface<Window> {
     #[inline]
     pub fn swap_buffers_with_damage(&self, rects: &[dpi::Rect]) -> Result<(), Error> {
         match self {
-            Surface::Egl(ref surf) => surf.swap_buffers_with_damage(rects),
+            Surface::Egl(ref surf, _, _) => surf.swap_buffers_with_damage(rects),
             //Surface::Glx(ref surf) => surf.swap_buffers_with_damage(rects),
         }
     }
@@ -479,7 +470,7 @@ impl Surface<Window> {
 // https://bugs.freedesktop.org/show_bug.cgi?id=67676
 // I'm working on a patch.
 pub fn select_configs<'a, T, I: IntoIterator<Item = T>, F>(
-    native_disp: &Arc<X11Display>,
+    disp: &Arc<Display>,
     target_transparency: Option<bool>,
     target_visual_xid: Option<raw::c_ulong>,
     conf_ids: I,
@@ -496,7 +487,7 @@ where
             let (visual_infos, xid) = convert_to_xvisualinfo(&conf_id)?;
 
             match utils::examine_visual_info(
-                native_disp,
+                disp,
                 visual_infos,
                 target_transparency,
                 target_visual_xid,

@@ -1,6 +1,5 @@
 use crate::config::Api;
 use crate::config::Config;
-use crate::display::Display;
 use crate::platform_impl;
 use crate::surface::{Surface, SurfaceTypeTrait};
 
@@ -56,9 +55,9 @@ impl Context {
 
 impl<'a> ContextBuilder<'a> {
     #[inline]
-    pub fn build(self, disp: &Display, conf: &Config) -> Result<Context, Error> {
+    pub fn build(self, conf: &Config) -> Result<Context, Error> {
         let cb = self.map_sharing(|ctx| &ctx.0);
-        platform_impl::Context::new(&disp.0, cb, conf.as_ref()).map(Context)
+        platform_impl::Context::new(cb, conf.as_ref()).map(Context)
     }
 }
 
@@ -234,8 +233,7 @@ pub enum Robustness {
 
     /// Everything is checked to avoid any crash. If a problem occurs, the
     /// context will enter a "context lost" state. It must then be
-    /// recreated. For the moment, glutin doesn't provide a way to recreate
-    /// a context with the same window :-/
+    /// recreated.
     RobustLoseContextOnReset,
 
     /// Same as [`RobustLoseContextOnReset`] but the context creation doesn't
@@ -256,5 +254,3 @@ pub enum GlProfile {
     /// Include all the future-compatible functions and definitions.
     Core,
 }
-
-// FIXME: Raw handles how?

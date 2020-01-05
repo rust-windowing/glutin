@@ -1,13 +1,9 @@
 #![cfg(target_os = "android")]
 
-use crate::api::egl::{
-    Context as EglContext, NativeDisplay, SurfaceType as EglSurfaceType,
-};
+use crate::api::egl::{Context as EglContext, NativeDisplay, SurfaceType as EglSurfaceType};
 use crate::platform::android::EventLoopExtAndroid;
 use crate::CreationError::{self, OsError};
-use crate::{
-    Api, ContextError, GlAttributes, PixelFormat, PixelFormatRequirements, Rect,
-};
+use crate::{Api, ContextError, GlAttributes, PixelFormat, PixelFormatRequirements, Rect};
 
 use glutin_egl_sys as ffi;
 use parking_lot::Mutex;
@@ -177,10 +173,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn swap_buffers_with_damage(
-        &self,
-        rects: &[Rect],
-    ) -> Result<(), ContextError> {
+    pub fn swap_buffers_with_damage(&self, rects: &[Rect]) -> Result<(), ContextError> {
         if let Some(ref stopped) = self.0.stopped {
             let stopped = stopped.lock();
             if *stopped {

@@ -1,6 +1,6 @@
-use crate::display::Display;
 use crate::platform_impl;
 
+use glutin_interface::inputs::NativeDisplay;
 use winit_types::error::{Error, ErrorType};
 
 use std::ops::Range;
@@ -420,11 +420,11 @@ impl ConfigBuilder {
     }
 
     #[inline]
-    pub fn build(self, disp: &Display) -> Result<Vec<Config>, Error> {
+    pub fn build<ND: NativeDisplay>(self, nd: &ND) -> Result<Vec<Config>, Error> {
         self.desired_swap_interval
             .unwrap_or(SwapInterval::DontWait)
             .validate()?;
-        platform_impl::Config::new(&disp.0, self).map(|configs| {
+        platform_impl::Config::new(&self, nd).map(|configs| {
             configs
                 .into_iter()
                 .map(|(attribs, config)| Config { attribs, config })
@@ -432,5 +432,3 @@ impl ConfigBuilder {
         })
     }
 }
-
-// FIXME: Raw handles how?

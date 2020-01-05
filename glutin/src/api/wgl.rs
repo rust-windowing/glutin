@@ -3,8 +3,8 @@
 mod make_current_guard;
 
 use crate::{
-    Api, ContextError, CreationError, GlAttributes, GlProfile, GlRequest,
-    PixelFormat, PixelFormatRequirements, ReleaseBehavior, Robustness,
+    Api, ContextError, CreationError, GlAttributes, GlProfile, GlRequest, PixelFormat,
+    PixelFormatRequirements, ReleaseBehavior, Robustness,
 };
 
 use self::make_current_guard::CurrentContextGuard;
@@ -114,13 +114,8 @@ impl Context {
         let mut pixel_format_id = GetPixelFormat(hdc);
         if pixel_format_id == 0 {
             let id = if use_arb_for_pixel_format {
-                choose_arb_pixel_format_id(
-                    &extra_functions,
-                    &extensions,
-                    hdc,
-                    pf_reqs,
-                )
-                .map_err(|_| CreationError::NoAvailablePixelFormat)?
+                choose_arb_pixel_format_id(&extra_functions, &extensions, hdc, pf_reqs)
+                    .map_err(|_| CreationError::NoAvailablePixelFormat)?
             } else {
                 choose_native_pixel_format_id(hdc, pf_reqs)
                     .map_err(|_| CreationError::NoAvailablePixelFormat)?
@@ -131,13 +126,8 @@ impl Context {
         }
 
         let pixel_format = if use_arb_for_pixel_format {
-            choose_arb_pixel_format(
-                &extra_functions,
-                &extensions,
-                hdc,
-                pixel_format_id,
-            )
-            .map_err(|_| CreationError::NoAvailablePixelFormat)?
+            choose_arb_pixel_format(&extra_functions, &extensions, hdc, pixel_format_id)
+                .map_err(|_| CreationError::NoAvailablePixelFormat)?
         } else {
             choose_native_pixel_format(hdc, pf_reqs, pixel_format_id)
                 .map_err(|_| CreationError::NoAvailablePixelFormat)?
@@ -161,9 +151,7 @@ impl Context {
         {
             let _guard = CurrentContextGuard::make_current(hdc, context.0)?;
 
-            if extra_functions.SwapIntervalEXT(if opengl.vsync { 1 } else { 0 })
-                == 0
-            {
+            if extra_functions.SwapIntervalEXT(if opengl.vsync { 1 } else { 0 }) == 0 {
                 return Err(CreationError::OsError(
                     "wglSwapIntervalEXT failed".to_string(),
                 ));
@@ -186,11 +174,7 @@ impl Context {
 
     #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
-        if gl::wgl::MakeCurrent(
-            self.hdc as *const _,
-            self.context.0 as *const _,
-        ) != 0
-        {
+        if gl::wgl::MakeCurrent(self.hdc as *const _, self.context.0 as *const _) != 0 {
             Ok(())
         } else {
             Err(ContextError::IoError(std::io::Error::last_os_error()))
@@ -199,9 +183,7 @@ impl Context {
 
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
-        if self.is_current()
-            && gl::wgl::MakeCurrent(self.hdc as *const _, std::ptr::null()) != 0
-        {
+        if self.is_current() && gl::wgl::MakeCurrent(self.hdc as *const _, std::ptr::null()) != 0 {
             Ok(())
         } else {
             Err(ContextError::IoError(std::io::Error::last_os_error()))
@@ -210,9 +192,7 @@ impl Context {
 
     #[inline]
     pub fn is_current(&self) -> bool {
-        unsafe {
-            gl::wgl::GetCurrentContext() == self.context.0 as *const raw::c_void
-        }
+        unsafe { gl::wgl::GetCurrentContext() == self.context.0 as *const raw::c_void }
     }
 
     pub fn get_proc_address(&self, addr: &str) -> *const () {
@@ -287,13 +267,9 @@ unsafe fn create_context(
             match opengl.version {
                 GlRequest::Latest => {}
                 GlRequest::Specific(Api::OpenGl, (major, minor)) => {
-                    attributes.push(
-                        gl::wgl_extra::CONTEXT_MAJOR_VERSION_ARB as raw::c_int,
-                    );
+                    attributes.push(gl::wgl_extra::CONTEXT_MAJOR_VERSION_ARB as raw::c_int);
                     attributes.push(major as raw::c_int);
-                    attributes.push(
-                        gl::wgl_extra::CONTEXT_MINOR_VERSION_ARB as raw::c_int,
-                    );
+                    attributes.push(gl::wgl_extra::CONTEXT_MINOR_VERSION_ARB as raw::c_int);
                     attributes.push(minor as raw::c_int);
                 }
                 GlRequest::Specific(Api::OpenGlEs, (major, minor)) => {
@@ -302,25 +278,15 @@ unsafe fn create_context(
                         .find(|&i| i == "WGL_EXT_create_context_es2_profile")
                         .is_some()
                     {
-                        attributes.push(
-                            gl::wgl_extra::CONTEXT_PROFILE_MASK_ARB
-                                as raw::c_int,
-                        );
-                        attributes.push(
-                            gl::wgl_extra::CONTEXT_ES2_PROFILE_BIT_EXT
-                                as raw::c_int,
-                        );
+                        attributes.push(gl::wgl_extra::CONTEXT_PROFILE_MASK_ARB as raw::c_int);
+                        attributes.push(gl::wgl_extra::CONTEXT_ES2_PROFILE_BIT_EXT as raw::c_int);
                     } else {
                         return Err(CreationError::OpenGlVersionNotSupported);
                     }
 
-                    attributes.push(
-                        gl::wgl_extra::CONTEXT_MAJOR_VERSION_ARB as raw::c_int,
-                    );
+                    attributes.push(gl::wgl_extra::CONTEXT_MAJOR_VERSION_ARB as raw::c_int);
                     attributes.push(major as raw::c_int);
-                    attributes.push(
-                        gl::wgl_extra::CONTEXT_MINOR_VERSION_ARB as raw::c_int,
-                    );
+                    attributes.push(gl::wgl_extra::CONTEXT_MINOR_VERSION_ARB as raw::c_int);
                     attributes.push(minor as raw::c_int);
                 }
                 GlRequest::Specific(_, _) => {
@@ -330,13 +296,9 @@ unsafe fn create_context(
                     opengl_version: (major, minor),
                     ..
                 } => {
-                    attributes.push(
-                        gl::wgl_extra::CONTEXT_MAJOR_VERSION_ARB as raw::c_int,
-                    );
+                    attributes.push(gl::wgl_extra::CONTEXT_MAJOR_VERSION_ARB as raw::c_int);
                     attributes.push(major as raw::c_int);
-                    attributes.push(
-                        gl::wgl_extra::CONTEXT_MINOR_VERSION_ARB as raw::c_int,
-                    );
+                    attributes.push(gl::wgl_extra::CONTEXT_MINOR_VERSION_ARB as raw::c_int);
                     attributes.push(minor as raw::c_int);
                 }
             }
@@ -351,17 +313,14 @@ unsafe fn create_context(
                         GlProfile::Compatibility => {
                             gl::wgl_extra::CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB
                         }
-                        GlProfile::Core => {
-                            gl::wgl_extra::CONTEXT_CORE_PROFILE_BIT_ARB
-                        }
+                        GlProfile::Core => gl::wgl_extra::CONTEXT_CORE_PROFILE_BIT_ARB,
                     };
-                    attributes.push(
-                        gl::wgl_extra::CONTEXT_PROFILE_MASK_ARB as raw::c_int,
-                    );
+                    attributes.push(gl::wgl_extra::CONTEXT_PROFILE_MASK_ARB as raw::c_int);
                     attributes.push(flag as raw::c_int);
                 } else {
                     return Err(CreationError::NotSupported(
-                        "required extension \"WGL_ARB_create_context_profile\" not found".to_string(),
+                        "required extension \"WGL_ARB_create_context_profile\" not found"
+                            .to_string(),
                     ));
                 }
             }
@@ -379,28 +338,22 @@ unsafe fn create_context(
                         Robustness::RobustNoResetNotification
                         | Robustness::TryRobustNoResetNotification => {
                             attributes.push(
-                                gl::wgl_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB as raw::c_int,
-                            );
-                            attributes.push(
-                                gl::wgl_extra::NO_RESET_NOTIFICATION_ARB
+                                gl::wgl_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB
                                     as raw::c_int,
                             );
-                            flags = flags
-                                | gl::wgl_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB
-                                    as raw::c_int;
+                            attributes.push(gl::wgl_extra::NO_RESET_NOTIFICATION_ARB as raw::c_int);
+                            flags =
+                                flags | gl::wgl_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as raw::c_int;
                         }
                         Robustness::RobustLoseContextOnReset
                         | Robustness::TryRobustLoseContextOnReset => {
                             attributes.push(
-                                gl::wgl_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB as raw::c_int,
-                            );
-                            attributes.push(
-                                gl::wgl_extra::LOSE_CONTEXT_ON_RESET_ARB
+                                gl::wgl_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB
                                     as raw::c_int,
                             );
-                            flags = flags
-                                | gl::wgl_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB
-                                    as raw::c_int;
+                            attributes.push(gl::wgl_extra::LOSE_CONTEXT_ON_RESET_ARB as raw::c_int);
+                            flags =
+                                flags | gl::wgl_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as raw::c_int;
                         }
                         Robustness::NotRobust => (),
                         Robustness::NoError => (),
@@ -416,8 +369,7 @@ unsafe fn create_context(
                 }
 
                 if opengl.debug {
-                    flags = flags
-                        | gl::wgl_extra::CONTEXT_DEBUG_BIT_ARB as raw::c_int;
+                    flags = flags | gl::wgl_extra::CONTEXT_DEBUG_BIT_ARB as raw::c_int;
                 }
 
                 flags
@@ -729,14 +681,8 @@ unsafe fn choose_arb_pixel_format_id(
                     .find(|&i| i == "WGL_ARB_context_flush_control")
                     .is_some()
                 {
-                    out.push(
-                        gl::wgl_extra::CONTEXT_RELEASE_BEHAVIOR_ARB
-                            as raw::c_int,
-                    );
-                    out.push(
-                        gl::wgl_extra::CONTEXT_RELEASE_BEHAVIOR_NONE_ARB
-                            as raw::c_int,
-                    );
+                    out.push(gl::wgl_extra::CONTEXT_RELEASE_BEHAVIOR_ARB as raw::c_int);
+                    out.push(gl::wgl_extra::CONTEXT_RELEASE_BEHAVIOR_NONE_ARB as raw::c_int);
                 }
             }
         }
@@ -831,10 +777,7 @@ unsafe fn choose_arb_pixel_format(
 }
 
 /// Calls `SetPixelFormat` on a window.
-unsafe fn set_pixel_format(
-    hdc: HDC,
-    id: raw::c_int,
-) -> Result<(), CreationError> {
+unsafe fn set_pixel_format(hdc: HDC, id: raw::c_int) -> Result<(), CreationError> {
     let mut output: PIXELFORMATDESCRIPTOR = std::mem::zeroed();
 
     if DescribePixelFormat(
@@ -883,9 +826,7 @@ unsafe fn load_opengl32_dll() -> Result<HMODULE, CreationError> {
 ///
 /// The `window` must be passed because the driver can vary depending on the
 /// window's characteristics.
-unsafe fn load_extra_functions(
-    win: HWND,
-) -> Result<gl::wgl_extra::Wgl, CreationError> {
+unsafe fn load_extra_functions(win: HWND) -> Result<gl::wgl_extra::Wgl, CreationError> {
     let (ex_style, style) = (
         WS_EX_APPWINDOW,
         WS_POPUP | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
@@ -988,8 +929,7 @@ unsafe fn load_extra_functions(
 
     // creating the dummy OpenGL context and making it current
     let dummy_ctx = create_context(None, dummy_win.0, dummy_win.1)?;
-    let _current_context =
-        CurrentContextGuard::make_current(dummy_win.1, dummy_ctx.0)?;
+    let _current_context = CurrentContextGuard::make_current(dummy_win.1, dummy_ctx.0)?;
 
     // loading the extra WGL functions
     Ok(gl::wgl_extra::Wgl::load_with(|addr| {
