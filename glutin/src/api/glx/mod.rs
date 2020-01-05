@@ -22,12 +22,12 @@ mod glx {
         fn load_with(lib: &libloading::Library) -> Self {
             Self::load_with(|sym| unsafe {
                 lib.get(
-                        std::ffi::CString::new(sym.as_bytes())
-                            .unwrap()
-                            .as_bytes_with_nul(),
-                    )
-                    .map(|sym| *sym)
-                    .unwrap_or(std::ptr::null_mut())
+                    std::ffi::CString::new(sym.as_bytes())
+                        .unwrap()
+                        .as_bytes_with_nul(),
+                )
+                .map(|sym| *sym)
+                .unwrap_or(std::ptr::null_mut())
             })
         }
     }
@@ -416,10 +416,10 @@ impl<'a> ContextPrototype<'a> {
         let swap_mode = if self.opengl.vsync { 1 } else { 0 };
 
         let _guard = MakeCurrentGuard::new(&self.xconn, window, context)
-                .map_err(|err| CreationError::OsError(err))?;
+            .map_err(|err| CreationError::OsError(err))?;
 
         if check_ext(&self.extensions, "GLX_EXT_swap_control")
-          && extra_functions.SwapIntervalEXT.is_loaded()
+            && extra_functions.SwapIntervalEXT.is_loaded()
         {
             // this should be the most common extension
             unsafe {
@@ -441,16 +441,19 @@ impl<'a> ContextPrototype<'a> {
             }
 
             if swap != swap_mode as u32 {
-                return Err(CreationError::OsError(format!("Couldn't setup vsync: expected interval `{}` but got `{}`", swap_mode, swap)));
+                return Err(CreationError::OsError(format!(
+                    "Couldn't setup vsync: expected interval `{}` but got `{}`",
+                    swap_mode, swap
+                )));
             }
         } else if check_ext(&self.extensions, "GLX_MESA_swap_control")
-          && extra_functions.SwapIntervalMESA.is_loaded()
+            && extra_functions.SwapIntervalMESA.is_loaded()
         {
             unsafe {
                 extra_functions.SwapIntervalMESA(swap_mode as u32);
             }
         } else if check_ext(&self.extensions, "GLX_SGI_swap_control")
-          && extra_functions.SwapIntervalSGI.is_loaded()
+            && extra_functions.SwapIntervalSGI.is_loaded()
         {
             unsafe {
                 extra_functions.SwapIntervalSGI(swap_mode);

@@ -46,8 +46,7 @@ mod this_example {
                 if el.is_wayland() {
                     let win = wb.build(&el).unwrap();
                     let dpi_factor = win.hidpi_factor();
-                    let size =
-                        win.inner_size().to_physical(dpi_factor);
+                    let size = win.inner_size().to_physical(dpi_factor);
                     let (width, height): (u32, u32) = size.into();
 
                     let display_ptr =

@@ -677,7 +677,9 @@ impl Context {
     pub fn swap_buffers_with_damage_supported(&self) -> bool {
         match self.context {
             X11Context::Glx(_) => false,
-            X11Context::Egl(ref ctx) => ctx.swap_buffers_with_damage_supported(),
+            X11Context::Egl(ref ctx) => {
+                ctx.swap_buffers_with_damage_supported()
+            }
         }
     }
 

@@ -708,18 +708,14 @@ unsafe fn choose_arb_pixel_format_id(
             .find(|&i| i == "WGL_ARB_framebuffer_sRGB")
             .is_some()
         {
-            out.push(
-                gl::wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as raw::c_int,
-            );
+            out.push(gl::wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as raw::c_int);
             out.push(pf_reqs.srgb as raw::c_int);
         } else if extensions
             .split(' ')
             .find(|&i| i == "WGL_EXT_framebuffer_sRGB")
             .is_some()
         {
-            out.push(
-                gl::wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as raw::c_int,
-            );
+            out.push(gl::wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as raw::c_int);
             out.push(pf_reqs.srgb as raw::c_int);
         } else if pf_reqs.srgb {
             return Err(());
