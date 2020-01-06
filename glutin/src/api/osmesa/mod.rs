@@ -71,7 +71,7 @@ impl OsMesaContext {
     pub fn new(
         _pf_reqs: &PixelFormatRequirements,
         opengl: &GlAttributes<&OsMesaContext>,
-        size: dpi::PhysicalSize,
+        size: dpi::PhysicalSize<u32>,
     ) -> Result<Self, CreationError> {
         osmesa_sys::OsMesa::try_loading()
             .map_err(LoadingError::new)

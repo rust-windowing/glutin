@@ -179,7 +179,7 @@ impl Context {
         el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-        size: Option<dpi::PhysicalSize>,
+        size: Option<dpi::PhysicalSize<u32>>,
     ) -> Result<Self, CreationError> {
         Self::try_then_fallback(|fallback| {
             Self::new_headless_impl(
@@ -196,7 +196,7 @@ impl Context {
         el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-        size: Option<dpi::PhysicalSize>,
+        size: Option<dpi::PhysicalSize<u32>>,
         fallback: bool,
     ) -> Result<Self, CreationError> {
         let xconn = match el.xlib_xconnection() {

@@ -30,12 +30,8 @@ fn main() {
 
         match event {
             Event::LoopDestroyed => return,
-            Event::WindowEvent { ref event, .. } => match event {
-                WindowEvent::Resized(logical_size) => {
-                    let dpi_factor = windowed_context.window().hidpi_factor();
-                    windowed_context
-                        .resize(logical_size.to_physical(dpi_factor));
-                }
+            Event::WindowEvent { event, .. } => match event {
+                WindowEvent::Resized(physical_size) => windowed_context.resize(physical_size),
                 WindowEvent::Touch(_touch) => {
                     const INCREMENTER: f32 = 0.05;
                     inc += INCREMENTER;
@@ -47,14 +43,14 @@ fn main() {
                     ]);
                     windowed_context.swap_buffers().unwrap();
                 }
-                WindowEvent::RedrawRequested => {
-                    gl.draw_frame([0.0; 4]);
-                    windowed_context.swap_buffers().unwrap();
-                }
                 WindowEvent::CloseRequested => {
                     *control_flow = ControlFlow::Exit
                 }
                 _ => (),
+            },
+            Event::RedrawRequested(_) => {
+                gl.draw_frame([0.0; 4]);
+                windowed_context.swap_buffers().unwrap();
             },
             _ => (),
         }

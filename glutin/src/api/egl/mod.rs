@@ -956,7 +956,7 @@ impl<'a> ContextPrototype<'a> {
     ))]
     pub fn finish_pbuffer(
         self,
-        size: dpi::PhysicalSize,
+        size: dpi::PhysicalSize<u32>,
     ) -> Result<Context, CreationError> {
         let size: (u32, u32) = size.into();
 

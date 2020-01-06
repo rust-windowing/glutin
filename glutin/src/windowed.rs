@@ -177,7 +177,7 @@ impl<W> ContextWrapper<PossiblyCurrent, W> {
     /// [`LogicalSize`]: dpi/struct.LogicalSize.html
     /// [`PhysicalSize`]: dpi/struct.PhysicalSize.html
     /// [`Resized`]: event/enum.WindowEvent.html#variant.Resized
-    pub fn resize(&self, size: dpi::PhysicalSize) {
+    pub fn resize(&self, size: dpi::PhysicalSize<u32>) {
         let (width, height) = size.into();
         self.context.context.resize(width, height);
     }

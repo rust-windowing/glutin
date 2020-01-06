@@ -29,7 +29,7 @@ mod this_example {
             true
         });
 
-        let (raw_context, el, win) = {
+        let (raw_context, el) = {
             let el = EventLoop::new();
             let mut wb = WindowBuilder::new().with_title("A fantastic window!");
 
@@ -45,8 +45,7 @@ mod this_example {
 
                 if el.is_wayland() {
                     let win = wb.build(&el).unwrap();
-                    let dpi_factor = win.hidpi_factor();
-                    let size = win.inner_size().to_physical(dpi_factor);
+                    let size = win.inner_size();
                     let (width, height): (u32, u32) = size.into();
 
                     let display_ptr =
@@ -62,7 +61,7 @@ mod this_example {
                         )
                         .unwrap();
 
-                    (raw_context, el, win)
+                    (raw_context, el)
                 } else {
                     if transparency {
                         unimplemented!(
@@ -90,7 +89,7 @@ File a PR if you are interested in implementing the latter.
                         .build_raw_x11_context(xconn, xwindow)
                         .unwrap();
 
-                    (raw_context, el, win)
+                    (raw_context, el)
                 }
             }
 
@@ -105,7 +104,7 @@ File a PR if you are interested in implementing the latter.
                 let raw_context =
                     ContextBuilder::new().build_raw_context(hwnd).unwrap();
 
-                (raw_context, el, win)
+                (raw_context, el)
             }
         };
 
@@ -128,24 +127,20 @@ File a PR if you are interested in implementing the latter.
                     Takeable::take(&mut raw_context); // Make sure it drops first
                     return;
                 }
-                Event::WindowEvent { ref event, .. } => match event {
-                    WindowEvent::Resized(logical_size) => {
-                        let dpi_factor = win.hidpi_factor();
-                        raw_context
-                            .resize(logical_size.to_physical(dpi_factor));
-                    }
-                    WindowEvent::RedrawRequested => {
-                        gl.draw_frame(if transparency {
-                            [0.0; 4]
-                        } else {
-                            [1.0, 0.5, 0.7, 1.0]
-                        });
-                        raw_context.swap_buffers().unwrap();
-                    }
+                Event::WindowEvent { event, .. } => match event {
+                    WindowEvent::Resized(physical_size) => raw_context.resize(physical_size),
                     WindowEvent::CloseRequested => {
                         *control_flow = ControlFlow::Exit
                     }
                     _ => (),
+                },
+                Event::RedrawRequested(_) => {
+                    gl.draw_frame(if transparency {
+                        [0.0; 4]
+                    } else {
+                        [1.0, 0.5, 0.7, 1.0]
+                    });
+                    raw_context.swap_buffers().unwrap();
                 },
                 _ => (),
             }

@@ -22,7 +22,7 @@ fn build_context_headless<T1: ContextCurrentState>(
     cb: ContextBuilder<T1>,
     el: &EventLoop<()>,
 ) -> Result<Context<NotCurrent>, CreationError> {
-    let size_one = PhysicalSize::new(1., 1.);
+    let size_one = PhysicalSize::new(1, 1);
     cb.build_headless(&el, size_one)
 }
 
@@ -31,7 +31,7 @@ fn build_context_osmesa<T1: ContextCurrentState>(
     cb: ContextBuilder<T1>,
 ) -> Result<Context<NotCurrent>, CreationError> {
     use glutin::platform::unix::HeadlessContextExt;
-    let size_one = PhysicalSize::new(1., 1.);
+    let size_one = PhysicalSize::new(1, 1);
     cb.build_osmesa(size_one)
 }
 
