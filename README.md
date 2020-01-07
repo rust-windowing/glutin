@@ -6,7 +6,7 @@ A low-level library for OpenGL context creation, written in pure Rust.
 
 ```toml
 [dependencies]
-glutin = "0.22.0-alpha4"
+glutin = "0.22"
 ```
 
 ## [Documentation](https://docs.rs/glutin)
@@ -22,7 +22,7 @@ Join us in any of these:
 
 ## Usage Examples
 
-Warning: these are examples for master. For the latest released version, 0.21, view [here.](https://github.com/rust-windowing/glutin/tree/2e816ae2654ba80eb3e201d0ce51d238cc105226)
+Warning: these are examples for master. For the latest released version, 0.22, view [here.](https://github.com/rust-windowing/glutin/tree/447f3526dcf90a460d52afefd0b29eb2ed7f87f3)
 
 ### Try it!
 
