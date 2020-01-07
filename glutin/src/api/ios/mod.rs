@@ -220,11 +220,11 @@ impl Context {
         el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-        size: dpi::PhysicalSize,
+        size: dpi::PhysicalSize<u32>,
     ) -> Result<Self, CreationError> {
         let wb = winit::window::WindowBuilder::new()
             .with_visible(false)
-            .with_inner_size(size.to_logical(1.));
+            .with_inner_size(size);
         Self::new_windowed(wb, el, pf_reqs, gl_attr)
             .map(|(_window, context)| context)
     }
@@ -272,7 +272,7 @@ impl Context {
         self.make_current().unwrap();
 
         let view = self.view;
-        let scale_factor = win.hidpi_factor() as ffi::CGFloat;
+        let scale_factor = win.scale_factor() as ffi::CGFloat;
         let _: () = msg_send![view, setContentScaleFactor: scale_factor];
         let layer: ffi::id = msg_send![view, layer];
         let _: () = msg_send![layer, setContentsScale: scale_factor];

@@ -122,7 +122,7 @@ impl Context {
         el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-        size: dpi::PhysicalSize,
+        size: dpi::PhysicalSize<u32>,
     ) -> Result<Self, CreationError> {
         Self::new_headless_impl(el, pf_reqs, gl_attr, Some(size))
     }
@@ -131,7 +131,7 @@ impl Context {
         el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-        size: Option<dpi::PhysicalSize>,
+        size: Option<dpi::PhysicalSize<u32>>,
     ) -> Result<Self, CreationError> {
         if el.is_wayland() {
             Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
@@ -283,7 +283,7 @@ pub trait HeadlessContextExt {
     /// [`Context`]: struct.Context.html
     fn build_osmesa(
         self,
-        size: dpi::PhysicalSize,
+        size: dpi::PhysicalSize<u32>,
     ) -> Result<crate::Context<NotCurrent>, CreationError>
     where
         Self: Sized;
@@ -309,7 +309,7 @@ impl<'a, T: ContextCurrentState> HeadlessContextExt
     #[inline]
     fn build_osmesa(
         self,
-        size: dpi::PhysicalSize,
+        size: dpi::PhysicalSize<u32>,
     ) -> Result<crate::Context<NotCurrent>, CreationError>
     where
         Self: Sized,

@@ -52,7 +52,7 @@ impl Context {
         el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-        size: Option<dpi::PhysicalSize>,
+        size: Option<dpi::PhysicalSize<u32>>,
     ) -> Result<Self, CreationError> {
         let gl_attr = gl_attr.clone().map_sharing(|c| &**c);
         let display_ptr = el.wayland_display().unwrap() as *const _;
@@ -93,8 +93,7 @@ impl Context {
     ) -> Result<(Window, Self), CreationError> {
         let win = wb.build(el)?;
 
-        let dpi_factor = win.hidpi_factor();
-        let size = win.inner_size().to_physical(dpi_factor);
+        let size = win.inner_size();
         let (width, height): (u32, u32) = size.into();
 
         let display_ptr = win.wayland_display().unwrap() as *const _;

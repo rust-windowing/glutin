@@ -175,7 +175,7 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     pub fn build_headless<TE>(
         self,
         el: &EventLoopWindowTarget<TE>,
-        size: dpi::PhysicalSize,
+        size: dpi::PhysicalSize<u32>,
     ) -> Result<Context<NotCurrent>, CreationError> {
         let ContextBuilder { pf_reqs, gl_attr } = self;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);

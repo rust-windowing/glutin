@@ -31,13 +31,11 @@ fn main() {
         match event {
             Event::LoopDestroyed => return,
             Event::WindowEvent { event, window_id } => match event {
-                WindowEvent::Resized(logical_size) => {
+                WindowEvent::Resized(physical_size) => {
                     let windowed_context =
                         ct.get_current(windows[&window_id].0).unwrap();
                     let windowed_context = windowed_context.windowed();
-                    let dpi_factor = windowed_context.window().hidpi_factor();
-                    windowed_context
-                        .resize(logical_size.to_physical(dpi_factor));
+                    windowed_context.resize(physical_size);
                 }
                 WindowEvent::CloseRequested => {
                     if let Some((cid, _, _)) = windows.remove(&window_id) {
@@ -48,19 +46,19 @@ fn main() {
                         );
                     }
                 }
-                WindowEvent::RedrawRequested => {
-                    let window = &windows[&window_id];
-
-                    let mut color = [1.0, 0.5, 0.7, 1.0];
-                    color.swap(0, window.2 % 3);
-
-                    let windowed_context = ct.get_current(window.0).unwrap();
-
-                    window.1.draw_frame(color);
-                    windowed_context.windowed().swap_buffers().unwrap();
-                }
                 _ => (),
             },
+            Event::RedrawRequested(window_id) => {
+                let window = &windows[&window_id];
+
+                let mut color = [1.0, 0.5, 0.7, 1.0];
+                color.swap(0, window.2 % 3);
+
+                let windowed_context = ct.get_current(window.0).unwrap();
+
+                window.1.draw_frame(color);
+                windowed_context.windowed().swap_buffers().unwrap();
+            }
             _ => (),
         }
 

@@ -50,10 +50,6 @@ fn main() {
                 WindowEvent::CloseRequested => {
                     *control_flow = ControlFlow::Exit
                 }
-                WindowEvent::RedrawRequested => {
-                    gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
-                    windowed_context.swap_buffers().unwrap();
-                }
                 WindowEvent::KeyboardInput {
                     input:
                         KeyboardInput {
@@ -93,6 +89,10 @@ fn main() {
                 },
                 _ => (),
             },
+            Event::RedrawRequested(_) => {
+                gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
+                windowed_context.swap_buffers().unwrap();
+            }
             _ => {}
         }
     });
