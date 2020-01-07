@@ -10,7 +10,6 @@ glutin = "0.22"
 ```
 
 ## [Documentation](https://docs.rs/glutin)
-## [0.21.0 Migration guide](https://gentz.rocks/posts/glutin-v0-21-0-migration-guide/)
 
 ## Contact Us
 
