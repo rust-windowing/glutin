@@ -1,5 +1,20 @@
 # Unreleased
 
+# Version 0.22.0 (2020-1-07)
+
+- Updated winit dependency to 0.20.0. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/blob/master/CHANGELOG.md#0200-2020-01-05) for more info.
+
+# Version 0.22.0-alpha6 (2020-1-05)
+
+- Fixed dependencies so wrong winit version is not used.
+- On X11, got rid of mistaken `XRenderFindVisualFormat` call so that glutin doesn't ignore configs that lack a `XRenderPictFormat`.
+- On iOS, fixed not linking against OpenGLES.framework.
+- On X11, fixed VSync not being disabled when requested.
+
+# Version 0.22.0-alpha5 (2019-11-14)
+
+- Fixed build issue.
+
 # Version 0.22.0-alpha4 (2019-11-10)
 
 - Update winit dependency to 0.20.0-alpha4. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/blob/master/CHANGELOG.md#0200-alpha-4) for more info.
