@@ -187,7 +187,7 @@ impl Context {
 
         let wb = WindowBuilder::new()
             .with_visible(false)
-            .with_inner_size(size.to_logical(1.));
+            .with_inner_size(size);
         Self::new_windowed(wb, &el, pf_reqs, gl_attr).map(|(win, context)| {
             match context {
                 Context::Egl(context) => Context::HiddenWindowEgl(win, context),

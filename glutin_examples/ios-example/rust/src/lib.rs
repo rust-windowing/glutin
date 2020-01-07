@@ -31,7 +31,9 @@ fn main() {
         match event {
             Event::LoopDestroyed => return,
             Event::WindowEvent { event, .. } => match event {
-                WindowEvent::Resized(physical_size) => windowed_context.resize(physical_size),
+                WindowEvent::Resized(physical_size) => {
+                    windowed_context.resize(physical_size)
+                }
                 WindowEvent::Touch(_touch) => {
                     const INCREMENTER: f32 = 0.05;
                     inc += INCREMENTER;
@@ -51,7 +53,7 @@ fn main() {
             Event::RedrawRequested(_) => {
                 gl.draw_frame([0.0; 4]);
                 windowed_context.swap_buffers().unwrap();
-            },
+            }
             _ => (),
         }
     });

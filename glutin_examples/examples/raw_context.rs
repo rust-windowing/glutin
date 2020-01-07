@@ -128,7 +128,9 @@ File a PR if you are interested in implementing the latter.
                     return;
                 }
                 Event::WindowEvent { event, .. } => match event {
-                    WindowEvent::Resized(physical_size) => raw_context.resize(physical_size),
+                    WindowEvent::Resized(physical_size) => {
+                        raw_context.resize(physical_size)
+                    }
                     WindowEvent::CloseRequested => {
                         *control_flow = ControlFlow::Exit
                     }
@@ -141,7 +143,7 @@ File a PR if you are interested in implementing the latter.
                         [1.0, 0.5, 0.7, 1.0]
                     });
                     raw_context.swap_buffers().unwrap();
-                },
+                }
                 _ => (),
             }
         });

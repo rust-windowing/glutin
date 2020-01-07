@@ -7,7 +7,10 @@ use glutin::window::WindowBuilder;
 use glutin::ContextBuilder;
 use support::{gl, ContextCurrentWrapper, ContextTracker, ContextWrapper};
 
-fn make_renderbuf(gl: &support::Gl, size: PhysicalSize<u32>) -> gl::types::GLuint {
+fn make_renderbuf(
+    gl: &support::Gl,
+    size: PhysicalSize<u32>,
+) -> gl::types::GLuint {
     let mut render_buf = 0;
     unsafe {
         gl.gl.GenRenderbuffers(1, &mut render_buf);
@@ -167,7 +170,7 @@ fn main() {
                     );
                 }
                 windowed_context.windowed().swap_buffers().unwrap();
-            },
+            }
             _ => (),
         }
     });

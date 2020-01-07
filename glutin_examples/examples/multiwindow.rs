@@ -58,7 +58,7 @@ fn main() {
 
                 window.1.draw_frame(color);
                 windowed_context.windowed().swap_buffers().unwrap();
-            },
+            }
             _ => (),
         }
 

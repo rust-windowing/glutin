@@ -28,7 +28,9 @@ fn main() {
         match event {
             Event::LoopDestroyed => return,
             Event::WindowEvent { event, .. } => match event {
-                WindowEvent::Resized(physical_size) => windowed_context.resize(physical_size),
+                WindowEvent::Resized(physical_size) => {
+                    windowed_context.resize(physical_size)
+                }
                 WindowEvent::CloseRequested => {
                     *control_flow = ControlFlow::Exit
                 }
@@ -37,7 +39,7 @@ fn main() {
             Event::RedrawRequested(_) => {
                 gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
                 windowed_context.swap_buffers().unwrap();
-            },
+            }
             _ => (),
         }
     });
