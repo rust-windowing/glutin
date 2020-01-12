@@ -240,8 +240,10 @@ impl Surface<Pixmap> {
                 wayland::Surface::<Pixmap>::new(conf.map_config(|_| config), nps, wb)
                     .map(|(pix, surf)| (pix, Surface::Wayland(surf)))
             }
-            Config::X11(config) => x11::Surface::<Pixmap>::new(conf.map_config(|_| config), nps, wb)
-                .map(|(pix, surf)| (pix, Surface::X11(surf))),
+            Config::X11(config) => {
+                x11::Surface::<Pixmap>::new(conf.map_config(|_| config), nps, wb)
+                    .map(|(pix, surf)| (pix, Surface::X11(surf)))
+            }
         }
     }
 
