@@ -101,7 +101,7 @@ impl Surface<Pixmap> {
 
 impl Surface<PBuffer> {
     #[inline]
-    pub unsafe fn new(conf: &Config, size: dpi::PhysicalSize) -> Result<Self, Error> {
+    pub unsafe fn new(conf: &Config, size: dpi::PhysicalSize<u32>) -> Result<Self, Error> {
         platform_impl::Surface::<PBuffer>::new(conf.as_ref(), size).map(Surface)
     }
 }
@@ -146,7 +146,7 @@ impl Surface<Window> {
     }
 
     #[inline]
-    pub fn update_after_resize(&self, size: dpi::PhysicalSize) {
+    pub fn update_after_resize(&self, size: dpi::PhysicalSize<u32>) {
         #![cfg(any(
             target_os = "linux",
             target_os = "dragonfly",

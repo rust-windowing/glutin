@@ -1,7 +1,10 @@
+#![cfg(target_os = "ios")]
+
 use glutin::event::{Event, WindowEvent};
 use glutin::event_loop::{ControlFlow, EventLoop};
 use glutin::window::WindowBuilder;
 use glutin::ContextBuilder;
+
 #[path = "../../../examples/support.rs"]
 mod support;
 

@@ -120,7 +120,7 @@ impl Surface<Window> {
     }
 
     #[inline]
-    pub fn update_after_resize(&self, size: dpi::PhysicalSize) {
+    pub fn update_after_resize(&self, size: dpi::PhysicalSize<u32>) {
         let (width, height): (u32, u32) = size.into();
         self.wsurface
             .as_ref()
@@ -143,7 +143,7 @@ impl Surface<PBuffer> {
     #[inline]
     pub unsafe fn new(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        size: dpi::PhysicalSize,
+        size: dpi::PhysicalSize<u32>,
     ) -> Result<Self, Error> {
         egl::Surface::<PBuffer>::new(conf.map_config(|conf| &conf.0), size).map(|surface| Surface {
             wsurface: None,

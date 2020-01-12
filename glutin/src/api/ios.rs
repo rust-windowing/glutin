@@ -212,11 +212,11 @@ impl Context {
         el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-        size: dpi::PhysicalSize,
+        size: dpi::PhysicalSize<u32>,
     ) -> Result<Self, CreationError> {
         let wb = WindowBuilder::new()
             .with_visible(false)
-            .with_inner_size(size.to_logical(1.));
+            .with_inner_size(size);
         Self::new_windowed(wb, el, pf_reqs, gl_attr).map(|(_window, context)| context)
     }
 

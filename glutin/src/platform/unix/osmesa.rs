@@ -68,7 +68,7 @@ impl OsMesaBuffer {
         &self.buffer
     }
 
-    pub fn new(ctx: &OsMesaContext, size: dpi::PhysicalSize) -> Result<OsMesaBuffer, Error> {
+    pub fn new(ctx: &OsMesaContext, size: dpi::PhysicalSize<u32>) -> Result<OsMesaBuffer, Error> {
         let ctx = ctx.inner();
         osmesa::OsMesaBuffer::new(ctx, size).map(|buffer| OsMesaBuffer { buffer })
     }

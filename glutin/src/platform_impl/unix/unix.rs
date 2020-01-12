@@ -214,7 +214,7 @@ impl Surface<PBuffer> {
     #[inline]
     pub unsafe fn new(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        size: dpi::PhysicalSize,
+        size: dpi::PhysicalSize<u32>,
     ) -> Result<Self, Error> {
         match conf.config {
             Config::Wayland(config) => {
@@ -316,7 +316,7 @@ impl Surface<Window> {
     }
 
     #[inline]
-    pub fn update_after_resize(&self, size: dpi::PhysicalSize) {
+    pub fn update_after_resize(&self, size: dpi::PhysicalSize<u32>) {
         match self {
             Surface::Wayland(ref surf) => surf.update_after_resize(size),
             Surface::X11(_) => (),

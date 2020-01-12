@@ -293,7 +293,7 @@ impl Surface<PBuffer> {
     #[inline]
     pub fn new(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        size: dpi::PhysicalSize,
+        size: dpi::PhysicalSize<u32>,
     ) -> Result<Self, Error> {
         match conf.config {
             Config::Egl(config, disp, screen) => {

@@ -1234,7 +1234,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     #[inline]
     fn assemble_desc(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        size: Option<dpi::PhysicalSize>,
+        size: Option<dpi::PhysicalSize<u32>>,
     ) -> Vec<raw::c_int> {
         let mut out = Vec::new();
         match conf.attribs.srgb {
@@ -1376,10 +1376,10 @@ impl Surface<Window> {
         let mut ffirects: Vec<ffi::egl::types::EGLint> = Vec::with_capacity(rects.len() * 4);
 
         for rect in rects {
-            ffirects.push(rect.x as ffi::egl::types::EGLint);
-            ffirects.push(rect.y as ffi::egl::types::EGLint);
-            ffirects.push(rect.width as ffi::egl::types::EGLint);
-            ffirects.push(rect.height as ffi::egl::types::EGLint);
+            ffirects.push(rect.pos.x as ffi::egl::types::EGLint);
+            ffirects.push(rect.pos.y as ffi::egl::types::EGLint);
+            ffirects.push(rect.size.width as ffi::egl::types::EGLint);
+            ffirects.push(rect.size.height as ffi::egl::types::EGLint);
         }
 
         let ret = unsafe {
@@ -1411,7 +1411,7 @@ impl Surface<PBuffer> {
     #[inline]
     pub fn new(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        size: dpi::PhysicalSize,
+        size: dpi::PhysicalSize<u32>,
     ) -> Result<Self, Error> {
         let display = Arc::clone(&conf.config.display);
         let egl = EGL.as_ref().unwrap();

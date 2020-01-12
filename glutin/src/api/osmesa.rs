@@ -184,7 +184,7 @@ unsafe impl Send for OsMesaContext {}
 unsafe impl Sync for OsMesaContext {}
 
 impl OsMesaBuffer {
-    pub fn new(ctx: &OsMesaContext, size: dpi::PhysicalSize) -> Result<Self, Error> {
+    pub fn new(ctx: &OsMesaContext, size: dpi::PhysicalSize<u32>) -> Result<Self, Error> {
         let size: (u32, u32) = size.into();
         Ok(OsMesaBuffer {
             width: size.0,

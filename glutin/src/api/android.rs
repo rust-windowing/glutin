@@ -106,7 +106,7 @@ impl Context {
         _el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-        size: dpi::PhysicalSize,
+        size: dpi::PhysicalSize<u32>,
     ) -> Result<Self, CreationError> {
         let gl_attr = gl_attr.clone().map_sharing(|c| &c.0.egl_context);
         let context = EglContext::new(

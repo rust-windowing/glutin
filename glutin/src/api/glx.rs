@@ -403,7 +403,7 @@ impl Config {
 //
 //    pub fn finish_pbuffer(
 //        self,
-//        size: dpi::PhysicalSize,
+//        size: dpi::PhysicalSize<u32>,
 //    ) -> Result<Context, Error> {
 //        let glx = GLX.as_ref().unwrap();
 //        let size: (u32, u32) = size.into();

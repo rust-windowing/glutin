@@ -167,7 +167,7 @@ impl Context {
         _el: &EventLoopWindowTarget<T>,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
-        _size: dpi::PhysicalSize,
+        _size: dpi::PhysicalSize<u32>,
     ) -> Result<Self, CreationError> {
         let gl_profile = helpers::get_gl_profile(gl_attr, pf_reqs)?;
         let attributes = helpers::build_nsattributes(pf_reqs, gl_profile)?;
