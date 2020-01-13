@@ -249,7 +249,7 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
 
     /// Sets whether sRGB should be enabled on the window.
     ///
-    /// The default value is `false`.
+    /// The default value is `true`.
     #[inline]
     pub fn with_srgb(mut self, srgb_enabled: bool) -> Self {
         self.pf_reqs.srgb = srgb_enabled;
