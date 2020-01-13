@@ -1,6 +1,6 @@
 //! You can use a [`ConfigsFinder`] to get a selection of [`Config`eration]s
 //! that match your criteria. Among many things, you must specify in advance
-//! what types of [`Surface`]s you're going to use the [`Config`]eration with.
+//! what types of [`Surface`]s you're going to use the [`Config`eration] with.
 //!
 //! Once a [`Config`eration] is made, you can also modify its
 //! [`desired_swap_interval`]. Please refer to [`ConfigAttribs`] for more info.
@@ -113,18 +113,18 @@ impl SwapIntervalRange {
     }
 }
 
-/// Describes the attributes of a possible [`Config`]eration. Immutably accessed
-/// via [`Config`]'s [`attribs`] function.
+/// Describes the attributes of a possible [`Config`eration]. Immutably accessed
+/// via [`Config`eration]'s [`attribs`] function.
 ///
-/// After the creation of the [`Config`], the [`desired_swap_interval`] can be
-/// modified into any other [`SwapInterval`] as long as it is within range of
-/// any one of the [`SwapIntervalRange`]s in [`swap_interval_ranges`] via
-/// [`Config`]'s [`set_desired_swap_interval`] function.
+/// After the creation of the [`Config`eration], the [`desired_swap_interval`]
+/// can be modified into any other [`SwapInterval`] as long as it is within range
+/// of any one of the [`SwapIntervalRange`]s in [`swap_interval_ranges`] via
+/// [`Config`eration]'s [`set_desired_swap_interval`] function.
 ///
 /// Please refer to [`ConfigsFinder`]'s methods for details on what each parameter
 /// is for.
 ///
-/// [`Config`]: crate::config::ConfigWrapper
+/// [`Config`eration]: crate::config::ConfigWrapper
 /// [`SwapInterval`]: crate::config::SwapInterval
 /// [`SwapIntervalRange`]: crate::config::SwapIntervalRange
 /// [`attribs`]: crate::config::ConfigWrapper::attribs()
@@ -204,23 +204,23 @@ impl<T, CA> ConfigWrapper<T, CA> {
 }
 
 impl ConfigWrapper<platform_impl::Config, ConfigAttribs> {
-    /// Provides immutable access to [`Config`]'s [`ConfigAttribs`].
+    /// Provides immutable access to [`Config`eration]'s [`ConfigAttribs`].
     ///
     /// Please refer to [`ConfigAttribs`] for more information.
     ///
-    /// [`Config`]: crate::config::ConfigWrapper
+    /// [`Config`eration]: crate::config::ConfigWrapper
     /// [`ConfigAttribs`]: crate::config::ConfigAttribs
     #[inline]
     pub fn attribs(&self) -> &ConfigAttribs {
         &self.attribs
     }
 
-    /// Changes the [`Config`]'s [`desired_swap_interval`].
+    /// Changes the [`Config`eration]'s [`desired_swap_interval`].
     ///
     /// Please refer to [`ConfigAttribs`] for more information.
     ///
     /// [`desired_swap_interval`]: crate::config::ConfigAttribs::desired_swap_interval
-    /// [`Config`]: crate::config::ConfigWrapper
+    /// [`Config`eration]: crate::config::ConfigWrapper
     /// [`ConfigAttribs`]: crate::config::ConfigAttribs
     #[inline]
     pub fn set_desired_swap_interval(
@@ -255,7 +255,18 @@ impl Config {
     }
 }
 
-// FIXME doc
+/// A type for finding one or more [`Config`eration]s that meet a certain
+/// criteria.
+///
+/// For details on what each member controls, please scroll through the
+/// [methods] bellow.
+///
+/// For what the defaults currently are, please refer to our [defaults
+/// implementation].
+///
+/// [`Config`eration]: crate::config::ConfigWrapper
+/// [methods]: ./struct.ConfigsFinder.html#methods
+/// [defaults implementation]: ./struct.ConfigsFinder.html#impl-Default
 #[allow(missing_docs)]
 #[derive(Clone, Debug)]
 pub struct ConfigsFinder {
@@ -305,19 +316,21 @@ impl Default for ConfigsFinder {
 }
 
 impl ConfigsFinder {
+    /// Makes a `ConfigsFinder` with the default options.
     fn new() -> Self {
         Default::default()
     }
 
-    /// Sets how the backend should choose the OpenGL API and version.
+    /// Sets which OpenGL API and version to use.
     #[inline]
     pub fn with_gl(mut self, version: (Api, Version)) -> Self {
         self.version = version;
         self
     }
 
-    /// If true, the color buffer must be in a floating point format. `None`
-    /// means "don't care",
+    /// If `true`, the color buffer must use a floating point format. `false`
+    /// means it must not use a floating point format. `None` means "don't
+    /// care".
     ///
     /// Using floating points allows you to write values outside of the `[0.0,
     /// 1.0]` range.
@@ -378,6 +391,10 @@ impl ConfigsFinder {
         self
     }
 
+    /// Sets the desired [`SwapInterval`]. Please refer to [`SwapInterval`] for
+    /// more details.
+    ///
+    /// [`SwapInterval`]: crate::config::SwapInterval
     #[inline]
     pub fn with_desired_swap_interval(
         mut self,
@@ -387,24 +404,43 @@ impl ConfigsFinder {
         self
     }
 
+    /// Whether or not the [`Config`eration]s should support [`PBuffer`]s.
+    ///
+    /// [`Config`eration]: crate::config::ConfigWrapper
+    /// [`PBuffer`]: crate::surface::PBuffer
     #[inline]
     pub fn with_pbuffer_surface_support(mut self, pbss: bool) -> Self {
         self.pbuffer_surface_support = pbss;
         self
     }
 
+    /// Whether or not the [`Config`eration]s should support [`Pixmap`]s.
+    ///
+    /// [`Config`eration]: crate::config::ConfigWrapper
+    /// [`Pixmap`]: crate::surface::Pixmap
     #[inline]
     pub fn with_pixmap_surface_support(mut self, pss: bool) -> Self {
         self.pixmap_surface_support = pss;
         self
     }
 
+    /// Whether or not the [`Config`eration]s should support [`Window`]s.
+    ///
+    /// [`Config`eration]: crate::config::ConfigWrapper
+    /// [`Window`]: crate::surface::Window
     #[inline]
     pub fn with_window_surface_support(mut self, wss: bool) -> Self {
         self.window_surface_support = wss;
         self
     }
 
+    /// Whether or not the [`Config`eration]s should support surfaceless
+    /// contexts.
+    ///
+    /// Please refer to [`Context::make_current_surfaceless`] for more details.
+    ///
+    /// [`Config`eration]: crate::config::ConfigWrapper
+    /// [`Context::make_current_surfaceless`]: crate::context::Context::make_current_surfaceless()
     #[inline]
     pub fn with_surfaceless_support(mut self, ss: bool) -> Self {
         self.surfaceless_support = ss;
@@ -413,7 +449,7 @@ impl ConfigsFinder {
 
     /// Sets whether double buffering should be enabled.
     ///
-    /// If true, only double-buffered formats will be considered. If false,
+    /// If `true`, only double-buffered formats will be considered. If false,
     /// only single-buffer formats. `None` means "don't care".
     ///
     /// ## Platform-specific
@@ -446,7 +482,7 @@ impl ConfigsFinder {
     }
 
     #[inline]
-    pub fn build<ND: NativeDisplay>(self, nd: &ND) -> Result<Vec<Config>, Error> {
+    pub fn find<ND: NativeDisplay>(self, nd: &ND) -> Result<Vec<Config>, Error> {
         self.desired_swap_interval
             .unwrap_or(SwapInterval::DontWait)
             .validate()?;
