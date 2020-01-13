@@ -53,10 +53,12 @@ pub trait ConfigExt {
 impl ConfigExt for Config {
     #[inline]
     fn config(&self) -> NativeConfig {
+        // FIXME
         unimplemented!()
     }
     #[inline]
     fn display(&self) -> NativeDisplay {
+        // FIXME
         unimplemented!()
     }
 }
@@ -68,6 +70,7 @@ pub trait SurfaceExt {
 impl<T: SurfaceTypeTrait> SurfaceExt for Surface<T> {
     #[inline]
     fn surface(&self) -> NativeSurface {
+        // FIXME
         unimplemented!()
     }
 }
@@ -79,6 +82,7 @@ pub trait ContextExt {
 impl ContextExt for Context {
     #[inline]
     fn context(&self) -> NativeContext {
+        // FIXME
         unimplemented!()
     }
 }
