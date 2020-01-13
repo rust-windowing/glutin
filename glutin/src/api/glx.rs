@@ -13,8 +13,8 @@ mod make_current_guard;
 pub use self::glx::{Glx, GlxExtra};
 use self::make_current_guard::MakeCurrentGuard;
 
-use crate::config::{Api, ConfigAttribs, ConfigBuilder, ReleaseBehavior, Version};
-use crate::context::{ContextBuilderWrapper, GlProfile, Robustness};
+use crate::config::{Api, ConfigAttribs, ConfigsFinder, Version};
+use crate::context::{ContextBuilderWrapper, GlProfile, Robustness, ReleaseBehavior};
 
 use glutin_interface::{NativeDisplay, NativeWindow, NativeWindowSource, RawDisplay, RawWindow};
 use glutin_x11_sym::Display as X11Display;
@@ -103,7 +103,7 @@ pub struct Config {
 impl Config {
     #[inline]
     pub fn new<F>(
-        cb: &ConfigBuilder,
+        cf: &ConfigsFinder,
         screen: raw::c_int,
         disp: &Arc<X11Display>,
         conf_selector: F,

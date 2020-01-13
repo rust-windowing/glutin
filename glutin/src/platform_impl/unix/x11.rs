@@ -1,6 +1,6 @@
 use crate::api::egl::{self, EGL};
 use crate::api::glx::{self, ffi, GLX};
-use crate::config::{Api, ConfigAttribs, ConfigBuilder, ConfigWrapper};
+use crate::config::{Api, ConfigAttribs, ConfigsFinder, ConfigWrapper};
 use crate::context::ContextBuilderWrapper;
 use crate::platform::unix::BackingApi;
 use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
@@ -29,7 +29,7 @@ pub enum Config {
 
 impl Config {
     pub fn new<ND: NativeDisplay>(
-        cb: &ConfigBuilder,
+        cf: &ConfigsFinder,
         nd: &ND,
     ) -> Result<Vec<(ConfigAttribs, Config)>, Error> {
         let xlib = syms!(XLIB);
@@ -41,19 +41,19 @@ impl Config {
         };
         let screen = unsafe { screen.unwrap_or_else(|| (xlib.XDefaultScreen)(**disp)) };
 
-        let conf = match cb.plat_attr.backing_api {
-            BackingApi::Glx | BackingApi::GlxThenEgl => Self::new_glx(cb, screen, &disp),
-            BackingApi::Egl | BackingApi::EglThenGlx => Self::new_egl(cb, nd, screen, &disp),
+        let conf = match cf.plat_attr.backing_api {
+            BackingApi::Glx | BackingApi::GlxThenEgl => Self::new_glx(cf, screen, &disp),
+            BackingApi::Egl | BackingApi::EglThenGlx => Self::new_egl(cf, nd, screen, &disp),
         };
 
-        match (&conf, cb.plat_attr.backing_api) {
+        match (&conf, cf.plat_attr.backing_api) {
             (_, BackingApi::Glx) | (_, BackingApi::Egl) | (Ok(_), _) => return conf,
             _ => (),
         }
 
-        let conf2 = match cb.plat_attr.backing_api {
-            BackingApi::EglThenGlx => Self::new_glx(cb, screen, &disp),
-            BackingApi::GlxThenEgl => Self::new_egl(cb, nd, screen, &disp),
+        let conf2 = match cf.plat_attr.backing_api {
+            BackingApi::EglThenGlx => Self::new_glx(cf, screen, &disp),
+            BackingApi::GlxThenEgl => Self::new_egl(cf, nd, screen, &disp),
             _ => unreachable!(),
         };
 
@@ -69,15 +69,15 @@ impl Config {
 
     #[inline]
     fn new_glx(
-        cb: &ConfigBuilder,
+        cf: &ConfigsFinder,
         screen: raw::c_int,
         disp: &Arc<Display>,
     ) -> Result<Vec<(ConfigAttribs, Config)>, Error> {
-        let configs = glx::Config::new(cb, screen, disp, |confs| {
+        let configs = glx::Config::new(cf, screen, disp, |confs| {
             select_configs(
                 disp,
-                cb.plat_attr.x11_transparency,
-                cb.plat_attr.x11_visual_xid,
+                cf.plat_attr.x11_transparency,
+                cf.plat_attr.x11_visual_xid,
                 confs,
                 |config_id| unimplemented!(),
             )
@@ -93,16 +93,16 @@ impl Config {
 
     #[inline]
     fn new_egl<ND: NativeDisplay>(
-        cb: &ConfigBuilder,
+        cf: &ConfigsFinder,
         nd: &ND,
         screen: raw::c_int,
         disp: &Arc<Display>,
     ) -> Result<Vec<(ConfigAttribs, Config)>, Error> {
-        let configs = egl::Config::new(cb, nd, |confs, egl_disp| {
+        let configs = egl::Config::new(cf, nd, |confs, egl_disp| {
             select_configs(
                 disp,
-                cb.plat_attr.x11_transparency,
-                cb.plat_attr.x11_visual_xid,
+                cf.plat_attr.x11_transparency,
+                cf.plat_attr.x11_visual_xid,
                 confs,
                 |config_id| {
                     let xid = egl::get_native_visual_id(***egl_disp, *config_id)? as ffi::VisualID;

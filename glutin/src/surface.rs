@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::config::{Config, SwapInterval};
 use crate::platform_impl;
 
 use glutin_interface::{NativePixmap, NativePixmapSource, NativeWindow, NativeWindowSource};
@@ -84,7 +84,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
 
 impl Surface<Pixmap> {
     #[inline]
-    pub unsafe fn new<NPS: NativePixmapSource>(
+    pub unsafe fn new_pixmap<NPS: NativePixmapSource>(
         conf: &Config,
         nps: &NPS,
         wb: NPS::PixmapBuilder,
@@ -94,21 +94,21 @@ impl Surface<Pixmap> {
     }
 
     #[inline]
-    pub unsafe fn new_existing<NP: NativePixmap>(conf: &Config, np: &NP) -> Result<Self, Error> {
+    pub unsafe fn new_from_existing_pixmap<NP: NativePixmap>(conf: &Config, np: &NP) -> Result<Self, Error> {
         platform_impl::Surface::<Pixmap>::new_existing(conf.as_ref(), np).map(Surface)
     }
 }
 
 impl Surface<PBuffer> {
     #[inline]
-    pub unsafe fn new(conf: &Config, size: dpi::PhysicalSize<u32>) -> Result<Self, Error> {
+    pub unsafe fn new_pbuffer(conf: &Config, size: dpi::PhysicalSize<u32>) -> Result<Self, Error> {
         platform_impl::Surface::<PBuffer>::new(conf.as_ref(), size).map(Surface)
     }
 }
 
 impl Surface<Window> {
     #[inline]
-    pub unsafe fn new<NWS: NativeWindowSource>(
+    pub unsafe fn new_window<NWS: NativeWindowSource>(
         conf: &Config,
         nws: &NWS,
         wb: NWS::WindowBuilder,
@@ -118,7 +118,7 @@ impl Surface<Window> {
     }
 
     #[inline]
-    pub unsafe fn new_existing<NW: NativeWindow>(conf: &Config, nw: &NW) -> Result<Self, Error> {
+    pub unsafe fn new_from_existing_window<NW: NativeWindow>(conf: &Config, nw: &NW) -> Result<Self, Error> {
         platform_impl::Surface::<Window>::new_existing(conf.as_ref(), nw).map(Surface)
     }
 
@@ -155,5 +155,11 @@ impl Surface<Window> {
             target_os = "openbsd",
         ))]
         self.0.update_after_resize(size);
+    }
+
+    pub fn modify_swap_interval(&self, swap_interval: SwapInterval) -> Result<(), Error> {
+        // FIXME
+        unimplemented!()
+        //self.0.modify_swap_interval()
     }
 }

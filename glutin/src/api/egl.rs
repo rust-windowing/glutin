@@ -16,10 +16,10 @@ pub use self::egl::Egl;
 use self::make_current_guard::MakeCurrentGuard;
 
 use crate::config::{
-    Api, ConfigAttribs, ConfigBuilder, ConfigWrapper, ReleaseBehavior, SwapInterval,
+    Api, ConfigAttribs, ConfigsFinder, ConfigWrapper, SwapInterval,
     SwapIntervalRange, Version,
 };
-use crate::context::{ContextBuilderWrapper, Robustness};
+use crate::context::{ContextBuilderWrapper, Robustness, ReleaseBehavior};
 use crate::surface::{PBuffer, Pixmap, SurfaceType, SurfaceTypeTrait, Window};
 
 use glutin_interface::{NativeDisplay, RawDisplay};
@@ -406,7 +406,7 @@ pub struct Config {
 impl Config {
     #[inline]
     pub fn new<F, NB: NativeDisplay>(
-        cb: &ConfigBuilder,
+        cf: &ConfigsFinder,
         nb: &NB,
         mut conf_selector: F,
     ) -> Result<Vec<(ConfigAttribs, Config)>, Error>
@@ -422,7 +422,7 @@ impl Config {
         // TODO: Alternatively, allow EGL_MESA_platform_surfaceless.
         // FIXME: Also check for the GL_OES_surfaceless_context *CONTEXT*
         // extension
-        if cb.surfaceless_support
+        if cf.surfaceless_support
             && display
                 .extensions
                 .iter()
@@ -435,10 +435,10 @@ impl Config {
         }
 
         // binding the right API and choosing the version
-        unsafe { Display::bind_api(cb.version.0, display.egl_version)? };
+        unsafe { Display::bind_api(cf.version.0, display.egl_version)? };
         let mut errors = make_error!(ErrorType::NoAvailableConfig);
 
-        match cb.desired_swap_interval {
+        match cf.desired_swap_interval {
             Some(SwapInterval::AdaptiveWait(_)) => {
                 errors.append(make_error!(ErrorType::AdaptiveSwapControlNotSupported));
                 return Err(errors);
@@ -456,18 +456,18 @@ impl Config {
 
             out.push(ffi::egl::SURFACE_TYPE as raw::c_int);
             let mut surface_type = 0;
-            if cb.window_surface_support {
+            if cf.window_surface_support {
                 surface_type = surface_type | ffi::egl::WINDOW_BIT;
             }
-            if cb.pbuffer_surface_support {
+            if cf.pbuffer_surface_support {
                 surface_type = surface_type | ffi::egl::PBUFFER_BIT;
             }
-            if cb.pixmap_surface_support {
+            if cf.pixmap_surface_support {
                 surface_type = surface_type | ffi::egl::PIXMAP_BIT;
             }
             out.push(surface_type as raw::c_int);
 
-            match cb.version {
+            match cf.version {
                 (Api::OpenGlEs, Version(3, _)) => {
                     if display.egl_version < (1, 3) {
                         return Err(errors);
@@ -507,7 +507,7 @@ impl Config {
                 (_, _) => unimplemented!(),
             };
 
-            if let Some(hardware_accelerated) = cb.hardware_accelerated {
+            if let Some(hardware_accelerated) = cf.hardware_accelerated {
                 out.push(ffi::egl::CONFIG_CAVEAT as raw::c_int);
                 out.push(if hardware_accelerated {
                     ffi::egl::NONE as raw::c_int
@@ -516,7 +516,7 @@ impl Config {
                 });
             }
 
-            if let Some(color) = cb.color_bits {
+            if let Some(color) = cf.color_bits {
                 out.push(ffi::egl::RED_SIZE as raw::c_int);
                 out.push((color / 3) as raw::c_int);
                 out.push(ffi::egl::GREEN_SIZE as raw::c_int);
@@ -525,51 +525,40 @@ impl Config {
                 out.push((color / 3 + if color % 3 == 2 { 1 } else { 0 }) as raw::c_int);
             }
 
-            if let Some(alpha) = cb.alpha_bits {
+            if let Some(alpha) = cf.alpha_bits {
                 out.push(ffi::egl::ALPHA_SIZE as raw::c_int);
                 out.push(alpha as raw::c_int);
             }
 
-            if let Some(depth) = cb.depth_bits {
+            if let Some(depth) = cf.depth_bits {
                 out.push(ffi::egl::DEPTH_SIZE as raw::c_int);
                 out.push(depth as raw::c_int);
             }
 
-            if let Some(stencil) = cb.stencil_bits {
+            if let Some(stencil) = cf.stencil_bits {
                 out.push(ffi::egl::STENCIL_SIZE as raw::c_int);
                 out.push(stencil as raw::c_int);
             }
 
-            if let Some(true) = cb.double_buffer {
+            if let Some(true) = cf.double_buffer {
                 return Err(errors);
             }
 
-            if let Some(multisampling) = cb.multisampling {
+            if let Some(multisampling) = cf.multisampling {
                 out.push(ffi::egl::SAMPLES as raw::c_int);
                 out.push(multisampling as raw::c_int);
             }
 
-            if cb.stereoscopy {
+            if cf.stereoscopy {
                 return Err(errors);
             }
 
-            if let Some(xid) = cb.plat_attr.x11_visual_xid {
+            if let Some(xid) = cf.plat_attr.x11_visual_xid {
                 out.push(ffi::egl::NATIVE_VISUAL_ID as raw::c_int);
                 out.push(xid as raw::c_int);
             }
 
-            match cb.release_behavior {
-                ReleaseBehavior::Flush => (),
-                ReleaseBehavior::None => {
-                    // FIXME: This isn't a client extension, right?
-                    if !display.has_extension("EGL_KHR_context_flush_control") {
-                        errors.append(make_error!(ErrorType::FlushControlNotSupported));
-                        return Err(errors);
-                    }
-                }
-            }
-
-            if let Some(srgb) = cb.srgb {
+            if let Some(srgb) = cf.srgb {
                 if srgb && !display.has_extension("EGL_KHR_gl_colorspace") {
                     return Err(errors);
                 }
@@ -644,7 +633,7 @@ impl Config {
             }};
         };
 
-        let configs = if let Some(desired_swap_interval) = cb.desired_swap_interval {
+        let configs = if let Some(desired_swap_interval) = cf.desired_swap_interval {
             let desired_swap_interval = match desired_swap_interval {
                 SwapInterval::Wait(n) => n,
                 SwapInterval::DontWait => 0,
@@ -731,11 +720,11 @@ impl Config {
                 };
 
                 let attribs = ConfigAttribs {
-                    version: cb.version,
-                    window_surface_support: cb.window_surface_support,
-                    pbuffer_surface_support: cb.pbuffer_surface_support,
-                    pixmap_surface_support: cb.pixmap_surface_support,
-                    surfaceless_support: cb.surfaceless_support,
+                    version: cf.version,
+                    window_surface_support: cf.window_surface_support,
+                    pbuffer_surface_support: cf.pbuffer_surface_support,
+                    pixmap_surface_support: cf.pixmap_surface_support,
+                    surfaceless_support: cf.surfaceless_support,
                     hardware_accelerated: attrib!(egl, display, conf_id, ffi::egl::CONFIG_CAVEAT)?
                         != ffi::egl::SLOW_CONFIG as i32,
                     color_bits: attrib!(egl, display, conf_id, ffi::egl::RED_SIZE)? as u8
@@ -750,9 +739,8 @@ impl Config {
                         0 | 1 => None,
                         a => Some(a as u16),
                     },
-                    release_behavior: cb.release_behavior,
-                    srgb: cb.srgb.unwrap_or(false),
-                    desired_swap_interval: cb.desired_swap_interval.clone().unwrap_or(
+                    srgb: cf.srgb.unwrap_or(false),
+                    desired_swap_interval: cf.desired_swap_interval.clone().unwrap_or(
                         match &swap_interval_ranges[0] {
                             SwapIntervalRange::DontWait => SwapInterval::DontWait,
                             SwapIntervalRange::Wait(n) => SwapInterval::Wait(n.start),
@@ -780,7 +768,7 @@ impl Config {
             return Err(errors);
         }
 
-        if cb.srgb.is_none() {
+        if cf.srgb.is_none() {
             let configs_len = configs.len();
             for i in 0..configs_len {
                 let mut new_conf = configs[i].clone();
@@ -796,7 +784,7 @@ impl Config {
                     attribs,
                     Config {
                         display: Arc::clone(&display),
-                        version: cb.version,
+                        version: cf.version,
                         config_id,
                     },
                 )
@@ -955,7 +943,7 @@ impl Context {
             context_attributes.push(version.0 as raw::c_int);
         }
 
-        match conf.attribs.release_behavior {
+        match cb.release_behavior {
             ReleaseBehavior::Flush => {
                 // FIXME: This isn't a client extension, right?
                 if display.has_extension("EGL_KHR_context_flush_control") {
@@ -966,6 +954,10 @@ impl Context {
                 }
             }
             ReleaseBehavior::None => {
+                // FIXME: This isn't a client extension, right?
+                if !display.has_extension("EGL_KHR_context_flush_control") {
+                    return Err(make_error!(ErrorType::FlushControlNotSupported));
+                }
                 context_attributes.push(ffi::egl::CONTEXT_RELEASE_BEHAVIOR_KHR as raw::c_int);
                 context_attributes.push(ffi::egl::CONTEXT_RELEASE_BEHAVIOR_NONE_KHR as raw::c_int);
             }

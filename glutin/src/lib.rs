@@ -1,75 +1,59 @@
 //! The purpose of this library is to provide an OpenGL [`Context`] on as many
-//! platforms as possible.
+//! platforms as possible, as well as a [`Surface`] to go along with it. Before
+//! you can do that, however, you need to decide on a [`Config`eration] for your
+//! [`Context`]s and [`Surface`]s.
 //!
-//! # Building a [`WindowedContext<T>`]
+//! You can use a [`ConfigsFinder`] to get a selection of [`Config`eration]s
+//! that match your criteria. Among many things, you must specify in advance
+//! what types of [`Surface`]s you're going to use the [`Config`eration] with.
 //!
-//! A [`WindowedContext<T>`] is composed of a [`Window`] and an OpenGL
-//! [`Context`].
+//! After settling on a [`Config`eration], you can make your [`Context`]s and
+//! [`Surface`]s in any order you want, as long as your [`Surface`]'s and
+//! [`Context`]'s [`Config`eration] are the same.
 //!
-//! Due to some operating-system-specific quirks, glutin prefers control over
-//! the order of creation of the [`Context`] and [`Window`]. Here is an example
-//! of building a [`WindowedContext<T>`]:
-// //! ```no_run
-// //! # fn main() {
-// //! let el = glutin::event_loop::EventLoop::new();
-// //! let wb = glutin::window::WindowBuilder::new()
-// //!     .with_title("Hello world!")
-// //!     .with_inner_size(glutin::dpi::LogicalSize::new(1024.0, 768.0));
-// //! let windowed_context = glutin::ContextBuilder::new()
-// //!     .build_windowed(wb, &el)
-// //!     .unwrap();
-// //! # }
-// //! ```
-// FIXME update
-//! You can, of course, create a [`RawContext<T>`] separately from an existing
-//! window, however that may result in an suboptimal configuration of the window
-//! on some platforms. In that case use the unsafe platform-specific
-//! [`RawContextExt`] available on unix operating systems and Windows.
+//! Similar to how [`Config`eration]s are acquired via a [`ConfigsFinder`], so
+//! too are [`Context`]s from a [`ContextBuilder`]. At this stage if you decide
+//! to make multiple [`Context`]s you can also choose to share them. Some
+//! platform specific restrictions are mentioned in [`ContextBuilderWrapper`]'s
+//! [`with_shared_lists`] function.
 //!
-//! You can also produce headless [`Context`]s via the
-//! [`ContextBuilder::build_headless`] function.
+//! [`Surface`]s come in three flavors, [`Pixmap`]s, [`PBuffer`]s, and
+//! [`Window`]s. They are created with the [`Surface::new_pixmap`],
+//! [`Surface::new_pbuffer`], and [`Surface::new_window`] functions,
+//! respectively. Alternatively, if you have already created a [`Window`] or
+//! [`Pixmap`], you can use [`Surface::new_from_existing_window`] and
+//! [`Surface::new_from_existing_pixmap`], respectively.
 //!
-//! [`Window`]: struct.Window.html
-//! [`Context`]: struct.Context.html
-//! [`WindowedContext<T>`]: type.WindowedContext.html
-//! [`RawContext<T>`]: type.RawContext.html
-#![cfg_attr(
-    target_os = "windows",
-    doc = "\
-[`RawContextExt`]: os/windows/trait.RawContextExt.html
-"
-)]
-#![cfg_attr(
-    not(any(
-        target_os = "linux",
-        target_os = "dragonfly",
-        target_os = "freebsd",
-        target_os = "netbsd",
-        target_os = "windows",
-        target_os = "openbsd",
-    )),
-    doc = "\
-[`RawContextExt`]: os/index.html
-"
-)]
-#![cfg_attr(
-    any(
-        target_os = "linux",
-        target_os = "dragonfly",
-        target_os = "freebsd",
-        target_os = "netbsd",
-        target_os = "openbsd",
-    ),
-    doc = "\
-[`RawContextExt`]: os/unix/trait.RawContextExt.html
-"
-)]
+//! Once you've made a [`Context`] and a [`Surface`], you can make them current
+//! with the [`Context::make_current`] function. Alternatively, you can use
+//! [`Context::make_current_surfaceless`] if you don't want to make a
+//! [`Surface`], but make sure that the [`Config`eration] you made the [`Context`]
+//! with supported surfaceless.
+//!
+//! [`Context`]: crate::context::Context
+//! [`ContextBuilder`]: crate::context::ContextBuilder
+//! [`ContextBuilderWrapper`]: crate::context::ContextBuilderWrapper
+//! [`with_shared_lists`]: crate::context::ContextBuilderWrapper::with_shared_lists()
+//! [`Surface`]: crate::surface::Surface
+//! [`Config`eration]: crate::config::ConfigWrapper
+//! [`ConfigsFinder`]: crate::config::ConfigsFinder
+//! [`Window`]: crate::surface::Window
+//! [`PBuffer`]: crate::surface::PBuffer
+//! [`Pixmap`]: crate::surface::Pixmap
+//! [`Surface::new_pixmap`]: crate::surface::Surface::new_pixmap()
+//! [`Surface::new_pbuffer`]: crate::surface::Surface::new_pbuffer()
+//! [`Surface::new_window`]: crate::surface::Surface::new_window()
+//! [`Surface::new_from_existing_pixmap`]: crate::surface::Surface::new_from_existing_window()
+//! [`Surface::new_from_existing_window`]: crate::surface::Surface::new_from_existing_pixmap()
+//! [`Context::make_current`]: crate::context::Context::make_current()
+//! [`Context::make_current_surfaceless`]: crate::context::Context::make_current_surfaceless()
+
 #![deny(
     missing_debug_implementations,
     //missing_docs,
 )]
 // FIXME: Remove before 0.23
-#![allow(unused_imports)]
+#![allow(unused_imports, unused_variables)]
 
 #[cfg(any(
     target_os = "windows",

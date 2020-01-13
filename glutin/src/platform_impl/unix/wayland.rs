@@ -1,6 +1,6 @@
 use crate::api::egl;
 use crate::api::egl::ffi;
-use crate::config::{Api, ConfigAttribs, ConfigBuilder, ConfigWrapper};
+use crate::config::{Api, ConfigAttribs, ConfigsFinder, ConfigWrapper};
 use crate::context::ContextBuilderWrapper;
 use crate::platform::unix::BackingApi;
 use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
@@ -24,13 +24,13 @@ pub struct Config(egl::Config);
 
 impl Config {
     pub fn new<ND: NativeDisplay>(
-        cb: &ConfigBuilder,
+        cf: &ConfigsFinder,
         nd: &ND,
     ) -> Result<Vec<(ConfigAttribs, Config)>, Error> {
         let glx_not_supported_error = make_error!(ErrorType::NotSupported(
             "GLX not supported by Wayland".to_string(),
         ));
-        let backing_api = cb.plat_attr.backing_api;
+        let backing_api = cf.plat_attr.backing_api;
         match backing_api {
             BackingApi::Glx => return Err(glx_not_supported_error),
             BackingApi::GlxThenEgl => {
@@ -39,7 +39,7 @@ impl Config {
             _ => (),
         }
 
-        let configs = egl::Config::new(cb, nd, |confs, _| {
+        let configs = egl::Config::new(cf, nd, |confs, _| {
             confs.into_iter().map(|config| Ok(config)).collect()
         })
         .map_err(|mut err| match backing_api {

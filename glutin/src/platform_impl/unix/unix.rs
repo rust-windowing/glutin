@@ -9,7 +9,7 @@
 mod wayland;
 mod x11;
 
-use crate::config::{Api, ConfigAttribs, ConfigBuilder, ConfigWrapper};
+use crate::config::{Api, ConfigAttribs, ConfigsFinder, ConfigWrapper};
 use crate::context::ContextBuilderWrapper;
 pub use crate::platform::unix::ConfigPlatformAttributes;
 use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
@@ -34,19 +34,19 @@ pub enum Config {
 impl Config {
     #[inline]
     pub fn new<ND: NativeDisplay>(
-        cb: &ConfigBuilder,
+        cf: &ConfigsFinder,
         nd: &ND,
     ) -> Result<Vec<(ConfigAttribs, Config)>, Error> {
         Ok(match nd.raw_display() {
             RawDisplay::Wayland { .. } => {
-                let configs = wayland::Config::new(cb, nd)?;
+                let configs = wayland::Config::new(cf, nd)?;
                 configs
                     .into_iter()
                     .map(|(attribs, config)| (attribs, Config::Wayland(config)))
                     .collect()
             }
             RawDisplay::Xlib { .. } => {
-                let configs = x11::Config::new(cb, nd)?;
+                let configs = x11::Config::new(cf, nd)?;
                 configs
                     .into_iter()
                     .map(|(attribs, config)| (attribs, Config::X11(config)))

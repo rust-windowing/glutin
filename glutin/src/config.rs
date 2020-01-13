@@ -1,3 +1,22 @@
+//! You can use a [`ConfigsFinder`] to get a selection of [`Config`eration]s
+//! that match your criteria. Among many things, you must specify in advance
+//! what types of [`Surface`]s you're going to use the [`Config`]eration with.
+//!
+//! Once a [`Config`eration] is made, you can also modify its
+//! [`desired_swap_interval`]. Please refer to [`ConfigAttribs`] for more info.
+//!
+//! **WARNING:** Glutin clients should use the [`Config`] type in their code, not
+//! [`ConfigWrapper`]. If I had a choice, I'd hide that type, but alas, due to
+//! limitations in rustdoc, I cannot. Unfortunately, all of [`Config`]'s methods
+//! are only visible on [`ConfigWrapper`].
+//!
+//! [`ConfigAttribs`]: crate::config::ConfigAttribs
+//! [`Config`eration]: crate::config::ConfigWrapper
+//! [`Config`]: crate::config::Config
+//! [`ConfigWrapper`]: crate::config::ConfigWrapper
+//! [`desired_swap_interval`]: crate::config::ConfigAttribs::desired_swap_interval
+//! [`Surface`]: crate::surface::Surface
+
 use crate::platform_impl;
 
 use glutin_interface::NativeDisplay;
@@ -5,7 +24,7 @@ use winit_types::error::{Error, ErrorType};
 
 use std::ops::Range;
 
-/// All APIs related to OpenGL that you can possibly get while using glutin.
+/// All OpenGL APIs that you can get while using glutin.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Api {
     /// The classical OpenGL. Available on Windows, Unix operating systems,
@@ -17,50 +36,41 @@ pub enum Api {
     WebGl,
 }
 
+/// The OpenGL version you want. Major then Minor, so `Version(3, 2)` equals
+/// OpenGL 3.2.
 #[derive(Debug, Copy, Clone)]
 pub struct Version(pub u8, pub u8);
 
-/// The behavior of the driver when you change the current context.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum ReleaseBehavior {
-    /// Doesn't do anything. Most notably doesn't flush.
-    None,
-
-    /// Flushes the context that was previously current as if `glFlush` was
-    /// called.
-    Flush,
-}
-
-impl Default for ReleaseBehavior {
-    fn default() -> Self {
-        ReleaseBehavior::Flush
-    }
-}
-
-/// The swap interval.
-///
-/// If the swap interval is `DontWait`, calling `swap_buffers` will not
-/// block.
-///
-/// When using `Wait(n)` or `AdaptiveWait(n)`, `n` may not equal zero.
-///
-/// When using `Wait(n)`, the swap is synchronized to the `n`'th video frame.
-/// This is typically set to `1` to enable vsync and prevent screen tearing.
-///
-/// When using `AdaptiveWait(n)`, the swap is synchronized to the `n`th video
-/// frame as long as the frame rate is higher than the sync rate. If the frame
-/// rate is less than the sync rate synchronization is disabled and
-/// `AdaptiveWait(n)` behaves as `DontWait`. This is only supported by WGL/GLX
-/// drivers that implement `EXT_swap_control_tear`.
+/// A swap interval.
 ///
 /// Please note that your application's desired swap interval may be overridden
 /// by external, driver-specific configuration, which means that you can't know
-/// in advance whether `swap_buffers`/`swap_buffers_with_damage` will block or
+/// in advance whether [`swap_buffers`]/[`swap_buffers_with_damage`] will block or
 /// not.
-#[derive(Debug, Clone, Copy)]
+///
+/// [`swap_buffers`]: crate::surface::Surface::swap_buffers
+/// [`swap_buffers_with_damage`]: crate::surface::Surface::swap_buffers_with_damage
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SwapInterval {
+    /// If the swap interval is `DontWait`, calling `swap_buffers` will not
+    /// block.
     DontWait,
+
+    /// When using `Wait(n)`, `n` may not equal zero.
+    ///
+    /// The swap is synchronized to the `n`'th video frame. This is typically
+    /// set to `1` to enable vsync and prevent screen tearing.
+    ///
     Wait(u32),
+
+    /// When using `AdaptiveWait(n)`, `n` may not equal zero.
+    ///
+    /// The swap is synchronized to the `n`th video frame as long as the frame
+    /// rate is higher than the sync rate.
+    ///
+    /// If the frame rate is less than the sync ratem synchronization is disabled
+    /// and `AdaptiveWait(n)` behaves as `DontWait`. This is only supported by
+    /// WGL/GLX drivers that implement `EXT_swap_control_tear`.
     AdaptiveWait(u32),
 }
 
@@ -77,14 +87,22 @@ impl SwapInterval {
     }
 }
 
-#[derive(Debug, Clone)]
+/// A range of swap intervals
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SwapIntervalRange {
+    /// [`DontWait`](crate::config::SwapInterval::DontWait) is in range.
     DontWait,
+    /// [`Wait(n)`](crate::config::SwapInterval::Wait) is in range, as long as
+    /// `n` is in this `Range<u32>`.
     Wait(Range<u32>),
+    /// [`AdaptiveWait(n)`](crate::config::SwapInterval::AdaptiveWait) is in
+    /// range, as long as `n` is in this `Range<u32>`.
     AdaptiveWait(Range<u32>),
 }
 
 impl SwapIntervalRange {
+    /// Returns `true` if the [`SwapInterval`](crate::config::SwapInterval) is
+    /// in range of this `SwapIntervalRange`, else `false`.
     fn contains(&self, swap_interval: &SwapInterval) -> bool {
         match (self, swap_interval) {
             (SwapIntervalRange::DontWait, SwapInterval::DontWait) => true,
@@ -95,33 +113,58 @@ impl SwapIntervalRange {
     }
 }
 
-/// Describes a possible format.
+/// Describes the attributes of a possible [`Config`]eration. Immutably accessed
+/// via [`Config`]'s [`attribs`] function.
+///
+/// After the creation of the [`Config`], the [`desired_swap_interval`] can be
+/// modified into any other [`SwapInterval`] as long as it is within range of
+/// any one of the [`SwapIntervalRange`]s in [`swap_interval_ranges`] via
+/// [`Config`]'s [`set_desired_swap_interval`] function.
+///
+/// Please refer to [`ConfigsFinder`]'s methods for details on what each parameter
+/// is for.
+///
+/// [`Config`]: crate::config::ConfigWrapper
+/// [`SwapInterval`]: crate::config::SwapInterval
+/// [`SwapIntervalRange`]: crate::config::SwapIntervalRange
+/// [`attribs`]: crate::config::ConfigWrapper::attribs()
+/// [`set_desired_swap_interval`]: crate::config::ConfigWrapper::set_desired_swap_interval()
+/// [`desired_swap_interval`]: crate::config::ConfigAttribs::desired_swap_interval
+/// [`swap_interval_ranges`]: crate::config::ConfigAttribs::swap_interval_ranges
+/// [`ConfigsFinder`]: crate::config::ConfigsFinder
 #[allow(missing_docs)]
 #[derive(Debug, Clone)]
 pub struct ConfigAttribs {
+    pub desired_swap_interval: SwapInterval,
+    pub swap_interval_ranges: Vec<SwapIntervalRange>,
     pub version: (Api, Version),
     pub hardware_accelerated: bool,
-    /// The number of color bits. Does not include alpha bits.
     pub color_bits: u8,
     pub alpha_bits: u8,
     pub depth_bits: u8,
     pub stencil_bits: u8,
     pub stereoscopy: bool,
     pub double_buffer: bool,
-    /// `None` if multisampling is disabled, otherwise `Some(N)` where `N` is
-    /// the multisampling level.
     pub multisampling: Option<u16>,
     pub srgb: bool,
-    pub desired_swap_interval: SwapInterval,
-    pub swap_interval_ranges: Vec<SwapIntervalRange>,
     pub pbuffer_surface_support: bool,
     pub pixmap_surface_support: bool,
     pub window_surface_support: bool,
     pub surfaceless_support: bool,
-    pub release_behavior: ReleaseBehavior,
 }
 
-/// Describes a possible format.
+/// A type that contains the [`ConfigAttribs`] along side with the native api's
+/// config type and (depending on the native API) possibly the connection to the
+/// native API..
+///
+/// Please refer to [`ConfigAttribs`] for more information.
+///
+/// **WARNING:** Glutin clients should use the [`Config`] type in their code,
+/// not this type. If I had a choice, I'd hide this type, but alas, due to
+/// limitations in rustdoc, I cannot.
+///
+/// [`ConfigAttribs`]: crate::config::ConfigAttribs
+/// [`Config`]: crate::config::Config
 #[allow(missing_docs)]
 #[derive(Debug, Clone)]
 pub struct ConfigWrapper<T, CA> {
@@ -129,6 +172,11 @@ pub struct ConfigWrapper<T, CA> {
     pub(crate) config: T,
 }
 
+/// A simple type alias for [`ConfigWrapper`]. Glutin clients should use this
+/// type in their code, not [`ConfigWrapper`]. If I had a choice, I'd hide
+/// [`ConfigWrapper`], but alas, due to limitations in rustdoc, I cannot.
+///
+/// [`ConfigWrapper`]: crate::config::ConfigWrapper
 pub type Config = ConfigWrapper<platform_impl::Config, ConfigAttribs>;
 
 impl<T: Clone, CA: Clone> ConfigWrapper<&T, &CA> {
@@ -155,12 +203,25 @@ impl<T, CA> ConfigWrapper<T, CA> {
     }
 }
 
-impl Config {
+impl ConfigWrapper<platform_impl::Config, ConfigAttribs> {
+    /// Provides immutable access to [`Config`]'s [`ConfigAttribs`].
+    ///
+    /// Please refer to [`ConfigAttribs`] for more information.
+    ///
+    /// [`Config`]: crate::config::ConfigWrapper
+    /// [`ConfigAttribs`]: crate::config::ConfigAttribs
     #[inline]
     pub fn attribs(&self) -> &ConfigAttribs {
         &self.attribs
     }
 
+    /// Changes the [`Config`]'s [`desired_swap_interval`].
+    ///
+    /// Please refer to [`ConfigAttribs`] for more information.
+    ///
+    /// [`desired_swap_interval`]: crate::config::ConfigAttribs::desired_swap_interval
+    /// [`Config`]: crate::config::ConfigWrapper
+    /// [`ConfigAttribs`]: crate::config::ConfigAttribs
     #[inline]
     pub fn set_desired_swap_interval(
         &mut self,
@@ -181,7 +242,9 @@ impl Config {
         self.attribs.desired_swap_interval = desired_swap_interval;
         Ok(())
     }
+}
 
+impl Config {
     /// Turns the `config` parameter into another type.
     #[inline]
     pub(crate) fn as_ref(&self) -> ConfigWrapper<&platform_impl::Config, &ConfigAttribs> {
@@ -192,80 +255,37 @@ impl Config {
     }
 }
 
-/// Describes how the backend should choose a pixel format.
-// TODO: swap method? (swap, copy)
+// FIXME doc
+#[allow(missing_docs)]
 #[derive(Clone, Debug)]
-pub struct ConfigBuilder {
-    /// Version to try create.
-    ///
-    /// The default is `(Api::OpenGl, (3, 3))'.
+pub struct ConfigsFinder {
     pub version: (Api, Version),
-
-    /// If true, only hardware-accelerated formats will be considered. If
-    /// false, only software renderers. `None` means "don't care". Default
-    /// is `Some(true)`.
     pub hardware_accelerated: Option<bool>,
-
-    /// Minimum number of bits for the color buffer, excluding alpha. `None`
-    /// means "don't care". The default is `Some(24)`.
     pub color_bits: Option<u8>,
-
-    /// If true, the color buffer must be in a floating point format. Default
-    /// is `false`.
-    ///
-    /// Using floating points allows you to write values outside of the `[0.0,
-    /// 1.0]` range.
-    pub float_color_buffer: bool,
-
-    /// Minimum number of bits for the alpha in the color buffer. `None` means
-    /// "don't care". The default is `Some(8)`.
+    pub float_color_buffer: Option<bool>,
     pub alpha_bits: Option<u8>,
-
-    /// Minimum number of bits for the depth buffer. `None` means "don't care".
-    /// The default value is `Some(24)`.
     pub depth_bits: Option<u8>,
-
-    /// Minimum number of stencil bits. `None` means "don't care".
-    /// The default value is `Some(8)`.
     pub stencil_bits: Option<u8>,
-
-    /// If true, only double-buffered formats will be considered. If false,
-    /// only single-buffer formats. `None` means "don't care". The default
-    /// is `Some(true)`.
     pub double_buffer: Option<bool>,
-
-    /// Contains the minimum number of samples per pixel in the color, depth
-    /// and stencil buffers. `None` means "don't care". Default is `None`.
-    /// A value of `Some(0)` indicates that multisampling must not be enabled.
     pub multisampling: Option<u16>,
-
-    /// If true, only stereoscopic formats will be considered. If false, only
-    /// non-stereoscopic formats. The default is `false`.
     pub stereoscopy: bool,
-
-    /// If sRGB-capable formats will be considered. If `None`, don't care.
-    /// The default is `None`.
     pub srgb: Option<bool>,
-
-    /// The behavior when changing the current context. Default is `Flush`.
-    pub release_behavior: ReleaseBehavior,
-
     pub desired_swap_interval: Option<SwapInterval>,
     pub pbuffer_surface_support: bool,
     pub window_surface_support: bool,
     pub pixmap_surface_support: bool,
     pub surfaceless_support: bool,
-
     pub plat_attr: platform_impl::ConfigPlatformAttributes,
 }
 
-impl Default for ConfigBuilder {
+impl Default for ConfigsFinder {
     #[inline]
     fn default() -> Self {
-        ConfigBuilder {
+        ConfigsFinder {
             hardware_accelerated: Some(true),
             color_bits: Some(24),
-            float_color_buffer: false,
+            // FIXME EGL_EXT_pixel_format_float
+            float_color_buffer: None,
             alpha_bits: Some(8),
             depth_bits: Some(24),
             stencil_bits: Some(8),
@@ -279,13 +299,12 @@ impl Default for ConfigBuilder {
             pixmap_surface_support: false,
             window_surface_support: true,
             version: (Api::OpenGl, Version(3, 3)),
-            release_behavior: Default::default(),
             plat_attr: Default::default(),
         }
     }
 }
 
-impl ConfigBuilder {
+impl ConfigsFinder {
     fn new() -> Self {
         Default::default()
     }
@@ -297,56 +316,62 @@ impl ConfigBuilder {
         self
     }
 
-    /// Sets the multisampling level to request. A value of `0` indicates that
-    /// multisampling must not be enabled.
+    /// If true, the color buffer must be in a floating point format. `None`
+    /// means "don't care",
+    ///
+    /// Using floating points allows you to write values outside of the `[0.0,
+    /// 1.0]` range.
+    #[inline]
+    pub fn with_float_color_buffer(mut self, float_color_buffer: Option<bool>) -> Self {
+        self.float_color_buffer = float_color_buffer;
+        self
+    }
+
+    /// Contains the minimum number of samples per pixel in the color, depth
+    /// and stencil buffers. `None` means "don't care".
+    /// A value of `None` indicates that multisampling must not be enabled.
     ///
     /// # Panic
     ///
     /// Will panic if `samples` is not a power of two.
     #[inline]
-    pub fn with_multisampling(mut self, samples: u16) -> Self {
-        self.multisampling = match samples {
-            0 => None,
-            _ => {
-                assert!(samples.is_power_of_two());
-                Some(samples)
-            }
-        };
+    pub fn with_multisampling(mut self, samples: Option<u16>) -> Self {
+        assert!(samples.unwrap_or(2).is_power_of_two());
+        self.multisampling = samples;
         self
     }
 
-    /// Sets the number of bits in the depth buffer.
+    /// Sets the number of bits in the depth buffer. `None` means "don't care".
     #[inline]
-    pub fn with_depth_buffer(mut self, bits: u8) -> Self {
-        self.depth_bits = Some(bits);
+    pub fn with_depth_buffer(mut self, bits: Option<u8>) -> Self {
+        self.depth_bits = bits;
         self
     }
 
-    /// Sets the number of bits in the stencil buffer.
+    /// Sets the number of bits in the stencil buffer. `None` means "don't care".
     #[inline]
-    pub fn with_stencil_buffer(mut self, bits: u8) -> Self {
-        self.stencil_bits = Some(bits);
+    pub fn with_stencil_buffer(mut self, bits: Option<u8>) -> Self {
+        self.stencil_bits = bits;
         self
     }
 
-    /// Sets the number of bits in the color buffer.
+    /// Sets the number of bits in the color buffer. `None` means "don't care".
     #[inline]
-    pub fn with_pixel_format(mut self, color_bits: u8, alpha_bits: u8) -> Self {
-        self.color_bits = Some(color_bits);
-        self.alpha_bits = Some(alpha_bits);
+    pub fn with_pixel_format(mut self, color_bits: Option<u8>, alpha_bits: Option<u8>) -> Self {
+        self.color_bits = color_bits;
+        self.alpha_bits = alpha_bits;
         self
     }
 
-    /// Request the backend to be stereoscopic.
+    /// If true, only stereoscopic formats will be considered. If false, only
+    /// non-stereoscopic formats.
     #[inline]
     pub fn with_stereoscopy(mut self, stereo: bool) -> Self {
         self.stereoscopy = stereo;
         self
     }
 
-    /// Sets whether sRGB should be enabled on the window.
-    ///
-    /// The default value is `None`.
+    /// If sRGB-capable formats will be considered. If `None`, don't care.
     #[inline]
     pub fn with_srgb(mut self, srgb: Option<bool>) -> Self {
         self.srgb = srgb;
@@ -388,7 +413,8 @@ impl ConfigBuilder {
 
     /// Sets whether double buffering should be enabled.
     ///
-    /// The default value is `None`.
+    /// If true, only double-buffered formats will be considered. If false,
+    /// only single-buffer formats. `None` means "don't care".
     ///
     /// ## Platform-specific
     ///
@@ -403,9 +429,7 @@ impl ConfigBuilder {
         self
     }
 
-    /// Sets whether hardware acceleration is required.
-    ///
-    /// The default value is `Some(true)`
+    /// Sets whether hardware acceleration is required. `None` means "don't care".
     ///
     /// ## Platform-specific
     ///

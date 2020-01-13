@@ -99,6 +99,8 @@ pub struct ContextBuilderWrapper<T> {
     /// [`TryRobustLoseContextOnReset`]:
     /// enum.Robustness.html#variant.TryRobustLoseContextOnReset
     pub robustness: Robustness,
+
+    pub release_behavior: ReleaseBehavior,
 }
 
 pub type ContextBuilder<'a> = ContextBuilderWrapper<&'a Context>;
@@ -115,6 +117,7 @@ impl<T> ContextBuilderWrapper<T> {
             profile: self.profile,
             debug: self.debug,
             robustness: self.robustness,
+            release_behavior: self.release_behavior,
         }
     }
 
@@ -126,6 +129,7 @@ impl<T> ContextBuilderWrapper<T> {
             profile: self.profile,
             debug: self.debug,
             robustness: self.robustness,
+            release_behavior: self.release_behavior,
         }
     }
 }
@@ -137,7 +141,8 @@ impl<T> Default for ContextBuilderWrapper<T> {
             sharing: None,
             profile: None,
             debug: cfg!(debug_assertions),
-            robustness: Robustness::NotRobust,
+            release_behavior: Default::default(),
+            robustness: Default::default(),
         }
     }
 }
@@ -189,6 +194,12 @@ impl<T> ContextBuilderWrapper<T> {
     pub fn with_shared_lists<T2>(self, other: T2) -> ContextBuilderWrapper<T2> {
         self.set_sharing(Some(other.into()))
     }
+
+    #[inline]
+    pub fn with_release_behaviour(mut self, release_behavior: ReleaseBehavior) -> Self {
+        self.release_behavior = release_behavior;
+        self
+    }
 }
 
 /// Specifies the tolerance of the OpenGL [`Context`] to faults. If you accept
@@ -237,6 +248,11 @@ pub enum Robustness {
     /// enum.Robustness.html#variant.RobustLoseContextOnReset
     TryRobustLoseContextOnReset,
 }
+impl Default for Robustness {
+    fn default() -> Self {
+        Robustness::NotRobust
+    }
+}
 
 /// Describes the requested OpenGL [`Context`] profiles.
 ///
@@ -247,4 +263,22 @@ pub enum GlProfile {
     Compatibility,
     /// Include all the future-compatible functions and definitions.
     Core,
+}
+
+/// The behavior of the driver when you change the current context.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum ReleaseBehavior {
+    /// Doesn't do anything. Most notably doesn't flush. Not supported by all
+    /// drivers.
+    None,
+
+    /// Flushes the context that was previously current as if `glFlush` was
+    /// called. This is the default behaviour.
+    Flush,
+}
+
+impl Default for ReleaseBehavior {
+    fn default() -> Self {
+        ReleaseBehavior::Flush
+    }
 }

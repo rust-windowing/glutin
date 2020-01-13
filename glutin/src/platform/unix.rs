@@ -10,7 +10,7 @@ pub mod osmesa;
 
 pub use crate::api::egl::ffi::EGLContext;
 pub use crate::api::glx::ffi::glx::types::GLXContext;
-use crate::config::ConfigBuilder;
+use crate::config::ConfigsFinder;
 
 use std::os::raw;
 
@@ -47,7 +47,7 @@ pub trait ConfigPlatformAttributesExt {
     fn with_backing_api(self, backing_api: BackingApi) -> Self;
 }
 
-impl ConfigPlatformAttributesExt for ConfigBuilder {
+impl ConfigPlatformAttributesExt for ConfigsFinder {
     #[inline]
     fn with_x11_visual_xid(mut self, xid: Option<raw::c_ulong>) -> Self {
         self.plat_attr.x11_visual_xid = xid;
@@ -66,3 +66,5 @@ impl ConfigPlatformAttributesExt for ConfigBuilder {
         self
     }
 }
+
+// FIXME: native
