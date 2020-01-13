@@ -1,6 +1,6 @@
 use crate::api::egl::{self, EGL};
 use crate::api::glx::{self, ffi, GLX};
-use crate::config::{Api, ConfigAttribs, ConfigsFinder, ConfigWrapper};
+use crate::config::{Api, ConfigAttribs, ConfigWrapper, ConfigsFinder};
 use crate::context::ContextBuilderWrapper;
 use crate::platform::unix::BackingApi;
 use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};

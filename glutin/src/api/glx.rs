@@ -14,7 +14,7 @@ pub use self::glx::{Glx, GlxExtra};
 use self::make_current_guard::MakeCurrentGuard;
 
 use crate::config::{Api, ConfigAttribs, ConfigsFinder, Version};
-use crate::context::{ContextBuilderWrapper, GlProfile, Robustness, ReleaseBehavior};
+use crate::context::{ContextBuilderWrapper, GlProfile, ReleaseBehavior, Robustness};
 
 use glutin_interface::{NativeDisplay, NativeWindow, NativeWindowSource, RawDisplay, RawWindow};
 use glutin_x11_sym::Display as X11Display;

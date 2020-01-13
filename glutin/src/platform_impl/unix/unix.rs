@@ -9,7 +9,7 @@
 mod wayland;
 mod x11;
 
-use crate::config::{Api, ConfigAttribs, ConfigsFinder, ConfigWrapper};
+use crate::config::{Api, ConfigAttribs, ConfigWrapper, ConfigsFinder};
 use crate::context::ContextBuilderWrapper;
 pub use crate::platform::unix::ConfigPlatformAttributes;
 use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};

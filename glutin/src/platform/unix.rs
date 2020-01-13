@@ -8,11 +8,80 @@
 
 pub mod osmesa;
 
-pub use crate::api::egl::ffi::EGLContext;
-pub use crate::api::glx::ffi::glx::types::GLXContext;
-use crate::config::ConfigsFinder;
+pub use crate::api::egl::ffi::{EGLConfig, EGLContext, EGLDisplay, EGLSurface};
+pub use crate::api::glx::ffi::{GLXContext, GLXDrawable, GLXFBConfig};
+use crate::config::{Config, ConfigsFinder};
+use crate::context::Context;
+use crate::surface::{Surface, SurfaceTypeTrait};
+pub use glutin_x11_sym::Display as GLXDisplay;
 
 use std::os::raw;
+
+#[non_exhaustive]
+#[derive(Debug)]
+pub enum NativeConfig {
+    Egl(EGLConfig),
+    Glx(GLXFBConfig),
+}
+
+#[non_exhaustive]
+#[derive(Debug)]
+pub enum NativeDisplay {
+    Egl(EGLDisplay),
+    Glx(GLXDisplay),
+}
+
+#[non_exhaustive]
+#[derive(Debug)]
+pub enum NativeSurface {
+    Egl(EGLSurface),
+    Glx(GLXDrawable),
+}
+
+#[non_exhaustive]
+#[derive(Debug)]
+pub enum NativeContext {
+    Egl(EGLContext),
+    Glx(GLXContext),
+}
+
+pub trait ConfigExt {
+    fn config(&self) -> NativeConfig;
+    fn display(&self) -> NativeDisplay;
+}
+
+impl ConfigExt for Config {
+    #[inline]
+    fn config(&self) -> NativeConfig {
+        unimplemented!()
+    }
+    #[inline]
+    fn display(&self) -> NativeDisplay {
+        unimplemented!()
+    }
+}
+
+pub trait SurfaceExt {
+    fn surface(&self) -> NativeSurface;
+}
+
+impl<T: SurfaceTypeTrait> SurfaceExt for Surface<T> {
+    #[inline]
+    fn surface(&self) -> NativeSurface {
+        unimplemented!()
+    }
+}
+
+pub trait ContextExt {
+    fn context(&self) -> NativeContext;
+}
+
+impl ContextExt for Context {
+    #[inline]
+    fn context(&self) -> NativeContext {
+        unimplemented!()
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum BackingApi {
@@ -66,5 +135,3 @@ impl ConfigPlatformAttributesExt for ConfigsFinder {
         self
     }
 }
-
-// FIXME: native

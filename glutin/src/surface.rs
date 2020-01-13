@@ -94,7 +94,10 @@ impl Surface<Pixmap> {
     }
 
     #[inline]
-    pub unsafe fn new_from_existing_pixmap<NP: NativePixmap>(conf: &Config, np: &NP) -> Result<Self, Error> {
+    pub unsafe fn new_from_existing_pixmap<NP: NativePixmap>(
+        conf: &Config,
+        np: &NP,
+    ) -> Result<Self, Error> {
         platform_impl::Surface::<Pixmap>::new_existing(conf.as_ref(), np).map(Surface)
     }
 }
@@ -118,7 +121,10 @@ impl Surface<Window> {
     }
 
     #[inline]
-    pub unsafe fn new_from_existing_window<NW: NativeWindow>(conf: &Config, nw: &NW) -> Result<Self, Error> {
+    pub unsafe fn new_from_existing_window<NW: NativeWindow>(
+        conf: &Config,
+        nw: &NW,
+    ) -> Result<Self, Error> {
         platform_impl::Surface::<Window>::new_existing(conf.as_ref(), nw).map(Surface)
     }
 

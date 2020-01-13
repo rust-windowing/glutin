@@ -1,12 +1,16 @@
+use crate::api::glx::ffi;
+
 use glutin_x11_sym::Display;
 use winit_types::error::Error;
 use winit_types::platform::OsError;
-use x11_dl::xlib::{VisualID, VisualIDMask, XVisualInfo};
 
 use std::os::raw;
 use std::sync::Arc;
 
-pub fn get_visual_info_from_xid(disp: &Arc<Display>, xid: VisualID) -> Result<XVisualInfo, Error> {
+pub fn get_visual_info_from_xid(
+    disp: &Arc<Display>,
+    xid: ffi::VisualID,
+) -> Result<ffi::XVisualInfo, Error> {
     let xlib = syms!(XLIB);
 
     if xid == 0 {
@@ -15,12 +19,13 @@ pub fn get_visual_info_from_xid(disp: &Arc<Display>, xid: VisualID) -> Result<XV
         )));
     }
 
-    let mut template: XVisualInfo = unsafe { std::mem::zeroed() };
+    let mut template: ffi::XVisualInfo = unsafe { std::mem::zeroed() };
     template.visualid = xid;
 
     let mut num_visuals = 0;
-    let vi =
-        unsafe { (xlib.XGetVisualInfo)(***disp, VisualIDMask, &mut template, &mut num_visuals) };
+    let vi = unsafe {
+        (xlib.XGetVisualInfo)(***disp, ffi::VisualIDMask, &mut template, &mut num_visuals)
+    };
     disp.check_errors()?;
 
     if vi.is_null() {
@@ -52,7 +57,7 @@ pub enum Lacks {
 /// Should always check for lack of xid before lack of transparency.
 pub fn examine_visual_info(
     disp: &Arc<Display>,
-    visual_infos: XVisualInfo,
+    visual_infos: ffi::XVisualInfo,
     wants_transparency: Option<bool>,
     target_visual_xid: Option<raw::c_ulong>,
 ) -> Result<(), Lacks> {

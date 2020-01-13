@@ -16,10 +16,9 @@ pub use self::egl::Egl;
 use self::make_current_guard::MakeCurrentGuard;
 
 use crate::config::{
-    Api, ConfigAttribs, ConfigsFinder, ConfigWrapper, SwapInterval,
-    SwapIntervalRange, Version,
+    Api, ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapInterval, SwapIntervalRange, Version,
 };
-use crate::context::{ContextBuilderWrapper, Robustness, ReleaseBehavior};
+use crate::context::{ContextBuilderWrapper, ReleaseBehavior, Robustness};
 use crate::surface::{PBuffer, Pixmap, SurfaceType, SurfaceTypeTrait, Window};
 
 use glutin_interface::{NativeDisplay, RawDisplay};
@@ -48,11 +47,11 @@ lazy_static! {
     pub static ref EGL: Result<Egl, Error> = Egl::new();
 }
 
-type EglVersion = (ffi::egl::types::EGLint, ffi::egl::types::EGLint);
+type EglVersion = (ffi::EGLint, ffi::EGLint);
 
 #[derive(Debug)]
 pub struct Display {
-    display: ffi::egl::types::EGLDisplay,
+    display: ffi::EGLDisplay,
     egl_version: EglVersion,
     extensions: Vec<String>,
     client_extensions: Vec<String>,
@@ -84,9 +83,9 @@ impl Display {
             {
                 let attrib_list = screen.map(|screen| {
                     [
-                        ffi::egl::PLATFORM_X11_SCREEN_KHR as ffi::egl::types::EGLAttrib,
-                        screen as ffi::egl::types::EGLAttrib,
-                        ffi::egl::NONE as ffi::egl::types::EGLAttrib,
+                        ffi::egl::PLATFORM_X11_SCREEN_KHR as ffi::EGLAttrib,
+                        screen as ffi::EGLAttrib,
+                        ffi::egl::NONE as ffi::EGLAttrib,
                     ]
                 });
                 unsafe {
@@ -108,9 +107,9 @@ impl Display {
             {
                 let attrib_list = screen.map(|screen| {
                     [
-                        ffi::egl::PLATFORM_X11_SCREEN_EXT as ffi::egl::types::EGLint,
-                        screen as ffi::egl::types::EGLint,
-                        ffi::egl::NONE as ffi::egl::types::EGLint,
+                        ffi::egl::PLATFORM_X11_SCREEN_EXT as ffi::EGLint,
+                        screen as ffi::EGLint,
+                        ffi::egl::NONE as ffi::EGLint,
                     ]
                 });
                 unsafe {
@@ -236,11 +235,11 @@ impl Display {
         }
     }
 
-    fn get_egl_version(disp: ffi::egl::types::EGLDisplay) -> Result<EglVersion, Error> {
+    fn get_egl_version(disp: ffi::EGLDisplay) -> Result<EglVersion, Error> {
         unsafe {
             let egl = EGL.as_ref().unwrap();
-            let mut major: ffi::egl::types::EGLint = 0;
-            let mut minor: ffi::egl::types::EGLint = 0;
+            let mut major: ffi::EGLint = 0;
+            let mut minor: ffi::EGLint = 0;
 
             if egl.Initialize(disp, &mut major, &mut minor) == ffi::egl::FALSE {
                 return Err(make_oserror!(OsError::Misc(format!(
@@ -324,7 +323,7 @@ impl Display {
 }
 
 impl Deref for Display {
-    type Target = ffi::egl::types::EGLDisplay;
+    type Target = ffi::EGLDisplay;
 
     fn deref(&self) -> &Self::Target {
         &self.display
@@ -392,14 +391,14 @@ impl Drop for Display {
 #[derive(Debug)]
 pub struct Context {
     display: Arc<Display>,
-    context: ffi::egl::types::EGLContext,
+    context: ffi::EGLContext,
     config: ConfigWrapper<Config, ConfigAttribs>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Config {
     display: Arc<Display>,
-    config_id: ffi::egl::types::EGLConfig,
+    config_id: ffi::EGLConfig,
     version: (Api, Version),
 }
 
@@ -411,10 +410,7 @@ impl Config {
         mut conf_selector: F,
     ) -> Result<Vec<(ConfigAttribs, Config)>, Error>
     where
-        F: FnMut(
-            Vec<ffi::egl::types::EGLConfig>,
-            &Arc<Display>,
-        ) -> Vec<Result<ffi::egl::types::EGLConfig, Error>>,
+        F: FnMut(Vec<ffi::EGLConfig>, &Arc<Display>) -> Vec<Result<ffi::EGLConfig, Error>>,
     {
         let egl = EGL.as_ref().unwrap();
         let display = Display::new(nb)?;
@@ -615,12 +611,7 @@ impl Config {
             ($egl:expr, $display:expr, $conf:expr, $attr:expr $(,)?) => {{
                 let mut value = 0;
                 let res = unsafe {
-                    $egl.GetConfigAttrib(
-                        **$display,
-                        $conf,
-                        $attr as ffi::egl::types::EGLint,
-                        &mut value,
-                    )
+                    $egl.GetConfigAttrib(**$display, $conf, $attr as ffi::EGLint, &mut value)
                 };
                 match res {
                     0 => Err(make_oserror!(OsError::Misc(format!(
@@ -793,7 +784,7 @@ impl Config {
     }
 
     #[inline]
-    pub fn get_native_visual_id(&self) -> Result<ffi::egl::types::EGLint, Error> {
+    pub fn get_native_visual_id(&self) -> Result<ffi::EGLint, Error> {
         get_native_visual_id(**self.display, self.config_id)
     }
 }
@@ -1144,7 +1135,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_native_visual_id(&self) -> Result<ffi::egl::types::EGLint, Error> {
+    pub fn get_native_visual_id(&self) -> Result<ffi::EGLint, Error> {
         get_native_visual_id(**self.display, self.config.config.config_id)
     }
 
@@ -1191,16 +1182,16 @@ impl Drop for Context {
 
 #[inline]
 pub fn get_native_visual_id(
-    disp: ffi::egl::types::EGLDisplay,
-    conf_id: ffi::egl::types::EGLConfig,
-) -> Result<ffi::egl::types::EGLint, Error> {
+    disp: ffi::EGLDisplay,
+    conf_id: ffi::EGLConfig,
+) -> Result<ffi::EGLint, Error> {
     let egl = EGL.as_ref().unwrap();
     let mut value = 0;
     let ret = unsafe {
         egl.GetConfigAttrib(
             disp,
             conf_id,
-            ffi::egl::NATIVE_VISUAL_ID as ffi::egl::types::EGLint,
+            ffi::egl::NATIVE_VISUAL_ID as ffi::EGLint,
             &mut value,
         )
     };
@@ -1216,7 +1207,7 @@ pub fn get_native_visual_id(
 #[derive(Debug)]
 pub struct Surface<T: SurfaceTypeTrait> {
     display: Arc<Display>,
-    surface: ffi::egl::types::EGLSurface,
+    surface: ffi::EGLSurface,
     config: ConfigWrapper<Config, ConfigAttribs>,
     phantom: PhantomData<T>,
     has_been_current: Mutex<bool>,
@@ -1365,13 +1356,13 @@ impl Surface<Window> {
             return Err(make_error!(ErrorType::ContextLost));
         }
 
-        let mut ffirects: Vec<ffi::egl::types::EGLint> = Vec::with_capacity(rects.len() * 4);
+        let mut ffirects: Vec<ffi::EGLint> = Vec::with_capacity(rects.len() * 4);
 
         for rect in rects {
-            ffirects.push(rect.pos.x as ffi::egl::types::EGLint);
-            ffirects.push(rect.pos.y as ffi::egl::types::EGLint);
-            ffirects.push(rect.size.width as ffi::egl::types::EGLint);
-            ffirects.push(rect.size.height as ffi::egl::types::EGLint);
+            ffirects.push(rect.pos.x as ffi::EGLint);
+            ffirects.push(rect.pos.y as ffi::EGLint);
+            ffirects.push(rect.size.width as ffi::EGLint);
+            ffirects.push(rect.size.height as ffi::EGLint);
         }
 
         let ret = unsafe {
@@ -1379,7 +1370,7 @@ impl Surface<Window> {
                 **self.display,
                 self.surface,
                 ffirects.as_mut_ptr(),
-                rects.len() as ffi::egl::types::EGLint,
+                rects.len() as ffi::EGLint,
             )
         };
 
