@@ -195,6 +195,7 @@ impl Context {
         Ok(Context::HeadlessContext(headless))
     }
 
+    #[inline]
     pub fn resize(&self, _width: u32, _height: u32) {
         match *self {
             Context::WindowedContext(ref c) => unsafe { c.context.update() },
@@ -255,6 +256,7 @@ impl Context {
         }
     }
 
+    #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const () {
         let symbol_name: CFString = FromStr::from_str(addr).unwrap();
         let framework_name: CFString =
@@ -338,11 +340,13 @@ impl Context {
 struct IdRef(id);
 
 impl IdRef {
+    #[inline]
     fn new(i: id) -> IdRef {
         IdRef(i)
     }
 
     #[allow(dead_code)]
+    #[inline]
     fn retain(i: id) -> IdRef {
         if i != nil {
             let _: id = unsafe { msg_send![i, retain] };
@@ -350,6 +354,7 @@ impl IdRef {
         IdRef(i)
     }
 
+    #[inline]
     fn non_nil(self) -> Option<IdRef> {
         if self.0 == nil {
             None
@@ -360,6 +365,7 @@ impl IdRef {
 }
 
 impl Drop for IdRef {
+    #[inline]
     fn drop(&mut self) {
         if self.0 != nil {
             let _: () = unsafe { msg_send![self.0, release] };
@@ -369,12 +375,14 @@ impl Drop for IdRef {
 
 impl Deref for IdRef {
     type Target = id;
+    #[inline]
     fn deref<'a>(&'a self) -> &'a id {
         &self.0
     }
 }
 
 impl Clone for IdRef {
+    #[inline]
     fn clone(&self) -> IdRef {
         if self.0 != nil {
             let _: id = unsafe { msg_send![self.0, retain] };

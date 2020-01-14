@@ -23,6 +23,7 @@ pub trait SymTrait {
 }
 
 impl<T: SymTrait> SymWrapper<T> {
+    #[inline]
     pub fn new(lib_paths: Vec<&str>) -> Result<Self, ()> {
         for path in lib_paths {
             let lib = Library::new(path);
@@ -41,12 +42,14 @@ impl<T: SymTrait> SymWrapper<T> {
 impl<T> Deref for SymWrapper<T> {
     type Target = T;
 
+    #[inline]
     fn deref(&self) -> &T {
         &self.inner
     }
 }
 
 impl<T> DerefMut for SymWrapper<T> {
+    #[inline]
     fn deref_mut(&mut self) -> &mut T {
         &mut self.inner
     }

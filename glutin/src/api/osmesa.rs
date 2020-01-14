@@ -32,6 +32,7 @@ pub struct OsMesaBuffer {
 }
 
 impl OsMesaContext {
+    #[inline]
     pub fn new(
         cb: ContextBuilderWrapper<&OsMesaContext>,
         version: (Api, Version),
@@ -184,6 +185,7 @@ unsafe impl Send for OsMesaContext {}
 unsafe impl Sync for OsMesaContext {}
 
 impl OsMesaBuffer {
+    #[inline]
     pub fn new(ctx: &OsMesaContext, size: dpi::PhysicalSize<u32>) -> Result<Self, Error> {
         let size: (u32, u32) = size.into();
         Ok(OsMesaBuffer {

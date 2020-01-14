@@ -58,10 +58,12 @@ pub struct Display {
 }
 
 impl Display {
+    #[inline]
     fn has_extension(&self, e: &str) -> bool {
         self.extensions.iter().find(|s| s == &e).is_some()
     }
 
+    #[inline]
     fn get_native_display(
         client_extensions: &[String],
         ndisp: &RawDisplay,
@@ -235,6 +237,7 @@ impl Display {
         }
     }
 
+    #[inline]
     fn get_egl_version(disp: ffi::EGLDisplay) -> Result<EglVersion, Error> {
         unsafe {
             let egl = EGL.as_ref().unwrap();
@@ -252,6 +255,7 @@ impl Display {
         }
     }
 
+    #[inline]
     pub fn new<ND: NativeDisplay>(nd: &ND) -> Result<Arc<Self>, Error> {
         let egl = EGL.as_ref().map_err(|err| err.clone())?;
 
@@ -303,6 +307,7 @@ impl Display {
         }))
     }
 
+    #[inline]
     unsafe fn bind_api(api: Api, egl_version: EglVersion) -> Result<(), Error> {
         let egl = EGL.as_ref().unwrap();
         if egl_version >= (1, 2) {
@@ -325,12 +330,14 @@ impl Display {
 impl Deref for Display {
     type Target = ffi::EGLDisplay;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.display
     }
 }
 
 impl Drop for Display {
+    #[inline]
     fn drop(&mut self) {
         // In a reasonable world, we could uncomment the line bellow.
         //
@@ -797,6 +804,7 @@ impl Context {
     /// To finish the process, you must call `.finish(window)` on the
     /// `ContextPrototype`.
     ///
+    #[inline]
     pub(crate) fn new(
         cb: ContextBuilderWrapper<&Context>,
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
@@ -986,6 +994,7 @@ impl Context {
         })
     }
 
+    #[inline]
     pub(crate) unsafe fn make_current<T: SurfaceTypeTrait>(
         &self,
         surf: &Surface<T>,
@@ -1139,6 +1148,7 @@ impl Context {
         get_native_visual_id(**self.display, self.config.config.config_id)
     }
 
+    #[inline]
     unsafe fn check_make_current(ret: Option<u32>) -> Result<(), Error> {
         let egl = EGL.as_ref().unwrap();
         if ret == Some(0) {
@@ -1162,6 +1172,7 @@ unsafe impl<T: SurfaceTypeTrait> Send for Surface<T> {}
 unsafe impl<T: SurfaceTypeTrait> Sync for Surface<T> {}
 
 impl Drop for Context {
+    #[inline]
     fn drop(&mut self) {
         unsafe {
             let egl = EGL.as_ref().unwrap();
@@ -1422,6 +1433,7 @@ impl Surface<PBuffer> {
 }
 
 impl<T: SurfaceTypeTrait> Drop for Surface<T> {
+    #[inline]
     fn drop(&mut self) {
         unsafe {
             let egl = EGL.as_ref().unwrap();

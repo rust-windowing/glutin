@@ -88,6 +88,7 @@ impl Display {
 impl Deref for Display {
     type Target = Arc<X11Display>;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.display
     }

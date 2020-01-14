@@ -193,6 +193,7 @@ impl Context {
 }
 
 impl Drop for Context {
+    #[inline]
     fn drop(&mut self) {
         unsafe {
             ffi::emscripten_webgl_destroy_context(self.raw_handle());
@@ -200,6 +201,7 @@ impl Drop for Context {
     }
 }
 
+#[inline]
 fn error_to_str(code: ffi::EMSCRIPTEN_RESULT) -> &'static str {
     match code {
         ffi::EMSCRIPTEN_RESULT_SUCCESS | ffi::EMSCRIPTEN_RESULT_DEFERRED => {

@@ -65,6 +65,7 @@ pub enum Context {
 }
 
 impl Context {
+    #[inline]
     fn inner_cb_wayland(
         cb: ContextBuilderWrapper<&Context>,
     ) -> Result<ContextBuilderWrapper<&wayland::Context>, Error> {
@@ -83,6 +84,7 @@ impl Context {
         }))
     }
 
+    #[inline]
     fn inner_cb_x11(
         cb: ContextBuilderWrapper<&Context>,
     ) -> Result<ContextBuilderWrapper<&x11::Context>, Error> {

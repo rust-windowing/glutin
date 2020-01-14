@@ -14,6 +14,7 @@ pub struct Glx(SymWrapper<ffi::glx::Glx>);
 unsafe impl Sync for Glx {}
 
 impl SymTrait for ffi::glx::Glx {
+    #[inline]
     fn load_with(lib: &libloading::Library) -> Self {
         Self::load_with(|sym| unsafe {
             lib.get(CString::new(sym.as_bytes()).unwrap().as_bytes_with_nul())
@@ -24,6 +25,7 @@ impl SymTrait for ffi::glx::Glx {
 }
 
 impl Glx {
+    #[inline]
     pub fn new() -> Result<Self, Error> {
         let paths = vec!["libGL.so.1", "libGL.so"];
 
@@ -36,12 +38,14 @@ impl Glx {
 impl Deref for Glx {
     type Target = ffi::glx::Glx;
 
+    #[inline]
     fn deref(&self) -> &ffi::glx::Glx {
         &self.0
     }
 }
 
 impl DerefMut for Glx {
+    #[inline]
     fn deref_mut(&mut self) -> &mut ffi::glx::Glx {
         &mut self.0
     }
@@ -54,6 +58,7 @@ pub struct GlxExtra(ffi::glx_extra::Glx);
 unsafe impl Sync for GlxExtra {}
 
 impl GlxExtra {
+    #[inline]
     pub fn new(glx: &Glx) -> Self {
         GlxExtra(ffi::glx_extra::Glx::load_with(|proc_name| {
             let c_str = CString::new(proc_name).unwrap();
@@ -65,12 +70,14 @@ impl GlxExtra {
 impl Deref for GlxExtra {
     type Target = ffi::glx_extra::Glx;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
 impl DerefMut for GlxExtra {
+    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }

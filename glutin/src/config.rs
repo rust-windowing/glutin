@@ -75,6 +75,7 @@ pub enum SwapInterval {
 }
 
 impl SwapInterval {
+    #[inline]
     pub(crate) fn validate(&self) -> Result<(), Error> {
         match self {
             SwapInterval::Wait(n) | SwapInterval::AdaptiveWait(n) if *n == 0 => {
@@ -103,6 +104,7 @@ pub enum SwapIntervalRange {
 impl SwapIntervalRange {
     /// Returns `true` if the [`SwapInterval`](crate::config::SwapInterval) is
     /// in range of this `SwapIntervalRange`, else `false`.
+    #[inline]
     fn contains(&self, swap_interval: &SwapInterval) -> bool {
         match (self, swap_interval) {
             (SwapIntervalRange::DontWait, SwapInterval::DontWait) => true,
@@ -317,6 +319,7 @@ impl Default for ConfigsFinder {
 
 impl ConfigsFinder {
     /// Makes a `ConfigsFinder` with the default options.
+    #[inline]
     fn new() -> Self {
         Default::default()
     }
@@ -481,6 +484,9 @@ impl ConfigsFinder {
         self
     }
 
+    /// Finds all the [`Config`eration]s that match the specified requirements.
+    ///
+    /// [`Config`eration]: crate::config::ConfigWrapper
     #[inline]
     pub fn find<ND: NativeDisplay>(self, nd: &ND) -> Result<Vec<Config>, Error> {
         self.desired_swap_interval

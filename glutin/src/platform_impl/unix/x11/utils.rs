@@ -7,6 +7,7 @@ use winit_types::platform::OsError;
 use std::os::raw;
 use std::sync::Arc;
 
+#[inline]
 pub fn get_visual_info_from_xid(
     disp: &Arc<Display>,
     xid: ffi::VisualID,
@@ -55,6 +56,7 @@ pub enum Lacks {
 }
 
 /// Should always check for lack of xid before lack of transparency.
+#[inline]
 pub fn examine_visual_info(
     disp: &Arc<Display>,
     visual_infos: ffi::XVisualInfo,

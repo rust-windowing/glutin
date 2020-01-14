@@ -28,6 +28,7 @@ pub enum Config {
 }
 
 impl Config {
+    #[inline]
     pub fn new<ND: NativeDisplay>(
         cf: &ConfigsFinder,
         nd: &ND,
@@ -175,6 +176,7 @@ impl Context {
         }
     }
 
+    #[inline]
     fn inner_cb_egl(
         cb: ContextBuilderWrapper<&Context>,
     ) -> Result<ContextBuilderWrapper<&egl::Context>, Error> {
@@ -426,6 +428,7 @@ impl Surface<Window> {
             window_attrs
         };
 
+        #[inline]
         fn assemble_non_match_error<T: Debug + PartialEq>(
             name: &str,
             a: T,
@@ -482,6 +485,7 @@ impl Surface<Window> {
 //
 // https://bugs.freedesktop.org/show_bug.cgi?id=67676
 // I'm working on a patch.
+#[inline]
 pub fn select_configs<'a, T, I: IntoIterator<Item = T>, F>(
     disp: &Arc<Display>,
     target_transparency: Option<bool>,

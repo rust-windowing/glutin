@@ -18,6 +18,7 @@ pub struct CurrentContextGuard<'a, 'b> {
 }
 
 impl<'a, 'b> CurrentContextGuard<'a, 'b> {
+    #[inline]
     pub unsafe fn make_current(
         hdc: HDC,
         context: HGLRC,
@@ -43,6 +44,7 @@ impl<'a, 'b> CurrentContextGuard<'a, 'b> {
 }
 
 impl<'a, 'b> Drop for CurrentContextGuard<'a, 'b> {
+    #[inline]
     fn drop(&mut self) {
         unsafe {
             gl::wgl::MakeCurrent(

@@ -23,6 +23,7 @@ use std::sync::Arc;
 pub struct Config(egl::Config);
 
 impl Config {
+    #[inline]
     pub fn new<ND: NativeDisplay>(
         cf: &ConfigsFinder,
         nd: &ND,

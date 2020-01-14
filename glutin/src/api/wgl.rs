@@ -195,6 +195,7 @@ impl Context {
         unsafe { gl::wgl::GetCurrentContext() == self.context.0 as *const raw::c_void }
     }
 
+    #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const () {
         let addr = CString::new(addr.as_bytes()).unwrap();
         let addr = addr.as_ptr();
@@ -242,6 +243,7 @@ unsafe impl Sync for Context {}
 ///
 /// Otherwise, only the basic API will be used and the chances of
 /// `CreationError::NotSupported` being returned increase.
+#[inline]
 unsafe fn create_context(
     extra: Option<(
         &gl::wgl_extra::Wgl,
@@ -422,6 +424,7 @@ unsafe fn create_context(
 /// Chooses a pixel formats without using WGL.
 ///
 /// Gives less precise results than `enumerate_arb_pixel_formats`.
+#[inline]
 unsafe fn choose_native_pixel_format_id(
     hdc: HDC,
     pf_reqs: &PixelFormatRequirements,
@@ -500,6 +503,7 @@ unsafe fn choose_native_pixel_format_id(
     Ok(pf_id)
 }
 
+#[inline]
 unsafe fn choose_native_pixel_format(
     hdc: HDC,
     pf_reqs: &PixelFormatRequirements,
@@ -570,6 +574,7 @@ unsafe fn choose_native_pixel_format(
 /// Enumerates the list of pixel formats by using extra WGL functions.
 ///
 /// Gives more precise results than `enumerate_native_pixel_formats`.
+#[inline]
 unsafe fn choose_arb_pixel_format_id(
     extra: &gl::wgl_extra::Wgl,
     extensions: &str,
@@ -712,6 +717,7 @@ unsafe fn choose_arb_pixel_format_id(
     Ok(format_id)
 }
 
+#[inline]
 unsafe fn choose_arb_pixel_format(
     extra: &gl::wgl_extra::Wgl,
     extensions: &str,
@@ -777,6 +783,7 @@ unsafe fn choose_arb_pixel_format(
 }
 
 /// Calls `SetPixelFormat` on a window.
+#[inline]
 unsafe fn set_pixel_format(hdc: HDC, id: raw::c_int) -> Result<(), CreationError> {
     let mut output: PIXELFORMATDESCRIPTOR = std::mem::zeroed();
 
@@ -804,6 +811,7 @@ unsafe fn set_pixel_format(hdc: HDC, id: raw::c_int) -> Result<(), CreationError
 }
 
 /// Loads the `opengl32.dll` library.
+#[inline]
 unsafe fn load_opengl32_dll() -> Result<HMODULE, CreationError> {
     let name = OsStr::new("opengl32.dll")
         .encode_wide()
@@ -826,6 +834,7 @@ unsafe fn load_opengl32_dll() -> Result<HMODULE, CreationError> {
 ///
 /// The `window` must be passed because the driver can vary depending on the
 /// window's characteristics.
+#[inline]
 unsafe fn load_extra_functions(win: HWND) -> Result<gl::wgl_extra::Wgl, CreationError> {
     let (ex_style, style) = (
         WS_EX_APPWINDOW,
@@ -941,6 +950,7 @@ unsafe fn load_extra_functions(win: HWND) -> Result<gl::wgl_extra::Wgl, Creation
 
 /// This function chooses a pixel format that is likely to be provided by
 /// the main video driver of the system.
+#[inline]
 fn choose_dummy_pixel_format(hdc: HDC) -> Result<raw::c_int, CreationError> {
     // building the descriptor to pass to ChoosePixelFormat
     let descriptor = PIXELFORMATDESCRIPTOR {

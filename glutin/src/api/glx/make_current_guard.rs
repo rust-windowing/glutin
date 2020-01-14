@@ -21,6 +21,7 @@ struct MakeCurrentGuardInner {
 }
 
 impl MakeCurrentGuard {
+    #[inline]
     pub fn new(
         x11_display: &Arc<Display>,
         drawable: ffi::glx::types::GLXDrawable,
@@ -50,16 +51,19 @@ impl MakeCurrentGuard {
         }
     }
 
+    #[inline]
     pub fn old_context(&mut self) -> Option<ffi::glx::types::GLXContext> {
         self.possibly_invalid.as_ref().map(|pi| pi.old_context)
     }
 
+    #[inline]
     pub fn invalidate(&mut self) {
         self.possibly_invalid.take();
     }
 }
 
 impl Drop for MakeCurrentGuard {
+    #[inline]
     fn drop(&mut self) {
         let glx = super::GLX.as_ref().unwrap();
         let (drawable, context) = match self.possibly_invalid.take() {

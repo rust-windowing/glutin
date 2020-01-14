@@ -85,6 +85,7 @@ enum ColorFormat {
 
 impl ColorFormat {
     #[allow(non_upper_case_globals)]
+    #[inline]
     pub fn for_view(view: ffi::id) -> Self {
         let color_format: ffi::NSUInteger = unsafe { msg_send![view, drawableColorFormat] };
         match color_format {
@@ -95,6 +96,7 @@ impl ColorFormat {
         }
     }
 
+    #[inline]
     pub fn color_bits(&self) -> u8 {
         if *self == ColorFormat::Rgba8888 || *self == ColorFormat::Srgba8888 {
             8
@@ -103,6 +105,7 @@ impl ColorFormat {
         }
     }
 
+    #[inline]
     pub fn alpha_bits(&self) -> u8 {
         if *self == ColorFormat::Rgba8888 || *self == ColorFormat::Srgba8888 {
             8
@@ -111,12 +114,14 @@ impl ColorFormat {
         }
     }
 
+    #[inline]
     pub fn srgb(&self) -> bool {
         *self == ColorFormat::Srgba8888
     }
 }
 
 #[allow(non_upper_case_globals)]
+#[inline]
 fn depth_for_view(view: ffi::id) -> u8 {
     let depth_format: ffi::NSUInteger = unsafe { msg_send![view, drawableDepthFormat] };
     match depth_format {
@@ -128,6 +133,7 @@ fn depth_for_view(view: ffi::id) -> u8 {
 }
 
 #[allow(non_upper_case_globals)]
+#[inline]
 fn stencil_for_view(view: ffi::id) -> u8 {
     let stencil_format: ffi::NSUInteger = unsafe { msg_send![view, drawableStencilFormat] };
     match stencil_format {
@@ -138,6 +144,7 @@ fn stencil_for_view(view: ffi::id) -> u8 {
 }
 
 #[allow(non_upper_case_globals)]
+#[inline]
 fn multisampling_for_view(view: ffi::id) -> Option<u16> {
     let ms_format: ffi::NSUInteger = unsafe { msg_send![view, drawableMultisample] };
     match ms_format {
@@ -153,6 +160,7 @@ pub struct Context {
     view: ffi::id, // this will be invalid after the `EventLoop` is dropped
 }
 
+#[inline]
 fn validate_version(version: u8) -> Result<ffi::NSUInteger, CreationError> {
     let version = version as ffi::NSUInteger;
     if version >= ffi::kEAGLRenderingAPIOpenGLES1 && version <= ffi::kEAGLRenderingAPIOpenGLES3 {
@@ -220,6 +228,7 @@ impl Context {
         Self::new_windowed(wb, el, pf_reqs, gl_attr).map(|(_window, context)| context)
     }
 
+    #[inline]
     unsafe fn create_context(mut version: ffi::NSUInteger) -> Result<ffi::id, CreationError> {
         let context_class = Class::get("EAGLContext").expect("Failed to get class `EAGLContext`");
         let eagl_context: ffi::id = msg_send![context_class, alloc];
@@ -237,6 +246,7 @@ impl Context {
         }
     }
 
+    #[inline]
     unsafe fn init_context(&mut self, win: &winit::window::Window) {
         let dict_class = Class::get("NSDictionary").expect("Failed to get class `NSDictionary`");
         let number_class = Class::get("NSNumber").expect("Failed to get class `NSNumber`");
@@ -403,7 +413,9 @@ impl Context {
     }
 }
 
+#[inline]
 fn create_view_class() {
+    #[inline]
     extern "C" fn init_with_frame(this: &Object, _: Sel, frame: ffi::CGRect) -> ffi::id {
         unsafe {
             let view: ffi::id = msg_send![super(this, class!(GLKView)), initWithFrame: frame];
@@ -419,6 +431,7 @@ fn create_view_class() {
         }
     }
 
+    #[inline]
     extern "C" fn layer_class(_: &Class, _: Sel) -> *const Class {
         unsafe {
             std::mem::transmute(
@@ -444,6 +457,7 @@ fn create_view_class() {
 }
 
 impl Drop for Context {
+    #[inline]
     fn drop(&mut self) {
         let _: () = unsafe { msg_send![self.eagl_context, release] };
     }

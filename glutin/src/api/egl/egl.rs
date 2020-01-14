@@ -31,6 +31,7 @@ mod egl {
     }
 
     impl SymTrait for ffi::egl::Egl {
+        #[inline]
         fn load_with(lib: &libloading::Library) -> Self {
             let f = move |s: &'static str| -> *const raw::c_void {
                 // Check if the symbol is available in the library directly. If
@@ -75,6 +76,7 @@ mod egl {
     }
 
     impl Egl {
+        #[inline]
         pub fn new() -> Result<Self, Error> {
             #[cfg(target_os = "windows")]
             let paths = vec!["libEGL.dll", "atioglxx.dll"];
@@ -99,6 +101,7 @@ mod egl {
     pub struct Egl(pub ffi::egl::Egl);
 
     impl Egl {
+        #[inline]
         pub fn new() -> Result<Self, Error> {
             Ok(Egl(ffi::egl::Egl))
         }
@@ -110,12 +113,14 @@ use std::ops::{Deref, DerefMut};
 impl Deref for Egl {
     type Target = super::ffi::egl::Egl;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
 impl DerefMut for Egl {
+    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }

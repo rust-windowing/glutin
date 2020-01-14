@@ -6,6 +6,7 @@ use crate::{
 use cocoa::appkit::*;
 use cocoa::base::nil;
 
+#[inline]
 pub fn get_gl_profile<T>(
     opengl: &GlAttributes<&T>,
     pf_reqs: &PixelFormatRequirements,
@@ -72,6 +73,7 @@ pub fn get_gl_profile<T>(
     }
 }
 
+#[inline]
 pub fn build_nsattributes(
     pf_reqs: &PixelFormatRequirements,
     profile: NSOpenGLPFAOpenGLProfiles,

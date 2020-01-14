@@ -96,6 +96,7 @@ pub enum BackingApi {
 }
 
 impl Default for BackingApi {
+    #[inline]
     fn default() -> Self {
         BackingApi::GlxThenEgl
     }

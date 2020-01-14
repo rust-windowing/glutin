@@ -53,57 +53,54 @@ impl Context {
     }
 }
 
+/// An object that allows you to build a [`Context`].
+///
+/// For details on what each member controls, please scroll through the
+/// [methods] bellow.
+///
+/// For what the defaults currently are, please refer to our [defaults
+/// implementation].
+///
+/// **WARNING:** Glutin clients should use the [`ContextBuilder`] type in their
+/// code, not this type. If I had a choice, I'd hide this type, but alas, due to
+/// limitations in rustdoc, I cannot.
+///
+/// **WARNING:** [`Context`]s are built with the annoyingly hidden [`build`]
+/// function. Once again, rustdoc!
+///
+/// [`Context`]: crate::context::Context
+/// [methods]: ./struct.ContextBuilderWrapper.html#methods
+/// [defaults implementation]: ./struct.ContextBuilderWrapper.html#impl-Default
+/// [`ContextBuilder`]: crate::context::ContextBuilder
+/// [`build`]: crate::context::ContextBuilderWrapper::build
+#[allow(missing_docs)]
+#[derive(Debug, Clone)]
+pub struct ContextBuilderWrapper<T> {
+    pub sharing: Option<T>,
+    pub profile: Option<GlProfile>,
+    pub debug: bool,
+    pub robustness: Robustness,
+    pub release_behavior: ReleaseBehavior,
+}
+
+/// A simple type alias for [`ContextBuilderWrapper`]. Glutin clients should use
+/// this type in their code, not [`ContextBuilderWrapper`]. If I had a choice,
+/// I'd hide [`ContextBuilderWrapper`], but alas, due to limitations in rustdoc,
+/// I cannot.
+///
+/// [`ContextBuilderWrapper`]: crate::context::ContextBuilderWrapper
+pub type ContextBuilder<'a> = ContextBuilderWrapper<&'a Context>;
+
 impl<'a> ContextBuilder<'a> {
+    /// Builds a [`Context`] that matches the specified requirements.
+    ///
+    /// [`Context`]: crate::context::Context
     #[inline]
     pub fn build(self, conf: &Config) -> Result<Context, Error> {
         let cb = self.map_sharing(|ctx| &ctx.0);
         platform_impl::Context::new(cb, conf.as_ref()).map(Context)
     }
 }
-
-/// An object that allows you to build [`Context`]s, [`RawContext<T>`]s and
-/// [`WindowedContext<T>`]s.
-///
-/// One notable limitation of the Wayland backend when it comes to shared
-/// [`Context`]s is that both contexts must use the same events loop.
-///
-/// [`Context`]: struct.Context.html
-/// [`WindowedContext<T>`]: type.WindowedContext.html
-/// [`RawContext<T>`]: type.RawContext.html
-#[derive(Debug, Clone)]
-pub struct ContextBuilderWrapper<T> {
-    /// An existing context with which some OpenGL objects get shared.
-    ///
-    /// The default is `None`.
-    pub sharing: Option<T>,
-
-    /// OpenGL profile to use.
-    ///
-    /// The default is `None`.
-    pub profile: Option<GlProfile>,
-
-    /// Whether to enable the `debug` flag of the context.
-    ///
-    /// Debug contexts are usually slower but give better error reporting.
-    ///
-    /// The default is `true` in debug mode and `false` in release mode.
-    pub debug: bool,
-
-    /// How the OpenGL [`Context`] should detect errors.
-    ///
-    /// The default is `NotRobust` because this is what is typically expected
-    /// when you create an OpenGL [`Context`]. However for safety you should
-    /// consider [`TryRobustLoseContextOnReset`].
-    ///
-    /// [`Context`]: struct.Context.html
-    /// [`TryRobustLoseContextOnReset`]:
-    /// enum.Robustness.html#variant.TryRobustLoseContextOnReset
-    pub robustness: Robustness,
-
-    pub release_behavior: ReleaseBehavior,
-}
-
-pub type ContextBuilder<'a> = ContextBuilderWrapper<&'a Context>;
 
 impl<T> ContextBuilderWrapper<T> {
     /// Turns the `sharing` parameter into another type by calling a closure.
@@ -136,6 +133,7 @@ impl<T> ContextBuilderWrapper<T> {
 
 impl<T> Default for ContextBuilderWrapper<T> {
     /// Initializes a new `ContextBuilder` with default values.
+    #[inline]
     fn default() -> Self {
         ContextBuilderWrapper {
             sharing: None,
@@ -148,6 +146,7 @@ impl<T> Default for ContextBuilderWrapper<T> {
 }
 
 impl<T> ContextBuilderWrapper<T> {
+    #[inline]
     fn new() -> Self {
         Default::default()
     }
@@ -156,22 +155,27 @@ impl<T> ContextBuilderWrapper<T> {
 impl<T> ContextBuilderWrapper<T> {
     /// Sets the desired OpenGL [`Context`] profile.
     ///
-    /// [`Context`]: struct.Context.html
+    /// Please refer to the docs of [`GlProfile`].
+    ///
+    /// [`Context`]: crate::context::Context
+    /// [`GlProfile`]: crate::context::GlProfile
     #[inline]
-    pub fn with_gl_profile(mut self, profile: GlProfile) -> Self {
+    pub fn with_profile(mut self, profile: GlProfile) -> Self {
         self.profile = Some(profile);
         self
     }
 
     /// Sets the *debug* flag for the OpenGL [`Context`].
     ///
+    /// Debug contexts are usually slower but give better error reporting.
+    ///
     /// The default value for this flag is `cfg!(debug_assertions)`, which means
     /// that it's enabled when you run `cargo build` and disabled when you run
     /// `cargo build --release`.
     ///
-    /// [`Context`]: struct.Context.html
+    /// [`Context`]: crate::context::Context
     #[inline]
-    pub fn with_gl_debug_flag(mut self, flag: bool) -> Self {
+    pub fn with_debug_flag(mut self, flag: bool) -> Self {
         self.debug = flag;
         self
     }
@@ -179,22 +183,46 @@ impl<T> ContextBuilderWrapper<T> {
     /// Sets the robustness of the OpenGL [`Context`]. See the docs of
     /// [`Robustness`].
     ///
-    /// [`Context`]: struct.Context.html
-    /// [`Robustness`]: enum.Robustness.html
+    /// The default is [`NotRobust`] because this is what is typically expected
+    /// when you create an OpenGL [`Context`]. However for safety you should
+    /// consider [`TryRobustLoseContextOnReset`].
+    ///
+    /// [`Context`]: crate::context::Context
+    /// [`Robustness`]: crate::context::Robustness
+    /// [`NotRobust`]: crate::context::Robustness::NotRobust
+    /// [`TryRobustLoseContextOnReset`]: crate::context::Robustness::TryRobustLoseContextOnReset
     #[inline]
-    pub fn with_gl_robustness(mut self, robustness: Robustness) -> Self {
+    pub fn with_robustness(mut self, robustness: Robustness) -> Self {
         self.robustness = robustness;
         self
     }
 
     /// Share the display lists with the given [`Context`].
     ///
-    /// [`Context`]: struct.Context.html
+    /// One notable limitation of the Wayland backend when it comes to shared
+    /// [`Context`]s is that both contexts must use the same events loop.
+    ///
+    /// It should come to no one's surprise that [`Context`]s can only share
+    /// display lists if they use the same implementation of OpenGL.
+    ///
+    /// Some platforms (e.g. Windows) only guarantee success if both [`Context`]s
+    /// are made with the same [`Config`eration] while others appear to be more
+    /// lenient. As with all things graphics related, the best way to check that
+    /// something works is to test!
+    ///
+    /// [`Context`]: crate::context::Context
+    /// [`Config`eration]: crate::config::ConfigWrapper
     #[inline]
     pub fn with_shared_lists<T2>(self, other: T2) -> ContextBuilderWrapper<T2> {
         self.set_sharing(Some(other.into()))
     }
 
+    /// The behavior when changing the current [`Context`].
+    ///
+    /// Please refer to [`ReleaseBehavior`]'s docs for more details.
+    ///
+    /// [`Context`]: crate::context::Context
+    /// [`ReleaseBehavior`]: crate::context::ReleaseBehavior
     #[inline]
     pub fn with_release_behaviour(mut self, release_behavior: ReleaseBehavior) -> Self {
         self.release_behavior = release_behavior;
@@ -206,7 +234,7 @@ impl<T> ContextBuilderWrapper<T> {
 /// raw OpenGL commands and/or raw shader code from an untrusted source, you
 /// should definitely care about this.
 ///
-/// [`Context`]: struct.Context.html
+/// [`Context`]: crate::context::Context
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Robustness {
     /// Not everything is checked. Your application can crash if you do
@@ -221,7 +249,7 @@ pub enum Robustness {
     /// if the backend doesn't support it. Instead it will automatically
     /// fall back to [`NotRobust`].
     ///
-    /// [`NotRobust`]: enum.Robustness.html#variant.NotRobust
+    /// [`NotRobust`]: crate::context::Robustness::NotRobust
     NoError,
 
     /// Everything is checked to avoid any crash. The driver will attempt to
@@ -232,8 +260,7 @@ pub enum Robustness {
     /// Same as [`RobustNoResetNotification`] but the context creation doesn't
     /// fail if it's not supported.
     ///
-    /// [`RobustNoResetNotification`]:
-    /// enum.Robustness.html#variant.RobustNoResetNotification
+    /// [`RobustNoResetNotification`]: crate::context::Robustness::RobustNoResetNotification
     TryRobustNoResetNotification,
 
     /// Everything is checked to avoid any crash. If a problem occurs, the
@@ -244,11 +271,11 @@ pub enum Robustness {
     /// Same as [`RobustLoseContextOnReset`] but the context creation doesn't
     /// fail if it's not supported.
     ///
-    /// [`RobustLoseContextOnReset`]:
-    /// enum.Robustness.html#variant.RobustLoseContextOnReset
+    /// [`RobustLoseContextOnReset`]: crate::context::Robustness::RobustLoseContextOnReset
     TryRobustLoseContextOnReset,
 }
 impl Default for Robustness {
+    #[inline]
     fn default() -> Self {
         Robustness::NotRobust
     }
@@ -256,7 +283,7 @@ impl Default for Robustness {
 
 /// Describes the requested OpenGL [`Context`] profiles.
 ///
-/// [`Context`]: struct.Context.html
+/// [`Context`]: crate::context::Context
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GlProfile {
     /// Include all the immediate more functions and definitions.
@@ -278,6 +305,7 @@ pub enum ReleaseBehavior {
 }
 
 impl Default for ReleaseBehavior {
+    #[inline]
     fn default() -> Self {
         ReleaseBehavior::Flush
     }

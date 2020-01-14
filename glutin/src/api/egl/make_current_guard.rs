@@ -20,6 +20,7 @@ struct MakeCurrentGuardInner {
 }
 
 impl MakeCurrentGuard {
+    #[inline]
     pub fn new(
         display: ffi::egl::types::EGLDisplay,
         draw_surface: ffi::egl::types::EGLSurface,
@@ -57,6 +58,7 @@ impl MakeCurrentGuard {
         }
     }
 
+    #[inline]
     pub fn new_keep(display: ffi::egl::types::EGLDisplay) -> Self {
         unsafe {
             let egl = super::EGL.as_ref().unwrap();
@@ -80,6 +82,7 @@ impl MakeCurrentGuard {
         }
     }
 
+    #[inline]
     pub fn if_any_same_then_invalidate(
         &mut self,
         draw_surface: ffi::egl::types::EGLSurface,
@@ -97,12 +100,14 @@ impl MakeCurrentGuard {
         }
     }
 
+    #[inline]
     pub fn invalidate(&mut self) {
         self.possibly_invalid.take();
     }
 }
 
 impl Drop for MakeCurrentGuard {
+    #[inline]
     fn drop(&mut self) {
         let egl = super::EGL.as_ref().unwrap();
         let (draw_surface, read_surface, context) = match self.possibly_invalid.take() {

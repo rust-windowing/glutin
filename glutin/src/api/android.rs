@@ -27,6 +27,7 @@ pub struct Context(Arc<AndroidContext>);
 struct AndroidSyncEventHandler(Arc<AndroidContext>);
 
 impl android_glue::SyncEventHandler for AndroidSyncEventHandler {
+    #[inline]
     fn handle(&mut self, event: &android_glue::Event) {
         match *event {
             // 'on_surface_destroyed' Android event can arrive with some delay

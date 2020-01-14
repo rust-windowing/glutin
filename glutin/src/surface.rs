@@ -45,18 +45,21 @@ pub enum PBuffer {}
 pub enum Pixmap {}
 
 impl SurfaceTypeTrait for Window {
+    #[inline]
     fn surface_type() -> SurfaceType {
         SurfaceType::Window
     }
 }
 
 impl SurfaceTypeTrait for PBuffer {
+    #[inline]
     fn surface_type() -> SurfaceType {
         SurfaceType::PBuffer
     }
 }
 
 impl SurfaceTypeTrait for Pixmap {
+    #[inline]
     fn surface_type() -> SurfaceType {
         SurfaceType::Pixmap
     }
@@ -147,6 +150,7 @@ impl Surface<Window> {
     /// rectangles.
     ///
     /// [`Surface::swap_buffers`]: crate::surface::Surface::swap_buffers()
+    #[inline]
     pub fn swap_buffers_with_damage(&self, rects: &[dpi::Rect]) -> Result<(), Error> {
         self.0.swap_buffers_with_damage(rects)
     }
@@ -163,6 +167,7 @@ impl Surface<Window> {
         self.0.update_after_resize(size);
     }
 
+    #[inline]
     pub fn modify_swap_interval(&self, swap_interval: SwapInterval) -> Result<(), Error> {
         // FIXME
         unimplemented!()
