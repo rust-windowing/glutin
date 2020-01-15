@@ -57,6 +57,13 @@ pub struct Display {
     client_extensions: Vec<String>,
 }
 
+impl PartialEq for Display {
+    fn eq(&self, o: &Self) -> bool {
+        self.display == o.display
+    }
+}
+impl Eq for Display {}
+
 impl Display {
     #[inline]
     fn has_extension(&self, e: &str) -> bool {
@@ -395,19 +402,19 @@ impl Drop for Display {
     }
 }
 
-#[derive(Debug)]
-pub struct Context {
-    display: Arc<Display>,
-    context: ffi::EGLContext,
-    config: ConfigWrapper<Config, ConfigAttribs>,
-}
-
 #[derive(Debug, Clone)]
 pub struct Config {
     display: Arc<Display>,
     config_id: ffi::EGLConfig,
     version: (Api, Version),
 }
+
+impl PartialEq for Config {
+    fn eq(&self, o: &Self) -> bool {
+        self.display == o.display && self.config_id == o.config_id
+    }
+}
+impl Eq for Config {}
 
 impl Config {
     #[inline]
@@ -425,7 +432,7 @@ impl Config {
         // TODO: Alternatively, allow EGL_MESA_platform_surfaceless.
         // FIXME: Also check for the GL_OES_surfaceless_context *CONTEXT*
         // extension
-        if cf.surfaceless_support
+        if cf.must_support_surfaceless
             && display
                 .extensions
                 .iter()
@@ -459,13 +466,13 @@ impl Config {
 
             out.push(ffi::egl::SURFACE_TYPE as raw::c_int);
             let mut surface_type = 0;
-            if cf.window_surface_support {
+            if cf.must_support_windows {
                 surface_type = surface_type | ffi::egl::WINDOW_BIT;
             }
-            if cf.pbuffer_surface_support {
+            if cf.must_support_pbuffers {
                 surface_type = surface_type | ffi::egl::PBUFFER_BIT;
             }
-            if cf.pixmap_surface_support {
+            if cf.must_support_pixmaps {
                 surface_type = surface_type | ffi::egl::PIXMAP_BIT;
             }
             out.push(surface_type as raw::c_int);
@@ -717,12 +724,17 @@ impl Config {
                     )],
                 };
 
+                let surf_type = attrib!(egl, display, conf_id, ffi::egl::SURFACE_TYPE)? as u32;
                 let attribs = ConfigAttribs {
                     version: cf.version,
-                    window_surface_support: cf.window_surface_support,
-                    pbuffer_surface_support: cf.pbuffer_surface_support,
-                    pixmap_surface_support: cf.pixmap_surface_support,
-                    surfaceless_support: cf.surfaceless_support,
+                    supports_windows: (surf_type & ffi::egl::WINDOW_BIT) == ffi::egl::WINDOW_BIT,
+                    supports_pixmaps: (surf_type & ffi::egl::PIXMAP_BIT) == ffi::egl::PIXMAP_BIT,
+                    supports_pbuffers: (surf_type & ffi::egl::PBUFFER_BIT) == ffi::egl::PBUFFER_BIT,
+                    supports_surfaceless: display
+                        .extensions
+                        .iter()
+                        .find(|s| s == &"EGL_KHR_surfaceless_context")
+                        .is_none(),
                     hardware_accelerated: attrib!(egl, display, conf_id, ffi::egl::CONFIG_CAVEAT)?
                         != ffi::egl::SLOW_CONFIG as i32,
                     color_bits: attrib!(egl, display, conf_id, ffi::egl::RED_SIZE)? as u8
@@ -795,6 +807,23 @@ impl Config {
         get_native_visual_id(**self.display, self.config_id)
     }
 }
+
+#[derive(Debug)]
+pub struct Context {
+    display: Arc<Display>,
+    context: ffi::EGLContext,
+    config: ConfigWrapper<Config, ConfigAttribs>,
+}
+
+unsafe impl Send for Context {}
+unsafe impl Sync for Context {}
+
+impl PartialEq for Context {
+    fn eq(&self, o: &Self) -> bool {
+        self.display == o.display && self.context == self.context
+    }
+}
+impl Eq for Context {}
 
 impl Context {
     /// Start building an EGL context.
@@ -1165,12 +1194,6 @@ impl Context {
     }
 }
 
-unsafe impl Send for Context {}
-unsafe impl Sync for Context {}
-
-unsafe impl<T: SurfaceTypeTrait> Send for Surface<T> {}
-unsafe impl<T: SurfaceTypeTrait> Sync for Surface<T> {}
-
 impl Drop for Context {
     #[inline]
     fn drop(&mut self) {
@@ -1223,6 +1246,16 @@ pub struct Surface<T: SurfaceTypeTrait> {
     phantom: PhantomData<T>,
     has_been_current: Mutex<bool>,
 }
+
+unsafe impl<T: SurfaceTypeTrait> Send for Surface<T> {}
+unsafe impl<T: SurfaceTypeTrait> Sync for Surface<T> {}
+
+impl<T: SurfaceTypeTrait> PartialEq for Surface<T> {
+    fn eq(&self, o: &Self) -> bool {
+        self.display == o.display && self.surface == self.surface
+    }
+}
+impl<T: SurfaceTypeTrait> Eq for Surface<T> {}
 
 impl<T: SurfaceTypeTrait> Surface<T> {
     #[inline]

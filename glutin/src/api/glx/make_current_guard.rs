@@ -32,7 +32,7 @@ impl MakeCurrentGuard {
 
             let ret = MakeCurrentGuard {
                 old_display: glx.GetCurrentDisplay() as *mut _,
-                display: x11_display.display as *mut _,
+                display: x11_display.raw() as *mut _,
                 x11_display: Arc::clone(x11_display),
                 possibly_invalid: Some(MakeCurrentGuardInner {
                     old_drawable: glx.GetCurrentDrawable(),
@@ -40,7 +40,7 @@ impl MakeCurrentGuard {
                 }),
             };
 
-            let res = glx.MakeCurrent(x11_display.display as *mut _, drawable, context);
+            let res = glx.MakeCurrent(x11_display.raw() as *mut _, drawable, context);
 
             if res == 0 {
                 let err = x11_display.check_errors();

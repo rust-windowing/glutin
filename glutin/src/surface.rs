@@ -37,11 +37,11 @@ pub trait SurfaceTypeTrait {
     fn surface_type() -> SurfaceType;
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Window {}
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum PBuffer {}
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Pixmap {}
 
 impl SurfaceTypeTrait for Window {
@@ -65,7 +65,7 @@ impl SurfaceTypeTrait for Pixmap {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Surface<T: SurfaceTypeTrait>(pub(crate) platform_impl::Surface<T>);
 
 impl<T: SurfaceTypeTrait> Surface<T> {

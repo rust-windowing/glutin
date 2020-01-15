@@ -19,7 +19,7 @@ use std::ops::Deref;
 use std::os::raw;
 use std::sync::Arc;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Config(egl::Config);
 
 impl Config {
@@ -62,6 +62,13 @@ pub struct Surface<T: SurfaceTypeTrait> {
     wsurface: Option<NoPrint<wegl::WlEglSurface>>,
     surface: egl::Surface<T>,
 }
+
+impl<T: SurfaceTypeTrait> PartialEq for Surface<T> {
+    fn eq(&self, o: &Self) -> bool {
+        self.surface == o.surface
+    }
+}
+impl<T: SurfaceTypeTrait> Eq for Surface<T> {}
 
 impl<T: SurfaceTypeTrait> Surface<T> {
     #[inline]
@@ -176,7 +183,7 @@ impl Surface<Pixmap> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Context(egl::Context);
 
 impl Context {
@@ -210,11 +217,6 @@ impl Context {
     #[inline]
     pub fn is_current(&self) -> bool {
         self.0.is_current()
-    }
-
-    #[inline]
-    pub fn get_api(&self) -> Api {
-        self.0.get_api()
     }
 
     #[inline]

@@ -9,37 +9,36 @@
 pub mod osmesa;
 
 pub use crate::api::egl::ffi::{EGLConfig, EGLContext, EGLDisplay, EGLSurface};
-pub use crate::api::glx::ffi::{GLXContext, GLXDrawable, GLXFBConfig};
+pub use crate::api::glx::ffi::{Display as GLXDisplay, GLXContext, GLXDrawable, GLXFBConfig};
 use crate::config::{Config, ConfigsFinder};
 use crate::context::Context;
 use crate::surface::{Surface, SurfaceTypeTrait};
-pub use glutin_x11_sym::Display as GLXDisplay;
 
 use std::os::raw;
 
 #[non_exhaustive]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum NativeConfig {
     Egl(EGLConfig),
     Glx(GLXFBConfig),
 }
 
 #[non_exhaustive]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum NativeDisplay {
     Egl(EGLDisplay),
-    Glx(GLXDisplay),
+    Glx(*mut GLXDisplay),
 }
 
 #[non_exhaustive]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum NativeSurface {
     Egl(EGLSurface),
     Glx(GLXDrawable),
 }
 
 #[non_exhaustive]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum NativeContext {
     Egl(EGLContext),
     Glx(GLXContext),
@@ -87,7 +86,7 @@ impl ContextExt for Context {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BackingApi {
     GlxThenEgl,
     EglThenGlx,
@@ -102,7 +101,7 @@ impl Default for BackingApi {
     }
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct ConfigPlatformAttributes {
     /// X11 only: set to insure a certain visual xid is used when
     /// choosing the fbconfig.

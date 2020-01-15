@@ -10,42 +10,113 @@ use std::os::raw;
 #[derive(Debug)]
 pub struct Context(pub(crate) platform_impl::Context);
 
+/// Represents an OpenGL context, which is the structure that holds the OpenGL
+/// state.
+///
+/// Is built by a [`ContextBuilder`]. Can have some its resources shared with
+/// another context via [`with_shared_lists`].
+///
+/// A context must be made current before using [`get_proc_address`] or any of
+/// the functions returns by [`get_proc_address`].
+///
+/// Contexts can be made current either via [`make_current_surfaceless`] or
+/// [`make_current`]. Please refer to those functions for more details, if
+/// interested.
+///
+/// **WARNING** On MacOS, Glutin clients must call [`update_after_resize`],
+/// [`make_current`], or [`make_current_surfaceless`] on the context whenever
+/// the backing surface's size changes.
+///
+/// [`ContextBuilder`]: crate::context::ContextBuilderWrapper
+/// [`with_shared_lists`]: crate::context::ContextBuilderWrapper::with_shared_lists
+/// [`get_proc_address`]: crate::context::Context::get_proc_address
+/// [`make_current_surfaceless`]: crate::context::Context::make_current_surfaceless
+/// [`make_current`]: crate::context::Context::make_current
+/// [`update_after_resize`]: crate::context::Context::update_after_resize
 impl Context {
+    /// Sets this context as the current context. The previously current context
+    /// on this thread (if any) is no longer current. The `Context`'s
+    /// [`Config`eration] must have [`supports_surfaceless`] set to `true`.
+    ///
+    /// For how to handle errors, refer to [`make_current`].
+    ///
+    /// [`make_current`]: crate::context::Context::make_current
+    /// [`Config`eration]: crate::config::ConfigWrapper
+    /// [`surfaceless_support`]: crate::config::ConfigWrapper::surfaceless_support
     #[inline]
     pub unsafe fn make_current_surfaceless(&self) -> Result<(), Error> {
         self.0.make_current_surfaceless()
     }
 
+    /// Sets this context as the current context. The previously current context
+    /// on this thread (if any) is no longer current. The passed in [`Surface`]
+    /// is also now current drawable.
+    ///
+    /// A failed call to `make_current`, [`make_current_surfaceless`] or
+    /// [`make_not_current`] might make this, or no context current. It could
+    /// also keep the previous context current. What happens varies by platform
+    /// and error.
+    ///
+    /// The [`Surface`] and the `Context` must have be made with the same
+    /// [`Config`eration]. The [`Config`eration] must support the [`Surface`]'s
+    /// type.
+    ///
+    /// To attempt to recover and get back into a know state, either:
+    ///
+    ///  * Attempt to use [`is_current`] to find the new current context,
+    ///  * Call [`make_not_current`] on both the previously current context and
+    ///  this context; or
+    ///  * Call `make_current` or [`make_current_surfaceless`] on some context
+    ///  successfully.
+    ///
+    /// [`make_current_surfaceless`]: crate::context::Context::make_current_surfaceless
+    /// [`is_current`]: crate::context::Context::is_current
+    /// [`make_not_current`]: crate::context::Context::make_not_current
+    /// [`surface`]: crate::surface::Surface
+    /// [`Config`eration]: crate::config::ConfigWrapper
     #[inline]
     pub unsafe fn make_current<T: SurfaceTypeTrait>(&self, surf: &Surface<T>) -> Result<(), Error> {
         self.0.make_current(&surf.0)
     }
 
+    /// If this context is current, makes this context not current. If this
+    /// context is not current, however, then this function does nothing.
+    ///
+    /// For how to handle errors, refer to [`make_current`].
+    ///
+    /// [`make_current`]: crate::context::Context::make_current
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), Error> {
         self.0.make_not_current()
     }
 
+    /// Returns true if this context is the current one in this thread.
     #[inline]
     pub fn is_current(&self) -> bool {
         self.0.is_current()
     }
 
+    /// Returns the [`Config`eration] that the context was created with.
+    ///
+    /// [`Config`eration]: crate::config::ConfigWrapper
     #[inline]
     pub fn get_config(&self) -> Config {
         self.0.get_config()
     }
 
-    #[inline]
-    pub fn get_api(&self) -> Api {
-        self.0.get_api()
-    }
-
+    /// Returns the address of an OpenGL function. This context should be current
+    /// when doing so.
     #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const raw::c_void {
         self.0.get_proc_address(addr)
     }
 
+    /// On MacOS, Glutin clients must call `update_after_resize`,
+    /// [`make_current`], or [`make_current_surfaceless`] on the context whenever
+    /// the backing surface's size changes.
+    ///
+    /// [`make_current_surfaceless`]: crate::context::Context::make_current_surfaceless
+    /// [`make_current`]: crate::context::Context::make_current
     #[inline]
     pub fn update_after_resize(&self) {
         #[cfg(target_os = "macos")]

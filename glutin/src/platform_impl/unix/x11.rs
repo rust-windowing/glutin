@@ -27,6 +27,17 @@ pub enum Config {
     Glx(glx::Config),
 }
 
+impl PartialEq for Config {
+    fn eq(&self, o: &Self) -> bool {
+        match (self, o) {
+            (Config::Egl(s, _, _), Config::Egl(o, _, _)) => s == o,
+            (Config::Glx(s), Config::Glx(o)) => s == o,
+            _ => false,
+        }
+    }
+}
+impl Eq for Config {}
+
 impl Config {
     #[inline]
     pub fn new<ND: NativeDisplay>(
@@ -153,6 +164,17 @@ pub enum Context {
     //Glx(glx::Display),
 }
 
+impl PartialEq for Context {
+    fn eq(&self, o: &Self) -> bool {
+        match (self, o) {
+            (Context::Egl(s, _, _), Context::Egl(o, _, _)) => s == o,
+            //(Context::Glx(s), Context::Glx(o)) => s == o,
+            _ => false,
+        }
+    }
+}
+impl Eq for Context {}
+
 impl Context {
     #[inline]
     pub(crate) fn new(
@@ -231,14 +253,6 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_api(&self) -> Api {
-        match self {
-            Context::Egl(ref ctx, _, _) => ctx.get_api(),
-            //Context::Glx(ref ctx) => ctx.get_api(),
-        }
-    }
-
-    #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const raw::c_void {
         match self {
             Context::Egl(ref ctx, _, _) => ctx.get_proc_address(addr),
@@ -262,6 +276,17 @@ pub enum Surface<T: SurfaceTypeTrait> {
     Egl(egl::Surface<T>, Arc<Display>, raw::c_int),
     //Glx(glx::Display),
 }
+
+impl<T: SurfaceTypeTrait> PartialEq for Surface<T> {
+    fn eq(&self, o: &Self) -> bool {
+        match (self, o) {
+            (Surface::Egl(s, _, _), Surface::Egl(o, _, _)) => s == o,
+            //(Surface::Glx(s), Surface::Glx(o)) => s == o,
+            _ => false,
+        }
+    }
+}
+impl<T: SurfaceTypeTrait> Eq for Surface<T> {}
 
 impl<T: SurfaceTypeTrait> Surface<T> {
     #[inline]

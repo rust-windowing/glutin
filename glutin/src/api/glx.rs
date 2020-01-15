@@ -42,6 +42,13 @@ pub struct Display {
     extensions: String,
 }
 
+impl PartialEq for Display {
+    fn eq(&self, o: &Self) -> bool {
+        self.display == o.display
+    }
+}
+impl Eq for Display {}
+
 impl Display {
     #[inline]
     pub fn new(screen: raw::c_int, display: &Arc<X11Display>) -> Result<Arc<Self>, Error> {
@@ -100,6 +107,13 @@ pub struct Config {
     version: (Api, Version),
     config_id: ffi::glx::types::GLXFBConfig,
 }
+
+impl PartialEq for Config {
+    fn eq(&self, o: &Self) -> bool {
+        self.display == o.display && self.config_id == o.config_id
+    }
+}
+impl Eq for Config {}
 
 impl Config {
     #[inline]

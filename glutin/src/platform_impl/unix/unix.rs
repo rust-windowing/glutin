@@ -25,7 +25,7 @@ use std::marker::PhantomData;
 use std::os::raw;
 use std::sync::Arc;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Config {
     X11(x11::Config),
     Wayland(wayland::Config),
@@ -58,7 +58,7 @@ impl Config {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Context {
     X11(x11::Context),
     Wayland(wayland::Context),
@@ -156,14 +156,6 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_api(&self) -> Api {
-        match self {
-            Context::Wayland(ref ctx) => ctx.get_api(),
-            Context::X11(ref ctx) => ctx.get_api(),
-        }
-    }
-
-    #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const raw::c_void {
         match self {
             Context::Wayland(ref ctx) => ctx.get_proc_address(addr),
@@ -180,7 +172,7 @@ impl Context {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Surface<T: SurfaceTypeTrait> {
     X11(x11::Surface<T>),
     Wayland(wayland::Surface<T>),

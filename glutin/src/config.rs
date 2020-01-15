@@ -38,7 +38,7 @@ pub enum Api {
 
 /// The OpenGL version you want. Major then Minor, so `Version(3, 2)` equals
 /// OpenGL 3.2.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Version(pub u8, pub u8);
 
 /// A swap interval.
@@ -135,7 +135,7 @@ impl SwapIntervalRange {
 /// [`swap_interval_ranges`]: crate::config::ConfigAttribs::swap_interval_ranges
 /// [`ConfigsFinder`]: crate::config::ConfigsFinder
 #[allow(missing_docs)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConfigAttribs {
     pub desired_swap_interval: SwapInterval,
     pub swap_interval_ranges: Vec<SwapIntervalRange>,
@@ -149,10 +149,10 @@ pub struct ConfigAttribs {
     pub double_buffer: bool,
     pub multisampling: Option<u16>,
     pub srgb: bool,
-    pub pbuffer_surface_support: bool,
-    pub pixmap_surface_support: bool,
-    pub window_surface_support: bool,
-    pub surfaceless_support: bool,
+    pub supports_pbuffers: bool,
+    pub supports_pixmaps: bool,
+    pub supports_windows: bool,
+    pub supports_surfaceless: bool,
 }
 
 /// A type that contains the [`ConfigAttribs`] along side with the native api's
@@ -168,7 +168,7 @@ pub struct ConfigAttribs {
 /// [`ConfigAttribs`]: crate::config::ConfigAttribs
 /// [`Config`]: crate::config::Config
 #[allow(missing_docs)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConfigWrapper<T, CA> {
     pub(crate) attribs: CA,
     pub(crate) config: T,
@@ -270,7 +270,7 @@ impl Config {
 /// [methods]: ./struct.ConfigsFinder.html#methods
 /// [defaults implementation]: ./struct.ConfigsFinder.html#impl-Default
 #[allow(missing_docs)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ConfigsFinder {
     pub version: (Api, Version),
     pub hardware_accelerated: Option<bool>,
@@ -284,10 +284,10 @@ pub struct ConfigsFinder {
     pub stereoscopy: bool,
     pub srgb: Option<bool>,
     pub desired_swap_interval: Option<SwapInterval>,
-    pub pbuffer_surface_support: bool,
-    pub window_surface_support: bool,
-    pub pixmap_surface_support: bool,
-    pub surfaceless_support: bool,
+    pub must_support_pbuffers: bool,
+    pub must_support_windows: bool,
+    pub must_support_pixmaps: bool,
+    pub must_support_surfaceless: bool,
     pub plat_attr: platform_impl::ConfigPlatformAttributes,
 }
 
@@ -307,10 +307,10 @@ impl Default for ConfigsFinder {
             stereoscopy: false,
             srgb: None,
             desired_swap_interval: None,
-            pbuffer_surface_support: false,
-            surfaceless_support: false,
-            pixmap_surface_support: false,
-            window_surface_support: true,
+            must_support_pbuffers: false,
+            must_support_windows: true,
+            must_support_pixmaps: true,
+            must_support_surfaceless: false,
             version: (Api::OpenGl, Version(3, 3)),
             plat_attr: Default::default(),
         }
@@ -407,37 +407,37 @@ impl ConfigsFinder {
         self
     }
 
-    /// Whether or not the [`Config`eration]s should support [`PBuffer`]s.
+    /// Whether or not the [`Config`eration]s must support [`PBuffer`]s.
     ///
     /// [`Config`eration]: crate::config::ConfigWrapper
     /// [`PBuffer`]: crate::surface::PBuffer
     #[inline]
-    pub fn with_pbuffer_surface_support(mut self, pbss: bool) -> Self {
-        self.pbuffer_surface_support = pbss;
+    pub fn with_support_pbuffers(mut self, pbss: bool) -> Self {
+        self.must_support_pbuffers = pbss;
         self
     }
 
-    /// Whether or not the [`Config`eration]s should support [`Pixmap`]s.
+    /// Whether or not the [`Config`eration]s must support [`Pixmap`]s.
     ///
     /// [`Config`eration]: crate::config::ConfigWrapper
     /// [`Pixmap`]: crate::surface::Pixmap
     #[inline]
-    pub fn with_pixmap_surface_support(mut self, pss: bool) -> Self {
-        self.pixmap_surface_support = pss;
+    pub fn with_support_pixmaps(mut self, pss: bool) -> Self {
+        self.must_support_pixmaps = pss;
         self
     }
 
-    /// Whether or not the [`Config`eration]s should support [`Window`]s.
+    /// Whether or not the [`Config`eration]s must support [`Window`]s.
     ///
     /// [`Config`eration]: crate::config::ConfigWrapper
     /// [`Window`]: crate::surface::Window
     #[inline]
-    pub fn with_window_surface_support(mut self, wss: bool) -> Self {
-        self.window_surface_support = wss;
+    pub fn with_support_windows(mut self, wss: bool) -> Self {
+        self.must_support_windows = wss;
         self
     }
 
-    /// Whether or not the [`Config`eration]s should support surfaceless
+    /// Whether or not the [`Config`eration]s must support surfaceless
     /// contexts.
     ///
     /// Please refer to [`Context::make_current_surfaceless`] for more details.
@@ -445,8 +445,8 @@ impl ConfigsFinder {
     /// [`Config`eration]: crate::config::ConfigWrapper
     /// [`Context::make_current_surfaceless`]: crate::context::Context::make_current_surfaceless()
     #[inline]
-    pub fn with_surfaceless_support(mut self, ss: bool) -> Self {
-        self.surfaceless_support = ss;
+    pub fn with_support_surfaceless(mut self, ss: bool) -> Self {
+        self.must_support_surfaceless = ss;
         self
     }
 
