@@ -3,12 +3,9 @@ use crate::config::Config;
 use crate::platform_impl;
 use crate::surface::{Surface, SurfaceTypeTrait};
 
-use winit_types::error::Error;
+use winit_types::error::{Error, ErrorType};
 
 use std::os::raw;
-
-#[derive(Debug)]
-pub struct Context(pub(crate) platform_impl::Context);
 
 /// Represents an OpenGL context, which is the structure that holds the OpenGL
 /// state.
@@ -17,7 +14,7 @@ pub struct Context(pub(crate) platform_impl::Context);
 /// another context via [`with_shared_lists`].
 ///
 /// A context must be made current before using [`get_proc_address`] or any of
-/// the functions returns by [`get_proc_address`].
+/// the functions returned by [`get_proc_address`].
 ///
 /// Contexts can be made current either via [`make_current_surfaceless`] or
 /// [`make_current`]. Please refer to those functions for more details, if
@@ -33,6 +30,9 @@ pub struct Context(pub(crate) platform_impl::Context);
 /// [`make_current_surfaceless`]: crate::context::Context::make_current_surfaceless
 /// [`make_current`]: crate::context::Context::make_current
 /// [`update_after_resize`]: crate::context::Context::update_after_resize
+#[derive(Debug, PartialEq, Eq)]
+pub struct Context(pub(crate) platform_impl::Context);
+
 impl Context {
     /// Sets this context as the current context. The previously current context
     /// on this thread (if any) is no longer current. The `Context`'s
@@ -40,11 +40,21 @@ impl Context {
     ///
     /// For how to handle errors, refer to [`make_current`].
     ///
+    /// The previously current [`Context`] might get `glFlush`ed if its
+    /// [`ReleaseBehaviour`] is equal to [`Flush`].
+    ///
     /// [`make_current`]: crate::context::Context::make_current
     /// [`Config`eration]: crate::config::ConfigWrapper
-    /// [`surfaceless_support`]: crate::config::ConfigWrapper::surfaceless_support
+    /// [`supports_surfaceless`]: crate::config::ConfigAttribs::supports_surfaceless
+    /// [`ReleaseBehaviour`]: crate::context::ReleaseBehaviour
+    /// [`Flush`]: crate::context::ReleaseBehaviour::Flush
     #[inline]
     pub unsafe fn make_current_surfaceless(&self) -> Result<(), Error> {
+        if !self.get_config().attribs().supports_surfaceless {
+            return Err(make_error!(ErrorType::BadApiUsage(
+                "`make_current_surfaceless` called on Context with surface without `supports_surfaceless`.".to_string()
+            )));
+        }
         self.0.make_current_surfaceless()
     }
 
@@ -52,14 +62,20 @@ impl Context {
     /// on this thread (if any) is no longer current. The passed in [`Surface`]
     /// is also now current drawable.
     ///
+    /// The [`Surface`] and the `Context` must have be made with the same
+    /// [`Config`eration] or two [`Config`eration]s which are, due to some
+    /// platform-specific reason, compatible. The [`Config`eration] must support
+    /// the [`Surface`]'s type.
+    ///
+    /// The previously current [`Context`] might get `glFlush`ed if its
+    /// [`ReleaseBehaviour`] is equal to [`Flush`].
+    ///
+    /// # Errors
+    ///
     /// A failed call to `make_current`, [`make_current_surfaceless`] or
     /// [`make_not_current`] might make this, or no context current. It could
     /// also keep the previous context current. What happens varies by platform
     /// and error.
-    ///
-    /// The [`Surface`] and the `Context` must have be made with the same
-    /// [`Config`eration]. The [`Config`eration] must support the [`Surface`]'s
-    /// type.
     ///
     /// To attempt to recover and get back into a know state, either:
     ///
@@ -74,17 +90,27 @@ impl Context {
     /// [`make_not_current`]: crate::context::Context::make_not_current
     /// [`surface`]: crate::surface::Surface
     /// [`Config`eration]: crate::config::ConfigWrapper
+    /// [`ReleaseBehaviour`]: crate::context::ReleaseBehaviour
+    /// [`Flush`]: crate::context::ReleaseBehaviour::Flush
     #[inline]
     pub unsafe fn make_current<T: SurfaceTypeTrait>(&self, surf: &Surface<T>) -> Result<(), Error> {
+        if self.get_config() != surf.get_config() {
+            warn!("[glutin] `make_current`: Your surface's and context's configurations don't match. Are you sure this is intentional?")
+        }
         self.0.make_current(&surf.0)
     }
 
     /// If this context is current, makes this context not current. If this
     /// context is not current, however, then this function does nothing.
     ///
+    /// The previously current [`Context`] might get `glFlush`ed if its
+    /// [`ReleaseBehaviour`] is equal to [`Flush`].
+    ///
     /// For how to handle errors, refer to [`make_current`].
     ///
     /// [`make_current`]: crate::context::Context::make_current
+    /// [`ReleaseBehaviour`]: crate::context::ReleaseBehaviour
+    /// [`Flush`]: crate::context::ReleaseBehaviour::Flush
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), Error> {
         self.0.make_not_current()
@@ -145,13 +171,13 @@ impl Context {
 /// [`ContextBuilder`]: crate::context::ContextBuilder
 /// [`build`]: crate::context::ContextBuilderWrapper::build
 #[allow(missing_docs)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ContextBuilderWrapper<T> {
     pub sharing: Option<T>,
     pub profile: Option<GlProfile>,
     pub debug: bool,
     pub robustness: Robustness,
-    pub release_behavior: ReleaseBehavior,
+    pub release_behavior: ReleaseBehaviour,
 }
 
 /// A simple type alias for [`ContextBuilderWrapper`]. Glutin clients should use
@@ -290,12 +316,12 @@ impl<T> ContextBuilderWrapper<T> {
 
     /// The behavior when changing the current [`Context`].
     ///
-    /// Please refer to [`ReleaseBehavior`]'s docs for more details.
+    /// Please refer to [`ReleaseBehaviour`]'s docs for more details.
     ///
     /// [`Context`]: crate::context::Context
-    /// [`ReleaseBehavior`]: crate::context::ReleaseBehavior
+    /// [`ReleaseBehaviour`]: crate::context::ReleaseBehaviour
     #[inline]
-    pub fn with_release_behaviour(mut self, release_behavior: ReleaseBehavior) -> Self {
+    pub fn with_release_behaviour(mut self, release_behavior: ReleaseBehaviour) -> Self {
         self.release_behavior = release_behavior;
         self
     }
@@ -365,7 +391,7 @@ pub enum GlProfile {
 
 /// The behavior of the driver when you change the current context.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum ReleaseBehavior {
+pub enum ReleaseBehaviour {
     /// Doesn't do anything. Most notably doesn't flush. Not supported by all
     /// drivers.
     None,
@@ -375,9 +401,9 @@ pub enum ReleaseBehavior {
     Flush,
 }
 
-impl Default for ReleaseBehavior {
+impl Default for ReleaseBehaviour {
     #[inline]
     fn default() -> Self {
-        ReleaseBehavior::Flush
+        ReleaseBehaviour::Flush
     }
 }

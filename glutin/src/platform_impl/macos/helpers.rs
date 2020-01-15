@@ -1,6 +1,6 @@
 use crate::{
     CreationError, GlAttributes, GlProfile, GlRequest, PixelFormatRequirements,
-    ReleaseBehavior,
+    ReleaseBehaviour,
 };
 
 use cocoa::appkit::*;
@@ -112,7 +112,7 @@ pub fn build_nsattributes(
         attributes.push(NSOpenGLPFADoubleBuffer as u32);
     }
 
-    if pf_reqs.release_behavior != ReleaseBehavior::Flush {
+    if pf_reqs.release_behavior != ReleaseBehaviour::Flush {
         return Err(CreationError::NoAvailablePixelFormat);
     }
 

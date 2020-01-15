@@ -4,7 +4,7 @@ mod make_current_guard;
 
 use crate::{
     Api, ContextError, CreationError, GlAttributes, GlProfile, GlRequest, PixelFormat,
-    PixelFormatRequirements, ReleaseBehavior, Robustness,
+    PixelFormatRequirements, ReleaseBehaviour, Robustness,
 };
 
 use self::make_current_guard::CurrentContextGuard;
@@ -450,7 +450,7 @@ unsafe fn choose_native_pixel_format_id(
         return Err(());
     }
 
-    if pf_reqs.release_behavior != ReleaseBehavior::Flush {
+    if pf_reqs.release_behavior != ReleaseBehaviour::Flush {
         return Err(());
     }
 
@@ -679,8 +679,8 @@ unsafe fn choose_arb_pixel_format_id(
         }
 
         match pf_reqs.release_behavior {
-            ReleaseBehavior::Flush => (),
-            ReleaseBehavior::None => {
+            ReleaseBehaviour::Flush => (),
+            ReleaseBehaviour::None => {
                 if extensions
                     .split(' ')
                     .find(|&i| i == "WGL_ARB_context_flush_control")

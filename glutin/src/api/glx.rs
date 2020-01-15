@@ -14,7 +14,7 @@ pub use self::glx::{Glx, GlxExtra};
 use self::make_current_guard::MakeCurrentGuard;
 
 use crate::config::{Api, ConfigAttribs, ConfigsFinder, Version};
-use crate::context::{ContextBuilderWrapper, GlProfile, ReleaseBehavior, Robustness};
+use crate::context::{ContextBuilderWrapper, GlProfile, ReleaseBehaviour, Robustness};
 
 use glutin_interface::{NativeDisplay, NativeWindow, NativeWindowSource, RawDisplay, RawWindow};
 use glutin_x11_sym::Display as X11Display;
@@ -769,8 +769,8 @@ impl Config {
 //        }
 //
 //        match cb.pf_reqs.release_behavior {
-//            ReleaseBehavior::Flush => (),
-//            ReleaseBehavior::None => {
+//            ReleaseBehaviour::Flush => (),
+//            ReleaseBehaviour::None => {
 //                if check_ext(extensions, "GLX_ARB_context_flush_control") {
 //                    out.push(
 //                        ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_ARB

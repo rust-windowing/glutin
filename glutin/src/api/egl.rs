@@ -18,7 +18,7 @@ use self::make_current_guard::MakeCurrentGuard;
 use crate::config::{
     Api, ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapInterval, SwapIntervalRange, Version,
 };
-use crate::context::{ContextBuilderWrapper, ReleaseBehavior, Robustness};
+use crate::context::{ContextBuilderWrapper, ReleaseBehaviour, Robustness};
 use crate::surface::{PBuffer, Pixmap, SurfaceType, SurfaceTypeTrait, Window};
 
 use glutin_interface::{NativeDisplay, RawDisplay};
@@ -972,7 +972,7 @@ impl Context {
         }
 
         match cb.release_behavior {
-            ReleaseBehavior::Flush => {
+            ReleaseBehaviour::Flush => {
                 // FIXME: This isn't a client extension, right?
                 if display.has_extension("EGL_KHR_context_flush_control") {
                     // With how shitty drivers are, never hurts to be explicit
@@ -981,7 +981,7 @@ impl Context {
                         .push(ffi::egl::CONTEXT_RELEASE_BEHAVIOR_FLUSH_KHR as raw::c_int);
                 }
             }
-            ReleaseBehavior::None => {
+            ReleaseBehaviour::None => {
                 // FIXME: This isn't a client extension, right?
                 if !display.has_extension("EGL_KHR_context_flush_control") {
                     return Err(make_error!(ErrorType::FlushControlNotSupported));
