@@ -190,7 +190,7 @@ impl Surface<Window> {
     /// [`Surface::swap_buffers`]: crate::surface::Surface::swap_buffers()
     #[inline]
     pub fn swap_buffers_with_damage(&self, rects: &[dpi::Rect]) -> Result<(), Error> {
-        if !self.is_current() {
+        if cfg!(debug_assertions) && !self.is_current() {
             return Err(make_error!(ErrorType::BadApiUsage(
                 "`swap_buffers_with_damage` called on surface that is not current.".to_string()
             )));
