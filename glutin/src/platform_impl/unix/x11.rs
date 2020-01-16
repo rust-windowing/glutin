@@ -1,6 +1,6 @@
 use crate::api::egl::{self, EGL};
 use crate::api::glx::{self, ffi, GLX};
-use crate::config::{Api, ConfigAttribs, ConfigWrapper, ConfigsFinder};
+use crate::config::{Api, ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapInterval};
 use crate::context::ContextBuilderWrapper;
 use crate::platform::unix::BackingApi;
 use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
@@ -23,14 +23,18 @@ pub mod utils;
 
 #[derive(Debug)]
 pub enum Config {
-    Egl(egl::Config, Arc<Display>, raw::c_int),
+    Egl {
+        config: egl::Config,
+        display: Arc<Display>,
+        screen: raw::c_int,
+    },
     Glx(glx::Config),
 }
 
 impl PartialEq for Config {
     fn eq(&self, o: &Self) -> bool {
         match (self, o) {
-            (Config::Egl(s, _, _), Config::Egl(o, _, _)) => s == o,
+            (Config::Egl { config: s, .. }, Config::Egl { config: o, .. }) => s == o,
             (Config::Glx(s), Config::Glx(o)) => s == o,
             _ => false,
         }
@@ -127,16 +131,28 @@ impl Config {
         })?;
         Ok(configs
             .into_iter()
-            .map(|(attribs, config)| (attribs, Config::Egl(config, Arc::clone(disp), screen)))
+            .map(|(attribs, config)| {
+                (
+                    attribs,
+                    Config::Egl {
+                        config,
+                        display: Arc::clone(disp),
+                        screen,
+                    },
+                )
+            })
             .collect())
     }
 
     #[inline]
     fn get_visual_info(&self) -> Result<ffi::XVisualInfo, Error> {
         match self {
-            Config::Egl(conf, disp, _) => {
-                utils::get_visual_info_from_xid(disp, conf.get_native_visual_id()? as ffi::VisualID)
-            }
+            Config::Egl {
+                config, display, ..
+            } => utils::get_visual_info_from_xid(
+                display,
+                config.get_native_visual_id()? as ffi::VisualID,
+            ),
             _ => unimplemented!(),
         }
     }
@@ -144,7 +160,7 @@ impl Config {
     #[inline]
     fn display(&self) -> &Arc<Display> {
         match self {
-            Config::Egl(_, disp, _) => disp,
+            Config::Egl { display, .. } => display,
             Config::Glx(conf) => conf.display(),
         }
     }
@@ -152,7 +168,7 @@ impl Config {
     #[inline]
     fn screen(&self) -> raw::c_int {
         match self {
-            Config::Egl(_, _, screen) => *screen,
+            Config::Egl { screen, .. } => *screen,
             Config::Glx(conf) => conf.screen(),
         }
     }
@@ -160,14 +176,18 @@ impl Config {
 
 #[derive(Debug)]
 pub enum Context {
-    Egl(egl::Context, Arc<Display>, raw::c_int),
+    Egl {
+        context: egl::Context,
+        display: Arc<Display>,
+        screen: raw::c_int,
+    },
     //Glx(glx::Display),
 }
 
 impl PartialEq for Context {
     fn eq(&self, o: &Self) -> bool {
         match (self, o) {
-            (Context::Egl(s, _, _), Context::Egl(o, _, _)) => s == o,
+            (Context::Egl { context: s, .. }, Context::Egl { context: o, .. }) => s == o,
             //(Context::Glx(s), Context::Glx(o)) => s == o,
             _ => false,
         }
@@ -182,10 +202,17 @@ impl Context {
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
     ) -> Result<Self, Error> {
         match conf.config {
-            Config::Egl(config, disp, screen) => {
-                egl::Context::new(Context::inner_cb_egl(cb)?, conf.map_config(|_| config))
-                    .map(|ctx| Context::Egl(ctx, Arc::clone(disp), *screen))
-            }
+            Config::Egl {
+                config,
+                display,
+                screen,
+            } => egl::Context::new(Context::inner_cb_egl(cb)?, conf.map_config(|_| config)).map(
+                |context| Context::Egl {
+                    context,
+                    display: Arc::clone(display),
+                    screen: *screen,
+                },
+            ),
             _ => unimplemented!(),
             //(BackendDisplay::Glx(disp), Config::Glx(config)) => {
             //    glx::Context::new(
@@ -203,7 +230,7 @@ impl Context {
         cb: ContextBuilderWrapper<&Context>,
     ) -> Result<ContextBuilderWrapper<&egl::Context>, Error> {
         match cb.sharing {
-            Some(Context::Egl(_, _, _)) | None => (),
+            Some(Context::Egl { .. }) | None => (),
             _ => {
                 return Err(make_error!(ErrorType::BadApiUsage(
                     "Cannot share a EGL context with a non-EGL context".to_string()
@@ -212,7 +239,7 @@ impl Context {
         }
 
         Ok(cb.map_sharing(|ctx| match ctx {
-            Context::Egl(ctx, _, _) => ctx,
+            Context::Egl { context, .. } => context,
             _ => unreachable!(),
         }))
     }
@@ -220,7 +247,7 @@ impl Context {
     #[inline]
     pub unsafe fn make_current_surfaceless(&self) -> Result<(), Error> {
         match self {
-            Context::Egl(ref ctx, _, _) => ctx.make_current_surfaceless(),
+            Context::Egl { context, .. } => context.make_current_surfaceless(),
             //Context::Glx(ref ctx) => ctx.make_current_surfaceless(),
         }
     }
@@ -228,7 +255,9 @@ impl Context {
     #[inline]
     pub unsafe fn make_current<T: SurfaceTypeTrait>(&self, surf: &Surface<T>) -> Result<(), Error> {
         match (self, surf) {
-            (Context::Egl(ref ctx, _, _), Surface::Egl(ref surf, _, _)) => ctx.make_current(surf),
+            (Context::Egl { context, .. }, Surface::Egl { surface, .. }) => {
+                context.make_current(surface)
+            }
             //(Context::Glx(ref ctx), Surface::Glx(ref surf)) => ctx.make_current(surf),
             (_, _) => Err(make_error!(ErrorType::BadApiUsage(
                 "Incompatible context and surface backends.".to_string()
@@ -239,7 +268,7 @@ impl Context {
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), Error> {
         match self {
-            Context::Egl(ref ctx, _, _) => ctx.make_not_current(),
+            Context::Egl { context, .. } => context.make_not_current(),
             //Context::Glx(ref ctx) => ctx.make_not_current(),
         }
     }
@@ -247,15 +276,15 @@ impl Context {
     #[inline]
     pub fn is_current(&self) -> bool {
         match self {
-            Context::Egl(ref ctx, _, _) => ctx.is_current(),
+            Context::Egl { context, .. } => context.is_current(),
             //Context::Glx(ref ctx) => ctx.is_current(),
         }
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const raw::c_void {
+    pub fn get_proc_address(&self, addr: &str) -> Result<*const raw::c_void, Error> {
         match self {
-            Context::Egl(ref ctx, _, _) => ctx.get_proc_address(addr),
+            Context::Egl { context, .. } => context.get_proc_address(addr),
             //Context::Glx(ref ctx) => ctx.get_proc_address(addr),
         }
     }
@@ -263,9 +292,15 @@ impl Context {
     #[inline]
     pub fn get_config(&self) -> ConfigWrapper<Config, ConfigAttribs> {
         match self {
-            Context::Egl(ref ctx, disp, screen) => ctx
-                .get_config()
-                .map_config(|conf| Config::Egl(conf, Arc::clone(disp), *screen)),
+            Context::Egl {
+                context,
+                display,
+                screen,
+            } => context.get_config().map_config(|config| Config::Egl {
+                config,
+                display: Arc::clone(display),
+                screen: *screen,
+            }),
             //Context::Glx(ref ctx) => ctx.get_config().map_config(Config::Glx),
         }
     }
@@ -273,14 +308,18 @@ impl Context {
 
 #[derive(Debug)]
 pub enum Surface<T: SurfaceTypeTrait> {
-    Egl(egl::Surface<T>, Arc<Display>, raw::c_int),
+    Egl {
+        surface: egl::Surface<T>,
+        display: Arc<Display>,
+        screen: raw::c_int,
+    },
     //Glx(glx::Display),
 }
 
 impl<T: SurfaceTypeTrait> PartialEq for Surface<T> {
     fn eq(&self, o: &Self) -> bool {
         match (self, o) {
-            (Surface::Egl(s, _, _), Surface::Egl(o, _, _)) => s == o,
+            (Surface::Egl { surface: s, .. }, Surface::Egl { surface: o, .. }) => s == o,
             //(Surface::Glx(s), Surface::Glx(o)) => s == o,
             _ => false,
         }
@@ -292,7 +331,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     #[inline]
     pub fn is_current(&self) -> bool {
         match self {
-            Surface::Egl(ref surf, _, _) => surf.is_current(),
+            Surface::Egl { surface, .. } => surface.is_current(),
             //Surface::Glx(ref surf) => surf.is_current(),
         }
     }
@@ -300,9 +339,15 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     #[inline]
     pub fn get_config(&self) -> ConfigWrapper<Config, ConfigAttribs> {
         match self {
-            Surface::Egl(ref surf, disp, screen) => surf
-                .get_config()
-                .map_config(|conf| Config::Egl(conf, Arc::clone(disp), *screen)),
+            Surface::Egl {
+                surface,
+                display,
+                screen,
+            } => surface.get_config().map_config(|config| Config::Egl {
+                config,
+                display: Arc::clone(display),
+                screen: *screen,
+            }),
             //Context::Glx(ref ctx) => ctx.get_config().map_config(Config::Glx),
         }
     }
@@ -310,7 +355,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), Error> {
         match self {
-            Surface::Egl(ref surf, _, _) => surf.make_not_current(),
+            Surface::Egl { surface, .. } => surface.make_not_current(),
             //Surface::Glx(ref surf) => surf.make_not_current(),
         }
     }
@@ -323,10 +368,17 @@ impl Surface<PBuffer> {
         size: dpi::PhysicalSize<u32>,
     ) -> Result<Self, Error> {
         match conf.config {
-            Config::Egl(config, disp, screen) => {
-                egl::Surface::<PBuffer>::new(conf.map_config(|_| config), size)
-                    .map(|surf| Surface::Egl(surf, Arc::clone(&disp), *screen))
-            }
+            Config::Egl {
+                config,
+                display,
+                screen,
+            } => egl::Surface::<PBuffer>::new(conf.map_config(|_| config), size).map(|surface| {
+                Surface::Egl {
+                    surface,
+                    display: Arc::clone(&display),
+                    screen: *screen,
+                }
+            }),
             _ => unimplemented!(),
             //(BackendDisplay::Glx(disp), Config::Glx(config)) => {
             //    glx::Surface::<PBuffer>::new(
@@ -471,10 +523,17 @@ impl Surface<Window> {
         assemble_non_match_error("depth", visual_info.depth, window_attrs.depth)?;
 
         match conf.config {
-            Config::Egl(config, disp, screen) => {
-                egl::Surface::<Window>::new(conf.map_config(|_| config), surface as *const _)
-                    .map(|surf| Surface::Egl(surf, Arc::clone(disp), *screen))
-            }
+            Config::Egl {
+                config,
+                display,
+                screen,
+            } => egl::Surface::<Window>::new(conf.map_config(|_| config), surface as *const _).map(
+                |surface| Surface::Egl {
+                    surface,
+                    display: Arc::clone(display),
+                    screen: *screen,
+                },
+            ),
             _ => unimplemented!(),
             //(Display::Glx(disp), Config::Glx(config)) => {
             //    glx::Surface::<Window>::new(
@@ -490,7 +549,7 @@ impl Surface<Window> {
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), Error> {
         match self {
-            Surface::Egl(ref surf, _, _) => surf.swap_buffers(),
+            Surface::Egl { surface, .. } => surface.swap_buffers(),
             //Surface::Glx(ref surf) => surf.swap_buffers(),
         }
     }
@@ -498,8 +557,16 @@ impl Surface<Window> {
     #[inline]
     pub fn swap_buffers_with_damage(&self, rects: &[dpi::Rect]) -> Result<(), Error> {
         match self {
-            Surface::Egl(ref surf, _, _) => surf.swap_buffers_with_damage(rects),
+            Surface::Egl { surface, .. } => surface.swap_buffers_with_damage(rects),
             //Surface::Glx(ref surf) => surf.swap_buffers_with_damage(rects),
+        }
+    }
+
+    #[inline]
+    pub fn modify_swap_interval(&self, swap_interval: SwapInterval) -> Result<(), Error> {
+        match self {
+            Surface::Egl { surface, .. } => surface.modify_swap_interval(swap_interval),
+            //Surface::Glx(ref surf) => surf.modify_swap_interval(swap_interval),
         }
     }
 }

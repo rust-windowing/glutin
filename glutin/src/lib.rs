@@ -1,17 +1,17 @@
 //! The purpose of this library is to provide an OpenGL [`Context`] on as many
 //! platforms as possible, as well as a [`Surface`] to go along with it. Before
-//! you can do that, however, you need to decide on a [`Config`eration] for your
+//! you can do that, however, you need to decide on a [`Config`] for your
 //! [`Context`]s and [`Surface`]s.
 //!
-//! You can use a [`ConfigsFinder`] to get a selection of [`Config`eration]s
+//! You can use a [`ConfigsFinder`] to get a selection of [`Config`]s
 //! that match your criteria. Among many things, you must specify in advance
-//! what types of [`Surface`]s you're going to use the [`Config`eration] with.
+//! what types of [`Surface`]s you're going to use the [`Config`] with.
 //!
-//! After settling on a [`Config`eration], you can make your [`Context`]s and
+//! After settling on a [`Config`], you can make your [`Context`]s and
 //! [`Surface`]s in any order you want, as long as your [`Surface`]'s and
-//! [`Context`]'s [`Config`eration] are the same.
+//! [`Context`]'s [`Config`] are the same.
 //!
-//! Similar to how [`Config`eration]s are acquired via a [`ConfigsFinder`], so
+//! Similar to how [`Config`]s are acquired via a [`ConfigsFinder`], so
 //! too are [`Context`]s from a [`ContextBuilder`]. At this stage if you decide
 //! to make multiple [`Context`]s you can also choose to share them. Some
 //! platform specific restrictions are mentioned in [`ContextBuilderWrapper`]'s
@@ -27,7 +27,7 @@
 //! Once you've made a [`Context`] and a [`Surface`], you can make them current
 //! with the [`Context::make_current`] function. Alternatively, you can use
 //! [`Context::make_current_surfaceless`] if you don't want to make a
-//! [`Surface`], but make sure that the [`Config`eration] you made the [`Context`]
+//! [`Surface`], but make sure that the [`Config`] you made the [`Context`]
 //! with supported surfaceless.
 //!
 //! [`Context`]: crate::context::Context
@@ -35,7 +35,7 @@
 //! [`ContextBuilderWrapper`]: crate::context::ContextBuilderWrapper
 //! [`with_shared_lists`]: crate::context::ContextBuilderWrapper::with_shared_lists()
 //! [`Surface`]: crate::surface::Surface
-//! [`Config`eration]: crate::config::ConfigWrapper
+//! [`Config`]: crate::config::ConfigWrapper
 //! [`ConfigsFinder`]: crate::config::ConfigsFinder
 //! [`Window`]: crate::surface::Window
 //! [`PBuffer`]: crate::surface::PBuffer

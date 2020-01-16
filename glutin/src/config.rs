@@ -1,20 +1,14 @@
-//! You can use a [`ConfigsFinder`] to get a selection of [`Config`eration]s
-//! that match your criteria. Among many things, you must specify in advance
-//! what types of [`Surface`]s you're going to use the [`Config`eration] with.
+//! You can use a [`ConfigsFinder`] to get a selection of [`Config`]s that match
+//! your criteria. Among many things, you must specify in advance what types of
+//! [`Surface`]s you're going to use the [`Config`] with.
 //!
-//! Once a [`Config`eration] is made, you can also modify its
-//! [`desired_swap_interval`]. Please refer to [`ConfigAttribs`] for more info.
+//! **WARNING:** Glutin clients should use the [`Config`] type in their code,
+//! not [`ConfigWrapper`]. If I had a choice, I'd hide that type, but alas, due
+//! to limitations in rustdoc, I cannot. Unfortunately, all of [`Config`]'s
+//! methods are only visible on [`ConfigWrapper`].
 //!
-//! **WARNING:** Glutin clients should use the [`Config`] type in their code, not
-//! [`ConfigWrapper`]. If I had a choice, I'd hide that type, but alas, due to
-//! limitations in rustdoc, I cannot. Unfortunately, all of [`Config`]'s methods
-//! are only visible on [`ConfigWrapper`].
-//!
-//! [`ConfigAttribs`]: crate::config::ConfigAttribs
-//! [`Config`eration]: crate::config::ConfigWrapper
 //! [`Config`]: crate::config::Config
 //! [`ConfigWrapper`]: crate::config::ConfigWrapper
-//! [`desired_swap_interval`]: crate::config::ConfigAttribs::desired_swap_interval
 //! [`Surface`]: crate::surface::Surface
 
 use crate::platform_impl;
@@ -43,11 +37,15 @@ pub struct Version(pub u8, pub u8);
 
 /// A swap interval.
 ///
+/// The default swap interval for your [`Surface`] is platform-dependent. For
+/// example, on EGL it is `1` by default, but on GLX it is `0` by default.
+///
 /// Please note that your application's desired swap interval may be overridden
 /// by external, driver-specific configuration, which means that you can't know
 /// in advance whether [`swap_buffers`]/[`swap_buffers_with_damage`] will block or
 /// not.
 ///
+/// [`Surface`]: crate::surface::Surface
 /// [`swap_buffers`]: crate::surface::Surface::swap_buffers
 /// [`swap_buffers_with_damage`]: crate::surface::Surface::swap_buffers_with_damage
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,7 +66,7 @@ pub enum SwapInterval {
     /// The swap is synchronized to the `n`th video frame as long as the frame
     /// rate is higher than the sync rate.
     ///
-    /// If the frame rate is less than the sync ratem synchronization is disabled
+    /// If the frame rate is less than the sync rate, synchronization is disabled
     /// and `AdaptiveWait(n)` behaves as `DontWait`. This is only supported by
     /// WGL/GLX drivers that implement `EXT_swap_control_tear`.
     AdaptiveWait(u32),
@@ -102,10 +100,25 @@ pub enum SwapIntervalRange {
 }
 
 impl SwapIntervalRange {
-    /// Returns `true` if the [`SwapInterval`](crate::config::SwapInterval) is
-    /// in range of this `SwapIntervalRange`, else `false`.
     #[inline]
-    fn contains(&self, swap_interval: &SwapInterval) -> bool {
+    pub(crate) fn validate(&self) -> Result<(), Error> {
+        match self {
+            SwapIntervalRange::Wait(n) | SwapIntervalRange::AdaptiveWait(n) if n.start == 0 => {
+                Err(make_error!(ErrorType::BadApiUsage(
+                    "SwapInterval of `0` not allowed. Use `SwapIntervalRange::DontWait`."
+                        .to_string()
+                )))
+            }
+            _ => Ok(()),
+        }
+    }
+
+    /// Returns `true` if the [`SwapInterval`] in range of this
+    /// `SwapIntervalRange`, else `false`.
+    ///
+    /// [`SwapInterval`]: crate::config::SwapInterval
+    #[inline]
+    pub fn contains(&self, swap_interval: &SwapInterval) -> bool {
         match (self, swap_interval) {
             (SwapIntervalRange::DontWait, SwapInterval::DontWait) => true,
             (SwapIntervalRange::Wait(nr), SwapInterval::Wait(n)) => nr.contains(n),
@@ -115,29 +128,21 @@ impl SwapIntervalRange {
     }
 }
 
-/// Describes the attributes of a possible [`Config`eration]. Immutably accessed
-/// via [`Config`eration]'s [`attribs`] function.
-///
-/// After the creation of the [`Config`eration], the [`desired_swap_interval`]
-/// can be modified into any other [`SwapInterval`] as long as it is within range
-/// of any one of the [`SwapIntervalRange`]s in [`swap_interval_ranges`] via
-/// [`Config`eration]'s [`set_desired_swap_interval`] function.
+/// Describes the attributes of a possible [`Config`]. Immutably accessed via
+/// [`Config`]'s [`attribs`] function.
 ///
 /// Please refer to [`ConfigsFinder`]'s methods for details on what each parameter
 /// is for.
 ///
-/// [`Config`eration]: crate::config::ConfigWrapper
+/// [`Config`]: crate::config::ConfigWrapper
 /// [`SwapInterval`]: crate::config::SwapInterval
 /// [`SwapIntervalRange`]: crate::config::SwapIntervalRange
 /// [`attribs`]: crate::config::ConfigWrapper::attribs()
-/// [`set_desired_swap_interval`]: crate::config::ConfigWrapper::set_desired_swap_interval()
-/// [`desired_swap_interval`]: crate::config::ConfigAttribs::desired_swap_interval
 /// [`swap_interval_ranges`]: crate::config::ConfigAttribs::swap_interval_ranges
 /// [`ConfigsFinder`]: crate::config::ConfigsFinder
 #[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConfigAttribs {
-    pub desired_swap_interval: SwapInterval,
     pub swap_interval_ranges: Vec<SwapIntervalRange>,
     pub version: (Api, Version),
     pub hardware_accelerated: bool,
@@ -206,43 +211,15 @@ impl<T, CA> ConfigWrapper<T, CA> {
 }
 
 impl ConfigWrapper<platform_impl::Config, ConfigAttribs> {
-    /// Provides immutable access to [`Config`eration]'s [`ConfigAttribs`].
+    /// Provides immutable access to [`Config`]'s [`ConfigAttribs`].
     ///
     /// Please refer to [`ConfigAttribs`] for more information.
     ///
-    /// [`Config`eration]: crate::config::ConfigWrapper
+    /// [`Config`]: crate::config::ConfigWrapper
     /// [`ConfigAttribs`]: crate::config::ConfigAttribs
     #[inline]
     pub fn attribs(&self) -> &ConfigAttribs {
         &self.attribs
-    }
-
-    /// Changes the [`Config`eration]'s [`desired_swap_interval`].
-    ///
-    /// Please refer to [`ConfigAttribs`] for more information.
-    ///
-    /// [`desired_swap_interval`]: crate::config::ConfigAttribs::desired_swap_interval
-    /// [`Config`eration]: crate::config::ConfigWrapper
-    /// [`ConfigAttribs`]: crate::config::ConfigAttribs
-    #[inline]
-    pub fn set_desired_swap_interval(
-        &mut self,
-        desired_swap_interval: SwapInterval,
-    ) -> Result<(), Error> {
-        if self
-            .attribs
-            .swap_interval_ranges
-            .iter()
-            .find(|r| r.contains(&desired_swap_interval))
-            .is_none()
-        {
-            return Err(make_error!(ErrorType::BadApiUsage(format!(
-                "SwapInterval of {:?} not in ranges {:?}.",
-                desired_swap_interval, self.attribs.swap_interval_ranges
-            ))));
-        }
-        self.attribs.desired_swap_interval = desired_swap_interval;
-        Ok(())
     }
 }
 
@@ -257,8 +234,7 @@ impl Config {
     }
 }
 
-/// A type for finding one or more [`Config`eration]s that meet a certain
-/// criteria.
+/// A type for finding one or more [`Config`]s that meet a certain criteria.
 ///
 /// For details on what each member controls, please scroll through the
 /// [methods] bellow.
@@ -266,7 +242,7 @@ impl Config {
 /// For what the defaults currently are, please refer to our [defaults
 /// implementation].
 ///
-/// [`Config`eration]: crate::config::ConfigWrapper
+/// [`Config`]: crate::config::ConfigWrapper
 /// [methods]: ./struct.ConfigsFinder.html#methods
 /// [defaults implementation]: ./struct.ConfigsFinder.html#impl-Default
 #[allow(missing_docs)]
@@ -283,7 +259,7 @@ pub struct ConfigsFinder {
     pub multisampling: Option<u16>,
     pub stereoscopy: bool,
     pub srgb: Option<bool>,
-    pub desired_swap_interval: Option<SwapInterval>,
+    pub desired_swap_interval_ranges: Vec<SwapIntervalRange>,
     pub must_support_pbuffers: bool,
     pub must_support_windows: bool,
     pub must_support_pixmaps: bool,
@@ -306,7 +282,7 @@ impl Default for ConfigsFinder {
             multisampling: None,
             stereoscopy: false,
             srgb: None,
-            desired_swap_interval: None,
+            desired_swap_interval_ranges: vec![],
             must_support_pbuffers: false,
             must_support_windows: true,
             must_support_pixmaps: true,
@@ -394,22 +370,25 @@ impl ConfigsFinder {
         self
     }
 
-    /// Sets the desired [`SwapInterval`]. Please refer to [`SwapInterval`] for
-    /// more details.
+    /// Sets the desired [`SwapIntervalRange`]s. The [`Config`] must support all
+    /// the ranges specified.
     ///
-    /// [`SwapInterval`]: crate::config::SwapInterval
+    /// Please refer to [`SwapIntervalRange`] for more details.
+    ///
+    /// [`SwapIntervalRange`]: crate::config::SwapIntervalRange
+    /// [`Config`]: crate::config::ConfigWrapper
     #[inline]
-    pub fn with_desired_swap_interval(
+    pub fn with_desired_swap_interval_ranges(
         mut self,
-        desired_swap_interval: Option<SwapInterval>,
+        desired_swap_interval_ranges: Vec<SwapIntervalRange>,
     ) -> Self {
-        self.desired_swap_interval = desired_swap_interval;
+        self.desired_swap_interval_ranges = desired_swap_interval_ranges;
         self
     }
 
-    /// Whether or not the [`Config`eration]s must support [`PBuffer`]s.
+    /// Whether or not the [`Config`]s must support [`PBuffer`]s.
     ///
-    /// [`Config`eration]: crate::config::ConfigWrapper
+    /// [`Config`]: crate::config::ConfigWrapper
     /// [`PBuffer`]: crate::surface::PBuffer
     #[inline]
     pub fn with_support_pbuffers(mut self, pbss: bool) -> Self {
@@ -417,9 +396,9 @@ impl ConfigsFinder {
         self
     }
 
-    /// Whether or not the [`Config`eration]s must support [`Pixmap`]s.
+    /// Whether or not the [`Config`]s must support [`Pixmap`]s.
     ///
-    /// [`Config`eration]: crate::config::ConfigWrapper
+    /// [`Config`]: crate::config::ConfigWrapper
     /// [`Pixmap`]: crate::surface::Pixmap
     #[inline]
     pub fn with_support_pixmaps(mut self, pss: bool) -> Self {
@@ -427,9 +406,9 @@ impl ConfigsFinder {
         self
     }
 
-    /// Whether or not the [`Config`eration]s must support [`Window`]s.
+    /// Whether or not the [`Config`]s must support [`Window`]s.
     ///
-    /// [`Config`eration]: crate::config::ConfigWrapper
+    /// [`Config`]: crate::config::ConfigWrapper
     /// [`Window`]: crate::surface::Window
     #[inline]
     pub fn with_support_windows(mut self, wss: bool) -> Self {
@@ -437,12 +416,12 @@ impl ConfigsFinder {
         self
     }
 
-    /// Whether or not the [`Config`eration]s must support surfaceless
+    /// Whether or not the [`Config`]s must support surfaceless
     /// contexts.
     ///
     /// Please refer to [`Context::make_current_surfaceless`] for more details.
     ///
-    /// [`Config`eration]: crate::config::ConfigWrapper
+    /// [`Config`]: crate::config::ConfigWrapper
     /// [`Context::make_current_surfaceless`]: crate::context::Context::make_current_surfaceless()
     #[inline]
     pub fn with_support_surfaceless(mut self, ss: bool) -> Self {
@@ -484,14 +463,15 @@ impl ConfigsFinder {
         self
     }
 
-    /// Finds all the [`Config`eration]s that match the specified requirements.
+    /// Finds all the [`Config`]s that match the specified requirements.
     ///
-    /// [`Config`eration]: crate::config::ConfigWrapper
+    /// [`Config`]: crate::config::ConfigWrapper
     #[inline]
     pub fn find<ND: NativeDisplay>(self, nd: &ND) -> Result<Vec<Config>, Error> {
-        self.desired_swap_interval
-            .unwrap_or(SwapInterval::DontWait)
-            .validate()?;
+        self.desired_swap_interval_ranges
+            .iter()
+            .map(|sir| sir.validate())
+            .collect::<Result<_, _>>()?;
         let configs = platform_impl::Config::new(&self, nd)?;
         assert!(!configs.is_empty());
 

@@ -3,15 +3,15 @@ use crate::platform_impl;
 
 use glutin_interface::{NativePixmap, NativePixmapSource, NativeWindow, NativeWindowSource};
 use winit_types::dpi;
-use winit_types::error::Error;
+use winit_types::error::{Error, ErrorType};
 
-#[derive(PartialEq, Eq, Copy, Clone, Debug)]
 /// A [`Surface`]'s type. Returned from calling
 /// [`SurfaceTypeTrait::surface_type()`] on the type specializing your
 /// [`Surface`].
 ///
 /// [`Surface`]: crate::surface::Surface
 /// [`SurfaceTypeTrait::surface_type()`]: crate::surface::SurfaceTypeTrait::surface_type()
+#[derive(PartialEq, Eq, Copy, Clone, Debug)]
 pub enum SurfaceType {
     /// A [`Window`](crate::surface::Window)
     Window,
@@ -92,6 +92,12 @@ impl Surface<Pixmap> {
         nps: &NPS,
         wb: NPS::PixmapBuilder,
     ) -> Result<(NPS::Pixmap, Self), Error> {
+        if !conf.attribs().supports_pixmaps {
+            return Err(make_error!(ErrorType::BadApiUsage(
+                "Tried to make pixmap surface with config without `supports_pixmaps`.".to_string()
+            )));
+        }
+
         platform_impl::Surface::<Pixmap>::new(conf.as_ref(), nps, wb)
             .map(|(pix, surf)| (pix, Surface(surf)))
     }
@@ -101,6 +107,12 @@ impl Surface<Pixmap> {
         conf: &Config,
         np: &NP,
     ) -> Result<Self, Error> {
+        if !conf.attribs().supports_pixmaps {
+            return Err(make_error!(ErrorType::BadApiUsage(
+                "Tried to make pixmap surface with config without `supports_pixmaps`.".to_string()
+            )));
+        }
+
         platform_impl::Surface::<Pixmap>::new_existing(conf.as_ref(), np).map(Surface)
     }
 }
@@ -108,6 +120,13 @@ impl Surface<Pixmap> {
 impl Surface<PBuffer> {
     #[inline]
     pub unsafe fn new_pbuffer(conf: &Config, size: dpi::PhysicalSize<u32>) -> Result<Self, Error> {
+        if !conf.attribs().supports_pbuffers {
+            return Err(make_error!(ErrorType::BadApiUsage(
+                "Tried to make pbuffer surface with config without `supports_pbuffers`."
+                    .to_string()
+            )));
+        }
+
         platform_impl::Surface::<PBuffer>::new(conf.as_ref(), size).map(Surface)
     }
 }
@@ -119,6 +138,12 @@ impl Surface<Window> {
         nws: &NWS,
         wb: NWS::WindowBuilder,
     ) -> Result<(NWS::Window, Self), Error> {
+        if !conf.attribs().supports_windows {
+            return Err(make_error!(ErrorType::BadApiUsage(
+                "Tried to make window surface with config without `supports_windows`.".to_string()
+            )));
+        }
+
         platform_impl::Surface::<Window>::new(conf.as_ref(), nws, wb)
             .map(|(win, surf)| (win, Surface(surf)))
     }
@@ -128,6 +153,12 @@ impl Surface<Window> {
         conf: &Config,
         nw: &NW,
     ) -> Result<Self, Error> {
+        if !conf.attribs().supports_windows {
+            return Err(make_error!(ErrorType::BadApiUsage(
+                "Tried to make window surface with config without `supports_windows`.".to_string()
+            )));
+        }
+
         platform_impl::Surface::<Window>::new_existing(conf.as_ref(), nw).map(Surface)
     }
 
@@ -136,6 +167,8 @@ impl Surface<Window> {
     /// You should call this function every time you have finished rendering, or
     /// the image may not be displayed on the screen.
     ///
+    /// This `Surface` must be current.
+    ///
     /// **Warning**: if the swap interval when creating the surface was not
     /// `DontWait` or your graphics driver decided to override your requested
     /// behaviour, this function may block. Please refer to [`SwapInterval`].
@@ -143,6 +176,11 @@ impl Surface<Window> {
     /// [`SwapInterval`]: crate::config::SwapInterval
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), Error> {
+        if cfg!(debug_assertions) && !self.is_current() {
+            return Err(make_error!(ErrorType::BadApiUsage(
+                "`swap_buffers` called on surface that is not current.".to_string()
+            )));
+        }
         self.0.swap_buffers()
     }
 
@@ -152,9 +190,18 @@ impl Surface<Window> {
     /// [`Surface::swap_buffers`]: crate::surface::Surface::swap_buffers()
     #[inline]
     pub fn swap_buffers_with_damage(&self, rects: &[dpi::Rect]) -> Result<(), Error> {
+        if !self.is_current() {
+            return Err(make_error!(ErrorType::BadApiUsage(
+                "`swap_buffers_with_damage` called on surface that is not current.".to_string()
+            )));
+        }
         self.0.swap_buffers_with_damage(rects)
     }
 
+    /// On Wayland, Glutin clients must call `update_after_resize`, on the
+    /// `Surface` whenever the backing [`Window`]'s size changes.
+    ///
+    /// [`Window`]: crate::surface::Window
     #[inline]
     pub fn update_after_resize(&self, size: dpi::PhysicalSize<u32>) {
         #![cfg(any(
@@ -167,10 +214,43 @@ impl Surface<Window> {
         self.0.update_after_resize(size);
     }
 
+    /// Modifies the `Surface`'s [`SwapInterval`] to the requested one.
+    ///
+    /// This `Surface` must be current.
+    ///
+    /// This [`SwapInterval`] must lie in the [`SwapIntervalRange`] specified in
+    /// the [`Config`] with which your [`Surface`] was made with.
+    ///
+    /// As mentioned in [`SwapInterval`], your request may be silently ignored
+    /// by the OpenGL driver. For more information, refer to [`SwapInterval`].
+    ///
+    /// [`SwapInterval`]: crate::config::SwapInterval
+    /// [`SwapIntervalRange`]: crate::config::SwapIntervalRange
+    /// [`Config`]: crate::config::Config
     #[inline]
     pub fn modify_swap_interval(&self, swap_interval: SwapInterval) -> Result<(), Error> {
-        // FIXME
-        unimplemented!()
-        //self.0.modify_swap_interval()
+        if cfg!(debug_assertions) {
+            if !self.is_current() {
+                return Err(make_error!(ErrorType::BadApiUsage(
+                    "`modify_swap_interval` called on surface that is not current.".to_string()
+                )));
+            }
+            let conf = self.get_config();
+            let attribs = conf.attribs();
+            if attribs
+                .swap_interval_ranges
+                .iter()
+                .find(|r| r.contains(&swap_interval))
+                .is_none()
+            {
+                return Err(make_error!(ErrorType::BadApiUsage(format!(
+                    "SwapInterval of {:?} not in ranges {:?}.",
+                    swap_interval, attribs.swap_interval_ranges
+                ))));
+            }
+        }
+        swap_interval.validate()?;
+
+        self.0.modify_swap_interval(swap_interval)
     }
 }

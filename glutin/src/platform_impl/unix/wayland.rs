@@ -1,6 +1,6 @@
 use crate::api::egl;
 use crate::api::egl::ffi;
-use crate::config::{Api, ConfigAttribs, ConfigWrapper, ConfigsFinder};
+use crate::config::{Api, ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapInterval};
 use crate::context::ContextBuilderWrapper;
 use crate::platform::unix::BackingApi;
 use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
@@ -145,6 +145,11 @@ impl Surface<Window> {
     pub fn swap_buffers_with_damage(&self, rects: &[dpi::Rect]) -> Result<(), Error> {
         self.surface.swap_buffers_with_damage(rects)
     }
+
+    #[inline]
+    pub fn modify_swap_interval(&self, swap_interval: SwapInterval) -> Result<(), Error> {
+        self.surface.modify_swap_interval(swap_interval)
+    }
 }
 
 impl Surface<PBuffer> {
@@ -220,7 +225,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const raw::c_void {
+    pub fn get_proc_address(&self, addr: &str) -> Result<*const raw::c_void, Error> {
         self.0.get_proc_address(addr)
     }
 

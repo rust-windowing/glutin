@@ -1,3 +1,25 @@
+//! You can use a [`ContextBuilder`] along side with a [`Config`] to get
+//! a [`Context`] with the requested parameters.
+//!
+//! Contexts can be made current either via [`make_current_surfaceless`] or
+//! [`make_current`]. Please refer to those functions for more details, if
+//! interested.
+//!
+//! **WARNING:** Glutin clients should use the [`ContextBuilder`] type in their
+//! code, not [`ContextBuilderWrapper`]. If I had a choice, I'd hide that type,
+//! but alas, due to limitations in rustdoc, I cannot. Unfortunately, almost all
+//! of [`ContextBuilder`]'s methods are only visible on
+//! [`ContextBuilderWrapper`], which exception of the [`build`] function which
+//! can only be found on the former.
+//!
+//! [`ContextBuilder`]: crate::context::ContextBuilder
+//! [`ContextBuilderWrapper`]: crate::context::ContextBuilderWrapper
+//! [`ContextBuilder`]: crate::context::ContextBuilderWrapper
+//! [`build`]: crate::context::ContextBuilderWrapper::build
+//! [`make_current_surfaceless`]: crate::context::Context::make_current_surfaceless
+//! [`make_current`]: crate::context::Context::make_current
+//! [`Config`]: crate::config::ConfigWrapper
+
 use crate::config::Api;
 use crate::config::Config;
 use crate::platform_impl;
@@ -36,7 +58,7 @@ pub struct Context(pub(crate) platform_impl::Context);
 impl Context {
     /// Sets this context as the current context. The previously current context
     /// on this thread (if any) is no longer current. The `Context`'s
-    /// [`Config`eration] must have [`supports_surfaceless`] set to `true`.
+    /// [`Config`] must have [`supports_surfaceless`] set to `true`.
     ///
     /// For how to handle errors, refer to [`make_current`].
     ///
@@ -44,7 +66,7 @@ impl Context {
     /// [`ReleaseBehaviour`] is equal to [`Flush`].
     ///
     /// [`make_current`]: crate::context::Context::make_current
-    /// [`Config`eration]: crate::config::ConfigWrapper
+    /// [`Config`]: crate::config::ConfigWrapper
     /// [`supports_surfaceless`]: crate::config::ConfigAttribs::supports_surfaceless
     /// [`ReleaseBehaviour`]: crate::context::ReleaseBehaviour
     /// [`Flush`]: crate::context::ReleaseBehaviour::Flush
@@ -52,7 +74,7 @@ impl Context {
     pub unsafe fn make_current_surfaceless(&self) -> Result<(), Error> {
         if !self.get_config().attribs().supports_surfaceless {
             return Err(make_error!(ErrorType::BadApiUsage(
-                "`make_current_surfaceless` called on Context with surface without `supports_surfaceless`.".to_string()
+                "`make_current_surfaceless` called on context with config without `supports_surfaceless`.".to_string()
             )));
         }
         self.0.make_current_surfaceless()
@@ -63,8 +85,8 @@ impl Context {
     /// is also now current drawable.
     ///
     /// The [`Surface`] and the `Context` must have be made with the same
-    /// [`Config`eration] or two [`Config`eration]s which are, due to some
-    /// platform-specific reason, compatible. The [`Config`eration] must support
+    /// [`Config`] or two [`Config`]s which are, due to some
+    /// platform-specific reason, compatible. The [`Config`] must support
     /// the [`Surface`]'s type.
     ///
     /// The previously current [`Context`] might get `glFlush`ed if its
@@ -89,7 +111,7 @@ impl Context {
     /// [`is_current`]: crate::context::Context::is_current
     /// [`make_not_current`]: crate::context::Context::make_not_current
     /// [`surface`]: crate::surface::Surface
-    /// [`Config`eration]: crate::config::ConfigWrapper
+    /// [`Config`]: crate::config::ConfigWrapper
     /// [`ReleaseBehaviour`]: crate::context::ReleaseBehaviour
     /// [`Flush`]: crate::context::ReleaseBehaviour::Flush
     #[inline]
@@ -122,9 +144,9 @@ impl Context {
         self.0.is_current()
     }
 
-    /// Returns the [`Config`eration] that the context was created with.
+    /// Returns the [`Config`] that the context was created with.
     ///
-    /// [`Config`eration]: crate::config::ConfigWrapper
+    /// [`Config`]: crate::config::ConfigWrapper
     #[inline]
     pub fn get_config(&self) -> Config {
         self.0.get_config()
@@ -133,16 +155,23 @@ impl Context {
     /// Returns the address of an OpenGL function. This context should be current
     /// when doing so.
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const raw::c_void {
+    pub fn get_proc_address(&self, addr: &str) -> Result<*const raw::c_void, Error> {
+        if cfg!(debug_assertions) && !self.is_current() {
+            return Err(make_error!(ErrorType::BadApiUsage(
+                "`get_proc_address` called on context that is not current.".to_string()
+            )));
+        }
         self.0.get_proc_address(addr)
     }
 
     /// On MacOS, Glutin clients must call `update_after_resize`,
     /// [`make_current`], or [`make_current_surfaceless`] on the context whenever
-    /// the backing surface's size changes.
+    /// the backing [`Surface`]`<`[`Window`]`>`'s size changes.
     ///
     /// [`make_current_surfaceless`]: crate::context::Context::make_current_surfaceless
     /// [`make_current`]: crate::context::Context::make_current
+    /// [`Surface`]: crate::surface::Surface
+    /// [`Window`]: crate::surface::Window
     #[inline]
     pub fn update_after_resize(&self) {
         #[cfg(target_os = "macos")]
@@ -303,12 +332,12 @@ impl<T> ContextBuilderWrapper<T> {
     /// display lists if they use the same implementation of OpenGL.
     ///
     /// Some platforms (e.g. Windows) only guarantee success if both [`Context`]s
-    /// are made with the same [`Config`eration] while others appear to be more
+    /// are made with the same [`Config`] while others appear to be more
     /// lenient. As with all things graphics related, the best way to check that
     /// something works is to test!
     ///
     /// [`Context`]: crate::context::Context
-    /// [`Config`eration]: crate::config::ConfigWrapper
+    /// [`Config`]: crate::config::ConfigWrapper
     #[inline]
     pub fn with_shared_lists<T2>(self, other: T2) -> ContextBuilderWrapper<T2> {
         self.set_sharing(Some(other.into()))

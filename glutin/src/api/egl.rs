@@ -41,6 +41,7 @@ use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::os::raw;
+use std::ptr;
 use std::sync::Arc;
 
 lazy_static! {
@@ -448,12 +449,17 @@ impl Config {
         unsafe { Display::bind_api(cf.version.0, display.egl_version)? };
         let mut errors = make_error!(ErrorType::NoAvailableConfig);
 
-        match cf.desired_swap_interval {
-            Some(SwapInterval::AdaptiveWait(_)) => {
-                errors.append(make_error!(ErrorType::AdaptiveSwapControlNotSupported));
-                return Err(errors);
-            }
-            _ => (),
+        if cf
+            .desired_swap_interval_ranges
+            .iter()
+            .find(|si| match si {
+                SwapIntervalRange::AdaptiveWait(_) => true,
+                _ => false,
+            })
+            .is_some()
+        {
+            errors.append(make_error!(ErrorType::AdaptiveSwapControlNotSupported));
+            return Err(errors);
         }
 
         let descriptor = {
@@ -638,12 +644,22 @@ impl Config {
             }};
         };
 
-        let configs = if let Some(desired_swap_interval) = cf.desired_swap_interval {
-            let desired_swap_interval = match desired_swap_interval {
-                SwapInterval::Wait(n) => n,
-                SwapInterval::DontWait => 0,
-                SwapInterval::AdaptiveWait(_) => unreachable!(),
+        let configs = if cf.desired_swap_interval_ranges.is_empty() {
+            configs
+        } else {
+            let conv_range = |sir: &_| match sir {
+                SwapIntervalRange::DontWait => 0..1,
+                SwapIntervalRange::Wait(r) => r.clone(),
+                SwapIntervalRange::AdaptiveWait(_) => unreachable!(),
             };
+
+            let mut dsir = conv_range(&cf.desired_swap_interval_ranges[0]);
+
+            for ndsir in &cf.desired_swap_interval_ranges[1..] {
+                let ndsir = conv_range(ndsir);
+                dsir.start = u32::min(dsir.start, ndsir.start);
+                dsir.end = u32::max(dsir.end, ndsir.end);
+            }
 
             configs
                 .into_iter()
@@ -655,9 +671,9 @@ impl Config {
                             errors.append(err);
                             return None;
                         }
-                        Ok(min) if (desired_swap_interval as i32) < min => {
+                        Ok(min) if (dsir.start as i32) < min => {
                             errors.append(make_oserror!(OsError::Misc(format!(
-                                "Desired swap interval smaller than minimum for {:?}",
+                                "Desired swap interval range start smaller than minimum for {:?}",
                                 conf_id
                             ))));
                             return None;
@@ -672,9 +688,9 @@ impl Config {
                             errors.append(err);
                             return None;
                         }
-                        Ok(max) if desired_swap_interval as i32 > max => {
+                        Ok(max) if (dsir.end as i32) > max => {
                             errors.append(make_oserror!(OsError::Misc(format!(
-                                "Desired swap interval bigger than maximum for {:?}",
+                                "Desired swap interval range end bigger than maximum for {:?}",
                                 conf_id
                             ))));
                             return None;
@@ -685,8 +701,6 @@ impl Config {
                     Some(conf_id)
                 })
                 .collect()
-        } else {
-            configs
         };
 
         if configs.is_empty() {
@@ -750,13 +764,6 @@ impl Config {
                         a => Some(a as u16),
                     },
                     srgb: cf.srgb.unwrap_or(false),
-                    desired_swap_interval: cf.desired_swap_interval.clone().unwrap_or(
-                        match &swap_interval_ranges[0] {
-                            SwapIntervalRange::DontWait => SwapInterval::DontWait,
-                            SwapIntervalRange::Wait(n) => SwapInterval::Wait(n.start),
-                            _ => unreachable!(),
-                        },
-                    ),
                     swap_interval_ranges,
                 };
 
@@ -1033,23 +1040,6 @@ impl Context {
         let ret = egl.MakeCurrent(**self.display, surf.surface, surf.surface, self.context);
         Self::check_make_current(Some(ret))?;
 
-        // Swap interval defaults to 1
-        let mut has_been_current = surf.has_been_current.lock();
-        if !*has_been_current && T::surface_type() == SurfaceType::Window {
-            let n = match surf.config.attribs.desired_swap_interval {
-                SwapInterval::Wait(n) => n,
-                SwapInterval::DontWait => 0,
-                SwapInterval::AdaptiveWait(_) => unreachable!(),
-            };
-            if egl.SwapInterval(**surf.display, n as i32) == ffi::egl::FALSE {
-                return Err(make_oserror!(OsError::Misc(format!(
-                    "eglSwapInterval failed with 0x{:x}",
-                    egl.GetError()
-                ))));
-            }
-            *has_been_current = true;
-        }
-
         Ok(())
     }
 
@@ -1165,11 +1155,15 @@ impl Context {
     // }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const raw::c_void {
+    pub fn get_proc_address(&self, addr: &str) -> Result<*const raw::c_void, Error> {
         let egl = EGL.as_ref().unwrap();
         let addr = CString::new(addr.as_bytes()).unwrap();
         let addr = addr.as_ptr();
-        unsafe { egl.GetProcAddress(addr) as *const _ }
+        let ptr = unsafe { egl.GetProcAddress(addr) as *const raw::c_void };
+        match ptr.is_null() {
+            true => Err(make_error!(ErrorType::FunctionDoesNotExist)),
+            false => Ok(ptr),
+        }
     }
 
     #[inline]
@@ -1244,7 +1238,6 @@ pub struct Surface<T: SurfaceTypeTrait> {
     surface: ffi::EGLSurface,
     config: ConfigWrapper<Config, ConfigAttribs>,
     phantom: PhantomData<T>,
-    has_been_current: Mutex<bool>,
 }
 
 unsafe impl<T: SurfaceTypeTrait> Send for Surface<T> {}
@@ -1358,7 +1351,6 @@ impl Surface<Window> {
             config: conf.clone_inner(),
             surface: surf,
             phantom: PhantomData,
-            has_been_current: Mutex::new(false),
         })
     }
 
@@ -1432,6 +1424,27 @@ impl Surface<Window> {
             Ok(())
         }
     }
+
+    #[inline]
+    pub fn modify_swap_interval(&self, swap_interval: SwapInterval) -> Result<(), Error> {
+        let egl = EGL.as_ref().unwrap();
+        // Swap interval defaults to 1
+        let n = match swap_interval {
+            SwapInterval::Wait(n) => n,
+            SwapInterval::DontWait => 0,
+            SwapInterval::AdaptiveWait(_) => unreachable!(),
+        };
+        unsafe {
+            if egl.SwapInterval(**self.display, n as i32) == ffi::egl::FALSE {
+                return Err(make_oserror!(OsError::Misc(format!(
+                    "eglSwapInterval failed with 0x{:x}",
+                    egl.GetError()
+                ))));
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl Surface<PBuffer> {
@@ -1460,7 +1473,6 @@ impl Surface<PBuffer> {
             config: conf.clone_inner(),
             surface: surf,
             phantom: PhantomData,
-            has_been_current: Mutex::new(false),
         })
     }
 }

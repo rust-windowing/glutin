@@ -9,7 +9,7 @@
 mod wayland;
 mod x11;
 
-use crate::config::{Api, ConfigAttribs, ConfigWrapper, ConfigsFinder};
+use crate::config::{Api, ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapInterval};
 use crate::context::ContextBuilderWrapper;
 pub use crate::platform::unix::ConfigPlatformAttributes;
 use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
@@ -156,7 +156,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const raw::c_void {
+    pub fn get_proc_address(&self, addr: &str) -> Result<*const raw::c_void, Error> {
         match self {
             Context::Wayland(ref ctx) => ctx.get_proc_address(addr),
             Context::X11(ref ctx) => ctx.get_proc_address(addr),
@@ -316,6 +316,14 @@ impl Surface<Window> {
         match self {
             Surface::Wayland(ref surf) => surf.update_after_resize(size),
             Surface::X11(_) => (),
+        }
+    }
+
+    #[inline]
+    pub fn modify_swap_interval(&self, swap_interval: SwapInterval) -> Result<(), Error> {
+        match self {
+            Surface::Wayland(ref surf) => surf.modify_swap_interval(swap_interval),
+            Surface::X11(ref surf) => surf.modify_swap_interval(swap_interval),
         }
     }
 }
