@@ -220,7 +220,7 @@ impl Context {
 /// [methods]: ./struct.ContextBuilderWrapper.html#methods
 /// [defaults implementation]: ./struct.ContextBuilderWrapper.html#impl-Default
 /// [`ContextBuilder`]: crate::context::ContextBuilder
-/// [`build`]: crate::context::ContextBuilderWrapper::build
+/// [`build`]: ./type.ContextBuilder.html#method.build
 #[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ContextBuilderWrapper<T> {
@@ -295,7 +295,7 @@ impl<T> Default for ContextBuilderWrapper<T> {
 
 impl<T> ContextBuilderWrapper<T> {
     #[inline]
-    fn new() -> Self {
+    pub fn new() -> Self {
         Default::default()
     }
 }

@@ -289,7 +289,7 @@ impl Default for ConfigsFinder {
             desired_swap_interval_ranges: vec![],
             must_support_pbuffers: false,
             must_support_windows: true,
-            must_support_pixmaps: true,
+            must_support_pixmaps: false,
             must_support_surfaceless: false,
             version: (Api::OpenGl, Version(3, 3)),
             plat_attr: Default::default(),
@@ -300,7 +300,7 @@ impl Default for ConfigsFinder {
 impl ConfigsFinder {
     /// Makes a `ConfigsFinder` with the default options.
     #[inline]
-    fn new() -> Self {
+    pub fn new() -> Self {
         Default::default()
     }
 

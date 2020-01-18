@@ -16,6 +16,8 @@ use crate::surface::{Surface, SurfaceTypeTrait};
 
 use std::os::raw;
 
+// FIXME DOCS
+
 #[non_exhaustive]
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum NativeConfig {
