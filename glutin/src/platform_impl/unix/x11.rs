@@ -397,7 +397,7 @@ impl Surface<Pixmap> {
     pub fn new<NPS: NativePixmapSource>(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         nps: &NPS,
-        wb: NPS::PixmapBuilder,
+        pb: NPS::PixmapBuilder,
     ) -> Result<(NPS::Pixmap, Self), Error> {
         unimplemented!()
         //match (disp, conf.config) {

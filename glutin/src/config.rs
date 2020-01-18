@@ -1,3 +1,6 @@
+//! Everything related to finding your [`Surface`]'s and [`Context`]'s
+//! [`Config`].
+//!
 //! You can use a [`ConfigsFinder`] to get a selection of [`Config`]s that match
 //! your criteria. Among many things, you must specify in advance what types of
 //! [`Surface`]s you're going to use the [`Config`] with.
@@ -10,6 +13,7 @@
 //! [`Config`]: crate::config::Config
 //! [`ConfigWrapper`]: crate::config::ConfigWrapper
 //! [`Surface`]: crate::surface::Surface
+//! [`Context`]: crate::context::Context
 
 use crate::platform_impl;
 

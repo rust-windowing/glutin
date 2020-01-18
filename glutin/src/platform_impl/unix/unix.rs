@@ -227,15 +227,15 @@ impl Surface<Pixmap> {
     pub unsafe fn new<NPS: NativePixmapSource>(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         nps: &NPS,
-        wb: NPS::PixmapBuilder,
+        pb: NPS::PixmapBuilder,
     ) -> Result<(NPS::Pixmap, Self), Error> {
         match conf.config {
             Config::Wayland(config) => {
-                wayland::Surface::<Pixmap>::new(conf.map_config(|_| config), nps, wb)
+                wayland::Surface::<Pixmap>::new(conf.map_config(|_| config), nps, pb)
                     .map(|(pix, surf)| (pix, Surface::Wayland(surf)))
             }
             Config::X11(config) => {
-                x11::Surface::<Pixmap>::new(conf.map_config(|_| config), nps, wb)
+                x11::Surface::<Pixmap>::new(conf.map_config(|_| config), nps, pb)
                     .map(|(pix, surf)| (pix, Surface::X11(surf)))
             }
         }

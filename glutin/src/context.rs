@@ -1,7 +1,9 @@
+//! Everything related to creating and manipulating [`Context`]s.
+//!
 //! You can use a [`ContextBuilder`] along side with a [`Config`] to get
 //! a [`Context`] with the requested parameters.
 //!
-//! Contexts can be made current either via [`make_current_surfaceless`] or
+//! [`Context`]s can be made current either via [`make_current_surfaceless`] or
 //! [`make_current`]. Please refer to those functions for more details, if
 //! interested.
 //!
@@ -13,6 +15,7 @@
 //! can only be found on the former.
 //!
 //! [`ContextBuilder`]: crate::context::ContextBuilder
+//! [`Context`]: crate::context::Context
 //! [`ContextBuilderWrapper`]: crate::context::ContextBuilderWrapper
 //! [`ContextBuilder`]: crate::context::ContextBuilderWrapper
 //! [`build`]: crate::context::ContextBuilderWrapper::build
@@ -46,14 +49,26 @@ use std::os::raw;
 /// [`make_current`], or [`make_current_surfaceless`] on the context whenever
 /// the backing surface's size changes.
 ///
+/// **WARNING** `Context`s cannot be used from threads they are not current on.
+/// If dropped from a different thread than the one they are currently on, UB can
+/// happen. If a context is current, please call [`make_not_current`] before
+/// moving it between two threads.
+///
 /// [`ContextBuilder`]: crate::context::ContextBuilderWrapper
 /// [`with_shared_lists`]: crate::context::ContextBuilderWrapper::with_shared_lists
 /// [`get_proc_address`]: crate::context::Context::get_proc_address
 /// [`make_current_surfaceless`]: crate::context::Context::make_current_surfaceless
 /// [`make_current`]: crate::context::Context::make_current
+/// [`make_not_current`]: crate::context::Context::make_not_current
 /// [`update_after_resize`]: crate::context::Context::update_after_resize
 #[derive(Debug, PartialEq, Eq)]
 pub struct Context(pub(crate) platform_impl::Context);
+
+impl Drop for Context {
+    fn drop(&mut self) {
+        self.make_not_current()
+    }
+}
 
 impl Context {
     /// Sets this context as the current context. The previously current context
@@ -125,12 +140,15 @@ impl Context {
     /// If this context is current, makes this context not current. If this
     /// context is not current, however, then this function does nothing.
     ///
+    /// The current [`Surface`], if any, will also become not current.
+    ///
     /// The previously current [`Context`] might get `glFlush`ed if its
     /// [`ReleaseBehaviour`] is equal to [`Flush`].
     ///
     /// For how to handle errors, refer to [`make_current`].
     ///
     /// [`make_current`]: crate::context::Context::make_current
+    /// [`Surface`]: crate::surface::Surface
     /// [`ReleaseBehaviour`]: crate::context::ReleaseBehaviour
     /// [`Flush`]: crate::context::ReleaseBehaviour::Flush
     #[inline]
@@ -138,7 +156,7 @@ impl Context {
         self.0.make_not_current()
     }
 
-    /// Returns true if this context is the current one in this thread.
+    /// Returns `true` if this context is the current one in this thread.
     #[inline]
     pub fn is_current(&self) -> bool {
         self.0.is_current()
@@ -168,6 +186,10 @@ impl Context {
     /// [`make_current`], or [`make_current_surfaceless`] on the context whenever
     /// the backing [`Surface`]`<`[`Window`]`>`'s size changes.
     ///
+    /// No-ops on other platforms. Please make sure to also call your
+    /// [`Surface`]'s [`update_after_resize`].
+    ///
+    /// [`update_after_resize`]: crate::surface::Surface::update_after_resize
     /// [`make_current_surfaceless`]: crate::context::Context::make_current_surfaceless
     /// [`make_current`]: crate::context::Context::make_current
     /// [`Surface`]: crate::surface::Surface

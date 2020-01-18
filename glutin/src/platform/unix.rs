@@ -86,6 +86,7 @@ impl ContextExt for Context {
     }
 }
 
+/// Which backing api should Glutin use. Wayland requires EGL.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BackingApi {
     GlxThenEgl,
@@ -101,22 +102,32 @@ impl Default for BackingApi {
     }
 }
 
+/// Platform specific config attributes for unix.
+///
+/// For details on what each member controls, please scroll through
+/// [`ConfigPlatformAttributesExt`]'s [methods].
+///
+/// [`ConfigPlatformAttributesExt`]: crate::platform::unix::ConfigPlatformAttributesExt
+/// [methods]: ./trait.ConfigPlatformAttributesExt.html#methods
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
+#[allow(missing_docs)]
 pub struct ConfigPlatformAttributes {
-    /// X11 only: set to insure a certain visual xid is used when
-    /// choosing the fbconfig.
     pub x11_visual_xid: Option<raw::c_ulong>,
-
-    /// Whether the X11 Visual will have transparency support.
     pub x11_transparency: Option<bool>,
-
-    /// Wayland/X11 only.
     pub backing_api: BackingApi,
 }
 
+/// A trait implemention functions for controlling unix's platform specific
+/// config attributes.
 pub trait ConfigPlatformAttributesExt {
+    /// X11 only: set to insure a certain visual xid is used when
+    /// choosing the fbconfig.
     fn with_x11_visual_xid(self, xid: Option<raw::c_ulong>) -> Self;
+
+    /// X11 only: whether the X11 Visual will have transparency support.
     fn with_x11_transparency(self, trans: Option<bool>) -> Self;
+
+    /// Wayland/X11 only. Wayland requires EGL.
     fn with_backing_api(self, backing_api: BackingApi) -> Self;
 }
 

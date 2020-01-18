@@ -180,7 +180,7 @@ impl Surface<Pixmap> {
     pub unsafe fn new<NPS: NativePixmapSource>(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         nps: &NPS,
-        wb: NPS::PixmapBuilder,
+        pb: NPS::PixmapBuilder,
     ) -> Result<(NPS::Pixmap, Self), Error> {
         return Err(make_error!(ErrorType::NotSupported(
             "Wayland does not support pixmaps.".to_string(),

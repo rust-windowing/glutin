@@ -20,9 +20,11 @@
 //! [`Surface`]s come in three flavors, [`Pixmap`]s, [`PBuffer`]s, and
 //! [`Window`]s. They are created with the [`Surface::new_pixmap`],
 //! [`Surface::new_pbuffer`], and [`Surface::new_window`] functions,
-//! respectively. Alternatively, if you have already created a [`Window`] or
-//! [`Pixmap`], you can use [`Surface::new_from_existing_window`] and
-//! [`Surface::new_from_existing_pixmap`], respectively.
+//! respectively. Alternatively, if you have already created your [`Window`]'s
+//! or [`Pixmap`]'s native API's object, you can use
+//! [`Surface::new_from_existing_window`] and
+//! [`Surface::new_from_existing_pixmap`] to create your [`Surface`],
+//! respectively.
 //!
 //! Once you've made a [`Context`] and a [`Surface`], you can make them current
 //! with the [`Context::make_current`] function. Alternatively, you can use
