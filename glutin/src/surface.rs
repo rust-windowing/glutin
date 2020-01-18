@@ -138,7 +138,7 @@ pub struct Surface<T: SurfaceTypeTrait>(pub(crate) platform_impl::Surface<T>);
 
 impl<T: SurfaceTypeTrait> Drop for Surface<T> {
     fn drop(&mut self) {
-        self.make_not_current()
+        unsafe { self.make_not_current().unwrap(); }
     }
 }
 

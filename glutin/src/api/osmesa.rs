@@ -6,7 +6,7 @@
     target_os = "openbsd",
 ))]
 
-use crate::config::{Api, Version};
+use crate::config::Version;
 use crate::context::ContextBuilderWrapper;
 use crate::context::{GlProfile, Robustness};
 use crate::utils::NoPrint;
@@ -19,11 +19,16 @@ use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::os::raw;
 
+/// Represents an OpenGL context made with OsMesa, which is the structure that
+/// holds the OpenGL state.
 #[derive(Debug)]
 pub struct OsMesaContext {
     context: glutin_osmesa_sys::OSMesaContext,
 }
 
+/// Represents an OsMesa buffer. The OsMesa equivalent to a [`Surface`].
+///
+/// [`Surface`]: crate::surface::Surface
 #[derive(Debug)]
 pub struct OsMesaBuffer {
     buffer: Vec<NoPrint<MaybeUninit<u8>>>,
@@ -33,9 +38,9 @@ pub struct OsMesaBuffer {
 
 impl OsMesaContext {
     #[inline]
-    pub fn new(
+    pub(crate) fn new(
         cb: ContextBuilderWrapper<&OsMesaContext>,
-        version: (Api, Version),
+        version: Version,
     ) -> Result<Self, Error> {
         glutin_osmesa_sys::OsMesa::try_loading()
             .map_err(|err| make_oserror!(OsError::OsMesaLoadingError(err)))?;
@@ -66,19 +71,10 @@ impl OsMesaContext {
             }
         }
 
-        match version {
-            (Api::OpenGl, Version(major, minor)) => {
-                attribs.push(glutin_osmesa_sys::OSMESA_CONTEXT_MAJOR_VERSION);
-                attribs.push(major as raw::c_int);
-                attribs.push(glutin_osmesa_sys::OSMESA_CONTEXT_MINOR_VERSION);
-                attribs.push(minor as raw::c_int);
-            }
-            _ => {
-                return Err(make_error!(ErrorType::NotSupported(
-                    "OSMesa only supports OpenGL, not WebGL or GLES.".to_string()
-                )));
-            }
-        }
+        attribs.push(glutin_osmesa_sys::OSMESA_CONTEXT_MAJOR_VERSION);
+        attribs.push(version.0 as raw::c_int);
+        attribs.push(glutin_osmesa_sys::OSMESA_CONTEXT_MINOR_VERSION);
+        attribs.push(version.1 as raw::c_int);
 
         // attribs array must be NULL terminated.
         attribs.push(0);
@@ -150,14 +146,10 @@ impl OsMesaContext {
         Ok(())
     }
 
+    /// Returns `true` if this context is the current one in this thread.
     #[inline]
     pub fn is_current(&self) -> bool {
         unsafe { glutin_osmesa_sys::OSMesaGetCurrentContext() == self.context }
-    }
-
-    #[inline]
-    pub fn get_api(&self) -> Api {
-        Api::OpenGl
     }
 
     #[inline]
@@ -165,6 +157,7 @@ impl OsMesaContext {
         self.context as *mut _
     }
 
+    /// Returns the address of an OpenGL function.
     #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const raw::c_void {
         unsafe {

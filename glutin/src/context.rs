@@ -66,7 +66,7 @@ pub struct Context(pub(crate) platform_impl::Context);
 
 impl Drop for Context {
     fn drop(&mut self) {
-        self.make_not_current()
+        unsafe { self.make_not_current().unwrap(); }
     }
 }
 
