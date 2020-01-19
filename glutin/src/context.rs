@@ -36,7 +36,7 @@ use std::os::raw;
 /// state.
 ///
 /// Is built by a [`ContextBuilder`]. Can have some its resources shared with
-/// another context via [`with_shared_lists`].
+/// another context via [`with_sharing`].
 ///
 /// A context must be made current before using [`get_proc_address`] or any of
 /// the functions returned by [`get_proc_address`].
@@ -55,7 +55,7 @@ use std::os::raw;
 /// moving it between two threads.
 ///
 /// [`ContextBuilder`]: crate::context::ContextBuilderWrapper
-/// [`with_shared_lists`]: crate::context::ContextBuilderWrapper::with_shared_lists
+/// [`with_sharing`]: crate::context::ContextBuilderWrapper::with_sharing
 /// [`get_proc_address`]: crate::context::Context::get_proc_address
 /// [`make_current_surfaceless`]: crate::context::Context::make_current_surfaceless
 /// [`make_current`]: crate::context::Context::make_current

@@ -15,7 +15,7 @@
 //! too are [`Context`]s from a [`ContextBuilder`]. At this stage if you decide
 //! to make multiple [`Context`]s you can also choose to share them. Some
 //! platform specific restrictions are mentioned in [`ContextBuilderWrapper`]'s
-//! [`with_shared_lists`] function.
+//! [`with_sharing`] function.
 //!
 //! [`Surface`]s come in three flavors, [`Pixmap`]s, [`PBuffer`]s, and
 //! [`Window`]s. They are created with the [`Surface::new_pixmap`],
@@ -35,7 +35,7 @@
 //! [`Context`]: crate::context::Context
 //! [`ContextBuilder`]: crate::context::ContextBuilder
 //! [`ContextBuilderWrapper`]: crate::context::ContextBuilderWrapper
-//! [`with_shared_lists`]: crate::context::ContextBuilderWrapper::with_shared_lists()
+//! [`with_sharing`]: crate::context::ContextBuilderWrapper::with_sharing()
 //! [`Surface`]: crate::surface::Surface
 //! [`Config`]: crate::config::ConfigWrapper
 //! [`ConfigsFinder`]: crate::config::ConfigsFinder
