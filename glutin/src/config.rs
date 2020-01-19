@@ -103,6 +103,16 @@ pub enum SwapIntervalRange {
     AdaptiveWait(Range<u32>),
 }
 
+impl From<SwapInterval> for SwapIntervalRange {
+    fn from(si: SwapInterval) -> Self {
+        match si {
+            SwapInterval::DontWait => SwapIntervalRange::DontWait,
+            SwapInterval::Wait(s) => SwapIntervalRange::Wait(s..s + 1),
+            SwapInterval::AdaptiveWait(s) => SwapIntervalRange::AdaptiveWait(s..s + 1),
+        }
+    }
+}
+
 impl SwapIntervalRange {
     #[inline]
     pub(crate) fn validate(&self) -> Result<(), Error> {

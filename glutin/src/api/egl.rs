@@ -667,8 +667,8 @@ impl Config {
                         }
                         Ok(min) if (dsir.start as i32) < min => {
                             errors.append(make_oserror!(OsError::Misc(format!(
-                                "Desired swap interval range start smaller than minimum for {:?}",
-                                conf_id
+                                "Desired swap interval range start ({:?}) smaller than minimum ({:?}) for {:?}",
+                                dsir.start, min, conf_id
                             ))));
                             return None;
                         }
@@ -682,10 +682,10 @@ impl Config {
                             errors.append(err);
                             return None;
                         }
-                        Ok(max) if (dsir.end as i32) > max => {
+                        Ok(max) if (dsir.end as i32) > (max + 1) => {
                             errors.append(make_oserror!(OsError::Misc(format!(
-                                "Desired swap interval range end bigger than maximum for {:?}",
-                                conf_id
+                                "Desired swap interval range end ({:?}) bigger than maximum ({:?}) for {:?}",
+                                dsir.end, max, conf_id
                             ))));
                             return None;
                         }
@@ -720,9 +720,12 @@ impl Config {
                     attrib!(egl, display, conf_id, ffi::egl::MAX_SWAP_INTERVAL)?
                         .try_into()
                         .unwrap();
+                // Inclusive to exclusive range
+                let max_swap_interval = max_swap_interval + 1;
 
+                assert!(max_swap_interval != min_swap_interval);
                 let swap_interval_ranges = match (min_swap_interval, max_swap_interval) {
-                    (0, 0) => vec![SwapIntervalRange::DontWait],
+                    (0, 1) => vec![SwapIntervalRange::DontWait],
                     (0, _) => vec![
                         SwapIntervalRange::Wait(1..max_swap_interval),
                         SwapIntervalRange::DontWait,
