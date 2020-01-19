@@ -433,13 +433,7 @@ impl Config {
         // TODO: Alternatively, allow EGL_MESA_platform_surfaceless.
         // FIXME: Also check for the GL_OES_surfaceless_context *CONTEXT*
         // extension
-        if cf.must_support_surfaceless
-            && display
-                .extensions
-                .iter()
-                .find(|s| s == &"EGL_KHR_surfaceless_context")
-                .is_none()
-        {
+        if cf.must_support_surfaceless && !display.has_extension("EGL_KHR_surfaceless_context") {
             return Err(make_error!(ErrorType::NotSupported(
                 "EGL surfaceless not supported".to_string(),
             )));
@@ -744,11 +738,7 @@ impl Config {
                     supports_windows: (surf_type & ffi::egl::WINDOW_BIT) == ffi::egl::WINDOW_BIT,
                     supports_pixmaps: (surf_type & ffi::egl::PIXMAP_BIT) == ffi::egl::PIXMAP_BIT,
                     supports_pbuffers: (surf_type & ffi::egl::PBUFFER_BIT) == ffi::egl::PBUFFER_BIT,
-                    supports_surfaceless: display
-                        .extensions
-                        .iter()
-                        .find(|s| s == &"EGL_KHR_surfaceless_context")
-                        .is_none(),
+                    supports_surfaceless: display.has_extension("EGL_KHR_surfaceless_context"),
                     hardware_accelerated: attrib!(egl, display, conf_id, ffi::egl::CONFIG_CAVEAT)?
                         != ffi::egl::SLOW_CONFIG as i32,
                     color_bits: attrib!(egl, display, conf_id, ffi::egl::RED_SIZE)? as u8
@@ -1159,11 +1149,7 @@ impl Context {
         let egl = EGL.as_ref().unwrap();
         let addr = CString::new(addr.as_bytes()).unwrap();
         let addr = addr.as_ptr();
-        let ptr = unsafe { egl.GetProcAddress(addr) as *const raw::c_void };
-        match ptr.is_null() {
-            true => Err(make_error!(ErrorType::FunctionDoesNotExist)),
-            false => Ok(ptr),
-        }
+        Ok(unsafe { egl.GetProcAddress(addr) as *const raw::c_void })
     }
 
     #[inline]
@@ -1254,7 +1240,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     #[inline]
     fn assemble_desc(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        size: Option<dpi::PhysicalSize<u32>>,
+        size: Option<&dpi::PhysicalSize<u32>>,
     ) -> Vec<raw::c_int> {
         let mut out = Vec::new();
         match conf.attribs.srgb {
@@ -1272,7 +1258,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
         }
 
         if let Some(size) = size {
-            let size: (u32, u32) = size.into();
+            let size: (u32, u32) = (*size).into();
             out.push(ffi::egl::TEXTURE_FORMAT as raw::c_int);
             out.push(match size {
                 (0, _) | (_, 0) => ffi::egl::NO_TEXTURE,
@@ -1382,7 +1368,11 @@ impl Surface<Window> {
     pub fn swap_buffers_with_damage(&self, rects: &[dpi::Rect]) -> Result<(), Error> {
         let egl = EGL.as_ref().unwrap();
 
-        if !egl.SwapBuffersWithDamageKHR.is_loaded() {
+        if !egl.SwapBuffersWithDamageKHR.is_loaded()
+            || !self
+                .display
+                .has_extension("EGL_KHR_swap_buffers_with_damage")
+        {
             return Err(make_error!(ErrorType::NotSupported(
                 "buffer damage not suported".to_string(),
             )));
@@ -1451,7 +1441,7 @@ impl Surface<PBuffer> {
     #[inline]
     pub fn new(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        size: dpi::PhysicalSize<u32>,
+        size: &dpi::PhysicalSize<u32>,
     ) -> Result<Self, Error> {
         let display = Arc::clone(&conf.config.display);
         let egl = EGL.as_ref().unwrap();

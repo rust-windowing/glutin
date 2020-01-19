@@ -1,10 +1,12 @@
 mod support;
 
-use glutin::event::{Event, WindowEvent};
-use glutin::event_loop::{ControlFlow, EventLoop};
-use glutin::window::WindowBuilder;
-use glutin::ContextBuilder;
-use glutin::Rect;
+use glutin::config::ConfigsFinder;
+use glutin::context::ContextBuilder;
+use glutin::surface::Surface;
+use winit::event::{Event, WindowEvent};
+use winit::event_loop::{ControlFlow, EventLoop};
+use winit::window::WindowBuilder;
+use winit_types::dpi::{PhysicalPosition, PhysicalSize, Rect};
 
 struct Color {
     red: f32,
@@ -20,6 +22,7 @@ impl Color {
             blue: 0.0,
         }
     }
+
     fn next(&self) -> Color {
         Color {
             red: if self.red >= 1.0 {
@@ -42,28 +45,24 @@ impl Color {
 }
 
 fn main() {
+    env_logger::init();
     let el = EventLoop::new();
     let wb = WindowBuilder::new().with_title("A fantastic window!");
 
-    let windowed_context = ContextBuilder::new().build_windowed(wb, &el).unwrap();
+    let confs = ConfigsFinder::new().find(&*el).unwrap();
+    let conf = &confs[0];
+    println!("Configeration chosen: {:?}", conf);
 
-    let windowed_context = unsafe { windowed_context.make_current().unwrap() };
+    let ctx = ContextBuilder::new().build(conf).unwrap();
+    let (win, surf) = unsafe { Surface::new_window(conf, &*el, wb).unwrap() };
 
-    if !windowed_context.swap_buffers_with_damage_supported() {
-        panic!("Damage not supported!");
-    }
+    unsafe { ctx.make_current(&surf).unwrap() }
 
-    println!(
-        "Pixel format of the window's GL context: {:?}",
-        windowed_context.get_pixel_format()
-    );
-
-    let gl = support::load(&windowed_context.context());
+    let gl = support::Gl::load(|s| ctx.get_proc_address(s).unwrap());
 
     let mut color = Color::new();
-
     gl.draw_frame([color.red, color.green, color.blue, 1.0]);
-    windowed_context.swap_buffers().unwrap();
+    surf.swap_buffers().unwrap();
 
     el.run(move |event, _, control_flow| {
         println!("{:?}", event);
@@ -71,40 +70,39 @@ fn main() {
 
         match event {
             Event::LoopDestroyed => return,
+            Event::RedrawRequested(_) => {
+                // Select a new color to render, draw and swap buffers.
+                //
+                // Note that damage is *intentionally* being misreported
+                // here to display the effect of damage. All changes must
+                // be covered by the reported damage, as the compositor is
+                // free to read more from the buffer than damage was
+                // reported, such as when windows unhide.
+                //
+                // However, here we only damage the lower left corner to
+                // show that it is (usually) only the damage that gets
+                // composited to screen.
+                //
+                // Panics if damage is not supported due to the unwrap.
+                color = color.next();
+                gl.draw_frame([color.red, color.green, color.blue, 1.0]);
+                surf.swap_buffers_with_damage(&[Rect {
+                    pos: PhysicalPosition::new(0, 0),
+                    size: PhysicalSize::new(100, 100),
+                }])
+                .unwrap();
+            }
             Event::WindowEvent { ref event, .. } => match event {
-                WindowEvent::Resized(logical_size) => {
-                    let dpi_factor = windowed_context.window().hidpi_factor();
-                    windowed_context.resize(logical_size.to_physical(dpi_factor));
+                WindowEvent::Resized(size) => {
+                    ctx.update_after_resize();
+                    surf.update_after_resize(size);
+                    unsafe {
+                        gl.gl.Viewport(0, 0, size.width as _, size.height as _);
+                    }
                 }
                 WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                 WindowEvent::CursorMoved { .. } => {
-                    // Select a new color to render, draw and swap buffers.
-                    //
-                    // Note that damage is *intentionally* being misreported
-                    // here to display the effect of damage. All changes must
-                    // be covered by the reported damage, as the compositor is
-                    // free to read more from the buffer than damage was
-                    // reported, such as when windows unhide.
-                    //
-                    // However, here we only damage the lower left corner to
-                    // show that it is (usually) only the damage that gets
-                    // composited to screen.
-                    //
-                    // Panics if damage is not supported due to the unwrap.
-                    color = color.next();
-                    gl.draw_frame([color.red, color.green, color.blue, 1.0]);
-                    if windowed_context.swap_buffers_with_damage_supported() {
-                        windowed_context
-                            .swap_buffers_with_damage(&[Rect {
-                                x: 0,
-                                y: 0,
-                                height: 100,
-                                width: 100,
-                            }])
-                            .unwrap();
-                    } else {
-                        windowed_context.swap_buffers().unwrap();
-                    }
+                    win.request_redraw();
                 }
                 _ => (),
             },

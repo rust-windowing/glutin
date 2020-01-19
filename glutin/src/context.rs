@@ -66,7 +66,9 @@ pub struct Context(pub(crate) platform_impl::Context);
 
 impl Drop for Context {
     fn drop(&mut self) {
-        unsafe { self.make_not_current().unwrap(); }
+        unsafe {
+            self.make_not_current().unwrap();
+        }
     }
 }
 
@@ -265,18 +267,6 @@ impl<T> ContextBuilderWrapper<T> {
             release_behavior: self.release_behavior,
         }
     }
-
-    /// Turns the `sharing` parameter into another type.
-    #[inline]
-    pub(crate) fn set_sharing<T2>(self, sharing: Option<T2>) -> ContextBuilderWrapper<T2> {
-        ContextBuilderWrapper {
-            sharing,
-            profile: self.profile,
-            debug: self.debug,
-            robustness: self.robustness,
-            release_behavior: self.release_behavior,
-        }
-    }
 }
 
 impl<T> Default for ContextBuilderWrapper<T> {
@@ -361,8 +351,14 @@ impl<T> ContextBuilderWrapper<T> {
     /// [`Context`]: crate::context::Context
     /// [`Config`]: crate::config::ConfigWrapper
     #[inline]
-    pub fn with_shared_lists<T2>(self, other: T2) -> ContextBuilderWrapper<T2> {
-        self.set_sharing(Some(other.into()))
+    pub fn with_sharing<T2>(self, sharing: Option<T2>) -> ContextBuilderWrapper<T2> {
+        ContextBuilderWrapper {
+            sharing,
+            profile: self.profile,
+            debug: self.debug,
+            robustness: self.robustness,
+            release_behavior: self.release_behavior,
+        }
     }
 
     /// The behavior when changing the current [`Context`].

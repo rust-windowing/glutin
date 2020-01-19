@@ -111,12 +111,23 @@ impl Default for BackingApi {
 ///
 /// [`ConfigPlatformAttributesExt`]: crate::platform::unix::ConfigPlatformAttributesExt
 /// [methods]: ./trait.ConfigPlatformAttributesExt.html#methods
-#[derive(Default, Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(missing_docs)]
 pub struct ConfigPlatformAttributes {
     pub x11_visual_xid: Option<raw::c_ulong>,
     pub x11_transparency: Option<bool>,
     pub backing_api: BackingApi,
+}
+
+impl Default for ConfigPlatformAttributes {
+    #[inline]
+    fn default() -> Self {
+        ConfigPlatformAttributes {
+            x11_transparency: Some(false),
+            x11_visual_xid: None,
+            backing_api: Default::default(),
+        }
+    }
 }
 
 /// A trait implemention functions for controlling unix's platform specific

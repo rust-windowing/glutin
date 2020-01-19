@@ -14,6 +14,7 @@ publish = false
 # FIXME
 glutin = { path = "../glutin" }
 winit = { path = "../../winit" }
+winit_types = { version = "0.1.0", path = "../../winit_types" }
 takeable-option = "0.5"
 image = "0.21"
 env_logger = "0.6"

@@ -1,9 +1,20 @@
 mod support;
 
-use glutin::event::{Event, WindowEvent};
-use glutin::event_loop::{ControlFlow, EventLoop};
-use glutin::window::WindowBuilder;
-use glutin::{ContextBuilder, ContextSupports, WindowSurface};
+#[cfg(any(
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+))]
+use glutin::platform::unix::ConfigPlatformAttributesExt;
+
+use glutin::config::ConfigsFinder;
+use glutin::context::ContextBuilder;
+use glutin::surface::Surface;
+use winit::event::{Event, WindowEvent};
+use winit::event_loop::{ControlFlow, EventLoop};
+use winit::window::WindowBuilder;
 
 fn main() {
     env_logger::init();
@@ -13,19 +24,26 @@ fn main() {
         .with_decorations(false)
         .with_transparent(true);
 
-    let ctx = ContextBuilder::new()
-        .build(&el, ContextSupports::WINDOW_SURFACES)
-        .unwrap();
-    let (win, surface) = WindowSurface::new(&el, &ctx, wb).unwrap();
+    let conf_finder = ConfigsFinder::new();
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd",
+    ))]
+    let conf_finder = conf_finder.with_x11_transparency(Some(true));
 
-    unsafe { ctx.make_current_surface(&surface).unwrap() }
+    let confs = conf_finder.find(&*el).unwrap();
+    let conf = &confs[0];
+    println!("Configeration chosen: {:?}", conf);
 
-    println!(
-        "Pixel format of the window's GL context: {:?}",
-        ctx.get_pixel_format()
-    );
+    let ctx = ContextBuilder::new().build(conf).unwrap();
+    let (win, surf) = unsafe { Surface::new_window(conf, &*el, wb).unwrap() };
 
-    let gl = support::load(|s| ctx.get_proc_address(s));
+    unsafe { ctx.make_current(&surf).unwrap() }
+
+    let gl = support::Gl::load(|s| ctx.get_proc_address(s).unwrap());
 
     el.run(move |event, _, control_flow| {
         println!("{:?}", event);
@@ -33,15 +51,20 @@ fn main() {
 
         match event {
             Event::LoopDestroyed => return,
+            Event::MainEventsCleared => {
+                win.request_redraw();
+            }
+            Event::RedrawRequested(_) => {
+                gl.draw_frame([0.0; 4]);
+                surf.swap_buffers().unwrap();
+            }
             Event::WindowEvent { ref event, .. } => match event {
-                WindowEvent::Resized(logical_size) => {
-                    let dpi_factor = win.hidpi_factor();
+                WindowEvent::Resized(size) => {
                     ctx.update_after_resize();
-                    surface.update_after_resize(logical_size.to_physical(dpi_factor));
-                }
-                WindowEvent::RedrawRequested => {
-                    gl.draw_frame([0.0; 4]);
-                    surface.swap_buffers().unwrap();
+                    surf.update_after_resize(size);
+                    unsafe {
+                        gl.gl.Viewport(0, 0, size.width as _, size.height as _);
+                    }
                 }
                 WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                 _ => (),

@@ -279,9 +279,9 @@ impl Default for ConfigsFinder {
             color_bits: Some(24),
             // FIXME EGL_EXT_pixel_format_float
             float_color_buffer: None,
-            alpha_bits: Some(8),
-            depth_bits: Some(24),
-            stencil_bits: Some(8),
+            alpha_bits: None,
+            depth_bits: None,
+            stencil_bits: None,
             double_buffer: None,
             multisampling: None,
             stereoscopy: false,
@@ -395,7 +395,7 @@ impl ConfigsFinder {
     /// [`Config`]: crate::config::ConfigWrapper
     /// [`PBuffer`]: crate::surface::PBuffer
     #[inline]
-    pub fn with_support_pbuffers(mut self, pbss: bool) -> Self {
+    pub fn with_must_support_pbuffers(mut self, pbss: bool) -> Self {
         self.must_support_pbuffers = pbss;
         self
     }
@@ -405,7 +405,7 @@ impl ConfigsFinder {
     /// [`Config`]: crate::config::ConfigWrapper
     /// [`Pixmap`]: crate::surface::Pixmap
     #[inline]
-    pub fn with_support_pixmaps(mut self, pss: bool) -> Self {
+    pub fn with_must_support_pixmaps(mut self, pss: bool) -> Self {
         self.must_support_pixmaps = pss;
         self
     }
@@ -415,7 +415,7 @@ impl ConfigsFinder {
     /// [`Config`]: crate::config::ConfigWrapper
     /// [`Window`]: crate::surface::Window
     #[inline]
-    pub fn with_support_windows(mut self, wss: bool) -> Self {
+    pub fn with_must_support_windows(mut self, wss: bool) -> Self {
         self.must_support_windows = wss;
         self
     }
@@ -428,7 +428,7 @@ impl ConfigsFinder {
     /// [`Config`]: crate::config::ConfigWrapper
     /// [`Context::make_current_surfaceless`]: crate::context::Context::make_current_surfaceless()
     #[inline]
-    pub fn with_support_surfaceless(mut self, ss: bool) -> Self {
+    pub fn with_must_support_surfaceless(mut self, ss: bool) -> Self {
         self.must_support_surfaceless = ss;
         self
     }

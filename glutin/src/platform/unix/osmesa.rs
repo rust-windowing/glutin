@@ -12,7 +12,7 @@ impl<'a> OsMesaContextBuilder<'a> {
     ///
     /// [`OsMesaContext`]: crate::platform::unix::osmesa::OsMesaContext
     #[inline]
-    fn build(self, version: Version) -> Result<OsMesaContext, Error>
+    pub fn build(self, version: Version) -> Result<OsMesaContext, Error>
     where
         Self: Sized,
     {

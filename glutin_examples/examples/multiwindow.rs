@@ -1,64 +1,86 @@
 mod support;
 
-use glutin::event::{Event, WindowEvent};
-use glutin::event_loop::{ControlFlow, EventLoop};
-use glutin::window::WindowBuilder;
-use glutin::ContextBuilder;
-use support::{ContextCurrentWrapper, ContextTracker, ContextWrapper};
+use glutin::config::ConfigsFinder;
+use glutin::context::ContextBuilder;
+use glutin::surface::Surface;
+use winit::event::{Event, WindowEvent};
+use winit::event_loop::{ControlFlow, EventLoop};
+use winit::window::WindowBuilder;
 
 fn main() {
     env_logger::init();
     let el = EventLoop::new();
-    let mut ct = ContextTracker::default();
 
-    let mut windows = std::collections::HashMap::new();
+    let confs = ConfigsFinder::new().find(&*el).unwrap();
+    let conf = &confs[0];
+    println!("Configeration chosen: {:?}", conf);
+
+    let ctx = ContextBuilder::new().build(conf).unwrap();
+
+    let mut wins = std::collections::HashMap::new();
     for index in 0..3 {
         let title = format!("Charming Window #{}", index + 1);
         let wb = WindowBuilder::new().with_title(title);
-        let windowed_context = ContextBuilder::new().build_windowed(wb, &el).unwrap();
-        let windowed_context = unsafe { windowed_context.make_current().unwrap() };
-        let gl = support::load(&windowed_context.context());
-        let window_id = windowed_context.window().id();
-        let context_id = ct.insert(ContextCurrentWrapper::PossiblyCurrent(
-            ContextWrapper::Windowed(windowed_context),
-        ));
-        windows.insert(window_id, (context_id, gl, index));
+
+        let (win, surf) = unsafe { Surface::new_window(conf, &*el, wb).unwrap() };
+
+        let win_id = win.id();
+        let size = win.inner_size();
+        wins.insert(win_id, (index, win, surf, size));
     }
+
+    let mut cur_surf = wins.keys().next().unwrap().clone();
+    unsafe { ctx.make_current(&wins[&cur_surf].2).unwrap() }
+    let gl = support::Gl::load(|s| ctx.get_proc_address(s).unwrap());
 
     el.run(move |event, _, control_flow| {
         println!("{:?}", event);
         match event {
             Event::LoopDestroyed => return,
+            Event::RedrawRequested(win_id) => {
+                let (index, _, surf, size) = &wins[&win_id];
+
+                let mut color = [1.0, 0.5, 0.7, 1.0];
+                color.swap(0, (index % 3) as _);
+
+                if cur_surf != win_id {
+                    unsafe { ctx.make_current(&surf).unwrap() };
+                    cur_surf = win_id;
+                }
+
+                unsafe {
+                    gl.gl.Viewport(0, 0, size.width as _, size.height as _);
+                }
+
+                gl.draw_frame(color);
+                surf.swap_buffers().unwrap();
+            }
             Event::WindowEvent { event, window_id } => match event {
-                WindowEvent::Resized(logical_size) => {
-                    let windowed_context = ct.get_current(windows[&window_id].0).unwrap();
-                    let windowed_context = windowed_context.windowed();
-                    let dpi_factor = windowed_context.window().hidpi_factor();
-                    windowed_context.resize(logical_size.to_physical(dpi_factor));
+                WindowEvent::Resized(size) => {
+                    let (_, _, surf, wsize) = &mut wins.get_mut(&window_id).unwrap();
+
+                    if cur_surf != window_id {
+                        unsafe { ctx.make_current(&surf).unwrap() };
+                        cur_surf = window_id;
+                    } else {
+                        // Only required if make_current was not called.
+                        ctx.update_after_resize();
+                    }
+
+                    surf.update_after_resize(&size);
+                    *wsize = size;
                 }
                 WindowEvent::CloseRequested => {
-                    if let Some((cid, _, _)) = windows.remove(&window_id) {
-                        ct.remove(cid);
+                    if let Some(_) = wins.remove(&window_id) {
                         println!("Window with ID {:?} has been closed", window_id);
                     }
-                }
-                WindowEvent::RedrawRequested => {
-                    let window = &windows[&window_id];
-
-                    let mut color = [1.0, 0.5, 0.7, 1.0];
-                    color.swap(0, window.2 % 3);
-
-                    let windowed_context = ct.get_current(window.0).unwrap();
-
-                    window.1.draw_frame(color);
-                    windowed_context.windowed().swap_buffers().unwrap();
                 }
                 _ => (),
             },
             _ => (),
         }
 
-        if windows.is_empty() {
+        if wins.is_empty() {
             *control_flow = ControlFlow::Exit
         } else {
             *control_flow = ControlFlow::Wait

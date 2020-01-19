@@ -138,7 +138,9 @@ pub struct Surface<T: SurfaceTypeTrait>(pub(crate) platform_impl::Surface<T>);
 
 impl<T: SurfaceTypeTrait> Drop for Surface<T> {
     fn drop(&mut self) {
-        unsafe { self.make_not_current().unwrap(); }
+        unsafe {
+            self.make_not_current().unwrap();
+        }
     }
 }
 
@@ -239,7 +241,7 @@ impl Surface<PBuffer> {
     ///
     /// [`PBuffer`]: crate::surface::PBuffer
     #[inline]
-    pub unsafe fn new_pbuffer(conf: &Config, size: dpi::PhysicalSize<u32>) -> Result<Self, Error> {
+    pub unsafe fn new_pbuffer(conf: &Config, size: &dpi::PhysicalSize<u32>) -> Result<Self, Error> {
         if !conf.attribs().supports_pbuffers {
             return Err(make_error!(ErrorType::BadApiUsage(
                 "Tried to make pbuffer surface with config without `supports_pbuffers`."
@@ -354,7 +356,7 @@ impl Surface<Window> {
     /// [`Context`]: crate::context::Context
     /// [`update_after_resize`]: crate::context::Context::update_after_resize
     #[inline]
-    pub fn update_after_resize(&self, size: dpi::PhysicalSize<u32>) {
+    pub fn update_after_resize(&self, size: &dpi::PhysicalSize<u32>) {
         #![cfg(any(
             target_os = "linux",
             target_os = "dragonfly",

@@ -96,7 +96,7 @@ impl OsMesaContext {
     }
 
     #[inline]
-    pub unsafe fn make_current_osmesa_buffer(&self, buffer: &OsMesaBuffer) -> Result<(), Error> {
+    pub unsafe fn make_current(&self, buffer: &OsMesaBuffer) -> Result<(), Error> {
         let ret = glutin_osmesa_sys::OSMesaMakeCurrent(
             self.context,
             buffer.buffer.as_ptr() as *mut _,
@@ -159,10 +159,17 @@ impl OsMesaContext {
 
     /// Returns the address of an OpenGL function.
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const raw::c_void {
+    pub fn get_proc_address(&self, addr: &str) -> Result<*const raw::c_void, Error> {
+        if cfg!(debug_assertions) && !self.is_current() {
+            return Err(make_error!(ErrorType::BadApiUsage(
+                "`get_proc_address` called on context that is not current.".to_string()
+            )));
+        }
         unsafe {
             let c_str = CString::new(addr.as_bytes().to_vec()).unwrap();
-            std::mem::transmute(glutin_osmesa_sys::OSMesaGetProcAddress(c_str.as_ptr()))
+            Ok(std::mem::transmute(
+                glutin_osmesa_sys::OSMesaGetProcAddress(c_str.as_ptr()),
+            ))
         }
     }
 }
@@ -179,8 +186,8 @@ unsafe impl Sync for OsMesaContext {}
 
 impl OsMesaBuffer {
     #[inline]
-    pub fn new(ctx: &OsMesaContext, size: dpi::PhysicalSize<u32>) -> Result<Self, Error> {
-        let size: (u32, u32) = size.into();
+    pub fn new(size: &dpi::PhysicalSize<u32>) -> Result<Self, Error> {
+        let size: (u32, u32) = (*size).into();
         Ok(OsMesaBuffer {
             width: size.0,
             height: size.1,
