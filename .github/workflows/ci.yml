@@ -101,35 +101,19 @@ jobs:
       if: matrix.platform.target != 'wasm32-unknown-unknown'
       run: cd glutin && cargo doc --no-deps --target ${{ matrix.platform.target }} --features $FEATURES
 
-    - name: Build glutin
+    - name: Build 
       shell: bash
       run: cd glutin && cargo $WEB build --verbose --target ${{ matrix.platform.target }} --features $FEATURES
-    - name: Build all
-      shell: bash
-      if: (!contains(matrix.platform.target, 'wasm32'))
-      run: cargo $WEB build --verbose --target ${{ matrix.platform.target }}
 
     - name: Build tests
       shell: bash
       run: cd glutin && cargo $WEB test --no-run --verbose --target ${{ matrix.platform.target }} --features $FEATURES
-    - name: Build tests all
-      shell: bash
-      if: (!contains(matrix.platform.target, 'wasm32'))
-      run: cargo $WEB test --no-run --verbose --target ${{ matrix.platform.target }}
     - name: Run tests
       shell: bash
       if: (!contains(matrix.platform.target, 'ios') && !contains(matrix.platform.target, 'wasm32'))
       run: cd glutin && cargo $WEB test --verbose --target ${{ matrix.platform.target }} --features $FEATURES
 
-
-    - name: Build with serde enabled
+    - name: iOS example
       shell: bash
-      run: cd glutin && cargo $WEB build --verbose --target ${{ matrix.platform.target }} --features serde,$FEATURES
-
-    - name: Build tests with serde enabled
-      shell: bash
-      run: cd glutin && cargo $WEB test --no-run --verbose --target ${{ matrix.platform.target }} --features serde,$FEATURES
-    - name: Run tests with serde enabled
-      shell: bash
-      if: (!contains(matrix.platform.target, 'ios') && !contains(matrix.platform.target, 'wasm32'))
-      run: cd glutin && cargo $WEB test --verbose --target ${{ matrix.platform.target }} --features serde,$FEATURES
+      if: contains(matrix.platform.target, 'ios')
+      run: cd ios-example && make -C glutin_examples/ios-example ci
