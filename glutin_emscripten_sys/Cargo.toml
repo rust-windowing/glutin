@@ -1,6 +1,6 @@
 [package]
 name = "glutin_emscripten_sys"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["The glutin contributors", "Hal Gentz <zegentzy@protonmail.com>"]
 description = "The emscripten bindings for glutin"
 repository = "https://github.com/rust-windowing/glutin"

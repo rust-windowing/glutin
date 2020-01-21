@@ -1,6 +1,6 @@
 [package]
 name = "glutin"
-version = "0.22.0"
+version = "0.22.1"
 authors = ["The glutin contributors", "Pierre Krieger <pierre.krieger1708@gmail.com>"]
 description = "Cross-platform OpenGL context provider."
 keywords = ["windowing", "opengl"]
@@ -26,11 +26,11 @@ glutin_egl_sys = { version = "0.1.4", path = "../glutin_egl_sys" }
 parking_lot = "0.10"
 
 [target.'cfg(target_os = "emscripten")'.dependencies]
-glutin_emscripten_sys = { version = "0.1.0", path = "../glutin_emscripten_sys" }
+glutin_emscripten_sys = { version = "0.1.1", path = "../glutin_emscripten_sys" }
 
 [target.'cfg(any(target_os = "ios", target_os = "macos"))'.dependencies]
 objc = "0.2.6"
-glutin_gles2_sys = { version = "0.1.3", path = "../glutin_gles2_sys" }
+glutin_gles2_sys = { version = "0.1.4", path = "../glutin_gles2_sys" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 cgl = "0.3"
@@ -49,7 +49,7 @@ features = [
 
 [target.'cfg(target_os = "windows")'.dependencies]
 libloading = "0.5"
-glutin_wgl_sys = { version = "0.1.3", path = "../glutin_wgl_sys" }
+glutin_wgl_sys = { version = "0.1.4", path = "../glutin_wgl_sys" }
 glutin_egl_sys = { version = "0.1.4", path = "../glutin_egl_sys" }
 parking_lot = "0.10"
 
@@ -58,6 +58,6 @@ osmesa-sys = "0.1"
 wayland-client = { version = "0.23", features = ["egl", "dlopen"] }
 libloading = "0.5"
 glutin_egl_sys = { version = "0.1.4", path = "../glutin_egl_sys" }
-glutin_glx_sys = { version = "0.1.5", path = "../glutin_glx_sys" }
+glutin_glx_sys = { version = "0.1.6", path = "../glutin_glx_sys" }
 parking_lot = "0.10"
 log = "0.4"
