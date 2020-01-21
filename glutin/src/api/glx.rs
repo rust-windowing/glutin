@@ -114,6 +114,8 @@ impl PartialEq for Config {
     }
 }
 impl Eq for Config {}
+unsafe impl Send for Config {}
+unsafe impl Sync for Config {}
 
 impl Config {
     #[inline]

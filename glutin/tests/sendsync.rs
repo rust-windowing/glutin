@@ -1,28 +1,18 @@
-use glutin::*;
+use glutin::config::{Config, ConfigsFinder};
+use glutin::context::{Context, ContextBuilder};
+use glutin::surface::{Surface, SurfaceTypeTrait};
 
-trait FailToCompileIfNotSendSync
+pub trait FailToCompileIfNotSendSync
 where
     Self: Send + Sync,
 {
 }
-impl<
-        PBT: SupportsPBuffersTrait,
-        WST: SupportsWindowSurfacesTrait,
-        ST: SupportsSurfacelessTrait,
-    > FailToCompileIfNotSendSync for SplitContext<ContextIsCurrent::No, PBT, WST, ST>
-{
-}
-impl FailToCompileIfNotSendSync for WindowSurface<SurfaceInUse::No> {}
-impl FailToCompileIfNotSendSync for RawWindowSurface<SurfaceInUse::No> {}
-impl FailToCompileIfNotSendSync for PBuffer<SurfaceInUse::No> {}
-impl<
-        PBT: SupportsPBuffersTrait,
-        WST: SupportsWindowSurfacesTrait,
-        ST: SupportsSurfacelessTrait,
-        SURFACE: Surface + Send + Sync,
-    > FailToCompileIfNotSendSync for Context<ContextIsCurrent::No, PBT, WST, ST, SURFACE>
-{
-}
+
+impl<T: SurfaceTypeTrait> FailToCompileIfNotSendSync for Surface<T> {}
+impl FailToCompileIfNotSendSync for Context {}
+impl<'a> FailToCompileIfNotSendSync for ContextBuilder<'a> {}
+impl FailToCompileIfNotSendSync for Config {}
+impl FailToCompileIfNotSendSync for ConfigsFinder {}
 
 #[cfg(any(
     target_os = "linux",
@@ -31,28 +21,10 @@ impl<
     target_os = "netbsd",
     target_os = "openbsd",
 ))]
-impl FailToCompileIfNotSendSync for glutin::platform::unix::osmesa::OsMesaBuffer<SurfaceInUse::No> {}
+mod unix {
+    use crate::FailToCompileIfNotSendSync;
+    use glutin::platform::unix::osmesa::{OsMesaBuffer, OsMesaContext};
 
-#[cfg(any(
-    target_os = "linux",
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-))]
-impl FailToCompileIfNotSendSync
-    for glutin::platform::unix::osmesa::OsMesaContext<ContextIsCurrent::No, SurfaceInUse::No>
-{
-}
-
-#[cfg(any(
-    target_os = "linux",
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-))]
-impl FailToCompileIfNotSendSync
-    for glutin::platform::unix::osmesa::SplitOsMesaContext<ContextIsCurrent::No>
-{
+    impl FailToCompileIfNotSendSync for OsMesaBuffer {}
+    impl FailToCompileIfNotSendSync for OsMesaContext {}
 }

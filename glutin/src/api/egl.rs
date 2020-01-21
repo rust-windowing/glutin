@@ -416,6 +416,8 @@ impl PartialEq for Config {
     }
 }
 impl Eq for Config {}
+unsafe impl Send for Config {}
+unsafe impl Sync for Config {}
 
 impl Config {
     #[inline]
@@ -815,15 +817,14 @@ pub struct Context {
     config: ConfigWrapper<Config, ConfigAttribs>,
 }
 
-unsafe impl Send for Context {}
-unsafe impl Sync for Context {}
-
 impl PartialEq for Context {
     fn eq(&self, o: &Self) -> bool {
         self.display == o.display && self.context == self.context
     }
 }
 impl Eq for Context {}
+unsafe impl Send for Context {}
+unsafe impl Sync for Context {}
 
 impl Context {
     /// Start building an EGL context.
@@ -1229,15 +1230,14 @@ pub struct Surface<T: SurfaceTypeTrait> {
     phantom: PhantomData<T>,
 }
 
-unsafe impl<T: SurfaceTypeTrait> Send for Surface<T> {}
-unsafe impl<T: SurfaceTypeTrait> Sync for Surface<T> {}
-
 impl<T: SurfaceTypeTrait> PartialEq for Surface<T> {
     fn eq(&self, o: &Self) -> bool {
         self.display == o.display && self.surface == self.surface
     }
 }
 impl<T: SurfaceTypeTrait> Eq for Surface<T> {}
+unsafe impl<T: SurfaceTypeTrait> Send for Surface<T> {}
+unsafe impl<T: SurfaceTypeTrait> Sync for Surface<T> {}
 
 impl<T: SurfaceTypeTrait> Surface<T> {
     #[inline]

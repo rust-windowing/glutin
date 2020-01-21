@@ -5,7 +5,7 @@ use glutin::event_loop::{ControlFlow, EventLoop};
 use glutin::window::WindowBuilder;
 use glutin::ContextBuilder;
 
-#[path = "../../../examples/support.rs"]
+#[path = "../../../examples/support/mod.rs"]
 mod support;
 
 fn main() {

@@ -45,7 +45,8 @@ fn main() {
 
     let confs = ConfigsFinder::new()
         .with_desired_swap_interval_ranges(vec![swap_interval.into()])
-        .find(&*el).unwrap();
+        .find(&*el)
+        .unwrap();
     let conf = &confs[0];
     println!("Configeration chosen: {:?}", conf);
 
