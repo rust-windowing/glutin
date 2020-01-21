@@ -68,6 +68,15 @@ jobs:
         rust-version: ${{ matrix.rust_version }}${{ matrix.platform.host }}
         targets: ${{ matrix.platform.target }}
 
+    # FIXME
+    - name: Git clone deps for now
+      run: |
+        git clone https://github.com/goddessfreya/winit.git -b winit-glutin-next ../winit --depth 1
+        git clone https://github.com/rust-windowing/glutin_interface.git ../glutin_interface --depth 1
+        git clone https://github.com/rust-windowing/glutin_sys.git ../glutin_sys --depth 1
+        git clone https://github.com/rust-windowing/glutin_x11_sym.git ../glutin_x11_sym --depth 1
+        git clone https://github.com/rust-windowing/winit_types.git ../winit_types --depth 1
+
     - name: Install GCC Multilib
       if: (matrix.platform.os == 'ubuntu-latest') && contains(matrix.platform.target, 'i686')
       run: sudo apt-get update && sudo apt-get install gcc-multilib
