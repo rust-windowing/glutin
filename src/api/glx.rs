@@ -13,8 +13,8 @@ mod make_current_guard;
 pub use self::glx::{Glx, GlxExtra};
 use self::make_current_guard::MakeCurrentGuard;
 
-use crate::config::{Api, ConfigAttribs, ConfigsFinder, Version};
-use crate::context::{ContextBuilderWrapper, GlProfile, ReleaseBehaviour, Robustness};
+use crate::config::{Api, ConfigAttribs, ConfigsFinder, ReleaseBehaviour, Version};
+use crate::context::{ContextBuilderWrapper, GlProfile, Robustness};
 
 use glutin_interface::{NativeDisplay, NativeWindow, NativeWindowSource, RawDisplay, RawWindow};
 use glutin_x11_sym::Display as X11Display;
@@ -26,6 +26,7 @@ use std::ffi::{CStr, CString};
 use std::ops::Deref;
 use std::os::raw;
 use std::sync::Arc;
+use std::slice;
 
 lazy_static! {
     pub static ref GLX: Result<Glx, Error> = Glx::new();
@@ -39,7 +40,7 @@ lazy_static! {
 pub struct Display {
     display: Arc<X11Display>,
     screen: raw::c_int,
-    extensions: String,
+    extensions: Vec<String>,
 }
 
 impl PartialEq for Display {
@@ -67,7 +68,8 @@ impl Display {
         }
 
         // loading the list of extensions
-        let extensions = Self::load_extensions(display, screen)?;
+        let extensions = Self::load_extensions(display, screen)?
+            .split(' ').map(|e| e.to_string()).collect::<Vec<_>>();
 
         Ok(Arc::new(Display {
             display: Arc::clone(display),
@@ -90,6 +92,11 @@ impl Display {
             Ok(String::from_utf8(extensions).unwrap())
         }
     }
+
+    #[inline]
+    fn has_extension(&self, e: &str) -> bool {
+        self.extensions.iter().find(|s| s == &e).is_some()
+    }
 }
 
 impl Deref for Display {
@@ -106,6 +113,7 @@ pub struct Config {
     display: Arc<Display>,
     version: (Api, Version),
     config_id: ffi::glx::types::GLXFBConfig,
+    visual_info: ffi::XVisualInfo,
 }
 
 impl PartialEq for Config {
@@ -130,6 +138,256 @@ impl Config {
             Vec<ffi::glx::types::GLXFBConfig>,
         ) -> Vec<Result<ffi::glx::types::GLXFBConfig, Error>>,
     {
+        let xlib = syms!(XLIB);
+        let glx = GLX.as_ref().map_err(|e| e.clone())?;
+        let disp = Display::new(screen, disp)?;
+
+        if cf.must_support_surfaceless {
+            return Err(make_error!(ErrorType::NotSupported(
+                "EGL surfaceless not supported with GLX".to_string(),
+            )));
+        }
+
+        let descriptor = {
+            let mut out: Vec<raw::c_int> = Vec::with_capacity(37);
+
+            out.push(ffi::glx::X_RENDERABLE as raw::c_int);
+            out.push(1);
+
+            if let Some(xid) = cf.plat_attr.x11_visual_xid {
+                // getting the visual infos
+                let fvi = crate::platform_impl::x11::utils::get_visual_info_from_xid(
+                    &**disp, xid,
+                )?;
+
+                out.push(ffi::glx::X_VISUAL_TYPE as raw::c_int);
+                out.push(fvi.class as raw::c_int);
+
+                out.push(ffi::glx::VISUAL_ID as raw::c_int);
+                out.push(xid as raw::c_int);
+            } else {
+                out.push(ffi::glx::X_VISUAL_TYPE as raw::c_int);
+                out.push(ffi::glx::TRUE_COLOR as raw::c_int);
+            }
+
+            out.push(ffi::glx::DRAWABLE_TYPE as raw::c_int);
+            let mut surface_type = 0;
+            if cf.must_support_windows {
+                surface_type = surface_type | ffi::glx::WINDOW_BIT;
+            }
+            if cf.must_support_pbuffers {
+                surface_type = surface_type | ffi::glx::PBUFFER_BIT;
+            }
+            if cf.must_support_pixmaps {
+                surface_type = surface_type | ffi::glx::PIXMAP_BIT;
+            }
+            out.push(surface_type as raw::c_int);
+
+            // TODO: Use RGB/RGB_FLOAT_BIT_ARB if they don't want alpha bits,
+            // fallback to it if they don't care
+            out.push(ffi::glx::RENDER_TYPE as raw::c_int);
+            if cf.float_color_buffer {
+                if disp.has_extension("GLX_ARB_fbconfig_float") {
+                    out.push(ffi::glx_extra::RGBA_FLOAT_BIT_ARB as raw::c_int);
+                } else {
+                    return Err(make_error!(ErrorType::NoAvailableConfig));
+                }
+            } else {
+                out.push(ffi::glx::RGBA_BIT as raw::c_int);
+            }
+
+            if let Some(color) = cf.color_bits {
+                out.push(ffi::glx::RED_SIZE as raw::c_int);
+                out.push((color / 3) as raw::c_int);
+                out.push(ffi::glx::GREEN_SIZE as raw::c_int);
+                out.push(
+                    (color / 3 + if color % 3 != 0 { 1 } else { 0 }) as raw::c_int,
+                );
+                out.push(ffi::glx::BLUE_SIZE as raw::c_int);
+                out.push(
+                    (color / 3 + if color % 3 == 2 { 1 } else { 0 }) as raw::c_int,
+                );
+            }
+
+            if let Some(alpha) = cf.alpha_bits {
+                out.push(ffi::glx::ALPHA_SIZE as raw::c_int);
+                out.push(alpha as raw::c_int);
+            }
+
+            if let Some(depth) = cf.depth_bits {
+                out.push(ffi::glx::DEPTH_SIZE as raw::c_int);
+                out.push(depth as raw::c_int);
+            }
+
+            if let Some(stencil) = cf.stencil_bits {
+                out.push(ffi::glx::STENCIL_SIZE as raw::c_int);
+                out.push(stencil as raw::c_int);
+            }
+
+            let double_buffer = cf.double_buffer.unwrap_or(true);
+            out.push(ffi::glx::DOUBLEBUFFER as raw::c_int);
+            out.push(if double_buffer { 1 } else { 0 });
+
+            if let Some(multisampling) = cf.multisampling {
+                if disp.has_extension("GLX_ARB_multisample") {
+                    out.push(ffi::glx_extra::SAMPLE_BUFFERS_ARB as raw::c_int);
+                    out.push(if multisampling == 0 { 0 } else { 1 });
+                    out.push(ffi::glx_extra::SAMPLES_ARB as raw::c_int);
+                    out.push(multisampling as raw::c_int);
+                } else {
+                    return Err(make_error!(ErrorType::NoAvailableConfig));
+                }
+            }
+
+            out.push(ffi::glx::STEREO as raw::c_int);
+            out.push(if cf.stereoscopy { 1 } else { 0 });
+
+            if let Some(srgb) = cf.srgb {
+                let srgb = if srgb { 1 } else { 0 };
+                if disp.has_extension("GLX_ARB_framebuffer_sRGB") {
+                    out.push(
+                        ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as raw::c_int,
+                    );
+                    out.push(srgb);
+                } else if disp.has_extension("GLX_EXT_framebuffer_sRGB") {
+                    out.push(
+                        ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as raw::c_int,
+                    );
+                    out.push(srgb);
+                } else {
+                    return Err(make_error!(ErrorType::NoAvailableConfig));
+                }
+            }
+
+            match cf.release_behavior {
+                ReleaseBehaviour::Flush => {
+                    if disp.has_extension("GLX_ARB_context_flush_control") {
+                        // With how shitty drivers are, never hurts to be explicit
+                        out.push(
+                            ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_ARB
+                                as raw::c_int,
+                        );
+                        out.push(
+                            ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_FLUSH_ARB
+                                as raw::c_int,
+                        );
+                    }
+                },
+                ReleaseBehaviour::None => {
+                    if !disp.has_extension("GLX_ARB_context_flush_control") {
+                        return Err(make_error!(ErrorType::FlushControlNotSupported));
+                    }
+                    out.push(
+                        ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_ARB
+                            as raw::c_int,
+                    );
+                    out.push(
+                        ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_NONE_ARB
+                            as raw::c_int,
+                    );
+                }
+            }
+
+            out.push(ffi::glx::CONFIG_CAVEAT as raw::c_int);
+            out.push(ffi::glx::DONT_CARE as raw::c_int);
+
+            out.push(0);
+            out
+        };
+
+        // calling glXChooseFBConfig
+        let mut num_confs = 0;
+        let confs_ptr = glx.ChooseFBConfig(
+            ****disp as *mut _,
+            screen,
+            descriptor.as_ptr(),
+            &mut num_confs,
+        );
+
+        if confs_ptr.is_null() {
+            return Err(make_error!(ErrorType::NoAvailableConfig));
+        }
+
+        if num_confs == 0 {
+            return Err(make_error!(ErrorType::NoAvailableConfig));
+        }
+
+        let confs: Vec<ffi::glx::types::GLXFBConfig> =
+            slice::from_raw_parts(confs_ptr, num_confs as usize)
+            .iter().cloned().collect();
+        (xlib.XFree)(confs_ptr as *mut _);
+
+            match crate::platform_impl::x11::utils::select_config(
+                disp,
+                transparent,
+                cf,
+                (0..num_confs).collect(),
+                |conf_id| {
+                    let visual_infos_raw = glx.GetVisualFromFBConfig(
+                        ****disp as *mut _,
+                        *confs.offset(*conf_id as isize),
+                    );
+
+                    if visual_infos_raw.is_null() {
+                        return None;
+                    }
+
+                    let visual_infos: ffi::XVisualInfo =
+                        std::ptr::read(visual_infos_raw as *const _);
+                    (xlib.XFree)(visual_infos_raw as *mut _);
+                    Some(visual_infos)
+                },
+            ) {
+                Ok((conf_id, visual_infos)) => {
+                    let conf = *confs.offset(conf_id as isize);
+                    let conf = conf.clone();
+
+                    (xlib.XFree)(confs as *mut _);
+                    (conf, visual_infos)
+                }
+                Err(()) => {
+                    return Err(make_error!(ErrorType::NoAvailableConfig));
+                }
+            }
+
+        let get_attrib = |attrib: raw::c_int| -> i32 {
+            let mut value = 0;
+            glx.GetFBConfigAttrib(
+                ****disp as *mut _,
+                fb_conf,
+                attrib,
+                &mut value,
+            );
+            // TODO: check return value
+            value
+        };
+
+        let pf_desc = PixelFormat {
+            hardware_accelerated: get_attrib(ffi::glx::CONFIG_CAVEAT as raw::c_int)
+                != ffi::glx::SLOW_CONFIG as raw::c_int,
+            color_bits: get_attrib(ffi::glx::RED_SIZE as raw::c_int) as u8
+                + get_attrib(ffi::glx::GREEN_SIZE as raw::c_int) as u8
+                + get_attrib(ffi::glx::BLUE_SIZE as raw::c_int) as u8,
+            alpha_bits: get_attrib(ffi::glx::ALPHA_SIZE as raw::c_int) as u8,
+            depth_bits: get_attrib(ffi::glx::DEPTH_SIZE as raw::c_int) as u8,
+            stencil_bits: get_attrib(ffi::glx::STENCIL_SIZE as raw::c_int) as u8,
+            stereoscopy: get_attrib(ffi::glx::STEREO as raw::c_int) != 0,
+            double_buffer: get_attrib(ffi::glx::DOUBLEBUFFER as raw::c_int) != 0,
+            multisampling: if get_attrib(ffi::glx::SAMPLE_BUFFERS as raw::c_int)
+                != 0
+            {
+                Some(get_attrib(ffi::glx::SAMPLES as raw::c_int) as u16)
+            } else {
+                None
+            },
+            srgb: get_attrib(
+                ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as raw::c_int,
+            ) != 0
+                || get_attrib(
+                    ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as raw::c_int,
+                ) != 0,
+        };
+
         unimplemented!()
     }
 
@@ -141,6 +399,11 @@ impl Config {
     #[inline]
     pub fn screen(&self) -> raw::c_int {
         self.display.screen
+    }
+
+    #[inline]
+    pub fn get_visual_info(&self) -> ffi::XVisualInfo {
+        self.visual_info
     }
 }
 
@@ -649,248 +912,5 @@ impl Config {
 //
 //        Ok(context)
 //    }
-//}
-//
-///// Enumerates all available FBConfigs
-//unsafe fn choose_fbconfig(
-//    extensions: &str,
-//    xconn: &Arc<XConnection>,
-//    screen_id: raw::c_int,
-//    cb: &ContextBuilderWrapper<&Context>,
-//    surface_type: SurfaceType,
-//    transparent: Option<bool>,
-//) -> Result<
-//    (ffi::glx::types::GLXFBConfig, PixelFormat, ffi::XVisualInfo),
-//    Error,
-//> {
-//    let glx = GLX.as_ref().unwrap();
-//
-//    let descriptor = {
-//        let mut out: Vec<raw::c_int> = Vec::with_capacity(37);
-//
-//        out.push(ffi::glx::X_RENDERABLE as raw::c_int);
-//        out.push(1);
-//
-//        if let Some(xid) = cb.plat_attr.x11_visual_xid {
-//            // getting the visual infos
-//            let fvi = crate::platform_impl::x11_utils::get_visual_info_from_xid(
-//                &xconn, xid,
-//            );
-//
-//            out.push(ffi::glx::X_VISUAL_TYPE as raw::c_int);
-//            out.push(fvi.class as raw::c_int);
-//
-//            out.push(ffi::glx::VISUAL_ID as raw::c_int);
-//            out.push(xid as raw::c_int);
-//        } else {
-//            out.push(ffi::glx::X_VISUAL_TYPE as raw::c_int);
-//            out.push(ffi::glx::TRUE_COLOR as raw::c_int);
-//        }
-//
-//        out.push(ffi::glx::DRAWABLE_TYPE as raw::c_int);
-//        let surface_type = match surface_type {
-//            SurfaceType::Window => ffi::glx::WINDOW_BIT,
-//            SurfaceType::PBuffer => ffi::glx::PBUFFER_BIT,
-//            SurfaceType::Surfaceless => ffi::glx::DONT_CARE, /* TODO: Properly support */
-//        };
-//        out.push(surface_type as raw::c_int);
-//
-//        // TODO: Use RGB/RGB_FLOAT_BIT_ARB if they don't want alpha bits,
-//        // fallback to it if they don't care
-//        out.push(ffi::glx::RENDER_TYPE as raw::c_int);
-//        if cb.pf_reqs.float_color_buffer {
-//            if check_ext(extensions, "GLX_ARB_fbconfig_float") {
-//                out.push(ffi::glx_extra::RGBA_FLOAT_BIT_ARB as raw::c_int);
-//            } else {
-//                return Err(make_error!(ErrorType::NoAvailableConfig));
-//            }
-//        } else {
-//            out.push(ffi::glx::RGBA_BIT as raw::c_int);
-//        }
-//
-//        if let Some(color) = cb.pf_reqs.color_bits {
-//            out.push(ffi::glx::RED_SIZE as raw::c_int);
-//            out.push((color / 3) as raw::c_int);
-//            out.push(ffi::glx::GREEN_SIZE as raw::c_int);
-//            out.push(
-//                (color / 3 + if color % 3 != 0 { 1 } else { 0 }) as raw::c_int,
-//            );
-//            out.push(ffi::glx::BLUE_SIZE as raw::c_int);
-//            out.push(
-//                (color / 3 + if color % 3 == 2 { 1 } else { 0 }) as raw::c_int,
-//            );
-//        }
-//
-//        if let Some(alpha) = cb.pf_reqs.alpha_bits {
-//            out.push(ffi::glx::ALPHA_SIZE as raw::c_int);
-//            out.push(alpha as raw::c_int);
-//        }
-//
-//        if let Some(depth) = cb.pf_reqs.depth_bits {
-//            out.push(ffi::glx::DEPTH_SIZE as raw::c_int);
-//            out.push(depth as raw::c_int);
-//        }
-//
-//        if let Some(stencil) = cb.pf_reqs.stencil_bits {
-//            out.push(ffi::glx::STENCIL_SIZE as raw::c_int);
-//            out.push(stencil as raw::c_int);
-//        }
-//
-//        let double_buffer = cb.pf_reqs.double_buffer.unwrap_or(true);
-//        out.push(ffi::glx::DOUBLEBUFFER as raw::c_int);
-//        out.push(if double_buffer { 1 } else { 0 });
-//
-//        if let Some(multisampling) = cb.pf_reqs.multisampling {
-//            if check_ext(extensions, "GLX_ARB_multisample") {
-//                out.push(ffi::glx_extra::SAMPLE_BUFFERS_ARB as raw::c_int);
-//                out.push(if multisampling == 0 { 0 } else { 1 });
-//                out.push(ffi::glx_extra::SAMPLES_ARB as raw::c_int);
-//                out.push(multisampling as raw::c_int);
-//            } else {
-//                return Err(make_error!(ErrorType::NoAvailableConfig));
-//            }
-//        }
-//
-//        out.push(ffi::glx::STEREO as raw::c_int);
-//        out.push(if cb.pf_reqs.stereoscopy { 1 } else { 0 });
-//
-//        if cb.pf_reqs.srgb {
-//            if check_ext(extensions, "GLX_ARB_framebuffer_sRGB") {
-//                out.push(
-//                    ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as raw::c_int,
-//                );
-//                out.push(1);
-//            } else if check_ext(extensions, "GLX_EXT_framebuffer_sRGB") {
-//                out.push(
-//                    ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as raw::c_int,
-//                );
-//                out.push(1);
-//            } else {
-//                return Err(make_error!(ErrorType::NoAvailableConfig));
-//            }
-//        }
-//
-//        match cb.pf_reqs.release_behavior {
-//            ReleaseBehaviour::Flush => (),
-//            ReleaseBehaviour::None => {
-//                if check_ext(extensions, "GLX_ARB_context_flush_control") {
-//                    out.push(
-//                        ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_ARB
-//                            as raw::c_int,
-//                    );
-//                    out.push(
-//                        ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_NONE_ARB
-//                            as raw::c_int,
-//                    );
-//                    FAIL IF ABSENT
-//                }
-//            }
-//        }
-//
-//        out.push(ffi::glx::CONFIG_CAVEAT as raw::c_int);
-//        out.push(ffi::glx::DONT_CARE as raw::c_int);
-//
-//        out.push(0);
-//        out
-//    };
-//
-//    // calling glXChooseFBConfig
-//    let (fb_conf, visual_infos): (
-//        ffi::glx::types::GLXFBConfig,
-//        ffi::XVisualInfo,
-//    ) = {
-//        let mut num_confs = 0;
-//        let confs = glx.ChooseFBConfig(
-//            xconn.display as *mut _,
-//            screen_id,
-//            descriptor.as_ptr(),
-//            &mut num_confs,
-//        );
-//        if confs.is_null() {
-//            return Err(make_error!(ErrorType::NoAvailableConfig));
-//        }
-//        if num_confs == 0 {
-//            return Err(make_error!(ErrorType::NoAvailableConfig));
-//        }
-//
-//        match crate::platform_impl::x11_utils::select_config(
-//            xconn,
-//            transparent,
-//            cb,
-//            (0..num_confs).collect(),
-//            |conf_id| {
-//                let visual_infos_raw = glx.GetVisualFromFBConfig(
-//                    xconn.display as *mut _,
-//                    *confs.offset(*conf_id as isize),
-//                );
-//
-//                if visual_infos_raw.is_null() {
-//                    return None;
-//                }
-//
-//                let visual_infos: ffi::XVisualInfo =
-//                    std::ptr::read(visual_infos_raw as *const _);
-//                (xconn.xlib.XFree)(visual_infos_raw as *mut _);
-//                Some(visual_infos)
-//            },
-//        ) {
-//            Ok((conf_id, visual_infos)) => {
-//                let conf = *confs.offset(conf_id as isize);
-//                let conf = conf.clone();
-//
-//                (xconn.xlib.XFree)(confs as *mut _);
-//                (conf, visual_infos)
-//            }
-//            Err(()) => {
-//                (xconn.xlib.XFree)(confs as *mut _);
-//                return Err(make_error!(ErrorType::NoAvailableConfig));
-//            }
-//        }
-//    };
-//
-//    let get_attrib = |attrib: raw::c_int| -> i32 {
-//        let mut value = 0;
-//        glx.GetFBConfigAttrib(
-//            xconn.display as *mut _,
-//            fb_conf,
-//            attrib,
-//            &mut value,
-//        );
-//        // TODO: check return value
-//        value
-//    };
-//
-//    let pf_desc = PixelFormat {
-//        hardware_accelerated: get_attrib(ffi::glx::CONFIG_CAVEAT as raw::c_int)
-//            != ffi::glx::SLOW_CONFIG as raw::c_int,
-//        color_bits: get_attrib(ffi::glx::RED_SIZE as raw::c_int) as u8
-//            + get_attrib(ffi::glx::GREEN_SIZE as raw::c_int) as u8
-//            + get_attrib(ffi::glx::BLUE_SIZE as raw::c_int) as u8,
-//        alpha_bits: get_attrib(ffi::glx::ALPHA_SIZE as raw::c_int) as u8,
-//        depth_bits: get_attrib(ffi::glx::DEPTH_SIZE as raw::c_int) as u8,
-//        stencil_bits: get_attrib(ffi::glx::STENCIL_SIZE as raw::c_int) as u8,
-//        stereoscopy: get_attrib(ffi::glx::STEREO as raw::c_int) != 0,
-//        double_buffer: get_attrib(ffi::glx::DOUBLEBUFFER as raw::c_int) != 0,
-//        multisampling: if get_attrib(ffi::glx::SAMPLE_BUFFERS as raw::c_int)
-//            != 0
-//        {
-//            Some(get_attrib(ffi::glx::SAMPLES as raw::c_int) as u16)
-//        } else {
-//            None
-//        },
-//        srgb: get_attrib(
-//            ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as raw::c_int,
-//        ) != 0
-//            || get_attrib(
-//                ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as raw::c_int,
-//            ) != 0,
-//    };
-//
-//    Ok((fb_conf, pf_desc, visual_infos))
-//}
-//
-///// Checks if `ext` is available.
-//fn check_ext(extensions: &str, ext: &str) -> bool {
-//    extensions.split(' ').find(|&s| s == ext).is_some()
 //}
 //

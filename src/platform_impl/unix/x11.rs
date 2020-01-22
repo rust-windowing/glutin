@@ -153,7 +153,7 @@ impl Config {
                 display,
                 config.get_native_visual_id()? as ffi::VisualID,
             ),
-            _ => unimplemented!(),
+            Config::Glx(conf) => Ok(conf.get_visual_info()),
         }
     }
 
@@ -593,15 +593,15 @@ where
     conf_ids
         .into_iter()
         .map(|conf_id| {
-            let (visual_infos, xid) = convert_to_xvisualinfo(&conf_id)?;
+            let (visual_info, xid) = convert_to_xvisualinfo(&conf_id)?;
 
             match utils::examine_visual_info(
                 disp,
-                visual_infos,
+                visual_info,
                 target_transparency,
                 target_visual_xid,
             ) {
-                Ok(()) => Ok((conf_id, visual_infos)),
+                Ok(()) => Ok((conf_id, visual_info)),
                 Err(lacks) => Err(make_oserror!(OsError::Misc(format!(
                     "X11 xid {:?} is lacking {:?}",
                     xid, lacks

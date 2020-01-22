@@ -85,8 +85,8 @@ impl Context {
     /// [`make_current`]: crate::context::Context::make_current
     /// [`Config`]: crate::config::ConfigWrapper
     /// [`supports_surfaceless`]: crate::config::ConfigAttribs::supports_surfaceless
-    /// [`ReleaseBehaviour`]: crate::context::ReleaseBehaviour
-    /// [`Flush`]: crate::context::ReleaseBehaviour::Flush
+    /// [`ReleaseBehaviour`]: crate::config::ReleaseBehaviour
+    /// [`Flush`]: crate::config::ReleaseBehaviour::Flush
     #[inline]
     pub unsafe fn make_current_surfaceless(&self) -> Result<(), Error> {
         if !self.get_config().attribs().supports_surfaceless {
@@ -129,8 +129,8 @@ impl Context {
     /// [`make_not_current`]: crate::context::Context::make_not_current
     /// [`surface`]: crate::surface::Surface
     /// [`Config`]: crate::config::ConfigWrapper
-    /// [`ReleaseBehaviour`]: crate::context::ReleaseBehaviour
-    /// [`Flush`]: crate::context::ReleaseBehaviour::Flush
+    /// [`ReleaseBehaviour`]: crate::config::ReleaseBehaviour
+    /// [`Flush`]: crate::config::ReleaseBehaviour::Flush
     #[inline]
     pub unsafe fn make_current<T: SurfaceTypeTrait>(&self, surf: &Surface<T>) -> Result<(), Error> {
         if self.get_config() != surf.get_config() {
@@ -151,8 +151,8 @@ impl Context {
     ///
     /// [`make_current`]: crate::context::Context::make_current
     /// [`Surface`]: crate::surface::Surface
-    /// [`ReleaseBehaviour`]: crate::context::ReleaseBehaviour
-    /// [`Flush`]: crate::context::ReleaseBehaviour::Flush
+    /// [`ReleaseBehaviour`]: crate::config::ReleaseBehaviour
+    /// [`Flush`]: crate::config::ReleaseBehaviour::Flush
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), Error> {
         self.0.make_not_current()
@@ -230,7 +230,6 @@ pub struct ContextBuilderWrapper<T> {
     pub profile: Option<GlProfile>,
     pub debug: bool,
     pub robustness: Robustness,
-    pub release_behavior: ReleaseBehaviour,
 }
 
 /// A simple type alias for [`ContextBuilderWrapper`]. Glutin clients should use
@@ -264,7 +263,6 @@ impl<T> ContextBuilderWrapper<T> {
             profile: self.profile,
             debug: self.debug,
             robustness: self.robustness,
-            release_behavior: self.release_behavior,
         }
     }
 }
@@ -277,7 +275,6 @@ impl<T> Default for ContextBuilderWrapper<T> {
             sharing: None,
             profile: None,
             debug: cfg!(debug_assertions),
-            release_behavior: Default::default(),
             robustness: Default::default(),
         }
     }
@@ -357,20 +354,7 @@ impl<T> ContextBuilderWrapper<T> {
             profile: self.profile,
             debug: self.debug,
             robustness: self.robustness,
-            release_behavior: self.release_behavior,
         }
-    }
-
-    /// The behavior when changing the current [`Context`].
-    ///
-    /// Please refer to [`ReleaseBehaviour`]'s docs for more details.
-    ///
-    /// [`Context`]: crate::context::Context
-    /// [`ReleaseBehaviour`]: crate::context::ReleaseBehaviour
-    #[inline]
-    pub fn with_release_behaviour(mut self, release_behavior: ReleaseBehaviour) -> Self {
-        self.release_behavior = release_behavior;
-        self
     }
 }
 
@@ -434,23 +418,4 @@ pub enum GlProfile {
     Compatibility,
     /// Include all the future-compatible functions and definitions.
     Core,
-}
-
-/// The behavior of the driver when you change the current context.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum ReleaseBehaviour {
-    /// Doesn't do anything. Most notably doesn't flush. Not supported by all
-    /// drivers.
-    None,
-
-    /// Flushes the context that was previously current as if `glFlush` was
-    /// called. This is the default behaviour.
-    Flush,
-}
-
-impl Default for ReleaseBehaviour {
-    #[inline]
-    fn default() -> Self {
-        ReleaseBehaviour::Flush
-    }
 }

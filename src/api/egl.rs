@@ -17,8 +17,9 @@ use self::make_current_guard::MakeCurrentGuard;
 
 use crate::config::{
     Api, ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapInterval, SwapIntervalRange, Version,
+    ReleaseBehaviour,
 };
-use crate::context::{ContextBuilderWrapper, ReleaseBehaviour, Robustness};
+use crate::context::{ContextBuilderWrapper, Robustness};
 use crate::surface::{PBuffer, Pixmap, SurfaceType, SurfaceTypeTrait, Window};
 
 use glutin_interface::{NativeDisplay, RawDisplay};
@@ -429,7 +430,7 @@ impl Config {
     where
         F: FnMut(Vec<ffi::EGLConfig>, &Arc<Display>) -> Vec<Result<ffi::EGLConfig, Error>>,
     {
-        let egl = EGL.as_ref().unwrap();
+        let egl = EGL.as_ref().map_err(|e| e.clone())?;
         let display = Display::new(nb)?;
 
         // TODO: Alternatively, allow EGL_MESA_platform_surfaceless.
@@ -972,7 +973,7 @@ impl Context {
             context_attributes.push(version.0 as raw::c_int);
         }
 
-        match cb.release_behavior {
+        match conf.attribs.release_behavior {
             ReleaseBehaviour::Flush => {
                 // FIXME: This isn't a client extension, right?
                 if display.has_extension("EGL_KHR_context_flush_control") {

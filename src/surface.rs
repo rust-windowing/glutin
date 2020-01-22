@@ -151,9 +151,16 @@ impl<T: SurfaceTypeTrait> Surface<T> {
         self.0.is_current()
     }
 
-    /// Returns the [`Config`] that the surface was created with.
+    /// Returns the [`Config`] of the surface.
+    ///
+    /// **WARNING**: The `Surface`'s [`SwapIntervalRange`]s might be different
+    /// than the [`SwapIntervalRange`]s of the [`Config`] that the `Surface` was
+    /// created with. Clients should call this function for the most  up to date
+    /// [`SwapIntervalRange`]s.
     ///
     /// [`Config`]: crate::config::ConfigWrapper
+    /// [`SwapInterval`]: crate::config::SwapInterval
+    /// [`SwapIntervalRange`]: crate::config::SwapIntervalRange
     #[inline]
     pub fn get_config(&self) -> Config {
         self.0.get_config()
@@ -171,8 +178,8 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     ///
     /// [`Context`]: crate::context::Context
     /// [`make_current`]: crate::context::Context::make_current
-    /// [`ReleaseBehaviour`]: crate::context::ReleaseBehaviour
-    /// [`Flush`]: crate::context::ReleaseBehaviour::Flush
+    /// [`ReleaseBehaviour`]: crate::config::ReleaseBehaviour
+    /// [`Flush`]: crate::config::ReleaseBehaviour::Flush
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), Error> {
         self.0.make_not_current()
@@ -377,9 +384,15 @@ impl Surface<Window> {
     /// As mentioned in [`SwapInterval`], your request may be silently ignored
     /// by the OpenGL driver. For more information, refer to [`SwapInterval`].
     ///
+    /// **WARNING**: The `Surface`'s [`SwapIntervalRange`]s might be different
+    /// than the [`SwapIntervalRange`]s of the [`Config`] that the `Surface` was
+    /// created with. Clients should call [`Surface::get_config`] for the most
+    /// up to date [`SwapIntervalRange`]s.
+    ///
     /// [`SwapInterval`]: crate::config::SwapInterval
     /// [`SwapIntervalRange`]: crate::config::SwapIntervalRange
     /// [`Config`]: crate::config::Config
+    /// [`Surface::get_config`]: crate::surface::Surface::get_config
     #[inline]
     pub fn modify_swap_interval(&self, swap_interval: SwapInterval) -> Result<(), Error> {
         if cfg!(debug_assertions) {

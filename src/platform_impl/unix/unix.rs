@@ -7,7 +7,7 @@
 ))]
 
 mod wayland;
-mod x11;
+pub mod x11;
 
 use crate::config::{Api, ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapInterval};
 use crate::context::ContextBuilderWrapper;

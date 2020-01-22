@@ -158,6 +158,8 @@ impl SwapIntervalRange {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConfigAttribs {
     pub swap_interval_ranges: Vec<SwapIntervalRange>,
+    // FIXME: Once we got all the platforms done, consider keeping `Api` in
+    // Config{,Attribs,sFinder} but moving `Version` to `ContextBuilder`
     pub version: (Api, Version),
     pub hardware_accelerated: bool,
     pub color_bits: u8,
@@ -172,6 +174,7 @@ pub struct ConfigAttribs {
     pub supports_pixmaps: bool,
     pub supports_windows: bool,
     pub supports_surfaceless: bool,
+    pub release_behavior: ReleaseBehaviour,
 }
 
 /// A type that contains the [`ConfigAttribs`] along side with the native api's
@@ -278,6 +281,7 @@ pub struct ConfigsFinder {
     pub must_support_windows: bool,
     pub must_support_pixmaps: bool,
     pub must_support_surfaceless: bool,
+    pub release_behavior: ReleaseBehaviour,
     pub plat_attr: platform_impl::ConfigPlatformAttributes,
 }
 
@@ -303,6 +307,7 @@ impl Default for ConfigsFinder {
             must_support_surfaceless: false,
             version: (Api::OpenGl, Version(3, 3)),
             plat_attr: Default::default(),
+            release_behavior: Default::default(),
         }
     }
 }
@@ -477,6 +482,18 @@ impl ConfigsFinder {
         self
     }
 
+    /// The behavior when changing the current [`Context`].
+    ///
+    /// Please refer to [`ReleaseBehaviour`]'s docs for more details.
+    ///
+    /// [`Context`]: crate::context::Context
+    /// [`ReleaseBehaviour`]: crate::config::ReleaseBehaviour
+    #[inline]
+    pub fn with_release_behaviour(mut self, release_behavior: ReleaseBehaviour) -> Self {
+        self.release_behavior = release_behavior;
+        self
+    }
+
     /// Finds all the [`Config`]s that match the specified requirements.
     ///
     /// [`Config`]: crate::config::ConfigWrapper
@@ -493,5 +510,24 @@ impl ConfigsFinder {
             .into_iter()
             .map(|(attribs, config)| Config { attribs, config })
             .collect())
+    }
+}
+
+/// The behavior of the driver when you change the current context.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum ReleaseBehaviour {
+    /// Doesn't do anything. Most notably doesn't flush. Not supported by all
+    /// drivers.
+    None,
+
+    /// Flushes the context that was previously current as if `glFlush` was
+    /// called. This is the default behaviour.
+    Flush,
+}
+
+impl Default for ReleaseBehaviour {
+    #[inline]
+    fn default() -> Self {
+        ReleaseBehaviour::Flush
     }
 }
