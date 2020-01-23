@@ -22,6 +22,8 @@ use glutin_interface::{NativePixmap, NativePixmapSource, NativeWindow, NativeWin
 use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
 
+use std::fmt::Debug;
+
 /// A [`Surface`]'s type. Returned from calling
 /// [`SurfaceTypeTrait::surface_type()`] on the type specializing your
 /// [`Surface`].
@@ -47,7 +49,7 @@ pub enum SurfaceType {
 /// [`Window`]: crate::surface::Window
 /// [`PBuffer`]: crate::surface::PBuffer
 /// [`Pixmap`]: crate::surface::Pixmap
-pub trait SurfaceTypeTrait {
+pub trait SurfaceTypeTrait: PartialEq + Eq + Debug + Clone + Copy {
     /// Returns the [`SurfaceType`] of the specialization.
     ///
     /// [`SurfaceType`]: crate::surface::SurfaceType
@@ -211,11 +213,13 @@ impl Surface<Pixmap> {
 
     /// Takes an pre-existing pixmap, returning a `Surface<`[`Pixmap`]`>`.
     ///
-    /// The pixmap can not be currently in use by any other `Surface`.
+    /// The pixmap can not be currently in use by any other `Surface`. Simply
+    /// dropping the previous `Surface` that was using the pixmap is not adequate,
+    /// as the pixmap's resources will not be released until all operations
+    /// using it are complete. To ensure that this is the case, clients should
+    /// call `glFinish` on the pixmap before dropping the `Surface`.
     ///
     /// Please prefer to use [`new_pixmap`] when possible.
-    ///
-    /// The pixmap and [`Config`] must have been made with the same `EventLoop`.
     ///
     /// Some platforms place additional restrictions on what [`Config`]s can be
     /// used with the pixmap:
@@ -285,15 +289,17 @@ impl Surface<Window> {
 
     /// Takes an pre-existing window, returning a `Surface<`[`Window`]`>`.
     ///
-    /// The window can not be currently in use by any other `Surface`.
+    /// The window can not be currently in use by any other `Surface`. Simply
+    /// dropping the previous `Surface` that was using the window is not adequate,
+    /// as the window's resources will not be released until all operations
+    /// using it are complete. To ensure that this is the case, clients should
+    /// call `glFinish` on the window before dropping the `Surface`.
     ///
     /// Please prefer to use [`new_window`] when possible.
     ///
-    /// The window and [`Config`] must have been made with the same `EventLoop`.
-    ///
     /// Some platforms place additional restrictions on what [`Config`]s can be
     /// used with the window:
-    ///  * Wayland: No known additional restrictions.
+    ///  * Wayland: FIXME
     ///  * X11: The [`Config`]'s `XVisualInfo`'s `depth` and `visual` must match
     ///  the window's.
     ///  FIXME missing plats

@@ -17,9 +17,8 @@ use self::make_current_guard::MakeCurrentGuard;
 
 use crate::config::{
     Api, ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapInterval, SwapIntervalRange, Version,
-    ReleaseBehaviour,
 };
-use crate::context::{ContextBuilderWrapper, Robustness};
+use crate::context::{ContextBuilderWrapper, ReleaseBehaviour, Robustness};
 use crate::surface::{PBuffer, Pixmap, SurfaceType, SurfaceTypeTrait, Window};
 
 use glutin_interface::{NativeDisplay, RawDisplay};
@@ -51,20 +50,13 @@ lazy_static! {
 
 type EglVersion = (ffi::EGLint, ffi::EGLint);
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Display {
     display: ffi::EGLDisplay,
     egl_version: EglVersion,
     extensions: Vec<String>,
     client_extensions: Vec<String>,
 }
-
-impl PartialEq for Display {
-    fn eq(&self, o: &Self) -> bool {
-        self.display == o.display
-    }
-}
-impl Eq for Display {}
 
 impl Display {
     #[inline]
@@ -404,19 +396,29 @@ impl Drop for Display {
     }
 }
 
-#[derive(Debug, Clone)]
+// FIXME why is this a macro again?
+macro_rules! attrib {
+    ($egl:expr, $disp:expr, $conf:expr, $attr:expr $(,)?) => {{
+        let mut value = 0;
+        let res = unsafe { $egl.GetConfigAttrib(**$disp, $conf, $attr as ffi::EGLint, &mut value) };
+        match res {
+            0 => Err(make_oserror!(OsError::Misc(format!(
+                "eglGetConfigAttrib failed for {:?} with 0x{:x}",
+                $conf,
+                unsafe { $egl.GetError() },
+            )))),
+            _ => Ok(value),
+        }
+    }};
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
     display: Arc<Display>,
     config_id: ffi::EGLConfig,
     version: (Api, Version),
 }
 
-impl PartialEq for Config {
-    fn eq(&self, o: &Self) -> bool {
-        self.display == o.display && self.config_id == o.config_id
-    }
-}
-impl Eq for Config {}
 unsafe impl Send for Config {}
 unsafe impl Sync for Config {}
 
@@ -432,6 +434,7 @@ impl Config {
     {
         let egl = EGL.as_ref().map_err(|e| e.clone())?;
         let display = Display::new(nb)?;
+        let mut errors = make_error!(ErrorType::NoAvailableConfig);
 
         // TODO: Alternatively, allow EGL_MESA_platform_surfaceless.
         // FIXME: Also check for the GL_OES_surfaceless_context *CONTEXT*
@@ -442,9 +445,15 @@ impl Config {
             )));
         }
 
+        if cf.float_color_buffer == Some(true) {
+            errors.append(make_error!(ErrorType::NotSupported(
+                "Float color buffers not supported with EGL.".to_string()
+            )));
+            return Err(errors);
+        }
+
         // binding the right API and choosing the version
         unsafe { Display::bind_api(cf.version.0, display.egl_version)? };
-        let mut errors = make_error!(ErrorType::NoAvailableConfig);
 
         if cf
             .desired_swap_interval_ranges
@@ -604,13 +613,13 @@ impl Config {
             return Err(errors);
         }
 
-        let mut configs = Vec::with_capacity(num_confs as usize);
-        configs.resize_with(num_confs as usize, || unsafe { std::mem::zeroed() });
+        let mut confs = Vec::with_capacity(num_confs as usize);
+        confs.resize_with(num_confs as usize, || unsafe { std::mem::zeroed() });
         if unsafe {
             egl.ChooseConfig(
                 **display,
                 descriptor.as_ptr(),
-                configs.as_mut_ptr(),
+                confs.as_mut_ptr(),
                 num_confs,
                 &mut num_confs,
             )
@@ -623,26 +632,8 @@ impl Config {
             return Err(errors);
         }
 
-        // analyzing each config
-        macro_rules! attrib {
-            ($egl:expr, $display:expr, $conf:expr, $attr:expr $(,)?) => {{
-                let mut value = 0;
-                let res = unsafe {
-                    $egl.GetConfigAttrib(**$display, $conf, $attr as ffi::EGLint, &mut value)
-                };
-                match res {
-                    0 => Err(make_oserror!(OsError::Misc(format!(
-                        "eglGetConfigAttrib failed for {:?} with 0x{:x}",
-                        $conf,
-                        unsafe { egl.GetError() },
-                    )))),
-                    _ => Ok(value),
-                }
-            }};
-        };
-
-        let configs = if cf.desired_swap_interval_ranges.is_empty() {
-            configs
+        let confs = if cf.desired_swap_interval_ranges.is_empty() {
+            confs
         } else {
             let conv_range = |sir: &_| match sir {
                 SwapIntervalRange::DontWait => 0..1,
@@ -658,11 +649,11 @@ impl Config {
                 dsir.end = u32::max(dsir.end, ndsir.end);
             }
 
-            configs
+            confs
                 .into_iter()
-                .filter_map(|conf_id| {
+                .filter_map(|conf| {
                     let min_swap_interval =
-                        attrib!(egl, display, conf_id, ffi::egl::MIN_SWAP_INTERVAL);
+                        attrib!(egl, display, conf, ffi::egl::MIN_SWAP_INTERVAL);
                     match min_swap_interval {
                         Err(err) => {
                             errors.append(err);
@@ -671,7 +662,7 @@ impl Config {
                         Ok(min) if (dsir.start as i32) < min => {
                             errors.append(make_oserror!(OsError::Misc(format!(
                                 "Desired swap interval range start ({:?}) smaller than minimum ({:?}) for {:?}",
-                                dsir.start, min, conf_id
+                                dsir.start, min, conf
                             ))));
                             return None;
                         }
@@ -679,7 +670,7 @@ impl Config {
                     }
 
                     let max_swap_interval =
-                        attrib!(egl, display, conf_id, ffi::egl::MAX_SWAP_INTERVAL);
+                        attrib!(egl, display, conf, ffi::egl::MAX_SWAP_INTERVAL);
                     match max_swap_interval {
                         Err(err) => {
                             errors.append(err);
@@ -688,39 +679,39 @@ impl Config {
                         Ok(max) if (dsir.end as i32) > (max + 1) => {
                             errors.append(make_oserror!(OsError::Misc(format!(
                                 "Desired swap interval range end ({:?}) bigger than maximum ({:?}) for {:?}",
-                                dsir.end, max, conf_id
+                                dsir.end, max, conf
                             ))));
                             return None;
                         }
                         _ => (),
                     }
 
-                    Some(conf_id)
+                    Some(conf)
                 })
                 .collect()
         };
 
-        if configs.is_empty() {
+        if confs.is_empty() {
             return Err(errors);
         }
 
-        let mut configs: Vec<_> = conf_selector(configs, &display)
+        let mut confs: Vec<_> = conf_selector(confs, &display)
             .into_iter()
-            .filter_map(|conf_id| match conf_id {
+            .filter_map(|conf| match conf {
                 Err(err) => {
                     errors.append(err);
                     return None;
                 }
-                Ok(conf_id) => Some(conf_id),
+                Ok(conf) => Some(conf),
             })
-            .map(|conf_id| {
+            .map(|conf| {
                 // Try into to panic if value is negative. Never trust the driver.
                 let min_swap_interval: u32 =
-                    attrib!(egl, display, conf_id, ffi::egl::MIN_SWAP_INTERVAL)?
+                    attrib!(egl, display, conf, ffi::egl::MIN_SWAP_INTERVAL)?
                         .try_into()
                         .unwrap();
                 let max_swap_interval: u32 =
-                    attrib!(egl, display, conf_id, ffi::egl::MAX_SWAP_INTERVAL)?
+                    attrib!(egl, display, conf, ffi::egl::MAX_SWAP_INTERVAL)?
                         .try_into()
                         .unwrap();
                 // Inclusive to exclusive range
@@ -738,24 +729,24 @@ impl Config {
                     )],
                 };
 
-                let surf_type = attrib!(egl, display, conf_id, ffi::egl::SURFACE_TYPE)? as u32;
+                let surf_type = attrib!(egl, display, conf, ffi::egl::SURFACE_TYPE)? as u32;
                 let attribs = ConfigAttribs {
                     version: cf.version,
-                    supports_windows: (surf_type & ffi::egl::WINDOW_BIT) == ffi::egl::WINDOW_BIT,
-                    supports_pixmaps: (surf_type & ffi::egl::PIXMAP_BIT) == ffi::egl::PIXMAP_BIT,
-                    supports_pbuffers: (surf_type & ffi::egl::PBUFFER_BIT) == ffi::egl::PBUFFER_BIT,
+                    supports_windows: (surf_type & ffi::egl::WINDOW_BIT) != 0,
+                    supports_pixmaps: (surf_type & ffi::egl::PIXMAP_BIT) != 0,
+                    supports_pbuffers: (surf_type & ffi::egl::PBUFFER_BIT) != 0,
                     supports_surfaceless: display.has_extension("EGL_KHR_surfaceless_context"),
-                    hardware_accelerated: attrib!(egl, display, conf_id, ffi::egl::CONFIG_CAVEAT)?
+                    hardware_accelerated: attrib!(egl, display, conf, ffi::egl::CONFIG_CAVEAT)?
                         != ffi::egl::SLOW_CONFIG as i32,
-                    color_bits: attrib!(egl, display, conf_id, ffi::egl::RED_SIZE)? as u8
-                        + attrib!(egl, display, conf_id, ffi::egl::BLUE_SIZE)? as u8
-                        + attrib!(egl, display, conf_id, ffi::egl::GREEN_SIZE)? as u8,
-                    alpha_bits: attrib!(egl, display, conf_id, ffi::egl::ALPHA_SIZE)? as u8,
-                    depth_bits: attrib!(egl, display, conf_id, ffi::egl::DEPTH_SIZE)? as u8,
-                    stencil_bits: attrib!(egl, display, conf_id, ffi::egl::STENCIL_SIZE)? as u8,
+                    color_bits: attrib!(egl, display, conf, ffi::egl::RED_SIZE)? as u8
+                        + attrib!(egl, display, conf, ffi::egl::BLUE_SIZE)? as u8
+                        + attrib!(egl, display, conf, ffi::egl::GREEN_SIZE)? as u8,
+                    alpha_bits: attrib!(egl, display, conf, ffi::egl::ALPHA_SIZE)? as u8,
+                    depth_bits: attrib!(egl, display, conf, ffi::egl::DEPTH_SIZE)? as u8,
+                    stencil_bits: attrib!(egl, display, conf, ffi::egl::STENCIL_SIZE)? as u8,
                     stereoscopy: false,
                     double_buffer: true,
-                    multisampling: match attrib!(egl, display, conf_id, ffi::egl::SAMPLES)? {
+                    multisampling: match attrib!(egl, display, conf, ffi::egl::SAMPLES)? {
                         0 | 1 => None,
                         a => Some(a as u16),
                     },
@@ -763,34 +754,34 @@ impl Config {
                     swap_interval_ranges,
                 };
 
-                Ok((attribs, conf_id))
+                Ok((attribs, conf))
             })
             // FIXME: Pleasing borrowck. Lokathor demands unrolling this loop.
             .collect::<Vec<_>>()
             .into_iter()
-            .filter_map(|conf_id| match conf_id {
+            .filter_map(|conf| match conf {
                 Err(err) => {
                     errors.append(err);
                     return None;
                 }
-                Ok(conf_id) => Some(conf_id),
+                Ok(conf) => Some(conf),
             })
             .collect();
 
-        if configs.is_empty() {
+        if confs.is_empty() {
             return Err(errors);
         }
 
         if cf.srgb.is_none() {
-            let configs_len = configs.len();
-            for i in 0..configs_len {
-                let mut new_conf = configs[i].clone();
+            let confs_len = confs.len();
+            for i in 0..confs_len {
+                let mut new_conf = confs[i].clone();
                 new_conf.0.srgb = true;
-                configs.push(new_conf);
+                confs.push(new_conf);
             }
         }
 
-        Ok(configs
+        Ok(confs
             .into_iter()
             .map(|(attribs, config_id)| {
                 (
@@ -811,19 +802,13 @@ impl Config {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Context {
     display: Arc<Display>,
     context: ffi::EGLContext,
     config: ConfigWrapper<Config, ConfigAttribs>,
 }
 
-impl PartialEq for Context {
-    fn eq(&self, o: &Self) -> bool {
-        self.display == o.display && self.context == self.context
-    }
-}
-impl Eq for Context {}
 unsafe impl Send for Context {}
 unsafe impl Sync for Context {}
 
@@ -973,7 +958,7 @@ impl Context {
             context_attributes.push(version.0 as raw::c_int);
         }
 
-        match conf.attribs.release_behavior {
+        match cb.release_behavior {
             ReleaseBehaviour::Flush => {
                 // FIXME: This isn't a client extension, right?
                 if display.has_extension("EGL_KHR_context_flush_control") {
@@ -1185,14 +1170,6 @@ impl Drop for Context {
         unsafe {
             let egl = EGL.as_ref().unwrap();
 
-            let mut guard = MakeCurrentGuard::new_keep(**self.display);
-            guard.if_any_same_then_invalidate(
-                ffi::egl::NO_SURFACE,
-                ffi::egl::NO_SURFACE,
-                self.context,
-            );
-            std::mem::drop(guard);
-
             egl.DestroyContext(**self.display, self.context);
             self.context = ffi::egl::NO_CONTEXT;
         }
@@ -1202,28 +1179,13 @@ impl Drop for Context {
 #[inline]
 pub fn get_native_visual_id(
     disp: ffi::EGLDisplay,
-    conf_id: ffi::EGLConfig,
+    conf: ffi::EGLConfig,
 ) -> Result<ffi::EGLint, Error> {
     let egl = EGL.as_ref().unwrap();
-    let mut value = 0;
-    let ret = unsafe {
-        egl.GetConfigAttrib(
-            disp,
-            conf_id,
-            ffi::egl::NATIVE_VISUAL_ID as ffi::EGLint,
-            &mut value,
-        )
-    };
-    if ret == 0 {
-        return Err(make_oserror!(OsError::Misc(format!(
-            "eglGetConfigAttrib failed with 0x{:x}",
-            unsafe { egl.GetError() },
-        ))));
-    };
-    Ok(value)
+    attrib!(egl, &&disp, conf, ffi::egl::NATIVE_VISUAL_ID)
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Surface<T: SurfaceTypeTrait> {
     display: Arc<Display>,
     surface: ffi::EGLSurface,
@@ -1231,12 +1193,6 @@ pub struct Surface<T: SurfaceTypeTrait> {
     phantom: PhantomData<T>,
 }
 
-impl<T: SurfaceTypeTrait> PartialEq for Surface<T> {
-    fn eq(&self, o: &Self) -> bool {
-        self.display == o.display && self.surface == self.surface
-    }
-}
-impl<T: SurfaceTypeTrait> Eq for Surface<T> {}
 unsafe impl<T: SurfaceTypeTrait> Send for Surface<T> {}
 unsafe impl<T: SurfaceTypeTrait> Sync for Surface<T> {}
 
@@ -1476,10 +1432,6 @@ impl<T: SurfaceTypeTrait> Drop for Surface<T> {
     fn drop(&mut self) {
         unsafe {
             let egl = EGL.as_ref().unwrap();
-
-            let mut guard = MakeCurrentGuard::new_keep(**self.display);
-            guard.if_any_same_then_invalidate(self.surface, self.surface, ffi::egl::NO_CONTEXT);
-            std::mem::drop(guard);
 
             egl.DestroySurface(**self.display, self.surface);
             self.surface = ffi::egl::NO_SURFACE;

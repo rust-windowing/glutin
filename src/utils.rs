@@ -26,3 +26,29 @@ impl<T> DerefMut for NoPrint<T> {
         &mut self.0
     }
 }
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct NoCmp<T>(pub(crate) T);
+
+impl<T> PartialEq for NoCmp<T> {
+    fn eq(&self, o: &Self) -> bool {
+        true
+    }
+}
+impl<T> Eq for NoCmp<T> {}
+
+impl<T> Deref for NoCmp<T> {
+    type Target = T;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T> DerefMut for NoCmp<T> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}

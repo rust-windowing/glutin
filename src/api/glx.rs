@@ -13,8 +13,10 @@ mod make_current_guard;
 pub use self::glx::{Glx, GlxExtra};
 use self::make_current_guard::MakeCurrentGuard;
 
-use crate::config::{Api, ConfigAttribs, ConfigsFinder, ReleaseBehaviour, Version};
-use crate::context::{ContextBuilderWrapper, GlProfile, Robustness};
+use crate::config::{Api, ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapIntervalRange, Version};
+use crate::context::{ContextBuilderWrapper, GlProfile, ReleaseBehaviour, Robustness};
+use crate::surface::{PBuffer, Pixmap, SurfaceType, SurfaceTypeTrait, Window};
+use crate::utils::NoCmp;
 
 use glutin_interface::{NativeDisplay, NativeWindow, NativeWindowSource, RawDisplay, RawWindow};
 use glutin_x11_sym::Display as X11Display;
@@ -23,10 +25,11 @@ use winit_types::error::{Error, ErrorType};
 use winit_types::platform::OsError;
 
 use std::ffi::{CStr, CString};
+use std::marker::PhantomData;
 use std::ops::Deref;
 use std::os::raw;
-use std::sync::Arc;
 use std::slice;
+use std::sync::Arc;
 
 lazy_static! {
     pub static ref GLX: Result<Glx, Error> = Glx::new();
@@ -36,19 +39,13 @@ lazy_static! {
         .map_err(|err| err.clone());
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Display {
     display: Arc<X11Display>,
     screen: raw::c_int,
     extensions: Vec<String>,
+    version: (u8, u8),
 }
-
-impl PartialEq for Display {
-    fn eq(&self, o: &Self) -> bool {
-        self.display == o.display
-    }
-}
-impl Eq for Display {}
 
 impl Display {
     #[inline]
@@ -69,12 +66,15 @@ impl Display {
 
         // loading the list of extensions
         let extensions = Self::load_extensions(display, screen)?
-            .split(' ').map(|e| e.to_string()).collect::<Vec<_>>();
+            .split(' ')
+            .map(|e| e.to_string())
+            .collect::<Vec<_>>();
 
         Ok(Arc::new(Display {
             display: Arc::clone(display),
             screen,
             extensions,
+            version: (major as _, minor as _),
         }))
     }
 
@@ -108,20 +108,30 @@ impl Deref for Display {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Config {
-    display: Arc<Display>,
-    version: (Api, Version),
-    config_id: ffi::glx::types::GLXFBConfig,
-    visual_info: ffi::XVisualInfo,
+// FIXME why is this a macro again?
+macro_rules! attrib {
+    ($glx:expr, $disp:expr, $conf:expr, $attr:expr $(,)?) => {{
+        let mut value = 0;
+        let res = unsafe {
+            $glx.GetFBConfigAttrib(****$disp as *mut _, $conf, $attr as raw::c_int, &mut value)
+        };
+        match res {
+            0 => Ok(value),
+            err => Err(make_oserror!(OsError::Misc(format!(
+                "glxGetFBConfigAttrib failed for {:?} with 0x{:x}",
+                $conf, err,
+            )))),
+        }
+    }};
 }
 
-impl PartialEq for Config {
-    fn eq(&self, o: &Self) -> bool {
-        self.display == o.display && self.config_id == o.config_id
-    }
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Config {
+    display: Arc<Display>,
+    config: ffi::glx::types::GLXFBConfig,
+    visual_info: NoCmp<ffi::XVisualInfo>,
 }
-impl Eq for Config {}
+
 unsafe impl Send for Config {}
 unsafe impl Sync for Config {}
 
@@ -131,16 +141,17 @@ impl Config {
         cf: &ConfigsFinder,
         screen: raw::c_int,
         disp: &Arc<X11Display>,
-        conf_selector: F,
+        mut conf_selector: F,
     ) -> Result<Vec<(ConfigAttribs, Config)>, Error>
     where
         F: FnMut(
             Vec<ffi::glx::types::GLXFBConfig>,
-        ) -> Vec<Result<ffi::glx::types::GLXFBConfig, Error>>,
+        ) -> Vec<Result<(ffi::glx::types::GLXFBConfig, ffi::XVisualInfo), Error>>,
     {
         let xlib = syms!(XLIB);
         let glx = GLX.as_ref().map_err(|e| e.clone())?;
         let disp = Display::new(screen, disp)?;
+        let mut errors = make_error!(ErrorType::NoAvailableConfig);
 
         if cf.must_support_surfaceless {
             return Err(make_error!(ErrorType::NotSupported(
@@ -156,9 +167,7 @@ impl Config {
 
             if let Some(xid) = cf.plat_attr.x11_visual_xid {
                 // getting the visual infos
-                let fvi = crate::platform_impl::x11::utils::get_visual_info_from_xid(
-                    &**disp, xid,
-                )?;
+                let fvi = crate::platform_impl::x11::utils::get_visual_info_from_xid(&**disp, xid)?;
 
                 out.push(ffi::glx::X_VISUAL_TYPE as raw::c_int);
                 out.push(fvi.class as raw::c_int);
@@ -183,35 +192,31 @@ impl Config {
             }
             out.push(surface_type as raw::c_int);
 
-            // TODO: Use RGB/RGB_FLOAT_BIT_ARB if they don't want alpha bits,
-            // fallback to it if they don't care
-            out.push(ffi::glx::RENDER_TYPE as raw::c_int);
-            if cf.float_color_buffer {
-                if disp.has_extension("GLX_ARB_fbconfig_float") {
-                    out.push(ffi::glx_extra::RGBA_FLOAT_BIT_ARB as raw::c_int);
-                } else {
-                    return Err(make_error!(ErrorType::NoAvailableConfig));
-                }
-            } else {
-                out.push(ffi::glx::RGBA_BIT as raw::c_int);
-            }
-
             if let Some(color) = cf.color_bits {
                 out.push(ffi::glx::RED_SIZE as raw::c_int);
                 out.push((color / 3) as raw::c_int);
                 out.push(ffi::glx::GREEN_SIZE as raw::c_int);
-                out.push(
-                    (color / 3 + if color % 3 != 0 { 1 } else { 0 }) as raw::c_int,
-                );
+                out.push((color / 3 + if color % 3 != 0 { 1 } else { 0 }) as raw::c_int);
                 out.push(ffi::glx::BLUE_SIZE as raw::c_int);
-                out.push(
-                    (color / 3 + if color % 3 == 2 { 1 } else { 0 }) as raw::c_int,
-                );
+                out.push((color / 3 + if color % 3 == 2 { 1 } else { 0 }) as raw::c_int);
             }
 
             if let Some(alpha) = cf.alpha_bits {
                 out.push(ffi::glx::ALPHA_SIZE as raw::c_int);
                 out.push(alpha as raw::c_int);
+            }
+
+            out.push(ffi::glx::RENDER_TYPE as raw::c_int);
+            match cf.float_color_buffer {
+                Some(true) => {
+                    if !disp.has_extension("GLX_ARB_fbconfig_float") {
+                        return Err(errors);
+                    }
+                    out.push(ffi::glx_extra::RGBA_FLOAT_BIT_ARB as raw::c_int);
+                }
+                _ => {
+                    out.push(ffi::glx::RGBA_BIT as raw::c_int);
+                }
             }
 
             if let Some(depth) = cf.depth_bits {
@@ -229,64 +234,69 @@ impl Config {
             out.push(if double_buffer { 1 } else { 0 });
 
             if let Some(multisampling) = cf.multisampling {
-                if disp.has_extension("GLX_ARB_multisample") {
-                    out.push(ffi::glx_extra::SAMPLE_BUFFERS_ARB as raw::c_int);
-                    out.push(if multisampling == 0 { 0 } else { 1 });
-                    out.push(ffi::glx_extra::SAMPLES_ARB as raw::c_int);
-                    out.push(multisampling as raw::c_int);
-                } else {
+                if !disp.has_extension("GLX_ARB_multisample") {
                     return Err(make_error!(ErrorType::NoAvailableConfig));
                 }
+                out.push(ffi::glx_extra::SAMPLE_BUFFERS_ARB as raw::c_int);
+                out.push(if multisampling == 0 { 0 } else { 1 });
+                out.push(ffi::glx_extra::SAMPLES_ARB as raw::c_int);
+                out.push(multisampling as raw::c_int);
             }
 
             out.push(ffi::glx::STEREO as raw::c_int);
             out.push(if cf.stereoscopy { 1 } else { 0 });
 
+            // The ARB ext says that if we don't pass GLX_FRAMEBUFFER_SRGB_CAPABLE_ARB
+            // it is treated as don't care, which is what we want.
+            //
+            // The ARB ext was ammended to say so in
+            // https://github.com/KhronosGroup/OpenGL-Registry/issues/199.
+            //
+            // The EXT ext doesn't specify, but given that they should both behave
+            // (nearly) the same, it is safe to assume that this is also the case
+            // for the EXT ext.
             if let Some(srgb) = cf.srgb {
                 let srgb = if srgb { 1 } else { 0 };
                 if disp.has_extension("GLX_ARB_framebuffer_sRGB") {
-                    out.push(
-                        ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as raw::c_int,
-                    );
+                    out.push(ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as raw::c_int);
                     out.push(srgb);
                 } else if disp.has_extension("GLX_EXT_framebuffer_sRGB") {
-                    out.push(
-                        ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as raw::c_int,
-                    );
+                    out.push(ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as raw::c_int);
                     out.push(srgb);
                 } else {
                     return Err(make_error!(ErrorType::NoAvailableConfig));
                 }
             }
 
-            match cf.release_behavior {
-                ReleaseBehaviour::Flush => {
-                    if disp.has_extension("GLX_ARB_context_flush_control") {
-                        // With how shitty drivers are, never hurts to be explicit
-                        out.push(
-                            ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_ARB
-                                as raw::c_int,
-                        );
-                        out.push(
-                            ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_FLUSH_ARB
-                                as raw::c_int,
-                        );
-                    }
-                },
-                ReleaseBehaviour::None => {
-                    if !disp.has_extension("GLX_ARB_context_flush_control") {
-                        return Err(make_error!(ErrorType::FlushControlNotSupported));
-                    }
-                    out.push(
-                        ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_ARB
-                            as raw::c_int,
-                    );
-                    out.push(
-                        ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_NONE_ARB
-                            as raw::c_int,
-                    );
-                }
-            }
+            // FIXME mv context
+            //match cf.release_behavior {
+            //    ReleaseBehaviour::Flush => {
+            //        if disp.has_extension("GLX_ARB_context_flush_control") {
+            //            // With how shitty drivers are, never hurts to be explicit
+            //            out.push(
+            //                ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_ARB
+            //                    as raw::c_int,
+            //            );
+            //            out.push(
+            //                ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_FLUSH_ARB
+            //                    as raw::c_int,
+            //            );
+            //        }
+            //    },
+            //    ReleaseBehaviour::None => {
+            //        if !disp.has_extension("GLX_ARB_context_flush_control") {
+            //            return Err(make_error!(ErrorType::FlushControlNotSupported));
+            //        }
+            //        out.push(
+            //            ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_ARB
+            //                as raw::c_int,
+            //        );
+            //        out.push(
+            //            ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_NONE_ARB
+            //                as raw::c_int,
+            //        );
+            //    }
+            //}
 
             out.push(ffi::glx::CONFIG_CAVEAT as raw::c_int);
             out.push(ffi::glx::DONT_CARE as raw::c_int);
@@ -297,98 +307,150 @@ impl Config {
 
         // calling glXChooseFBConfig
         let mut num_confs = 0;
-        let confs_ptr = glx.ChooseFBConfig(
-            ****disp as *mut _,
-            screen,
-            descriptor.as_ptr(),
-            &mut num_confs,
-        );
+        let confs_ptr = unsafe {
+            glx.ChooseFBConfig(
+                ****disp as *mut _,
+                screen,
+                descriptor.as_ptr(),
+                &mut num_confs,
+            )
+        };
+
+        if let Err(err) = disp.check_errors() {
+            errors.append(err);
+            return Err(errors);
+        }
 
         if confs_ptr.is_null() {
-            return Err(make_error!(ErrorType::NoAvailableConfig));
+            return Err(errors);
         }
 
         if num_confs == 0 {
-            return Err(make_error!(ErrorType::NoAvailableConfig));
+            return Err(errors);
         }
 
-        let confs: Vec<ffi::glx::types::GLXFBConfig> =
-            slice::from_raw_parts(confs_ptr, num_confs as usize)
-            .iter().cloned().collect();
-        (xlib.XFree)(confs_ptr as *mut _);
-
-            match crate::platform_impl::x11::utils::select_config(
-                disp,
-                transparent,
-                cf,
-                (0..num_confs).collect(),
-                |conf_id| {
-                    let visual_infos_raw = glx.GetVisualFromFBConfig(
-                        ****disp as *mut _,
-                        *confs.offset(*conf_id as isize),
-                    );
-
-                    if visual_infos_raw.is_null() {
-                        return None;
-                    }
-
-                    let visual_infos: ffi::XVisualInfo =
-                        std::ptr::read(visual_infos_raw as *const _);
-                    (xlib.XFree)(visual_infos_raw as *mut _);
-                    Some(visual_infos)
-                },
-            ) {
-                Ok((conf_id, visual_infos)) => {
-                    let conf = *confs.offset(conf_id as isize);
-                    let conf = conf.clone();
-
-                    (xlib.XFree)(confs as *mut _);
-                    (conf, visual_infos)
-                }
-                Err(()) => {
-                    return Err(make_error!(ErrorType::NoAvailableConfig));
-                }
-            }
-
-        let get_attrib = |attrib: raw::c_int| -> i32 {
-            let mut value = 0;
-            glx.GetFBConfigAttrib(
-                ****disp as *mut _,
-                fb_conf,
-                attrib,
-                &mut value,
-            );
-            // TODO: check return value
-            value
+        let confs: Vec<ffi::glx::types::GLXFBConfig> = unsafe {
+            let confs = slice::from_raw_parts(confs_ptr, num_confs as usize)
+                .iter()
+                .cloned()
+                .collect();
+            (xlib.XFree)(confs_ptr as *mut _);
+            confs
         };
 
-        let pf_desc = PixelFormat {
-            hardware_accelerated: get_attrib(ffi::glx::CONFIG_CAVEAT as raw::c_int)
-                != ffi::glx::SLOW_CONFIG as raw::c_int,
-            color_bits: get_attrib(ffi::glx::RED_SIZE as raw::c_int) as u8
-                + get_attrib(ffi::glx::GREEN_SIZE as raw::c_int) as u8
-                + get_attrib(ffi::glx::BLUE_SIZE as raw::c_int) as u8,
-            alpha_bits: get_attrib(ffi::glx::ALPHA_SIZE as raw::c_int) as u8,
-            depth_bits: get_attrib(ffi::glx::DEPTH_SIZE as raw::c_int) as u8,
-            stencil_bits: get_attrib(ffi::glx::STENCIL_SIZE as raw::c_int) as u8,
-            stereoscopy: get_attrib(ffi::glx::STEREO as raw::c_int) != 0,
-            double_buffer: get_attrib(ffi::glx::DOUBLEBUFFER as raw::c_int) != 0,
-            multisampling: if get_attrib(ffi::glx::SAMPLE_BUFFERS as raw::c_int)
-                != 0
-            {
-                Some(get_attrib(ffi::glx::SAMPLES as raw::c_int) as u16)
-            } else {
-                None
-            },
-            srgb: get_attrib(
-                ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as raw::c_int,
-            ) != 0
-                || get_attrib(
-                    ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as raw::c_int,
-                ) != 0,
-        };
+        let confs: Vec<_> = conf_selector(confs)
+            .into_iter()
+            .filter_map(|conf| match conf {
+                Err(err) => {
+                    errors.append(err);
+                    return None;
+                }
+                Ok(conf) => Some(conf),
+            })
+            .map(|(conf, visual_info)| {
+                // There is no way for us to know the SwapIntervalRange's max until the
+                // drawable is made.
+                //
+                // 1000 is reasonable.
+                let mut swap_interval_ranges = vec![
+                    SwapIntervalRange::DontWait,
+                    SwapIntervalRange::Wait(1..1000),
+                ];
+                if disp.has_extension("GLX_EXT_swap_control_tear") {
+                    swap_interval_ranges.push(SwapIntervalRange::AdaptiveWait(1..1000));
+                }
 
-        unimplemented!()
+                let surf_type = attrib!(glx, disp, conf, ffi::glx::DRAWABLE_TYPE)? as u32;
+                let attribs = ConfigAttribs {
+                    version: cf.version,
+                    supports_windows: (surf_type & ffi::glx::WINDOW_BIT) != 0,
+                    supports_pixmaps: (surf_type & ffi::glx::PIXMAP_BIT) != 0,
+                    supports_pbuffers: (surf_type & ffi::glx::PBUFFER_BIT) != 0,
+                    supports_surfaceless: false,
+                    hardware_accelerated: attrib!(glx, disp, conf, ffi::glx::CONFIG_CAVEAT)?
+                        != ffi::glx::SLOW_CONFIG as raw::c_int,
+                    color_bits: attrib!(glx, disp, conf, ffi::glx::RED_SIZE)? as u8
+                        + attrib!(glx, disp, conf, ffi::glx::BLUE_SIZE)? as u8
+                        + attrib!(glx, disp, conf, ffi::glx::GREEN_SIZE)? as u8,
+                    alpha_bits: attrib!(glx, disp, conf, ffi::glx::ALPHA_SIZE)? as u8,
+                    depth_bits: attrib!(glx, disp, conf, ffi::glx::DEPTH_SIZE)? as u8,
+                    stencil_bits: attrib!(glx, disp, conf, ffi::glx::STENCIL_SIZE)? as u8,
+                    stereoscopy: attrib!(glx, disp, conf, ffi::glx::STEREO)? != 0,
+                    double_buffer: attrib!(glx, disp, conf, ffi::glx::DOUBLEBUFFER)? != 0,
+
+                    multisampling: match disp.has_extension("GLX_ARB_multisample") {
+                        false => None,
+                        true => match attrib!(glx, disp, conf, ffi::glx::SAMPLE_BUFFERS)? {
+                            0 => None,
+                            _ => Some(attrib!(glx, disp, conf, ffi::glx::SAMPLES)? as u16),
+                        },
+                    },
+                    srgb: match (
+                        disp.has_extension("GLX_ARB_framebuffer_sRGB"),
+                        disp.has_extension("GLX_EXT_framebuffer_sRGB"),
+                    ) {
+                        (true, _) => {
+                            attrib!(
+                                glx,
+                                disp,
+                                conf,
+                                ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB
+                            )? != 0
+                        }
+                        (_, true) => {
+                            attrib!(
+                                glx,
+                                disp,
+                                conf,
+                                ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT
+                            )? != 0
+                        }
+                        // Mesa prior to 2017 did not support sRGB contexts. It is sane to assume
+                        // that if neither ext is implmented the config is most likely not sRGB.
+                        //
+                        // Of course, this might not be the case, but without either ext
+                        // implemented there is no way for us to tell.
+                        (_, _) => false,
+                    },
+                    swap_interval_ranges,
+                };
+
+                Ok((attribs, conf, visual_info))
+            })
+            // FIXME: Pleasing borrowck. Lokathor demands unrolling this loop.
+            .collect::<Vec<_>>()
+            .into_iter()
+            .filter_map(|conf| match conf {
+                Err(err) => {
+                    errors.append(err);
+                    return None;
+                }
+                Ok(conf) => Some(conf),
+            })
+            .collect();
+
+        if confs.is_empty() {
+            return Err(errors);
+        }
+
+        if let Err(err) = disp.check_errors() {
+            errors.append(err);
+            return Err(errors);
+        }
+
+        Ok(confs
+            .into_iter()
+            .map(|(attribs, config, visual)| {
+                (
+                    attribs,
+                    Config {
+                        display: Arc::clone(&disp),
+                        config,
+                        visual_info: NoCmp(visual),
+                    },
+                )
+            })
+            .collect())
     }
 
     #[inline]
@@ -403,7 +465,70 @@ impl Config {
 
     #[inline]
     pub fn get_visual_info(&self) -> ffi::XVisualInfo {
-        self.visual_info
+        *self.visual_info
+    }
+}
+
+#[inline]
+pub fn get_native_visual_id(
+    disp: &Arc<X11Display>,
+    conf: ffi::glx::types::GLXFBConfig,
+) -> Result<ffi::VisualID, Error> {
+    let glx = GLX.as_ref().unwrap();
+    Ok(attrib!(glx, &disp, conf, ffi::glx::VISUAL_ID)? as ffi::VisualID)
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct Context {
+    display: Arc<Display>,
+    context: ffi::glx::types::GLXContext,
+    config: ConfigWrapper<Config, ConfigAttribs>,
+}
+
+unsafe impl Send for Context {}
+unsafe impl Sync for Context {}
+
+impl Drop for Context {
+    fn drop(&mut self) {
+        let glx = GLX.as_ref().unwrap();
+        unsafe {
+            glx.DestroyContext(****self.display as *mut _, self.context);
+        }
+
+        self.display.check_errors().unwrap();
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct Surface<T: SurfaceTypeTrait> {
+    display: Arc<Display>,
+    surface: ffi::Drawable,
+    config: ConfigWrapper<Config, ConfigAttribs>,
+    phantom: PhantomData<T>,
+}
+
+unsafe impl<T: SurfaceTypeTrait> Send for Surface<T> {}
+unsafe impl<T: SurfaceTypeTrait> Sync for Surface<T> {}
+
+impl<T: SurfaceTypeTrait> Drop for Surface<T> {
+    fn drop(&mut self) {
+        let glx = GLX.as_ref().unwrap();
+        unsafe {
+            match T::surface_type() {
+                SurfaceType::Window => glx.DestroyWindow(****self.display as *mut _, self.surface),
+                SurfaceType::PBuffer => {
+                    glx.DestroyPbuffer(****self.display as *mut _, self.surface)
+                }
+                SurfaceType::Pixmap => {
+                    if self.display.version >= (1, 3) {
+                        glx.DestroyPixmap(****self.display as *mut _, self.surface)
+                    } else {
+                        glx.DestroyGLXPixmap(****self.display as *mut _, self.surface)
+                    }
+                }
+            }
+        }
+        self.display.check_errors().unwrap();
     }
 }
 

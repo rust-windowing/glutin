@@ -14,27 +14,6 @@ on:
       - '.github/workflows/ci.yml'
 
 jobs:
-  Check_Formatting:
-    runs-on: ubuntu-latest
-    steps:
-
-    # FIXME
-    - name: Git clone deps for now
-      run: |
-        git clone https://github.com/goddessfreya/winit.git -b winit-glutin-next ../winit --depth 1
-        git clone https://github.com/rust-windowing/glutin_interface.git ../glutin_interface --depth 1
-        git clone https://github.com/rust-windowing/glutin_sys.git ../glutin_sys --depth 1
-        git clone https://github.com/rust-windowing/glutin_x11_sym.git ../glutin_x11_sym --depth 1
-        git clone https://github.com/rust-windowing/winit_types.git ../winit_types --depth 1
-
-    - uses: actions/checkout@v1
-    - uses: hecrj/setup-rust-action@v1
-      with:
-        rust-version: stable
-        components: rustfmt
-    - name: Check Formatting
-      run: cargo +stable fmt --all -- --check
-
   Tests:
     strategy:
       fail-fast: false
@@ -67,13 +46,40 @@ jobs:
     steps:
         
     # FIXME
-    - name: Git clone deps for now
-      run: |
-        git clone https://github.com/goddessfreya/winit.git -b winit-glutin-next ../winit --depth 1
-        git clone https://github.com/rust-windowing/glutin_interface.git ../glutin_interface --depth 1
-        git clone https://github.com/rust-windowing/glutin_sys.git ../glutin_sys --depth 1
-        git clone https://github.com/rust-windowing/glutin_x11_sym.git ../glutin_x11_sym --depth 1
-        git clone https://github.com/rust-windowing/winit_types.git ../winit_types --depth 1
+    - uses: actions/checkout@v1
+      with:
+        repository: rust-windowing/glutin_interface
+        path: glutin_interface
+        ref: master
+    - uses: actions/checkout@v1
+      with:
+        repository: rust-windowing/glutin_x11_sym
+        path: glutin_x11_sym
+        ref: master
+    - uses: actions/checkout@v1
+      with:
+        repository: rust-windowing/winit_types
+        path: winit_types
+        ref: master
+    - uses: actions/checkout@v1
+      with:
+        repository: rust-windowing/glutin_sys
+        path: glutin_sys
+        ref: master
+    - uses: actions/checkout@v1
+      with:
+        repository: goddessfreya/winit
+        path: winit
+        ref: winit-glutin-next
+
+    - uses: actions/checkout@v1
+    - uses: hecrj/setup-rust-action@v1
+      with:
+        rust-version: stable
+        components: rustfmt
+
+    - name: Check Formatting
+      run: cargo +stable fmt --all -- --check
 
     - uses: actions/checkout@v1
     # Used to cache cargo-web

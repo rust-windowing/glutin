@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 pub mod utils;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Config {
     Egl {
         config: egl::Config,
@@ -30,17 +30,6 @@ pub enum Config {
     },
     Glx(glx::Config),
 }
-
-impl PartialEq for Config {
-    fn eq(&self, o: &Self) -> bool {
-        match (self, o) {
-            (Config::Egl { config: s, .. }, Config::Egl { config: o, .. }) => s == o,
-            (Config::Glx(s), Config::Glx(o)) => s == o,
-            _ => false,
-        }
-    }
-}
-impl Eq for Config {}
 
 impl Config {
     #[inline]
@@ -94,11 +83,15 @@ impl Config {
                 disp,
                 cf.plat_attr.x11_transparency,
                 cf.plat_attr.x11_visual_xid,
-                confs,
-                |config_id| unimplemented!(),
+                confs.into_iter().map(|conf| {
+                    let xid = glx::get_native_visual_id(disp, conf)? as ffi::VisualID;
+                    utils::get_visual_info_from_xid(disp, xid).map(|vis| (conf, vis, xid))
+                }),
+                // FIXME: A cookie for whoever gets rid of this clone.
+                |conf| conf.clone().map(|(_, vis, xid)| (vis, xid)),
             )
             .into_iter()
-            .map(|config| config.map(|(conf, _)| conf))
+            .map(|conf| conf.map(|(conf, vis)| (conf.unwrap().0, vis)))
             .collect()
         })?;
         Ok(configs
@@ -174,26 +167,15 @@ impl Config {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Context {
     Egl {
         context: egl::Context,
         display: Arc<Display>,
         screen: raw::c_int,
     },
-    //Glx(glx::Display),
+    Glx(glx::Context),
 }
-
-impl PartialEq for Context {
-    fn eq(&self, o: &Self) -> bool {
-        match (self, o) {
-            (Context::Egl { context: s, .. }, Context::Egl { context: o, .. }) => s == o,
-            //(Context::Glx(s), Context::Glx(o)) => s == o,
-            _ => false,
-        }
-    }
-}
-impl Eq for Context {}
 
 impl Context {
     #[inline]
@@ -213,16 +195,30 @@ impl Context {
                     screen: *screen,
                 },
             ),
-            _ => unimplemented!(),
-            //(BackendDisplay::Glx(disp), Config::Glx(config)) => {
-            //    glx::Context::new(
-            //        disp,
-            //        Context::inner_cb_glx(cb)?,
-            //        conf.map_config(|_| config),
-            //    )
-            //    .map(Context::Glx)
-            //},
+            Config::Glx(config) => {
+                glx::Context::new(Context::inner_cb_glx(cb)?, conf.map_config(|_| config))
+                    .map(Context::Glx)
+            }
         }
+    }
+
+    #[inline]
+    fn inner_cb_glx(
+        cb: ContextBuilderWrapper<&Context>,
+    ) -> Result<ContextBuilderWrapper<&glx::Context>, Error> {
+        match cb.sharing {
+            Some(Context::Glx(_)) | None => (),
+            _ => {
+                return Err(make_error!(ErrorType::BadApiUsage(
+                    "Cannot share a GLX context with a non-GLX context".to_string()
+                )))
+            }
+        }
+
+        Ok(cb.map_sharing(|ctx| match ctx {
+            Context::Glx(ctx) => ctx,
+            _ => unreachable!(),
+        }))
     }
 
     #[inline]
@@ -248,7 +244,7 @@ impl Context {
     pub unsafe fn make_current_surfaceless(&self) -> Result<(), Error> {
         match self {
             Context::Egl { context, .. } => context.make_current_surfaceless(),
-            //Context::Glx(ref ctx) => ctx.make_current_surfaceless(),
+            Context::Glx(ref ctx) => ctx.make_current_surfaceless(),
         }
     }
 
@@ -258,7 +254,7 @@ impl Context {
             (Context::Egl { context, .. }, Surface::Egl { surface, .. }) => {
                 context.make_current(surface)
             }
-            //(Context::Glx(ref ctx), Surface::Glx(ref surf)) => ctx.make_current(surf),
+            (Context::Glx(ref ctx), Surface::Glx(ref surf)) => ctx.make_current(surf),
             (_, _) => Err(make_error!(ErrorType::BadApiUsage(
                 "Incompatible context and surface backends.".to_string()
             ))),
@@ -269,7 +265,7 @@ impl Context {
     pub unsafe fn make_not_current(&self) -> Result<(), Error> {
         match self {
             Context::Egl { context, .. } => context.make_not_current(),
-            //Context::Glx(ref ctx) => ctx.make_not_current(),
+            Context::Glx(ref ctx) => ctx.make_not_current(),
         }
     }
 
@@ -277,7 +273,7 @@ impl Context {
     pub fn is_current(&self) -> bool {
         match self {
             Context::Egl { context, .. } => context.is_current(),
-            //Context::Glx(ref ctx) => ctx.is_current(),
+            Context::Glx(ref ctx) => ctx.is_current(),
         }
     }
 
@@ -285,7 +281,7 @@ impl Context {
     pub fn get_proc_address(&self, addr: &str) -> Result<*const raw::c_void, Error> {
         match self {
             Context::Egl { context, .. } => context.get_proc_address(addr),
-            //Context::Glx(ref ctx) => ctx.get_proc_address(addr),
+            Context::Glx(ref ctx) => ctx.get_proc_address(addr),
         }
     }
 
@@ -301,38 +297,27 @@ impl Context {
                 display: Arc::clone(display),
                 screen: *screen,
             }),
-            //Context::Glx(ref ctx) => ctx.get_config().map_config(Config::Glx),
+            Context::Glx(ref ctx) => ctx.get_config().map_config(Config::Glx),
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Surface<T: SurfaceTypeTrait> {
     Egl {
         surface: egl::Surface<T>,
         display: Arc<Display>,
         screen: raw::c_int,
     },
-    //Glx(glx::Display),
+    Glx(glx::Surface<T>),
 }
-
-impl<T: SurfaceTypeTrait> PartialEq for Surface<T> {
-    fn eq(&self, o: &Self) -> bool {
-        match (self, o) {
-            (Surface::Egl { surface: s, .. }, Surface::Egl { surface: o, .. }) => s == o,
-            //(Surface::Glx(s), Surface::Glx(o)) => s == o,
-            _ => false,
-        }
-    }
-}
-impl<T: SurfaceTypeTrait> Eq for Surface<T> {}
 
 impl<T: SurfaceTypeTrait> Surface<T> {
     #[inline]
     pub fn is_current(&self) -> bool {
         match self {
             Surface::Egl { surface, .. } => surface.is_current(),
-            //Surface::Glx(ref surf) => surf.is_current(),
+            Surface::Glx(ref surf) => surf.is_current(),
         }
     }
 
@@ -348,7 +333,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
                 display: Arc::clone(display),
                 screen: *screen,
             }),
-            //Context::Glx(ref ctx) => ctx.get_config().map_config(Config::Glx),
+            Surface::Glx(ref ctx) => ctx.get_config().map_config(Config::Glx),
         }
     }
 
@@ -356,7 +341,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     pub unsafe fn make_not_current(&self) -> Result<(), Error> {
         match self {
             Surface::Egl { surface, .. } => surface.make_not_current(),
-            //Surface::Glx(ref surf) => surf.make_not_current(),
+            Surface::Glx(ref surf) => surf.make_not_current(),
         }
     }
 }
@@ -379,15 +364,9 @@ impl Surface<PBuffer> {
                     screen: *screen,
                 }
             }),
-            _ => unimplemented!(),
-            //(BackendDisplay::Glx(disp), Config::Glx(config)) => {
-            //    glx::Surface::<PBuffer>::new(
-            //        disp,
-            //        conf.map_config(|_| config),
-            //        size,
-            //    )
-            //    .map(Surface::Glx)
-            //},
+            Config::Glx(config) => {
+                glx::Surface::<PBuffer>::new(conf.map_config(|_| config), size).map(Surface::Glx)
+            }
         }
     }
 }
@@ -399,6 +378,7 @@ impl Surface<Pixmap> {
         nps: &NPS,
         pb: NPS::PixmapBuilder,
     ) -> Result<(NPS::Pixmap, Self), Error> {
+        // FIXME
         unimplemented!()
         //match (disp, conf.config) {
         //    (Display::Egl(disp), Config::Egl(config)) => {
@@ -534,15 +514,10 @@ impl Surface<Window> {
                     screen: *screen,
                 },
             ),
-            _ => unimplemented!(),
-            //(Display::Glx(disp), Config::Glx(config)) => {
-            //    glx::Surface::<Window>::new(
-            //        disp,
-            //        conf.map_config(|_| config),
-            //        nws,
-            //    )
-            //    .map(|surf| (win, Surface::Glx(surf)))
-            //},
+            Config::Glx(config) => {
+                glx::Surface::<Window>::new(conf.map_config(|_| config), surface as *const _)
+                    .map(Surface::Glx)
+            }
         }
     }
 
@@ -550,7 +525,7 @@ impl Surface<Window> {
     pub fn swap_buffers(&self) -> Result<(), Error> {
         match self {
             Surface::Egl { surface, .. } => surface.swap_buffers(),
-            //Surface::Glx(ref surf) => surf.swap_buffers(),
+            Surface::Glx(ref surf) => surf.swap_buffers(),
         }
     }
 
@@ -558,7 +533,7 @@ impl Surface<Window> {
     pub fn swap_buffers_with_damage(&self, rects: &[dpi::Rect]) -> Result<(), Error> {
         match self {
             Surface::Egl { surface, .. } => surface.swap_buffers_with_damage(rects),
-            //Surface::Glx(ref surf) => surf.swap_buffers_with_damage(rects),
+            Surface::Glx(ref surf) => surf.swap_buffers_with_damage(rects),
         }
     }
 
@@ -566,7 +541,7 @@ impl Surface<Window> {
     pub fn modify_swap_interval(&self, swap_interval: SwapInterval) -> Result<(), Error> {
         match self {
             Surface::Egl { surface, .. } => surface.modify_swap_interval(swap_interval),
-            //Surface::Glx(ref surf) => surf.modify_swap_interval(swap_interval),
+            Surface::Glx(ref surf) => surf.modify_swap_interval(swap_interval),
         }
     }
 }

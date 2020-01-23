@@ -4,7 +4,7 @@ use crate::config::{Api, ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapInterv
 use crate::context::ContextBuilderWrapper;
 use crate::platform::unix::BackingApi;
 use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
-use crate::utils::NoPrint;
+use crate::utils::{NoCmp, NoPrint};
 
 use glutin_interface::{
     NativeDisplay, NativePixmap, NativePixmapSource, NativeWindow, NativeWindowSource, RawWindow,
@@ -57,18 +57,11 @@ impl Config {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Surface<T: SurfaceTypeTrait> {
-    wsurface: Option<NoPrint<wegl::WlEglSurface>>,
+    wsurface: Option<NoCmp<NoPrint<wegl::WlEglSurface>>>,
     surface: egl::Surface<T>,
 }
-
-impl<T: SurfaceTypeTrait> PartialEq for Surface<T> {
-    fn eq(&self, o: &Self) -> bool {
-        self.surface == o.surface
-    }
-}
-impl<T: SurfaceTypeTrait> Eq for Surface<T> {}
 
 impl<T: SurfaceTypeTrait> Surface<T> {
     #[inline]
@@ -122,7 +115,7 @@ impl Surface<Window> {
 
         egl::Surface::<Window>::new(conf.map_config(|conf| &conf.0), wsurface.ptr() as *const _)
             .map(|surface| Surface {
-                wsurface: Some(NoPrint(wsurface)),
+                wsurface: Some(NoCmp(NoPrint(wsurface))),
                 surface,
             })
     }
