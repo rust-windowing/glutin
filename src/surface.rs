@@ -184,7 +184,10 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     /// [`Flush`]: crate::config::ReleaseBehaviour::Flush
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), Error> {
-        self.0.make_not_current()
+        match self.is_current() {
+            true => self.0.make_not_current(),
+            false => Ok(()),
+        }
     }
 }
 

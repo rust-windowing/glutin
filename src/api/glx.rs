@@ -154,9 +154,15 @@ impl Config {
         let mut errors = make_error!(ErrorType::NoAvailableConfig);
 
         if cf.must_support_surfaceless {
-            return Err(make_error!(ErrorType::NotSupported(
+            errors.append(make_error!(ErrorType::NotSupported(
                 "EGL surfaceless not supported with GLX".to_string(),
             )));
+            return Err(errors);
+        }
+
+        if cf.version.0 != Api::OpenGl {
+            errors.append(make_error!(ErrorType::OpenGlVersionNotSupported));
+            return Err(errors);
         }
 
         let descriptor = {
@@ -206,17 +212,20 @@ impl Config {
                 out.push(alpha as raw::c_int);
             }
 
-            out.push(ffi::glx::RENDER_TYPE as raw::c_int);
             match cf.float_color_buffer {
                 Some(true) => {
                     if !disp.has_extension("GLX_ARB_fbconfig_float") {
+                        errors.append(make_error!(ErrorType::FloatingPointSurfaceNotSupported));
                         return Err(errors);
                     }
+                    out.push(ffi::glx::RENDER_TYPE as raw::c_int);
                     out.push(ffi::glx_extra::RGBA_FLOAT_BIT_ARB as raw::c_int);
                 }
-                _ => {
+                Some(false) => {
+                    out.push(ffi::glx::RENDER_TYPE as raw::c_int);
                     out.push(ffi::glx::RGBA_BIT as raw::c_int);
                 }
+                _ => (),
             }
 
             if let Some(depth) = cf.depth_bits {
@@ -235,7 +244,8 @@ impl Config {
 
             if let Some(multisampling) = cf.multisampling {
                 if !disp.has_extension("GLX_ARB_multisample") {
-                    return Err(make_error!(ErrorType::NoAvailableConfig));
+                    errors.append(make_error!(ErrorType::MultisamplingNotSupported));
+                    return Err(errors);
                 }
                 out.push(ffi::glx_extra::SAMPLE_BUFFERS_ARB as raw::c_int);
                 out.push(if multisampling == 0 { 0 } else { 1 });
@@ -264,6 +274,7 @@ impl Config {
                     out.push(ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as raw::c_int);
                     out.push(srgb);
                 } else {
+                    errors.append(make_error!(ErrorType::SrgbSurfaceNotSupported));
                     return Err(make_error!(ErrorType::NoAvailableConfig));
                 }
             }
@@ -343,7 +354,7 @@ impl Config {
             .filter_map(|conf| match conf {
                 Err(err) => {
                     errors.append(err);
-                    return None;
+                    None
                 }
                 Ok(conf) => Some(conf),
             })
@@ -377,6 +388,8 @@ impl Config {
                     stencil_bits: attrib!(glx, disp, conf, ffi::glx::STENCIL_SIZE)? as u8,
                     stereoscopy: attrib!(glx, disp, conf, ffi::glx::STEREO)? != 0,
                     double_buffer: attrib!(glx, disp, conf, ffi::glx::DOUBLEBUFFER)? != 0,
+                    // Gets populated later.
+                    float_color_buffer: false,
 
                     multisampling: match disp.has_extension("GLX_ARB_multisample") {
                         false => None,
@@ -420,13 +433,47 @@ impl Config {
             // FIXME: Pleasing borrowck. Lokathor demands unrolling this loop.
             .collect::<Vec<_>>()
             .into_iter()
-            .filter_map(|conf| match conf {
-                Err(err) => {
+            .filter_map(|conf| {
+                if let Err(err) = conf {
                     errors.append(err);
                     return None;
                 }
-                Ok(conf) => Some(conf),
+                let (attribs, conf, visual_info) = conf.unwrap();
+
+                let render_type = match attrib!(glx, disp, conf, ffi::glx::RENDER_TYPE) {
+                    Ok(rt) => rt,
+                    Err(err) => {
+                        errors.append(err);
+                        return None;
+                    }
+                } as u32;
+
+                let wants_floating_point = cf.float_color_buffer != Some(false);
+                let wants_standard = cf.float_color_buffer != Some(true);
+
+                let is_floating_point = disp.has_extension("GLX_ARB_fbconfig_float") && (render_type & ffi::glx_extra::RGBA_FLOAT_BIT_ARB) != 0;
+                let is_standard = (render_type & ffi::glx::RGBA_BIT) != 0;
+
+                let mut confs = vec![];
+
+                if wants_floating_point && is_floating_point {
+                    let attribs = attribs.clone();
+                    attribs.float_color_buffer = true;
+                    confs.push((attribs, conf, visual_info));
+                }
+
+                if wants_standard && is_standard {
+                    confs.push((attribs, conf, visual_info));
+                }
+
+                if confs.is_empty() {
+                    errors.append(make_error!(ErrorType::FloatingPointSurfaceNotSupported));
+                    return None;
+                }
+
+                Some(confs)
             })
+            .flat_map(|conf| conf)
             .collect();
 
         if confs.is_empty() {
@@ -487,6 +534,83 @@ pub struct Context {
 
 unsafe impl Send for Context {}
 unsafe impl Sync for Context {}
+
+impl Context {
+    #[inline]
+    pub(crate) fn new(
+        cb: ContextBuilderWrapper<&Context>,
+        conf: ConfigWrapper<&Config, &ConfigAttribs>,
+    ) -> Result<Context, Error> {
+    }
+
+    #[inline]
+    pub(crate) unsafe fn make_current<T: SurfaceTypeTrait>(
+        &self,
+        surf: &Surface<T>,
+    ) -> Result<(), Error> {
+        let glx = GLX.as_ref().unwrap();
+        let res = glx.MakeCurrent(
+            ****self.display as *mut _,
+            surf.surface,
+            self.context,
+        );
+        Self::check_make_current(&self.display, res)
+    }
+
+    #[inline]
+    pub unsafe fn make_current_surfaceless(&self) -> Result<(), Error> {
+        // Should have been caught in src/surface.rs
+        unreachable!()
+    }
+
+    #[inline]
+    pub unsafe fn make_not_current(&self) -> Result<(), Error> {
+        let glx = GLX.as_ref().unwrap();
+        let res = glx.MakeCurrent(
+            ****self.display as *mut _,
+            0,
+            std::ptr::null(),
+        );
+        Self::check_make_current(&self.display, res)
+    }
+
+    #[inline]
+    pub fn is_current(&self) -> bool {
+        let glx = GLX.as_ref().unwrap();
+        unsafe { glx.GetCurrentContext() == self.context }
+    }
+
+    #[inline]
+    pub fn get_config(&self) -> ConfigWrapper<Config, ConfigAttribs> {
+        self.config.clone()
+    }
+
+    #[inline]
+    pub fn get_api(&self) -> Api {
+        Api::OpenGl
+    }
+
+    #[inline]
+    pub fn get_proc_address(&self, addr: &str) -> Result<*const raw::c_void, Error> {
+        let glx = GLX.as_ref().unwrap();
+        let addr = CString::new(addr.as_bytes()).unwrap();
+        let addr = addr.as_ptr();
+        Ok(unsafe { glx.GetProcAddress(addr as *const _) as *const _ })
+    }
+
+    #[inline]
+    unsafe fn check_make_current(disp: &Arc<Display>, ret: i32) -> Result<(), Error> {
+        if ret == 0 {
+            let err = disp.check_errors();
+            Err(make_oserror!(OsError::Misc(format!(
+                "`glXMakeCurrent` failed: {:?}",
+                err
+            ))))
+        } else {
+            Ok(())
+        }
+    }
+}
 
 impl Drop for Context {
     fn drop(&mut self) {
@@ -571,73 +695,6 @@ impl<T: SurfaceTypeTrait> Drop for Surface<T> {
 //        })
 //    }
 //
-//    unsafe fn check_make_current(
-//        &self,
-//        ret: Option<i32>,
-//    ) -> Result<(), Error> {
-//        if ret == Some(0) {
-//            let err = self.xconn.check_errors();
-//            Err(make_oserror!(OsError::Misc(format!(
-//                "`glXMakeCurrent` failed: {:?}",
-//                err
-//            ))))
-//        } else {
-//            Ok(())
-//        }
-//    }
-//
-//    #[inline]
-//    pub unsafe fn make_current(&self) -> Result<(), Error> {
-//        let glx = GLX.as_ref().unwrap();
-//        let res = glx.MakeCurrent(
-//            self.xconn.display as *mut _,
-//            self.drawable,
-//            self.context,
-//        );
-//        self.check_make_current(Some(res))
-//    }
-//
-//    #[inline]
-//    pub unsafe fn make_not_current(&self) -> Result<(), Error> {
-//        let glx = GLX.as_ref().unwrap();
-//        if self.drawable == glx.GetCurrentDrawable()
-//            || self.context == glx.GetCurrentContext()
-//        {
-//            let res = glx.MakeCurrent(
-//                self.xconn.display as *mut _,
-//                0,
-//                std::ptr::null(),
-//            );
-//            self.check_make_current(Some(res))
-//        } else {
-//            self.check_make_current(None)
-//        }
-//    }
-//
-//    #[inline]
-//    pub fn is_current(&self) -> bool {
-//        let glx = GLX.as_ref().unwrap();
-//        unsafe { glx.GetCurrentContext() == self.context }
-//    }
-//
-//    #[inline]
-//    pub fn get_api(&self) -> Api {
-//        Api::OpenGl
-//    }
-//
-//    #[inline]
-//    pub unsafe fn raw_handle(&self) -> ffi::glx::types::GLXContext {
-//        self.context
-//    }
-//
-//    #[inline]
-//    pub fn get_proc_address(&self, addr: &str) -> *const () {
-//        let glx = GLX.as_ref().unwrap();
-//        let addr = CString::new(addr.as_bytes()).unwrap();
-//        let addr = addr.as_ptr();
-//        unsafe { glx.GetProcAddress(addr as *const _) as *const _ }
-//    }
-//
 //    #[inline]
 //    pub fn swap_buffers(&self) -> Result<(), Error> {
 //        let glx = GLX.as_ref().unwrap();
@@ -653,40 +710,8 @@ impl<T: SurfaceTypeTrait> Drop for Surface<T> {
 //            Ok(())
 //        }
 //    }
-//
-//    #[inline]
-//    pub fn get_pixel_format(&self) -> PixelFormat {
-//        self.pixel_format.clone()
-//    }
 //}
 //
-//unsafe impl Send for Context {}
-//unsafe impl Sync for Context {}
-//
-//impl Drop for Context {
-//    fn drop(&mut self) {
-//        let glx = GLX.as_ref().unwrap();
-//        unsafe {
-//            // See `drop` for `crate::api::egl::Context` for rationale.
-//            let mut guard =
-//                MakeCurrentGuard::new(&self.xconn, self.drawable, self.context)
-//                    .unwrap();
-//
-//            let gl_finish_fn = self.get_proc_address("glFinish");
-//            assert!(gl_finish_fn != std::ptr::null());
-//            let gl_finish_fn =
-//                std::mem::transmute::<_, extern "system" fn()>(gl_finish_fn);
-//            gl_finish_fn();
-//
-//            if guard.old_context() == Some(self.context) {
-//                guard.invalidate()
-//            }
-//            std::mem::drop(guard);
-//
-//            glx.DestroyContext(self.xconn.display as *mut _, self.context);
-//        }
-//    }
-//}
 //
 //#[derive(Debug)]
 //pub struct ContextPrototype<'a> {
@@ -900,13 +925,6 @@ impl<T: SurfaceTypeTrait> Drop for Surface<T> {
 //            pixel_format: self.pixel_format,
 //        })
 //    }
-//}
-//
-//extern "C" fn x_error_callback(
-//    _dpy: *mut ffi::Display,
-//    _err: *mut ffi::XErrorEvent,
-//) -> i32 {
-//    0
 //}
 //
 //fn create_context(

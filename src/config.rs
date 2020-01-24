@@ -158,8 +158,6 @@ impl SwapIntervalRange {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConfigAttribs {
     pub swap_interval_ranges: Vec<SwapIntervalRange>,
-    // FIXME: Once we got all the platforms done, consider keeping `Api` in
-    // Config{,Attribs,sFinder} but moving `Version` to `ContextBuilder`
     pub version: (Api, Version),
     pub hardware_accelerated: bool,
     pub color_bits: u8,
@@ -174,6 +172,7 @@ pub struct ConfigAttribs {
     pub supports_pixmaps: bool,
     pub supports_windows: bool,
     pub supports_surfaceless: bool,
+    pub float_color_buffer: bool,
 }
 
 /// A type that contains the [`ConfigAttribs`] along side with the native api's

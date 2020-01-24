@@ -1,3 +1,5 @@
+pixmap examples
+new_existing examples
 GLX_LARGEST_PBUFFER
 AUDIT flush behaviour
 Test srgb and flush w/ egl

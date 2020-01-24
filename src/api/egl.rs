@@ -416,7 +416,6 @@ macro_rules! attrib {
 pub struct Config {
     display: Arc<Display>,
     config_id: ffi::EGLConfig,
-    version: (Api, Version),
 }
 
 unsafe impl Send for Config {}
@@ -446,9 +445,7 @@ impl Config {
         }
 
         if cf.float_color_buffer == Some(true) {
-            errors.append(make_error!(ErrorType::NotSupported(
-                "Float color buffers not supported with EGL.".to_string()
-            )));
+            errors.append(make_error!(ErrorType::FloatingPointSurfaceNotSupported));
             return Err(errors);
         }
 
@@ -465,6 +462,7 @@ impl Config {
             .is_some()
         {
             errors.append(make_error!(ErrorType::AdaptiveSwapControlNotSupported));
+            errors.append(make_error!(ErrorType::SwapControlRangeNotSupported));
             return Err(errors);
         }
 
@@ -492,6 +490,7 @@ impl Config {
             match cf.version {
                 (Api::OpenGlEs, Version(3, _)) => {
                     if display.egl_version < (1, 3) {
+                        errors.append(make_error!(ErrorType::OpenGlVersionNotSupported));
                         return Err(errors);
                     }
                     out.push(ffi::egl::RENDERABLE_TYPE as raw::c_int);
@@ -501,6 +500,7 @@ impl Config {
                 }
                 (Api::OpenGlEs, Version(2, _)) => {
                     if display.egl_version < (1, 3) {
+                        errors.append(make_error!(ErrorType::OpenGlVersionNotSupported));
                         return Err(errors);
                     }
                     out.push(ffi::egl::RENDERABLE_TYPE as raw::c_int);
@@ -519,6 +519,7 @@ impl Config {
                 (Api::OpenGlEs, _) => unimplemented!(),
                 (Api::OpenGl, _) => {
                     if display.egl_version < (1, 3) {
+                        errors.append(make_error!(ErrorType::OpenGlVersionNotSupported));
                         return Err(errors);
                     }
                     out.push(ffi::egl::RENDERABLE_TYPE as raw::c_int);
@@ -562,10 +563,6 @@ impl Config {
                 out.push(stencil as raw::c_int);
             }
 
-            if let Some(true) = cf.double_buffer {
-                return Err(errors);
-            }
-
             if let Some(multisampling) = cf.multisampling {
                 out.push(ffi::egl::SAMPLES as raw::c_int);
                 out.push(multisampling as raw::c_int);
@@ -582,6 +579,7 @@ impl Config {
 
             if let Some(srgb) = cf.srgb {
                 if srgb && !display.has_extension("EGL_KHR_gl_colorspace") {
+                    errors.append(make_error!(ErrorType::SrgbSurfaceNotSupported));
                     return Err(errors);
                 }
             }
@@ -660,10 +658,7 @@ impl Config {
                             return None;
                         }
                         Ok(min) if (dsir.start as i32) < min => {
-                            errors.append(make_oserror!(OsError::Misc(format!(
-                                "Desired swap interval range start ({:?}) smaller than minimum ({:?}) for {:?}",
-                                dsir.start, min, conf
-                            ))));
+                            errors.append(make_error!(ErrorType::SwapControlRangeNotSupported));
                             return None;
                         }
                         _ => (),
@@ -677,10 +672,7 @@ impl Config {
                             return None;
                         }
                         Ok(max) if (dsir.end as i32) > (max + 1) => {
-                            errors.append(make_oserror!(OsError::Misc(format!(
-                                "Desired swap interval range end ({:?}) bigger than maximum ({:?}) for {:?}",
-                                dsir.end, max, conf
-                            ))));
+                            errors.append(make_error!(ErrorType::SwapControlRangeNotSupported));
                             return None;
                         }
                         _ => (),
@@ -700,7 +692,7 @@ impl Config {
             .filter_map(|conf| match conf {
                 Err(err) => {
                     errors.append(err);
-                    return None;
+                    None
                 }
                 Ok(conf) => Some(conf),
             })
@@ -744,13 +736,14 @@ impl Config {
                     alpha_bits: attrib!(egl, display, conf, ffi::egl::ALPHA_SIZE)? as u8,
                     depth_bits: attrib!(egl, display, conf, ffi::egl::DEPTH_SIZE)? as u8,
                     stencil_bits: attrib!(egl, display, conf, ffi::egl::STENCIL_SIZE)? as u8,
+                    float_color_buffer: false,
                     stereoscopy: false,
-                    double_buffer: true,
                     multisampling: match attrib!(egl, display, conf, ffi::egl::SAMPLES)? {
                         0 | 1 => None,
                         a => Some(a as u16),
                     },
                     srgb: cf.srgb.unwrap_or(false),
+                    double_buffer: cf.double_buffer.unwrap_or(true),
                     swap_interval_ranges,
                 };
 
@@ -759,26 +752,42 @@ impl Config {
             // FIXME: Pleasing borrowck. Lokathor demands unrolling this loop.
             .collect::<Vec<_>>()
             .into_iter()
-            .filter_map(|conf| match conf {
-                Err(err) => {
+            .filter_map(|conf| {
+                if let Err(err) = conf {
                     errors.append(err);
                     return None;
                 }
-                Ok(conf) => Some(conf),
+                let (attribs, conf) = conf.unwrap();
+
+                let mut confs = vec![
+                    (attribs, conf),
+                ];
+
+                if cf.srgb.is_none() {
+                    let mut attribs = attribs.clone();
+                    attribs.srgb = true;
+                    confs.push((attribs, conf));
+                }
+
+                if cf.double_buffer.is_none() {
+                    let mut attribs = attribs.clone();
+                    attribs.double_buffer = false;
+                    confs.push((attribs, conf));
+                }
+
+                if cf.double_buffer.is_none() && cf.srgb.is_none() {
+                    attribs.srgb = true;
+                    attribs.double_buffer = false;
+                    confs.push((attribs, conf));
+                }
+
+                Some(confs)
             })
+            .flat_map(|conf| conf)
             .collect();
 
         if confs.is_empty() {
             return Err(errors);
-        }
-
-        if cf.srgb.is_none() {
-            let confs_len = confs.len();
-            for i in 0..confs_len {
-                let mut new_conf = confs[i].clone();
-                new_conf.0.srgb = true;
-                confs.push(new_conf);
-            }
         }
 
         Ok(confs
@@ -788,7 +797,6 @@ impl Config {
                     attribs,
                     Config {
                         display: Arc::clone(&display),
-                        version: cf.version,
                         config_id,
                     },
                 )
@@ -813,13 +821,6 @@ unsafe impl Send for Context {}
 unsafe impl Sync for Context {}
 
 impl Context {
-    /// Start building an EGL context.
-    ///
-    /// This function initializes some things and chooses the pixel format.
-    ///
-    /// To finish the process, you must call `.finish(window)` on the
-    /// `ContextPrototype`.
-    ///
     #[inline]
     pub(crate) fn new(
         cb: ContextBuilderWrapper<&Context>,
@@ -1018,7 +1019,7 @@ impl Context {
         let egl = EGL.as_ref().unwrap();
 
         let ret = egl.MakeCurrent(**self.display, surf.surface, surf.surface, self.context);
-        Self::check_make_current(Some(ret))?;
+        Self::check_make_current(ret)?;
 
         Ok(())
     }
@@ -1033,25 +1034,21 @@ impl Context {
             self.context,
         );
 
-        Self::check_make_current(Some(ret))
+        Self::check_make_current(ret)
     }
 
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), Error> {
         let egl = EGL.as_ref().unwrap();
 
-        if egl.GetCurrentContext() == self.context {
-            let ret = egl.MakeCurrent(
-                **self.display,
-                ffi::egl::NO_SURFACE,
-                ffi::egl::NO_SURFACE,
-                ffi::egl::NO_CONTEXT,
-            );
+        let ret = egl.MakeCurrent(
+            **self.display,
+            ffi::egl::NO_SURFACE,
+            ffi::egl::NO_SURFACE,
+            ffi::egl::NO_CONTEXT,
+        );
 
-            Self::check_make_current(Some(ret))
-        } else {
-            Self::check_make_current(None)
-        }
+        Self::check_make_current(ret)
     }
 
     #[inline]
@@ -1067,7 +1064,7 @@ impl Context {
 
     #[inline]
     pub fn get_api(&self) -> Api {
-        self.config.config.version.0
+        self.config.attribs.version.0
     }
 
     // FIXME: Needed for android support.
@@ -1148,9 +1145,9 @@ impl Context {
     }
 
     #[inline]
-    unsafe fn check_make_current(ret: Option<u32>) -> Result<(), Error> {
+    unsafe fn check_make_current(ret: u32) -> Result<(), Error> {
         let egl = EGL.as_ref().unwrap();
-        if ret == Some(0) {
+        if ret == 0 {
             match egl.GetError() as u32 {
                 ffi::egl::CONTEXT_LOST => Err(make_error!(ErrorType::ContextLost)),
                 err => Err(make_oserror!(OsError::Misc(format!(
@@ -1217,6 +1214,18 @@ impl<T: SurfaceTypeTrait> Surface<T> {
             }
         }
 
+        if T::surface_type() == SurfaceType::Window {
+            out.push(ffi::egl::RENDER_BUFFER as raw::c_int);
+            match conf.attribs.double_buffer {
+                false => {
+                    out.push(ffi::egl::SINGLE_BUFFER as raw::c_int);
+                }
+                true => {
+                    out.push(ffi::egl::BACK_BUFFER as raw::c_int);
+                }
+            }
+        }
+
         if let Some(size) = size {
             let size: (u32, u32) = (*size).into();
             out.push(ffi::egl::TEXTURE_FORMAT as raw::c_int);
@@ -1254,20 +1263,14 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     pub unsafe fn make_not_current(&self) -> Result<(), Error> {
         let egl = EGL.as_ref().unwrap();
 
-        if egl.GetCurrentSurface(ffi::egl::DRAW as i32) == self.surface
-            || egl.GetCurrentSurface(ffi::egl::READ as i32) == self.surface
-        {
-            let ret = egl.MakeCurrent(
-                **self.display,
-                ffi::egl::NO_SURFACE,
-                ffi::egl::NO_SURFACE,
-                ffi::egl::NO_CONTEXT,
-            );
+        let ret = egl.MakeCurrent(
+            **self.display,
+            ffi::egl::NO_SURFACE,
+            ffi::egl::NO_SURFACE,
+            ffi::egl::NO_CONTEXT,
+        );
 
-            Context::check_make_current(Some(ret))
-        } else {
-            Context::check_make_current(None)
-        }
+        Context::check_make_current(ret)
     }
 }
 
