@@ -759,9 +759,7 @@ impl Config {
                 }
                 let (attribs, conf) = conf.unwrap();
 
-                let mut confs = vec![
-                    (attribs, conf),
-                ];
+                let mut confs = vec![(attribs, conf)];
 
                 if cf.srgb.is_none() {
                     let mut attribs = attribs.clone();
@@ -1019,9 +1017,24 @@ impl Context {
         let egl = EGL.as_ref().unwrap();
 
         let ret = egl.MakeCurrent(**self.display, surf.surface, surf.surface, self.context);
-        Self::check_make_current(ret)?;
+        Self::check_errors(ret)
+    }
 
-        Ok(())
+    #[inline]
+    pub(crate) unsafe fn make_current_rw<TR: SurfaceTypeTrait, TW: SurfaceTypeTrait>(
+        &self,
+        read_surf: &Surface<TR>,
+        write_surf: &Surface<TW>,
+    ) -> Result<(), Error> {
+        let egl = EGL.as_ref().unwrap();
+
+        let ret = egl.MakeCurrent(
+            **self.display,
+            write_surf.surface,
+            read_surf.surface,
+            self.context,
+        );
+        Self::check_errors(ret)
     }
 
     #[inline]
@@ -1034,7 +1047,7 @@ impl Context {
             self.context,
         );
 
-        Self::check_make_current(ret)
+        Self::check_errors(ret)
     }
 
     #[inline]
@@ -1048,7 +1061,7 @@ impl Context {
             ffi::egl::NO_CONTEXT,
         );
 
-        Self::check_make_current(ret)
+        Self::check_errors(ret)
     }
 
     #[inline]
@@ -1145,13 +1158,13 @@ impl Context {
     }
 
     #[inline]
-    unsafe fn check_make_current(ret: u32) -> Result<(), Error> {
+    unsafe fn check_errors(ret: u32) -> Result<(), Error> {
         let egl = EGL.as_ref().unwrap();
         if ret == 0 {
             match egl.GetError() as u32 {
                 ffi::egl::CONTEXT_LOST => Err(make_error!(ErrorType::ContextLost)),
                 err => Err(make_oserror!(OsError::Misc(format!(
-                    "eglMakeCurrent failed (eglGetError returned 0x{:x})",
+                    "failed (eglGetError returned 0x{:x})",
                     err,
                 )))),
             }
@@ -1270,7 +1283,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
             ffi::egl::NO_CONTEXT,
         );
 
-        Context::check_make_current(ret)
+        Context::check_errors(ret)
     }
 }
 
@@ -1312,19 +1325,7 @@ impl Surface<Window> {
 
         let ret = unsafe { egl.SwapBuffers(**self.display, self.surface) };
 
-        if ret == 0 {
-            match unsafe { egl.GetError() } as u32 {
-                ffi::egl::CONTEXT_LOST => {
-                    return Err(make_error!(ErrorType::ContextLost));
-                }
-                err => Err(make_oserror!(OsError::Misc(format!(
-                    "eglSwapBuffers failed with 0x{:x}",
-                    err,
-                )))),
-            }
-        } else {
-            Ok(())
-        }
+        Context::check_errors(ret)
     }
 
     #[inline]
@@ -1363,19 +1364,7 @@ impl Surface<Window> {
             )
         };
 
-        if ret == ffi::egl::FALSE {
-            match unsafe { egl.GetError() } as u32 {
-                ffi::egl::CONTEXT_LOST => {
-                    return Err(make_error!(ErrorType::ContextLost));
-                }
-                err => Err(make_oserror!(OsError::Misc(format!(
-                    "eglSwapBuffersWithDamageKHR failed with 0x{:x}",
-                    err,
-                )))),
-            }
-        } else {
-            Ok(())
-        }
+        Context::check_errors(ret)
     }
 
     #[inline]

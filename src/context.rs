@@ -3,9 +3,9 @@
 //! You can use a [`ContextBuilder`] along side with a [`Config`] to get
 //! a [`Context`] with the requested parameters.
 //!
-//! [`Context`]s can be made current either via [`make_current_surfaceless`] or
-//! [`make_current`]. Please refer to those functions for more details, if
-//! interested.
+//! [`Context`]s can be made current either via [`make_current_surfaceless`],
+//! [`make_current_rw`], or [`make_current`]. Please refer to those functions
+//! for more details, if interested.
 //!
 //! **WARNING:** Glutin clients should use the [`ContextBuilder`] type in their
 //! code, not [`ContextBuilderWrapper`]. If I had a choice, I'd hide that type,
@@ -21,6 +21,7 @@
 //! [`build`]: crate::context::ContextBuilderWrapper::build
 //! [`make_current_surfaceless`]: crate::context::Context::make_current_surfaceless
 //! [`make_current`]: crate::context::Context::make_current
+//! [`make_current_rw`]: crate::context::Context::make_current_rw
 //! [`Config`]: crate::config::ConfigWrapper
 
 use crate::config::Api;
@@ -41,13 +42,13 @@ use std::os::raw;
 /// A context must be made current before using [`get_proc_address`] or any of
 /// the functions returned by [`get_proc_address`].
 ///
-/// Contexts can be made current either via [`make_current_surfaceless`] or
-/// [`make_current`]. Please refer to those functions for more details, if
-/// interested.
+/// Contexts can be made current either via [`make_current_surfaceless`],
+/// [`make_current_rw`], or [`make_current`]. Please refer to those functions
+/// for more details, if interested.
 ///
 /// **WARNING** On MacOS, Glutin clients must call [`update_after_resize`],
-/// [`make_current`], or [`make_current_surfaceless`] on the context whenever
-/// the backing surface's size changes.
+/// [`make_current`], [`make_current_rw`], or [`make_current_surfaceless`] on
+/// the context whenever the backing surface's size changes.
 ///
 /// **WARNING** `Context`s cannot be used from threads they are not current on.
 /// If dropped from a different thread than the one they are currently on, UB can
@@ -59,6 +60,7 @@ use std::os::raw;
 /// [`get_proc_address`]: crate::context::Context::get_proc_address
 /// [`make_current_surfaceless`]: crate::context::Context::make_current_surfaceless
 /// [`make_current`]: crate::context::Context::make_current
+/// [`make_current_rw`]: crate::context::Context::make_current_rw
 /// [`make_not_current`]: crate::context::Context::make_not_current
 /// [`update_after_resize`]: crate::context::Context::update_after_resize
 #[derive(Debug, PartialEq, Eq)]
@@ -98,12 +100,45 @@ impl Context {
     }
 
     /// Sets this context as the current context. The previously current context
+    /// on this thread (if any) is no longer current. The passed in [`Surface`]s
+    /// also become the current drawables.
+    ///
+    /// The [`Surface`]s and the `Context` must have be made with the same
+    /// [`Config`] or two [`Config`]s which are, due to some
+    /// platform-specific reason, compatible. The [`Config`]s must support
+    /// both [`Surface`]s' types.
+    ///
+    /// The previously current [`Context`] might get `glFlush`ed if its
+    /// [`ReleaseBehaviour`] is equal to [`Flush`].
+    ///
+    /// For how to handle errors, refer to [`make_current`].
+    ///
+    /// [`make_current`]: crate::context::Context::make_current
+    /// [`surface`]: crate::surface::Surface
+    /// [`Config`]: crate::config::ConfigWrapper
+    /// [`ReleaseBehaviour`]: crate::context::ReleaseBehaviour
+    /// [`Flush`]: crate::context::ReleaseBehaviour::Flush
+    #[inline]
+    pub unsafe fn make_curren_rw<TR: SurfaceTypeTrait, TW: SurfaceTypeTrait>(
+        &self,
+        read_surf: &Surface<TR>,
+        write_surf: &Surface<TW>,
+    ) -> Result<(), Error> {
+        if self.get_config() != read_surf.get_config()
+            || self.get_config() != write_surf.get_config()
+        {
+            warn!("[glutin] `make_current`: Your surfaces' and context's configurations don't match. Are you sure this is intentional?")
+        }
+        self.0.make_current_rw(&read_surf.0, &write_surf.0)
+    }
+
+    /// Sets this context as the current context. The previously current context
     /// on this thread (if any) is no longer current. The passed in [`Surface`]
     /// is also now current drawable.
     ///
     /// The [`Surface`] and the `Context` must have be made with the same
     /// [`Config`] or two [`Config`]s which are, due to some
-    /// platform-specific reason, compatible. The [`Config`] must support
+    /// platform-specific reason, compatible. The [`Config`]s must support
     /// the [`Surface`]'s type.
     ///
     /// The previously current [`Context`] might get `glFlush`ed if its
@@ -188,8 +223,9 @@ impl Context {
     }
 
     /// On MacOS, Glutin clients must call `update_after_resize`,
-    /// [`make_current`], or [`make_current_surfaceless`] on the context whenever
-    /// the backing [`Surface`]`<`[`Window`]`>`'s size changes.
+    /// [`make_current`], [`make_current_rw`], or [`make_current_surfaceless`]
+    /// on the context whenever the backing [`Surface`]`<`[`Window`]`>`'s size
+    /// changes.
     ///
     /// No-ops on other platforms. Please make sure to also call your
     /// [`Surface`]'s [`update_after_resize`].
@@ -197,6 +233,7 @@ impl Context {
     /// [`update_after_resize`]: crate::surface::Surface::update_after_resize
     /// [`make_current_surfaceless`]: crate::context::Context::make_current_surfaceless
     /// [`make_current`]: crate::context::Context::make_current
+    /// [`make_current_rw`]: crate::context::Context::make_current_rw
     /// [`Surface`]: crate::surface::Surface
     /// [`Window`]: crate::surface::Window
     #[inline]

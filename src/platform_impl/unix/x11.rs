@@ -262,6 +262,32 @@ impl Context {
     }
 
     #[inline]
+    pub unsafe fn make_current_rw<TR: SurfaceTypeTrait, TW: SurfaceTypeTrait>(
+        &self,
+        read_surf: &Surface<TR>,
+        write_surf: &Surface<TW>,
+    ) -> Result<(), Error> {
+        match (self, read_surf, write_surf) {
+            (
+                Context::Egl { context, .. },
+                Surface::Egl {
+                    surface: read_surf, ..
+                },
+                Surface::Egl {
+                    surface: write_surf,
+                    ..
+                },
+            ) => context.make_current_rw(read_surf, write_surf),
+            (Context::Glx(ref ctx), Surface::Glx(ref read_surf), Surface::Glx(ref write_surf)) => {
+                ctx.make_current_rw(read_surf, write_surf)
+            }
+            (_, _, _) => Err(make_error!(ErrorType::BadApiUsage(
+                "Incompatible context and surface backends.".to_string()
+            ))),
+        }
+    }
+
+    #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), Error> {
         match self {
             Context::Egl { context, .. } => context.make_not_current(),
@@ -515,8 +541,7 @@ impl Surface<Window> {
                 },
             ),
             Config::Glx(config) => {
-                glx::Surface::<Window>::new(conf.map_config(|_| config), surface as *const _)
-                    .map(Surface::Glx)
+                glx::Surface::<Window>::new(conf.map_config(|_| config), surface).map(Surface::Glx)
             }
         }
     }

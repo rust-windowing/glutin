@@ -1,6 +1,8 @@
+glx support
 pixmap examples
 new_existing examples
-GLX_LARGEST_PBUFFER
+make_current_rw examples
+GLX_LARGEST_PBUFFER & egl equiv
 AUDIT flush behaviour
 Test srgb and flush w/ egl
 remove { path = ... } in cargo tomls

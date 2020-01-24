@@ -27,10 +27,13 @@
 //! respectively.
 //!
 //! Once you've made a [`Context`] and a [`Surface`], you can make them current
-//! with the [`Context::make_current`] function. Alternatively, you can use
-//! [`Context::make_current_surfaceless`] if you don't want to make a
-//! [`Surface`], but make sure that the [`Config`] you made the [`Context`]
-//! with supported surfaceless.
+//! with the [`Context::make_current`] function. Sometimes the backends support
+//! using two different [`Surface`]s for reading and writing. If you hope to use
+//! this functionality, try using [`Context::make_current_rw`].
+//!
+//! Alternatively, you can try to use [`Context::make_current_surfaceless`] if
+//! you don't want to make a [`Surface`]. Do make sure that the [`Config`] you
+//! made the [`Context`] with supports surfaceless.
 //!
 //! [`Context`]: crate::context::Context
 //! [`ContextBuilder`]: crate::context::ContextBuilder
@@ -48,6 +51,7 @@
 //! [`Surface::new_from_existing_pixmap`]: crate::surface::Surface::new_from_existing_window()
 //! [`Surface::new_from_existing_window`]: crate::surface::Surface::new_from_existing_pixmap()
 //! [`Context::make_current`]: crate::context::Context::make_current()
+//! [`Context::make_current_rw`]: crate::context::Context::make_current_rw()
 //! [`Context::make_current_surfaceless`]: crate::context::Context::make_current_surfaceless()
 
 #![deny(

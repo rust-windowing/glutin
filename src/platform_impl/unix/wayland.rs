@@ -208,6 +208,16 @@ impl Context {
     }
 
     #[inline]
+    pub unsafe fn make_current_rw<TR: SurfaceTypeTrait, TW: SurfaceTypeTrait>(
+        &self,
+        read_surf: &Surface<TR>,
+        write_surf: &Surface<TW>,
+    ) -> Result<(), Error> {
+        self.0
+            .make_current_rw(&read_surf.surface, &write_surf.surface)
+    }
+
+    #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), Error> {
         self.0.make_not_current()
     }

@@ -140,6 +140,27 @@ impl Context {
     }
 
     #[inline]
+    pub unsafe fn make_current_rw<TR: SurfaceTypeTrait, TW: SurfaceTypeTrait>(
+        &self,
+        read_surf: &Surface<TR>,
+        write_surf: &Surface<TW>,
+    ) -> Result<(), Error> {
+        match (self, read_surf, write_surf) {
+            (
+                Context::Wayland(ref ctx),
+                Surface::Wayland(ref read_surf),
+                Surface::Wayland(ref write_surf),
+            ) => ctx.make_current_rw(read_surf, write_surf),
+            (Context::X11(ref ctx), Surface::X11(ref read_surf), Surface::X11(ref write_surf)) => {
+                ctx.make_current_rw(read_surf, write_surf)
+            }
+            (_, _, _) => Err(make_error!(ErrorType::BadApiUsage(
+                "Incompatible context and surface backends.".to_string()
+            ))),
+        }
+    }
+
+    #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), Error> {
         match self {
             Context::Wayland(ref ctx) => ctx.make_not_current(),

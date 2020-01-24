@@ -13,7 +13,9 @@ mod make_current_guard;
 pub use self::glx::{Glx, GlxExtra};
 use self::make_current_guard::MakeCurrentGuard;
 
-use crate::config::{Api, ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapIntervalRange, Version};
+use crate::config::{
+    Api, ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapInterval, SwapIntervalRange, Version,
+};
 use crate::context::{ContextBuilderWrapper, GlProfile, ReleaseBehaviour, Robustness};
 use crate::surface::{PBuffer, Pixmap, SurfaceType, SurfaceTypeTrait, Window};
 use crate::utils::NoCmp;
@@ -451,7 +453,8 @@ impl Config {
                 let wants_floating_point = cf.float_color_buffer != Some(false);
                 let wants_standard = cf.float_color_buffer != Some(true);
 
-                let is_floating_point = disp.has_extension("GLX_ARB_fbconfig_float") && (render_type & ffi::glx_extra::RGBA_FLOAT_BIT_ARB) != 0;
+                let is_floating_point = disp.has_extension("GLX_ARB_fbconfig_float")
+                    && (render_type & ffi::glx_extra::RGBA_FLOAT_BIT_ARB) != 0;
                 let is_standard = (render_type & ffi::glx::RGBA_BIT) != 0;
 
                 let mut confs = vec![];
@@ -549,12 +552,30 @@ impl Context {
         surf: &Surface<T>,
     ) -> Result<(), Error> {
         let glx = GLX.as_ref().unwrap();
-        let res = glx.MakeCurrent(
+        let res = glx.MakeCurrent(****self.display as *mut _, surf.surface, self.context);
+        Self::check_errors(&self.display, Some(res))
+    }
+
+    #[inline]
+    pub(crate) unsafe fn make_current_rw<TR: SurfaceTypeTrait, TW: SurfaceTypeTrait>(
+        &self,
+        read_surf: &Surface<TR>,
+        write_surf: &Surface<TW>,
+    ) -> Result<(), Error> {
+        if self.display.version < (1, 3) {
+            return Err(make_error!(ErrorType::NotSupported(
+                "Glx does not support `make_current_rw` on versions prior to GLX 1.3.".to_string(),
+            )));
+        }
+
+        let glx = GLX.as_ref().unwrap();
+        let res = glx.MakeContextCurrent(
             ****self.display as *mut _,
-            surf.surface,
+            write_surf.surface,
+            read_surf.surface,
             self.context,
         );
-        Self::check_make_current(&self.display, res)
+        Self::check_errors(&self.display, Some(res))
     }
 
     #[inline]
@@ -566,12 +587,8 @@ impl Context {
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), Error> {
         let glx = GLX.as_ref().unwrap();
-        let res = glx.MakeCurrent(
-            ****self.display as *mut _,
-            0,
-            std::ptr::null(),
-        );
-        Self::check_make_current(&self.display, res)
+        let res = glx.MakeCurrent(****self.display as *mut _, 0, std::ptr::null());
+        Self::check_errors(&self.display, Some(res))
     }
 
     #[inline]
@@ -599,16 +616,14 @@ impl Context {
     }
 
     #[inline]
-    unsafe fn check_make_current(disp: &Arc<Display>, ret: i32) -> Result<(), Error> {
-        if ret == 0 {
-            let err = disp.check_errors();
-            Err(make_oserror!(OsError::Misc(format!(
-                "`glXMakeCurrent` failed: {:?}",
-                err
-            ))))
-        } else {
-            Ok(())
+    unsafe fn check_errors(disp: &Arc<Display>, ret: Option<i32>) -> Result<(), Error> {
+        disp.check_errors()?;
+        if ret == Some(ffi::False) {
+            return Err(make_oserror!(OsError::Misc(
+                "Function failed without generating error.".to_string(),
+            )));
         }
+        Ok(())
     }
 }
 
@@ -634,6 +649,138 @@ pub struct Surface<T: SurfaceTypeTrait> {
 unsafe impl<T: SurfaceTypeTrait> Send for Surface<T> {}
 unsafe impl<T: SurfaceTypeTrait> Sync for Surface<T> {}
 
+impl<T: SurfaceTypeTrait> Surface<T> {
+    #[inline]
+    pub fn is_current(&self) -> bool {
+        let glx = GLX.as_ref().unwrap();
+        unsafe {
+            if glx.GetCurrentDrawable() == self.surface {
+                return true;
+            }
+
+            if self.display.version >= (1, 3) && glx.GetCurrentReadDrawable() == self.surface {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    #[inline]
+    pub fn get_config(&self) -> ConfigWrapper<Config, ConfigAttribs> {
+        self.config.clone()
+    }
+
+    #[inline]
+    pub unsafe fn make_not_current(&self) -> Result<(), Error> {
+        let glx = GLX.as_ref().unwrap();
+        let res = glx.MakeCurrent(****self.display as *mut _, 0, std::ptr::null());
+        Context::check_errors(&self.display, Some(res))
+    }
+}
+
+impl Surface<Window> {
+    #[inline]
+    pub fn new(
+        conf: ConfigWrapper<&Config, &ConfigAttribs>,
+        nwin: ffi::Window,
+    ) -> Result<Self, Error> {
+    }
+
+    #[inline]
+    pub fn swap_buffers(&self) -> Result<(), Error> {
+        let glx = GLX.as_ref().unwrap();
+        unsafe {
+            glx.SwapBuffers(****self.display as *mut _, self.surface);
+        }
+        Context::check_errors(&self.display, None)
+    }
+
+    #[inline]
+    pub fn swap_buffers_with_damage(&self, rects: &[dpi::Rect]) -> Result<(), Error> {
+        Err(make_error!(ErrorType::NotSupported(
+            "Glx does not support swap buffers with damage.".to_string(),
+        )))
+    }
+
+    #[inline]
+    pub fn modify_swap_interval(&self, swap_interval: SwapInterval) -> Result<(), Error> {
+        let glx_extra = GLX_EXTRA.as_ref().map_err(|e| e.clone())?;
+        let glx = GLX.as_ref().unwrap();
+        let desired_swap_interval = match swap_interval {
+            SwapInterval::DontWait => 0,
+            SwapInterval::Wait(n) => n as i32,
+            SwapInterval::AdaptiveWait(n) => {
+                if !self.display.has_extension("GLX_EXT_swap_control_tear") {
+                    return Err(make_error!(ErrorType::AdaptiveSwapControlNotSupported));
+                }
+
+                // Note: GLX_EXT_swap_control_tear implies and requires GLX_EXT_swap_control.
+                //
+                // We just need to pass in the swap_interval as negative
+                -(n as i32)
+            }
+        };
+
+        if self.display.has_extension("GLX_EXT_swap_control")
+            && glx_extra.SwapIntervalEXT.is_loaded()
+        {
+            // this should be the most common extension
+            unsafe {
+                glx_extra.SwapIntervalEXT(
+                    ****self.display as *mut _,
+                    self.surface,
+                    desired_swap_interval,
+                );
+            }
+
+            let mut swap = 0;
+            unsafe {
+                glx.QueryDrawable(
+                    ****self.display as *mut _,
+                    self.surface,
+                    ffi::glx_extra::SWAP_INTERVAL_EXT as i32,
+                    &mut swap,
+                );
+            }
+
+            if swap != (desired_swap_interval.abs()) as u32 {
+                return Err(make_oserror!(OsError::Misc(format!(
+                    "Couldn't setup vsync: expected interval `{}` but got `{}`",
+                    desired_swap_interval, swap
+                ))));
+            }
+        } else if self.display.has_extension("GLX_MESA_swap_control")
+            && glx_extra.SwapIntervalMESA.is_loaded()
+        {
+            unsafe {
+                glx_extra.SwapIntervalMESA(desired_swap_interval as u32);
+            }
+        } else if self.display.has_extension("GLX_SGI_swap_control")
+            && glx_extra.SwapIntervalSGI.is_loaded()
+        {
+            unsafe {
+                glx_extra.SwapIntervalSGI(desired_swap_interval);
+            }
+        } else {
+            return Err(make_oserror!(OsError::Misc(
+                "Couldn't find any available vsync extension".to_string(),
+            )));
+        }
+
+        Ok(())
+    }
+}
+
+impl Surface<PBuffer> {
+    #[inline]
+    pub fn new(
+        conf: ConfigWrapper<&Config, &ConfigAttribs>,
+        size: &dpi::PhysicalSize<u32>,
+    ) -> Result<Self, Error> {
+    }
+}
+
 impl<T: SurfaceTypeTrait> Drop for Surface<T> {
     fn drop(&mut self) {
         let glx = GLX.as_ref().unwrap();
@@ -656,181 +803,6 @@ impl<T: SurfaceTypeTrait> Drop for Surface<T> {
     }
 }
 
-//#[derive(Debug)]
-//pub struct Context {
-//    xconn: Arc<XConnection>,
-//    drawable: ffi::Window,
-//    context: ffi::glx::types::GLXContext,
-//    pixel_format: PixelFormat,
-//}
-//
-//impl Context {
-//    // transparent is `None` if window is raw.
-//    pub fn new<'a>(
-//        xconn: Arc<XConnection>,
-//        cb: &'a ContextBuilderWrapper<&'a Context>,
-//        screen_id: raw::c_int,
-//        surface_type: SurfaceType,
-//        transparent: Option<bool>,
-//    ) -> Result<ContextPrototype<'a>, Error> {
-//        // finding the pixel format we want
-//        let (fb_config, pixel_format, visual_infos) = unsafe {
-//            choose_fbconfig(
-//                &extensions,
-//                &xconn,
-//                screen_id,
-//                cb,
-//                surface_type,
-//                transparent,
-//            )?
-//        };
-//
-//        Ok(ContextPrototype {
-//            extensions,
-//            xconn,
-//            gl_attr: &cb.gl_attr,
-//            fb_config,
-//            visual_infos: unsafe { std::mem::transmute(visual_infos) },
-//            pixel_format,
-//        })
-//    }
-//
-//    #[inline]
-//    pub fn swap_buffers(&self) -> Result<(), Error> {
-//        let glx = GLX.as_ref().unwrap();
-//        unsafe {
-//            glx.SwapBuffers(self.xconn.display as *mut _, self.drawable);
-//        }
-//        if let Err(err) = self.xconn.check_errors() {
-//            Err(make_oserror!(OsError::Misc(format!(
-//                "`glXSwapBuffers` failed: {:?}",
-//                err
-//            ))))
-//        } else {
-//            Ok(())
-//        }
-//    }
-//}
-//
-//
-//#[derive(Debug)]
-//pub struct ContextPrototype<'a> {
-//    extensions: String,
-//    xconn: Arc<XConnection>,
-//    gl_attr: &'a GlAttributes<&'a Context>,
-//    fb_config: ffi::glx::types::GLXFBConfig,
-//    visual_infos: ffi::XVisualInfo,
-//    pixel_format: PixelFormat,
-//}
-//
-//impl<'a> ContextPrototype<'a> {
-//    #[inline]
-//    pub fn get_visual_infos(&self) -> &ffi::XVisualInfo {
-//        &self.visual_infos
-//    }
-//
-//    // creating GL context
-//    fn create_context(
-//        &self,
-//    ) -> Result<(ffi::glx_extra::Glx, ffi::glx::types::GLXContext), Error> {
-//        let glx = GLX.as_ref().unwrap();
-//        let share = match self.gl_attr.sharing {
-//            Some(ctx) => ctx.context,
-//            None => std::ptr::null(),
-//        };
-//
-//        let context = match self.gl_attr.version {
-//            GlRequest::Latest => {
-//                let opengl_versions = [
-//                    GlVersion(4, 6),
-//                    GlVersion(4, 5),
-//                    GlVersion(4, 4),
-//                    GlVersion(4, 3),
-//                    GlVersion(4, 2),
-//                    GlVersion(4, 1),
-//                    GlVersion(4, 0),
-//                    GlVersion(3, 3),
-//                    GlVersion(3, 2),
-//                    GlVersion(3, 1),
-//                ];
-//                let ctx;
-//                'outer: loop {
-//                    // Try all OpenGL versions in descending order because some
-//                    // non-compliant drivers don't return
-//                    // the latest supported version but the one requested
-//                    for opengl_version in opengl_versions.iter() {
-//                        match create_context(
-//                            &extra_functions,
-//                            &self.extensions,
-//                            &self.xconn.xlib,
-//                            *opengl_version,
-//                            self.gl_attr.profile,
-//                            self.gl_attr.debug,
-//                            self.gl_attr.robustness,
-//                            share,
-//                            self.xconn.display,
-//                            self.fb_config,
-//                            &self.visual_infos,
-//                        ) {
-//                            Ok(x) => {
-//                                ctx = x;
-//                                break 'outer;
-//                            }
-//                            Err(_) => continue,
-//                        }
-//                    }
-//                    ctx = create_context(
-//                        &extra_functions,
-//                        &self.extensions,
-//                        &self.xconn.xlib,
-//                        GlVersion(1, 0),
-//                        self.gl_attr.profile,
-//                        self.gl_attr.debug,
-//                        self.gl_attr.robustness,
-//                        share,
-//                        self.xconn.display,
-//                        self.fb_config,
-//                        &self.visual_infos,
-//                    )?;
-//                    break;
-//                }
-//                ctx
-//            }
-//            GlRequest::Specific(Api::OpenGl, opengl_version) => create_context(
-//                &extra_functions,
-//                &self.extensions,
-//                &self.xconn.xlib,
-//                opengl_version,
-//                self.gl_attr.profile,
-//                self.gl_attr.debug,
-//                self.gl_attr.robustness,
-//                share,
-//                self.xconn.display,
-//                self.fb_config,
-//                &self.visual_infos,
-//            )?,
-//            GlRequest::Specific(_, _) => panic!("Only OpenGL is supported"),
-//            GlRequest::GlThenGles {
-//                opengl_version,
-//                ..
-//            } => create_context(
-//                &extra_functions,
-//                &self.extensions,
-//                &self.xconn.xlib,
-//                opengl_version,
-//                self.gl_attr.profile,
-//                self.gl_attr.debug,
-//                self.gl_attr.robustness,
-//                share,
-//                self.xconn.display,
-//                self.fb_config,
-//                &self.visual_infos,
-//            )?,
-//        };
-//
-//        Ok((extra_functions, context))
-//    }
-//
 //    pub fn finish_pbuffer(
 //        self,
 //        size: dpi::PhysicalSize<u32>,
@@ -866,57 +838,6 @@ impl<T: SurfaceTypeTrait> Drop for Surface<T> {
 //    pub fn finish(self, window: ffi::Window) -> Result<Context, Error> {
 //        let glx = GLX.as_ref().unwrap();
 //        let (extra_functions, context) = self.create_context()?;
-//
-//        // vsync
-//        if self.gl_attr.vsync {
-//            let _guard = MakeCurrentGuard::new(&self.xconn, window, context)?;
-//
-//            if check_ext(&self.extensions, "GLX_EXT_swap_control")
-//                && extra_functions.SwapIntervalEXT.is_loaded()
-//            {
-//                // this should be the most common extension
-//                unsafe {
-//                    extra_functions.SwapIntervalEXT(
-//                        self.xconn.display as *mut _,
-//                        window,
-//                        1,
-//                    );
-//                }
-//
-//                let mut swap = 0;
-//                unsafe {
-//                    glx.QueryDrawable(
-//                        self.xconn.display as *mut _,
-//                        window,
-//                        ffi::glx_extra::SWAP_INTERVAL_EXT as i32,
-//                        &mut swap,
-//                    );
-//                }
-//
-//                if swap != 1 {
-//                    return Err(make_oserror!(OsError::Misc(format!(
-//                        "Couldn't setup vsync: expected interval `1` but got `{}`",
-//                        swap
-//                    ))));
-//                }
-//            } else if check_ext(&self.extensions, "GLX_MESA_swap_control")
-//                && extra_functions.SwapIntervalMESA.is_loaded()
-//            {
-//                unsafe {
-//                    extra_functions.SwapIntervalMESA(1);
-//                }
-//            } else if check_ext(&self.extensions, "GLX_SGI_swap_control")
-//                && extra_functions.SwapIntervalSGI.is_loaded()
-//            {
-//                unsafe {
-//                    extra_functions.SwapIntervalSGI(1);
-//                }
-//            } else {
-//                return Err(make_oserror!(OsError::Misc(
-//                    "Couldn't find any available vsync extension".to_string(),
-//                )));
-//            }
-//        }
 //
 //        Ok(Context {
 //            xconn: self.xconn,
