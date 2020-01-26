@@ -11,6 +11,12 @@ documentation = "https://docs.rs/glutin"
 edition = "2018"
 build = "build.rs"
 
+[package.metadata.docs.rs]
+features = ["serde_feature"]
+
+[features]
+serde_feature = ["winit_types/serde_feature"]
+
 [dependencies]
 lazy_static = "1.3"
 winit_types = { version = "0.1.0", path = "../winit_types" }
