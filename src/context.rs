@@ -118,7 +118,7 @@ impl Context {
     /// [`ReleaseBehaviour`]: crate::context::ReleaseBehaviour
     /// [`Flush`]: crate::context::ReleaseBehaviour::Flush
     #[inline]
-    pub unsafe fn make_curren_rw<TR: SurfaceTypeTrait, TW: SurfaceTypeTrait>(
+    pub unsafe fn make_current_rw<TR: SurfaceTypeTrait, TW: SurfaceTypeTrait>(
         &self,
         read_surf: &Surface<TR>,
         write_surf: &Surface<TW>,
@@ -362,12 +362,12 @@ impl<T> ContextBuilderWrapper<T> {
     ///
     /// The default is [`NotRobust`] because this is what is typically expected
     /// when you create an OpenGL [`Context`]. However for safety you should
-    /// consider [`TryRobustLoseContextOnReset`].
+    /// consider [`RobustLoseContextOnReset`].
     ///
     /// [`Context`]: crate::context::Context
     /// [`Robustness`]: crate::context::Robustness
     /// [`NotRobust`]: crate::context::Robustness::NotRobust
-    /// [`TryRobustLoseContextOnReset`]: crate::context::Robustness::TryRobustLoseContextOnReset
+    /// [`RobustLoseContextOnReset`]: crate::context::Robustness::RobustLoseContextOnReset
     #[inline]
     pub fn with_robustness(mut self, robustness: Robustness) -> Self {
         self.robustness = robustness;

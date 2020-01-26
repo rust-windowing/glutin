@@ -180,8 +180,8 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     ///
     /// [`Context`]: crate::context::Context
     /// [`make_current`]: crate::context::Context::make_current
-    /// [`ReleaseBehaviour`]: crate::config::ReleaseBehaviour
-    /// [`Flush`]: crate::config::ReleaseBehaviour::Flush
+    /// [`ReleaseBehaviour`]: crate::context::ReleaseBehaviour
+    /// [`Flush`]: crate::context::ReleaseBehaviour::Flush
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), Error> {
         match self.is_current() {
