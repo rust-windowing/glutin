@@ -853,12 +853,13 @@ impl Context {
             // handling robustness
             let supports_robustness = display.egl_version >= (1, 5)
                 || display.has_extension("EGL_EXT_create_context_robustness");
-            let supports_no_error =
-                display.has_extension("EGL_KHR_create_context_no_error");
+            let supports_no_error = display.has_extension("EGL_KHR_create_context_no_error");
 
             if !match cb.robustness {
                 Robustness::NoError => supports_no_error,
-                Robustness::RobustLoseContextOnReset | Robustness::RobustNoResetNotification => supports_robustness,
+                Robustness::RobustLoseContextOnReset | Robustness::RobustNoResetNotification => {
+                    supports_robustness
+                }
                 _ => true,
             } {
                 return Err(make_error!(ErrorType::RobustnessNotSupported));
@@ -866,21 +867,18 @@ impl Context {
 
             match cb.robustness {
                 Robustness::NoError => {
-                    context_attributes
-                        .push(ffi::egl::CONTEXT_OPENGL_NO_ERROR_KHR as raw::c_int);
+                    context_attributes.push(ffi::egl::CONTEXT_OPENGL_NO_ERROR_KHR as raw::c_int);
                     context_attributes.push(1);
                 }
                 Robustness::RobustNoResetNotification => {
-                    context_attributes.push(
-                        ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY as raw::c_int,
-                    );
+                    context_attributes
+                        .push(ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY as raw::c_int);
                     context_attributes.push(ffi::egl::NO_RESET_NOTIFICATION as raw::c_int);
                     flags = flags | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
                 }
                 Robustness::RobustLoseContextOnReset => {
-                    context_attributes.push(
-                        ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY as raw::c_int,
-                    );
+                    context_attributes
+                        .push(ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY as raw::c_int);
                     context_attributes.push(ffi::egl::LOSE_CONTEXT_ON_RESET as raw::c_int);
                     flags = flags | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
                 }
@@ -1116,7 +1114,7 @@ impl Context {
     fn check_errors(ret: Option<u32>) -> Result<(), Error> {
         let egl = EGL.as_ref().unwrap();
         if ret == Some(ffi::egl::FALSE) || ret == None {
-            match unsafe{ egl.GetError() } as u32 {
+            match unsafe { egl.GetError() } as u32 {
                 ffi::egl::SUCCESS if ret == None => Ok(()),
                 ffi::egl::CONTEXT_LOST => Err(make_error!(ErrorType::ContextLost)),
                 err => Err(make_oserror!(OsError::Misc(format!(

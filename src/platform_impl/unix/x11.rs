@@ -14,9 +14,9 @@ use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
 use winit_types::platform::OsError;
 
-use std::sync::Arc;
 use std::fmt::Debug;
 use std::os::raw;
+use std::sync::Arc;
 
 pub mod utils;
 

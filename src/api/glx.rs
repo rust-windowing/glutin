@@ -298,10 +298,9 @@ impl Config {
             out
         };
 
-        let swap_control_supported =
-            disp.has_extension("GLX_EXT_swap_control")
-                || disp.has_extension("GLX_MESA_swap_control")
-                || disp.has_extension("GLX_SGI_swap_control");
+        let swap_control_supported = disp.has_extension("GLX_EXT_swap_control")
+            || disp.has_extension("GLX_MESA_swap_control")
+            || disp.has_extension("GLX_SGI_swap_control");
         let swap_control_tear_supported = disp.has_extension("GLX_EXT_swap_control_tear");
 
         if !cf.desired_swap_interval_ranges.is_empty() {
@@ -314,9 +313,9 @@ impl Config {
                 for dsir in &cf.desired_swap_interval_ranges[..] {
                     match dsir {
                         SwapIntervalRange::AdaptiveWait(_) => {
-                                errors.append(make_error!(ErrorType::AdaptiveSwapControlNotSupported));
-                                errors.append(make_error!(ErrorType::SwapControlRangeNotSupported));
-                                return Err(errors);
+                            errors.append(make_error!(ErrorType::AdaptiveSwapControlNotSupported));
+                            errors.append(make_error!(ErrorType::SwapControlRangeNotSupported));
+                            return Err(errors);
                         }
                         _ => (),
                     }
@@ -371,10 +370,14 @@ impl Config {
                 // drawable is made.
                 //
                 // 1000 is reasonable.
-                let mut swap_interval_ranges = if swap_control_supported { vec![
-                    SwapIntervalRange::DontWait,
-                    SwapIntervalRange::Wait(1..1000),
-                ] } else { vec![] };
+                let mut swap_interval_ranges = if swap_control_supported {
+                    vec![
+                        SwapIntervalRange::DontWait,
+                        SwapIntervalRange::Wait(1..1000),
+                    ]
+                } else {
+                    vec![]
+                };
                 if swap_control_tear_supported {
                     swap_interval_ranges.push(SwapIntervalRange::AdaptiveWait(1..1000));
                 }
@@ -553,16 +556,17 @@ impl Context {
         let glx = GLX.as_ref().unwrap();
         let glx_extra = GLX_EXTRA.as_ref().unwrap();
         let disp = &conf.config.display;
-        let sharing = cb.sharing.map(|ctx| ctx.context).unwrap_or(std::ptr::null());
+        let sharing = cb
+            .sharing
+            .map(|ctx| ctx.context)
+            .unwrap_or(std::ptr::null());
         let context = if disp.has_extension("GLX_ARB_create_context") {
             let mut attributes = Vec::with_capacity(9);
 
             let version = conf.attribs.version.1;
-            attributes
-                .push(ffi::glx_extra::CONTEXT_MAJOR_VERSION_ARB as raw::c_int);
+            attributes.push(ffi::glx_extra::CONTEXT_MAJOR_VERSION_ARB as raw::c_int);
             attributes.push(version.0 as raw::c_int);
-            attributes
-                .push(ffi::glx_extra::CONTEXT_MINOR_VERSION_ARB as raw::c_int);
+            attributes.push(ffi::glx_extra::CONTEXT_MINOR_VERSION_ARB as raw::c_int);
             attributes.push(version.1 as raw::c_int);
 
             if let Some(profile) = cb.profile {
@@ -570,14 +574,10 @@ impl Context {
                     GlProfile::Compatibility => {
                         ffi::glx_extra::CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB
                     }
-                    GlProfile::Core => {
-                        ffi::glx_extra::CONTEXT_CORE_PROFILE_BIT_ARB
-                    }
+                    GlProfile::Core => ffi::glx_extra::CONTEXT_CORE_PROFILE_BIT_ARB,
                 };
 
-                attributes.push(
-                    ffi::glx_extra::CONTEXT_PROFILE_MASK_ARB as raw::c_int,
-                );
+                attributes.push(ffi::glx_extra::CONTEXT_PROFILE_MASK_ARB as raw::c_int);
                 attributes.push(flag as raw::c_int);
             }
 
@@ -589,27 +589,23 @@ impl Context {
                     match cb.robustness {
                         Robustness::RobustNoResetNotification => {
                             attributes.push(
-                                ffi::glx_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB as raw::c_int,
-                            );
-                            attributes.push(
-                                ffi::glx_extra::NO_RESET_NOTIFICATION_ARB
+                                ffi::glx_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB
                                     as raw::c_int,
                             );
-                            flags = flags
-                                | ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB
-                                    as raw::c_int;
+                            attributes
+                                .push(ffi::glx_extra::NO_RESET_NOTIFICATION_ARB as raw::c_int);
+                            flags =
+                                flags | ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as raw::c_int;
                         }
                         Robustness::RobustLoseContextOnReset => {
                             attributes.push(
-                                ffi::glx_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB as raw::c_int,
-                            );
-                            attributes.push(
-                                ffi::glx_extra::LOSE_CONTEXT_ON_RESET_ARB
+                                ffi::glx_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB
                                     as raw::c_int,
                             );
-                            flags = flags
-                                | ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB
-                                    as raw::c_int;
+                            attributes
+                                .push(ffi::glx_extra::LOSE_CONTEXT_ON_RESET_ARB as raw::c_int);
+                            flags =
+                                flags | ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as raw::c_int;
                         }
                         Robustness::NoError => {
                             return Err(make_error!(ErrorType::RobustnessNotSupported));
@@ -628,8 +624,7 @@ impl Context {
                 }
 
                 if cb.debug {
-                    flags = flags
-                        | ffi::glx_extra::CONTEXT_DEBUG_BIT_ARB as raw::c_int;
+                    flags = flags | ffi::glx_extra::CONTEXT_DEBUG_BIT_ARB as raw::c_int;
                 }
 
                 flags
@@ -642,41 +637,33 @@ impl Context {
                 ReleaseBehaviour::Flush => {
                     if disp.has_extension("GLX_ARB_context_flush_control") {
                         // With how shitty drivers are, never hurts to be explicit
-                        attributes.push(
-                            ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_ARB
-                                as raw::c_int,
-                        );
-                        attributes.push(
-                            ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_FLUSH_ARB
-                                as raw::c_int,
-                        );
+                        attributes.push(ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_ARB as raw::c_int);
+                        attributes
+                            .push(ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_FLUSH_ARB as raw::c_int);
                     }
-                },
+                }
                 ReleaseBehaviour::None => {
                     if !disp.has_extension("GLX_ARB_context_flush_control") {
                         return Err(make_error!(ErrorType::FlushControlNotSupported));
                     }
-                    attributes.push(
-                        ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_ARB
-                            as raw::c_int,
-                    );
-                    attributes.push(
-                        ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_NONE_ARB
-                            as raw::c_int,
-                    );
+                    attributes.push(ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_ARB as raw::c_int);
+                    attributes
+                        .push(ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_NONE_ARB as raw::c_int);
                 }
             }
 
             attributes.push(0);
 
             println!("Okay freya, lets run ctx create");
-            unsafe { glx_extra.CreateContextAttribsARB(
-                *****disp as *mut _,
-                conf.config.config as *mut _,
-                sharing,
-                1,
-                attributes.as_ptr(),
-            )}
+            unsafe {
+                glx_extra.CreateContextAttribsARB(
+                    *****disp as *mut _,
+                    conf.config.config as *mut _,
+                    sharing,
+                    1,
+                    attributes.as_ptr(),
+                )
+            }
         } else {
             match cb.robustness {
                 Robustness::RobustNoResetNotification
@@ -687,13 +674,15 @@ impl Context {
                 _ => (),
             }
 
-            unsafe { glx.CreateNewContext(
-                *****disp as *mut _,
-                conf.config.config as *mut _,
-                ffi::glx::RGBA_TYPE as _,
-                sharing,
-                1,
-            )}
+            unsafe {
+                glx.CreateNewContext(
+                    *****disp as *mut _,
+                    conf.config.config as *mut _,
+                    ffi::glx::RGBA_TYPE as _,
+                    sharing,
+                    1,
+                )
+            }
         };
 
         // TODO: If BadMatch, it was either an unsupported sharing or version.
@@ -967,11 +956,7 @@ impl Surface<PBuffer> {
         ];
 
         let pbuffer = unsafe {
-            glx.CreatePbuffer(
-                *****disp as *mut _,
-                conf.config.config,
-                attributes.as_ptr(),
-            )
+            glx.CreatePbuffer(*****disp as *mut _, conf.config.config, attributes.as_ptr())
         };
 
         disp.check_errors()?;
@@ -994,9 +979,7 @@ impl<T: SurfaceTypeTrait> Drop for Surface<T> {
                 SurfaceType::PBuffer => {
                     glx.DestroyPbuffer(****self.display as *mut _, self.surface)
                 }
-                SurfaceType::Pixmap => {
-                        glx.DestroyPixmap(****self.display as *mut _, self.surface)
-                }
+                SurfaceType::Pixmap => glx.DestroyPixmap(****self.display as *mut _, self.surface),
             }
         }
         self.display.check_errors().unwrap();

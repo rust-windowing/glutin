@@ -5,8 +5,8 @@ use winit_types::error::Error;
 use winit_types::platform::OsError;
 
 use std::os::raw;
-use std::sync::Arc;
 use std::ptr;
+use std::sync::Arc;
 
 #[inline]
 pub fn get_visual_info_from_xid(
@@ -30,7 +30,9 @@ pub fn get_visual_info_from_xid(
     };
 
     disp.check_errors().map_err(|err| unsafe {
-        if !vi.is_null() { (xlib.XFree)(vi as *mut _); }
+        if !vi.is_null() {
+            (xlib.XFree)(vi as *mut _);
+        }
         err
     })?;
 

@@ -106,10 +106,11 @@ impl Context {
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
     ) -> Result<Self, Error> {
         match conf.config {
-            Config::GenericEgl(config) => {
-                generic_egl::Context::new(Context::inner_cb_generic_egl(cb)?, conf.map_config(|_| config))
-                    .map(Context::GenericEgl)
-            }
+            Config::GenericEgl(config) => generic_egl::Context::new(
+                Context::inner_cb_generic_egl(cb)?,
+                conf.map_config(|_| config),
+            )
+            .map(Context::GenericEgl),
             Config::X11(config) => {
                 x11::Context::new(Context::inner_cb_x11(cb)?, conf.map_config(|_| config))
                     .map(Context::X11)
@@ -126,7 +127,10 @@ impl Context {
     }
 
     #[inline]
-    pub(crate) unsafe fn make_current<T: SurfaceTypeTrait>(&self, surf: &Surface<T>) -> Result<(), Error> {
+    pub(crate) unsafe fn make_current<T: SurfaceTypeTrait>(
+        &self,
+        surf: &Surface<T>,
+    ) -> Result<(), Error> {
         match (self, surf) {
             (Context::GenericEgl(ref ctx), Surface::GenericEgl(ref surf)) => ctx.make_current(surf),
             (Context::X11(ref ctx), Surface::X11(ref surf)) => ctx.make_current(surf),

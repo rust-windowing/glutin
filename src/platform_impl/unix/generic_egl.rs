@@ -6,16 +6,16 @@ use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
 use crate::utils::{NoCmp, NoPrint};
 
 use glutin_interface::{
-    NativeDisplay, NativePixmap, NativePixmapSource, NativeWindow, NativeWindowSource, RawWindow,
-    Seal, WaylandWindowParts, RawDisplay,
+    NativeDisplay, NativePixmap, NativePixmapSource, NativeWindow, NativeWindowSource, RawDisplay,
+    RawWindow, Seal, WaylandWindowParts,
 };
 use wayland_client::egl as wegl;
 pub use wayland_client::sys::client::wl_display;
 use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
 
-use std::os::raw;
 use std::ops::Deref;
+use std::os::raw;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Backend {
@@ -67,10 +67,15 @@ impl Config {
         })?;
         Ok(configs
             .into_iter()
-            .map(|(attribs, config)| (attribs, match nd.raw_display() {
-                RawDisplay::Wayland { .. } => Config::Wayland(config),
-                _ => unreachable!(),
-            }))
+            .map(|(attribs, config)| {
+                (
+                    attribs,
+                    match nd.raw_display() {
+                        RawDisplay::Wayland { .. } => Config::Wayland(config),
+                        _ => unreachable!(),
+                    },
+                )
+            })
             .collect())
     }
 
@@ -109,9 +114,11 @@ impl<T: SurfaceTypeTrait> Surface<T> {
 
     #[inline]
     pub fn get_config(&self) -> ConfigWrapper<Config, ConfigAttribs> {
-        (**self).get_config().map_config(|conf| match self.backend() {
-            Backend::Wayland => Config::Wayland(conf),
-        })
+        (**self)
+            .get_config()
+            .map_config(|conf| match self.backend() {
+                Backend::Wayland => Config::Wayland(conf),
+            })
     }
 
     #[inline]
@@ -154,14 +161,20 @@ impl Surface<Window> {
         let surface = nw.raw_window();
         match surface {
             RawWindow::Wayland { wl_surface, .. } => {
-                let wl_surface =
-                    wegl::WlEglSurface::new_from_raw(wl_surface as *mut _, width as i32, height as i32);
+                let wl_surface = wegl::WlEglSurface::new_from_raw(
+                    wl_surface as *mut _,
+                    width as i32,
+                    height as i32,
+                );
 
-                egl::Surface::<Window>::new(conf.map_config(|conf| &**conf), wl_surface.ptr() as *const _)
-                    .map(|surface| Surface::WaylandWindow {
-                        wsurface: NoCmp(NoPrint(wl_surface)),
-                        surface,
-                    })
+                egl::Surface::<Window>::new(
+                    conf.map_config(|conf| &**conf),
+                    wl_surface.ptr() as *const _,
+                )
+                .map(|surface| Surface::WaylandWindow {
+                    wsurface: NoCmp(NoPrint(wl_surface)),
+                    surface,
+                })
             }
             _ => unreachable!(),
         }
@@ -172,8 +185,7 @@ impl Surface<Window> {
         match self {
             Surface::WaylandWindow { wsurface, .. } => {
                 let (width, height): (u32, u32) = (*size).into();
-                wsurface
-                    .resize(width as i32, height as i32, 0, 0)
+                wsurface.resize(width as i32, height as i32, 0, 0)
             }
             _ => (),
         }
@@ -202,10 +214,11 @@ impl Surface<PBuffer> {
         size: &dpi::PhysicalSize<u32>,
     ) -> Result<Self, Error> {
         let backend = conf.config.backend();
-        egl::Surface::<PBuffer>::new(conf.map_config(|conf| &**conf), size)
-            .map(|surf| match backend {
-            Backend::Wayland => Surface::WaylandPbuffer(surf),
-        })
+        egl::Surface::<PBuffer>::new(conf.map_config(|conf| &**conf), size).map(
+            |surf| match backend {
+                Backend::Wayland => Surface::WaylandPbuffer(surf),
+            },
+        )
     }
 }
 
@@ -258,7 +271,7 @@ impl Context {
             cb.map_sharing(|ctx| &**ctx),
             conf.map_config(|conf| &**conf),
         )
-            .map(|ctx| match backend {
+        .map(|ctx| match backend {
             Backend::Wayland => Context::Wayland(ctx),
         })
     }
@@ -269,7 +282,10 @@ impl Context {
     }
 
     #[inline]
-    pub(crate) unsafe fn make_current<T: SurfaceTypeTrait>(&self, surf: &Surface<T>) -> Result<(), Error> {
+    pub(crate) unsafe fn make_current<T: SurfaceTypeTrait>(
+        &self,
+        surf: &Surface<T>,
+    ) -> Result<(), Error> {
         if self.backend() != surf.backend() {
             return Err(make_error!(ErrorType::BadApiUsage(
                 "Incompatible context and surface backends.".to_string()
@@ -291,8 +307,7 @@ impl Context {
             )));
         }
 
-        (**self)
-            .make_current_rw(&**read_surf, &**write_surf)
+        (**self).make_current_rw(&**read_surf, &**write_surf)
     }
 
     #[inline]
@@ -312,9 +327,11 @@ impl Context {
 
     #[inline]
     pub fn get_config(&self) -> ConfigWrapper<Config, ConfigAttribs> {
-        (**self).get_config().map_config(|conf| match self.backend() {
-            Backend::Wayland => Config::Wayland(conf),
-        })
+        (**self)
+            .get_config()
+            .map_config(|conf| match self.backend() {
+                Backend::Wayland => Config::Wayland(conf),
+            })
     }
 
     #[inline]
