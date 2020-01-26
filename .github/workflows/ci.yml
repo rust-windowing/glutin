@@ -39,6 +39,11 @@ jobs:
         repository: rust-windowing/glutin_sys
         path: glutin_sys
         ref: master
+    - uses: actions/checkout@v1
+      with:
+        repository: goddessfreya/winit
+        path: winit
+        ref: winit-glutin-next
 
     - uses: actions/checkout@v1
     - uses: hecrj/setup-rust-action@v1
