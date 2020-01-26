@@ -11,7 +11,7 @@ use winit::window::{Fullscreen, WindowBuilder};
 use std::io::{stdin, stdout, Write};
 
 fn main() {
-    env_logger::init();
+    simple_logger::init().unwrap();
     let el = EventLoop::new();
 
     print!("Please choose the fullscreen mode: (1) exclusive, (2) borderless: ");

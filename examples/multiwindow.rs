@@ -8,7 +8,7 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
 
 fn main() {
-    env_logger::init();
+    simple_logger::init().unwrap();
     let el = EventLoop::new();
 
     let confs = ConfigsFinder::new().find(&*el).unwrap();

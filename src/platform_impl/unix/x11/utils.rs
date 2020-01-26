@@ -6,6 +6,7 @@ use winit_types::platform::OsError;
 
 use std::os::raw;
 use std::sync::Arc;
+use std::ptr;
 
 #[inline]
 pub fn get_visual_info_from_xid(
@@ -27,7 +28,11 @@ pub fn get_visual_info_from_xid(
     let vi = unsafe {
         (xlib.XGetVisualInfo)(***disp, ffi::VisualIDMask, &mut template, &mut num_visuals)
     };
-    disp.check_errors()?;
+
+    disp.check_errors().map_err(|err| unsafe {
+        if !vi.is_null() { (xlib.XFree)(vi as *mut _); }
+        err
+    })?;
 
     if vi.is_null() {
         return Err(make_oserror!(OsError::Misc(format!(
@@ -35,18 +40,22 @@ pub fn get_visual_info_from_xid(
             xid
         ))));
     }
+
     if num_visuals != 1 {
-        return Err(make_oserror!(OsError::Misc(format!(
-            "Tried to get XVisualInfo of xid {:?} but got returned {:?} visuals",
-            xid, num_visuals
-        ))));
+        unsafe {
+            (xlib.XFree)(vi as *mut _);
+            return Err(make_oserror!(OsError::Misc(format!(
+                "Tried to get XVisualInfo of xid {:?} but got returned {:?} visuals",
+                xid, num_visuals
+            ))));
+        }
     }
 
-    let vi_copy = unsafe { std::ptr::read(vi as *const _) };
+    let vi_copy: ffi::XVisualInfo = unsafe { ptr::read(vi as *const _) };
     unsafe {
         (xlib.XFree)(vi as *mut _);
     }
-    vi_copy
+    Ok(vi_copy)
 }
 
 #[derive(Clone, Copy, Debug)]

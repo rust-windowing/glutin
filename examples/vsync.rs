@@ -36,7 +36,7 @@ fn prompt_vsync() -> SwapInterval {
 }
 
 fn main() {
-    env_logger::init();
+    simple_logger::init().unwrap();
     let swap_interval = prompt_vsync();
     println!("Using {:?}", swap_interval);
 

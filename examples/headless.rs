@@ -8,7 +8,7 @@ use winit_types::dpi::PhysicalSize;
 use std::path::Path;
 
 fn main() {
-    env_logger::init();
+    simple_logger::init().unwrap();
     let size = PhysicalSize::new(512, 512);
     let el = EventLoop::new();
 

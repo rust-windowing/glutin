@@ -10,7 +10,7 @@ use winit::window::WindowBuilder;
 use winit_types::dpi::PhysicalSize;
 
 fn main() {
-    env_logger::init();
+    simple_logger::init().unwrap();
     let mut size = PhysicalSize::new(512, 512);
     let el = EventLoop::new();
 

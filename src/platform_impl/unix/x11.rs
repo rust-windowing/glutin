@@ -466,7 +466,7 @@ impl Surface<Window> {
         wb: NWS::WindowBuilder,
     ) -> Result<(NWS::Window, Self), Error> {
         // Get the screen_id for the window being built.
-        let visual_info = conf.config.get_visual_info();
+        let visual_info: ffi::XVisualInfo = conf.config.get_visual_info()?;
         #[allow(deprecated)]
         let nw = nws.build_x11(
             wb,

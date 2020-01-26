@@ -669,9 +669,10 @@ impl Context {
 
             attributes.push(0);
 
+            println!("Okay freya, lets run ctx create");
             unsafe { glx_extra.CreateContextAttribsARB(
                 *****disp as *mut _,
-                &*conf.config.visual_info as *const _ as *mut _,
+                conf.config.config as *mut _,
                 sharing,
                 1,
                 attributes.as_ptr(),
@@ -686,17 +687,16 @@ impl Context {
                 _ => (),
             }
 
-            unsafe { glx.CreateContext(
+            unsafe { glx.CreateNewContext(
                 *****disp as *mut _,
-                &*conf.config.visual_info as *const _ as *mut _,
+                conf.config.config as *mut _,
+                ffi::glx::RGBA_TYPE as _,
                 sharing,
                 1,
             )}
         };
 
         // TODO: If BadMatch, it was either an unsupported sharing or version.
-        disp.check_errors()?;
-
         if context.is_null() {
             return Err(make_oserror!(OsError::Misc(
                 "GL context creation failed, no errors generated though".to_string(),
