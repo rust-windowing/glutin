@@ -31,7 +31,7 @@ impl<T> DerefMut for NoPrint<T> {
 pub(crate) struct NoCmp<T>(pub(crate) T);
 
 impl<T> PartialEq for NoCmp<T> {
-    fn eq(&self, o: &Self) -> bool {
+    fn eq(&self, _: &Self) -> bool {
         true
     }
 }

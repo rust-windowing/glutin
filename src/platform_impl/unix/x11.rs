@@ -1,6 +1,6 @@
-use crate::api::egl::{self, EGL};
-use crate::api::glx::{self, ffi, GLX};
-use crate::config::{Api, ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapInterval};
+use crate::api::egl;
+use crate::api::glx::{self, ffi};
+use crate::config::{ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapInterval};
 use crate::context::ContextBuilderWrapper;
 use crate::platform::unix::BackingApi;
 use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
@@ -14,10 +14,9 @@ use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
 use winit_types::platform::OsError;
 
-use std::fmt::Debug;
-use std::ops::{Deref, DerefMut};
-use std::os::raw;
 use std::sync::Arc;
+use std::fmt::Debug;
+use std::os::raw;
 
 pub mod utils;
 
@@ -588,8 +587,6 @@ pub fn select_configs<'a, T, I: IntoIterator<Item = T>, F>(
 where
     F: FnMut(&T) -> Result<(ffi::XVisualInfo, ffi::VisualID), Error>,
 {
-    use utils::Lacks;
-
     conf_ids
         .into_iter()
         .map(|conf_id| {

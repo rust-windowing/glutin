@@ -2,10 +2,7 @@ pub use crate::api::osmesa::{OsMesaBuffer, OsMesaContext};
 use crate::config::Version;
 use crate::context::ContextBuilderWrapper;
 
-use winit_types::dpi;
 use winit_types::error::Error;
-
-use std::os::raw;
 
 impl<'a> OsMesaContextBuilder<'a> {
     /// Builds a [`OsMesaContext`].

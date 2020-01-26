@@ -9,7 +9,7 @@
 mod wayland;
 pub mod x11;
 
-use crate::config::{Api, ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapInterval};
+use crate::config::{ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapInterval};
 use crate::context::ContextBuilderWrapper;
 pub use crate::platform::unix::ConfigPlatformAttributes;
 use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
@@ -19,11 +19,8 @@ use glutin_interface::{
 };
 use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
-use winit_types::platform::OsError;
 
-use std::marker::PhantomData;
 use std::os::raw;
-use std::sync::Arc;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Config {

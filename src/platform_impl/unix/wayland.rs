@@ -1,6 +1,5 @@
 use crate::api::egl;
-use crate::api::egl::ffi;
-use crate::config::{Api, ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapInterval};
+use crate::config::{ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapInterval};
 use crate::context::ContextBuilderWrapper;
 use crate::platform::unix::BackingApi;
 use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
@@ -15,9 +14,7 @@ pub use wayland_client::sys::client::wl_display;
 use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
 
-use std::ops::Deref;
 use std::os::raw;
-use std::sync::Arc;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Config(egl::Config);
@@ -161,8 +158,8 @@ impl Surface<PBuffer> {
 impl Surface<Pixmap> {
     #[inline]
     pub unsafe fn new_existing<NP: NativePixmap>(
-        conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        np: &NP,
+        _conf: ConfigWrapper<&Config, &ConfigAttribs>,
+        _np: &NP,
     ) -> Result<Self, Error> {
         return Err(make_error!(ErrorType::NotSupported(
             "Wayland does not support pixmaps.".to_string(),
@@ -171,9 +168,9 @@ impl Surface<Pixmap> {
 
     #[inline]
     pub unsafe fn new<NPS: NativePixmapSource>(
-        conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        nps: &NPS,
-        pb: NPS::PixmapBuilder,
+        _conf: ConfigWrapper<&Config, &ConfigAttribs>,
+        _nps: &NPS,
+        _pb: NPS::PixmapBuilder,
     ) -> Result<(NPS::Pixmap, Self), Error> {
         return Err(make_error!(ErrorType::NotSupported(
             "Wayland does not support pixmaps.".to_string(),

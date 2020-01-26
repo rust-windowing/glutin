@@ -8,19 +8,16 @@
 
 pub mod ffi;
 mod glx;
-mod make_current_guard;
 
 pub use self::glx::{Glx, GlxExtra};
-use self::make_current_guard::MakeCurrentGuard;
 
 use crate::config::{
-    Api, ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapInterval, SwapIntervalRange, Version,
+    Api, ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapInterval, SwapIntervalRange,
 };
 use crate::context::{ContextBuilderWrapper, GlProfile, ReleaseBehaviour, Robustness};
 use crate::surface::{PBuffer, Pixmap, SurfaceType, SurfaceTypeTrait, Window};
 use crate::utils::NoCmp;
 
-use glutin_interface::{NativeDisplay, NativeWindow, NativeWindowSource, RawDisplay, RawWindow};
 use glutin_x11_sym::Display as X11Display;
 use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
@@ -65,6 +62,13 @@ impl Display {
         unsafe {
             glx.QueryVersion(***display as *mut _, &mut major, &mut minor);
         }
+        let version = (major as _, minor as _);
+
+        if version < (1, 3) {
+            return Err(make_error!(ErrorType::NotSupported(
+                "Glutin does not support GLX versions older than 1.3. GLX 1.3 was released in 1997. You've had plenty time to upgrade :D".to_string(),
+            )));
+        }
 
         // loading the list of extensions
         let extensions = Self::load_extensions(display, screen)?
@@ -76,7 +80,7 @@ impl Display {
             display: Arc::clone(display),
             screen,
             extensions,
-            version: (major as _, minor as _),
+            version,
         }))
     }
 
@@ -245,14 +249,20 @@ impl Config {
             out.push(if double_buffer { 1 } else { 0 });
 
             if let Some(multisampling) = cf.multisampling {
-                if !disp.has_extension("GLX_ARB_multisample") {
+                if disp.version >= (1, 4) {
+                    out.push(ffi::glx::SAMPLE_BUFFERS as raw::c_int);
+                    out.push(if multisampling == 0 { 0 } else { 1 });
+                    out.push(ffi::glx::SAMPLES as raw::c_int);
+                    out.push(multisampling as raw::c_int);
+                } else if disp.has_extension("GLX_ARB_multisample") {
+                    out.push(ffi::glx_extra::SAMPLE_BUFFERS_ARB as raw::c_int);
+                    out.push(if multisampling == 0 { 0 } else { 1 });
+                    out.push(ffi::glx_extra::SAMPLES_ARB as raw::c_int);
+                    out.push(multisampling as raw::c_int);
+                } else {
                     errors.append(make_error!(ErrorType::MultisamplingNotSupported));
                     return Err(errors);
                 }
-                out.push(ffi::glx_extra::SAMPLE_BUFFERS_ARB as raw::c_int);
-                out.push(if multisampling == 0 { 0 } else { 1 });
-                out.push(ffi::glx_extra::SAMPLES_ARB as raw::c_int);
-                out.push(multisampling as raw::c_int);
             }
 
             out.push(ffi::glx::STEREO as raw::c_int);
@@ -281,42 +291,38 @@ impl Config {
                 }
             }
 
-            // FIXME mv context
-            //match cf.release_behavior {
-            //    ReleaseBehaviour::Flush => {
-            //        if disp.has_extension("GLX_ARB_context_flush_control") {
-            //            // With how shitty drivers are, never hurts to be explicit
-            //            out.push(
-            //                ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_ARB
-            //                    as raw::c_int,
-            //            );
-            //            out.push(
-            //                ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_FLUSH_ARB
-            //                    as raw::c_int,
-            //            );
-            //        }
-            //    },
-            //    ReleaseBehaviour::None => {
-            //        if !disp.has_extension("GLX_ARB_context_flush_control") {
-            //            return Err(make_error!(ErrorType::FlushControlNotSupported));
-            //        }
-            //        out.push(
-            //            ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_ARB
-            //                as raw::c_int,
-            //        );
-            //        out.push(
-            //            ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_NONE_ARB
-            //                as raw::c_int,
-            //        );
-            //    }
-            //}
-
             out.push(ffi::glx::CONFIG_CAVEAT as raw::c_int);
             out.push(ffi::glx::DONT_CARE as raw::c_int);
 
             out.push(0);
             out
         };
+
+        let swap_control_supported =
+            disp.has_extension("GLX_EXT_swap_control")
+                || disp.has_extension("GLX_MESA_swap_control")
+                || disp.has_extension("GLX_SGI_swap_control");
+        let swap_control_tear_supported = disp.has_extension("GLX_EXT_swap_control_tear");
+
+        if !cf.desired_swap_interval_ranges.is_empty() {
+            if !swap_control_supported {
+                errors.append(make_error!(ErrorType::SwapControlRangeNotSupported));
+                return Err(errors);
+            }
+
+            if !swap_control_tear_supported {
+                for dsir in &cf.desired_swap_interval_ranges[..] {
+                    match dsir {
+                        SwapIntervalRange::AdaptiveWait(_) => {
+                                errors.append(make_error!(ErrorType::AdaptiveSwapControlNotSupported));
+                                errors.append(make_error!(ErrorType::SwapControlRangeNotSupported));
+                                return Err(errors);
+                        }
+                        _ => (),
+                    }
+                }
+            }
+        }
 
         // calling glXChooseFBConfig
         let mut num_confs = 0;
@@ -365,11 +371,11 @@ impl Config {
                 // drawable is made.
                 //
                 // 1000 is reasonable.
-                let mut swap_interval_ranges = vec![
+                let mut swap_interval_ranges = if swap_control_supported { vec![
                     SwapIntervalRange::DontWait,
                     SwapIntervalRange::Wait(1..1000),
-                ];
-                if disp.has_extension("GLX_EXT_swap_control_tear") {
+                ] } else { vec![] };
+                if swap_control_tear_supported {
                     swap_interval_ranges.push(SwapIntervalRange::AdaptiveWait(1..1000));
                 }
 
@@ -460,7 +466,7 @@ impl Config {
                 let mut confs = vec![];
 
                 if wants_floating_point && is_floating_point {
-                    let attribs = attribs.clone();
+                    let mut attribs = attribs.clone();
                     attribs.float_color_buffer = true;
                     confs.push((attribs, conf, visual_info));
                 }
@@ -479,12 +485,12 @@ impl Config {
             .flat_map(|conf| conf)
             .collect();
 
-        if confs.is_empty() {
+        if let Err(err) = disp.check_errors() {
+            errors.append(err);
             return Err(errors);
         }
 
-        if let Err(err) = disp.check_errors() {
-            errors.append(err);
+        if confs.is_empty() {
             return Err(errors);
         }
 
@@ -544,6 +550,164 @@ impl Context {
         cb: ContextBuilderWrapper<&Context>,
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
     ) -> Result<Context, Error> {
+        let glx = GLX.as_ref().unwrap();
+        let glx_extra = GLX_EXTRA.as_ref().unwrap();
+        let disp = &conf.config.display;
+        let sharing = cb.sharing.map(|ctx| ctx.context).unwrap_or(std::ptr::null());
+        let context = if disp.has_extension("GLX_ARB_create_context") {
+            let mut attributes = Vec::with_capacity(9);
+
+            let version = conf.attribs.version.1;
+            attributes
+                .push(ffi::glx_extra::CONTEXT_MAJOR_VERSION_ARB as raw::c_int);
+            attributes.push(version.0 as raw::c_int);
+            attributes
+                .push(ffi::glx_extra::CONTEXT_MINOR_VERSION_ARB as raw::c_int);
+            attributes.push(version.1 as raw::c_int);
+
+            if let Some(profile) = cb.profile {
+                let flag = match profile {
+                    GlProfile::Compatibility => {
+                        ffi::glx_extra::CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB
+                    }
+                    GlProfile::Core => {
+                        ffi::glx_extra::CONTEXT_CORE_PROFILE_BIT_ARB
+                    }
+                };
+
+                attributes.push(
+                    ffi::glx_extra::CONTEXT_PROFILE_MASK_ARB as raw::c_int,
+                );
+                attributes.push(flag as raw::c_int);
+            }
+
+            let flags = {
+                let mut flags = 0;
+
+                // robustness
+                if disp.has_extension("GLX_ARB_create_context_robustness") {
+                    match cb.robustness {
+                        Robustness::RobustNoResetNotification => {
+                            attributes.push(
+                                ffi::glx_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB as raw::c_int,
+                            );
+                            attributes.push(
+                                ffi::glx_extra::NO_RESET_NOTIFICATION_ARB
+                                    as raw::c_int,
+                            );
+                            flags = flags
+                                | ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB
+                                    as raw::c_int;
+                        }
+                        Robustness::RobustLoseContextOnReset => {
+                            attributes.push(
+                                ffi::glx_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB as raw::c_int,
+                            );
+                            attributes.push(
+                                ffi::glx_extra::LOSE_CONTEXT_ON_RESET_ARB
+                                    as raw::c_int,
+                            );
+                            flags = flags
+                                | ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB
+                                    as raw::c_int;
+                        }
+                        Robustness::NoError => {
+                            return Err(make_error!(ErrorType::RobustnessNotSupported));
+                        }
+                        _ => (),
+                    }
+                } else {
+                    match cb.robustness {
+                        Robustness::RobustNoResetNotification
+                        | Robustness::RobustLoseContextOnReset
+                        | Robustness::NoError => {
+                            return Err(make_error!(ErrorType::RobustnessNotSupported));
+                        }
+                        _ => (),
+                    }
+                }
+
+                if cb.debug {
+                    flags = flags
+                        | ffi::glx_extra::CONTEXT_DEBUG_BIT_ARB as raw::c_int;
+                }
+
+                flags
+            };
+
+            attributes.push(ffi::glx_extra::CONTEXT_FLAGS_ARB as raw::c_int);
+            attributes.push(flags);
+
+            match cb.release_behavior {
+                ReleaseBehaviour::Flush => {
+                    if disp.has_extension("GLX_ARB_context_flush_control") {
+                        // With how shitty drivers are, never hurts to be explicit
+                        attributes.push(
+                            ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_ARB
+                                as raw::c_int,
+                        );
+                        attributes.push(
+                            ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_FLUSH_ARB
+                                as raw::c_int,
+                        );
+                    }
+                },
+                ReleaseBehaviour::None => {
+                    if !disp.has_extension("GLX_ARB_context_flush_control") {
+                        return Err(make_error!(ErrorType::FlushControlNotSupported));
+                    }
+                    attributes.push(
+                        ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_ARB
+                            as raw::c_int,
+                    );
+                    attributes.push(
+                        ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_NONE_ARB
+                            as raw::c_int,
+                    );
+                }
+            }
+
+            attributes.push(0);
+
+            unsafe { glx_extra.CreateContextAttribsARB(
+                *****disp as *mut _,
+                &*conf.config.visual_info as *const _ as *mut _,
+                sharing,
+                1,
+                attributes.as_ptr(),
+            )}
+        } else {
+            match cb.robustness {
+                Robustness::RobustNoResetNotification
+                | Robustness::RobustLoseContextOnReset
+                | Robustness::NoError => {
+                    return Err(make_error!(ErrorType::RobustnessNotSupported));
+                }
+                _ => (),
+            }
+
+            unsafe { glx.CreateContext(
+                *****disp as *mut _,
+                &*conf.config.visual_info as *const _ as *mut _,
+                sharing,
+                1,
+            )}
+        };
+
+        // TODO: If BadMatch, it was either an unsupported sharing or version.
+        disp.check_errors()?;
+
+        if context.is_null() {
+            return Err(make_oserror!(OsError::Misc(
+                "GL context creation failed, no errors generated though".to_string(),
+            )));
+        }
+
+        Ok(Context {
+            display: Arc::clone(&disp),
+            config: conf.clone_inner(),
+            context,
+        })
     }
 
     #[inline]
@@ -553,7 +717,7 @@ impl Context {
     ) -> Result<(), Error> {
         let glx = GLX.as_ref().unwrap();
         let res = glx.MakeCurrent(****self.display as *mut _, surf.surface, self.context);
-        Self::check_errors(&self.display, Some(res))
+        Self::check_errors(&self.display, res)
     }
 
     #[inline]
@@ -562,20 +726,16 @@ impl Context {
         read_surf: &Surface<TR>,
         write_surf: &Surface<TW>,
     ) -> Result<(), Error> {
-        if self.display.version < (1, 3) {
-            return Err(make_error!(ErrorType::NotSupported(
-                "Glx does not support `make_current_rw` on versions prior to GLX 1.3.".to_string(),
-            )));
-        }
-
         let glx = GLX.as_ref().unwrap();
+        // This is a newer variant of glxMakeCurrent introduced in GLX 1.3 as the older variant was
+        // not enough.
         let res = glx.MakeContextCurrent(
             ****self.display as *mut _,
             write_surf.surface,
             read_surf.surface,
             self.context,
         );
-        Self::check_errors(&self.display, Some(res))
+        Self::check_errors(&self.display, res)
     }
 
     #[inline]
@@ -588,7 +748,7 @@ impl Context {
     pub unsafe fn make_not_current(&self) -> Result<(), Error> {
         let glx = GLX.as_ref().unwrap();
         let res = glx.MakeCurrent(****self.display as *mut _, 0, std::ptr::null());
-        Self::check_errors(&self.display, Some(res))
+        Self::check_errors(&self.display, res)
     }
 
     #[inline]
@@ -603,22 +763,24 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_api(&self) -> Api {
-        Api::OpenGl
-    }
-
-    #[inline]
     pub fn get_proc_address(&self, addr: &str) -> Result<*const raw::c_void, Error> {
         let glx = GLX.as_ref().unwrap();
         let addr = CString::new(addr.as_bytes()).unwrap();
         let addr = addr.as_ptr();
-        Ok(unsafe { glx.GetProcAddress(addr as *const _) as *const _ })
+        if self.display.version < (1, 4) {
+            return Err(make_error!(ErrorType::NotSupported(
+                "Glx does not support glxGetProcAddress on GLX versions older than 1.4. GLX 1.4 was released in 2005. You've had plenty time to upgrade :D".to_string(),
+            )));
+        }
+        let ret = unsafe { glx.GetProcAddress(addr as *const _) as *const _ };
+        self.display.check_errors()?;
+        Ok(ret)
     }
 
     #[inline]
-    unsafe fn check_errors(disp: &Arc<Display>, ret: Option<i32>) -> Result<(), Error> {
+    fn check_errors(disp: &Arc<Display>, ret: i32) -> Result<(), Error> {
         disp.check_errors()?;
-        if ret == Some(ffi::False) {
+        if ret == ffi::False {
             return Err(make_oserror!(OsError::Misc(
                 "Function failed without generating error.".to_string(),
             )));
@@ -654,16 +816,8 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     pub fn is_current(&self) -> bool {
         let glx = GLX.as_ref().unwrap();
         unsafe {
-            if glx.GetCurrentDrawable() == self.surface {
-                return true;
-            }
-
-            if self.display.version >= (1, 3) && glx.GetCurrentReadDrawable() == self.surface {
-                return true;
-            }
+            glx.GetCurrentDrawable() == self.surface || glx.GetCurrentReadDrawable() == self.surface
         }
-
-        false
     }
 
     #[inline]
@@ -675,7 +829,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     pub unsafe fn make_not_current(&self) -> Result<(), Error> {
         let glx = GLX.as_ref().unwrap();
         let res = glx.MakeCurrent(****self.display as *mut _, 0, std::ptr::null());
-        Context::check_errors(&self.display, Some(res))
+        Context::check_errors(&self.display, res)
     }
 }
 
@@ -685,6 +839,26 @@ impl Surface<Window> {
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         nwin: ffi::Window,
     ) -> Result<Self, Error> {
+        let glx = GLX.as_ref().unwrap();
+        let disp = &conf.config.display;
+
+        let window = unsafe {
+            glx.CreateWindow(
+                *****disp as *mut _,
+                conf.config.config,
+                nwin,
+                std::ptr::null_mut(),
+            )
+        };
+
+        disp.check_errors()?;
+
+        Ok(Surface {
+            display: Arc::clone(&disp),
+            surface: window,
+            config: conf.clone_inner(),
+            phantom: PhantomData,
+        })
     }
 
     #[inline]
@@ -693,11 +867,11 @@ impl Surface<Window> {
         unsafe {
             glx.SwapBuffers(****self.display as *mut _, self.surface);
         }
-        Context::check_errors(&self.display, None)
+        self.display.check_errors()
     }
 
     #[inline]
-    pub fn swap_buffers_with_damage(&self, rects: &[dpi::Rect]) -> Result<(), Error> {
+    pub fn swap_buffers_with_damage(&self, _rects: &[dpi::Rect]) -> Result<(), Error> {
         Err(make_error!(ErrorType::NotSupported(
             "Glx does not support swap buffers with damage.".to_string(),
         )))
@@ -763,10 +937,12 @@ impl Surface<Window> {
                 glx_extra.SwapIntervalSGI(desired_swap_interval);
             }
         } else {
-            return Err(make_oserror!(OsError::Misc(
-                "Couldn't find any available vsync extension".to_string(),
+            return Err(make_error!(ErrorType::BadApiUsage(
+                "Couldn't find any available swap control extension. This means the config did not support any swap interval ranges.".to_string(),
             )));
         }
+
+        self.display.check_errors()?;
 
         Ok(())
     }
@@ -778,6 +954,34 @@ impl Surface<PBuffer> {
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         size: &dpi::PhysicalSize<u32>,
     ) -> Result<Self, Error> {
+        let glx = GLX.as_ref().unwrap();
+        let size: (u32, u32) = (*size).into();
+        let disp = &conf.config.display;
+
+        let attributes: Vec<raw::c_int> = vec![
+            ffi::glx::PBUFFER_WIDTH as raw::c_int,
+            size.0 as raw::c_int,
+            ffi::glx::PBUFFER_HEIGHT as raw::c_int,
+            size.1 as raw::c_int,
+            0,
+        ];
+
+        let pbuffer = unsafe {
+            glx.CreatePbuffer(
+                *****disp as *mut _,
+                conf.config.config,
+                attributes.as_ptr(),
+            )
+        };
+
+        disp.check_errors()?;
+
+        Ok(Surface {
+            display: Arc::clone(&disp),
+            surface: pbuffer,
+            config: conf.clone_inner(),
+            phantom: PhantomData,
+        })
     }
 }
 
@@ -791,190 +995,10 @@ impl<T: SurfaceTypeTrait> Drop for Surface<T> {
                     glx.DestroyPbuffer(****self.display as *mut _, self.surface)
                 }
                 SurfaceType::Pixmap => {
-                    if self.display.version >= (1, 3) {
                         glx.DestroyPixmap(****self.display as *mut _, self.surface)
-                    } else {
-                        glx.DestroyGLXPixmap(****self.display as *mut _, self.surface)
-                    }
                 }
             }
         }
         self.display.check_errors().unwrap();
     }
 }
-
-//    pub fn finish_pbuffer(
-//        self,
-//        size: dpi::PhysicalSize<u32>,
-//    ) -> Result<Context, Error> {
-//        let glx = GLX.as_ref().unwrap();
-//        let size: (u32, u32) = size.into();
-//        let (_extra_functions, context) = self.create_context()?;
-//
-//        let attributes: Vec<raw::c_int> = vec![
-//            ffi::glx::PBUFFER_WIDTH as raw::c_int,
-//            size.0 as raw::c_int,
-//            ffi::glx::PBUFFER_HEIGHT as raw::c_int,
-//            size.1 as raw::c_int,
-//            0,
-//        ];
-//
-//        let pbuffer = unsafe {
-//            glx.CreatePbuffer(
-//                self.xconn.display as *mut _,
-//                self.fb_config,
-//                attributes.as_ptr(),
-//            )
-//        };
-//
-//        Ok(Context {
-//            xconn: self.xconn,
-//            drawable: pbuffer,
-//            context,
-//            pixel_format: self.pixel_format,
-//        })
-//    }
-//
-//    pub fn finish(self, window: ffi::Window) -> Result<Context, Error> {
-//        let glx = GLX.as_ref().unwrap();
-//        let (extra_functions, context) = self.create_context()?;
-//
-//        Ok(Context {
-//            xconn: self.xconn,
-//            drawable: window,
-//            context,
-//            pixel_format: self.pixel_format,
-//        })
-//    }
-//}
-//
-//fn create_context(
-//    extra_functions: &ffi::glx_extra::Glx,
-//    extensions: &str,
-//    xlib: &ffi::Xlib,
-//    version: GlVersion,
-//    profile: Option<GlProfile>,
-//    debug: bool,
-//    robustness: Robustness,
-//    share: ffi::glx::types::GLXContext,
-//    display: *mut ffi::Display,
-//    fb_config: ffi::glx::types::GLXFBConfig,
-//    visual_infos: &ffi::XVisualInfo,
-//) -> Result<ffi::glx::types::GLXContext, Error> {
-//    let glx = GLX.as_ref().unwrap();
-//    unsafe {
-//        let old_callback = (xlib.XSetErrorHandler)(Some(x_error_callback));
-//        let context = if check_ext(extensions, "GLX_ARB_create_context") {
-//            let mut attributes = Vec::with_capacity(9);
-//
-//            attributes
-//                .push(ffi::glx_extra::CONTEXT_MAJOR_VERSION_ARB as raw::c_int);
-//            attributes.push(version.0 as raw::c_int);
-//            attributes
-//                .push(ffi::glx_extra::CONTEXT_MINOR_VERSION_ARB as raw::c_int);
-//            attributes.push(version.1 as raw::c_int);
-//
-//            if let Some(profile) = profile {
-//                let flag = match profile {
-//                    GlProfile::Compatibility => {
-//                        ffi::glx_extra::CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB
-//                    }
-//                    GlProfile::Core => {
-//                        ffi::glx_extra::CONTEXT_CORE_PROFILE_BIT_ARB
-//                    }
-//                };
-//
-//                attributes.push(
-//                    ffi::glx_extra::CONTEXT_PROFILE_MASK_ARB as raw::c_int,
-//                );
-//                attributes.push(flag as raw::c_int);
-//            }
-//
-//            let flags = {
-//                let mut flags = 0;
-//
-//                // robustness
-//                if check_ext(extensions, "GLX_ARB_create_context_robustness") {
-//                    match robustness {
-//                        Robustness::RobustNoResetNotification
-//                        | Robustness::TryRobustNoResetNotification => {
-//                            attributes.push(
-//                                ffi::glx_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB as raw::c_int,
-//                            );
-//                            attributes.push(
-//                                ffi::glx_extra::NO_RESET_NOTIFICATION_ARB
-//                                    as raw::c_int,
-//                            );
-//                            flags = flags
-//                                | ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB
-//                                    as raw::c_int;
-//                        }
-//                        Robustness::RobustLoseContextOnReset
-//                        | Robustness::TryRobustLoseContextOnReset => {
-//                            attributes.push(
-//                                ffi::glx_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB as raw::c_int,
-//                            );
-//                            attributes.push(
-//                                ffi::glx_extra::LOSE_CONTEXT_ON_RESET_ARB
-//                                    as raw::c_int,
-//                            );
-//                            flags = flags
-//                                | ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB
-//                                    as raw::c_int;
-//                        }
-//                        Robustness::NotRobust => (),
-//                        Robustness::NoError => (),
-//                    }
-//                } else {
-//                    match robustness {
-//                        Robustness::RobustNoResetNotification
-//                        | Robustness::RobustLoseContextOnReset => {
-//                            return Err(make_error!(ErrorType::RobustnessNotSupported));
-//                        }
-//                        _ => (),
-//                    }
-//                }
-//
-//                if debug {
-//                    flags = flags
-//                        | ffi::glx_extra::CONTEXT_DEBUG_BIT_ARB as raw::c_int;
-//                }
-//
-//                flags
-//            };
-//
-//            attributes.push(ffi::glx_extra::CONTEXT_FLAGS_ARB as raw::c_int);
-//            attributes.push(flags);
-//
-//            attributes.push(0);
-//
-//            extra_functions.CreateContextAttribsARB(
-//                display as *mut _,
-//                fb_config,
-//                share,
-//                1,
-//                attributes.as_ptr(),
-//            )
-//        } else {
-//            let visual_infos: *const ffi::XVisualInfo = visual_infos;
-//            glx.CreateContext(
-//                display as *mut _,
-//                visual_infos as *mut _,
-//                share,
-//                1,
-//            )
-//        };
-//
-//        (xlib.XSetErrorHandler)(old_callback);
-//
-//        if context.is_null() {
-//            // TODO: check for errors and return `OpenGlVersionNotSupported`
-//            return Err(make_oserror!(OsError::Misc(
-//                "GL context creation failed".to_string(),
-//            )));
-//        }
-//
-//        Ok(context)
-//    }
-//}
-//

@@ -24,7 +24,6 @@
 //! [`make_current_rw`]: crate::context::Context::make_current_rw
 //! [`Config`]: crate::config::ConfigWrapper
 
-use crate::config::Api;
 use crate::config::Config;
 use crate::platform_impl;
 use crate::surface::{Surface, SurfaceTypeTrait};
@@ -441,22 +440,10 @@ pub enum Robustness {
     /// implementation-defined. You are just guaranteed not to get a crash.
     RobustNoResetNotification,
 
-    /// Same as [`RobustNoResetNotification`] but the context creation doesn't
-    /// fail if it's not supported.
-    ///
-    /// [`RobustNoResetNotification`]: crate::context::Robustness::RobustNoResetNotification
-    TryRobustNoResetNotification,
-
     /// Everything is checked to avoid any crash. If a problem occurs, the
     /// context will enter a "context lost" state. It must then be
     /// recreated.
     RobustLoseContextOnReset,
-
-    /// Same as [`RobustLoseContextOnReset`] but the context creation doesn't
-    /// fail if it's not supported.
-    ///
-    /// [`RobustLoseContextOnReset`]: crate::context::Robustness::RobustLoseContextOnReset
-    TryRobustLoseContextOnReset,
 }
 impl Default for Robustness {
     #[inline]

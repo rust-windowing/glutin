@@ -10,10 +10,8 @@
 
 mod egl;
 pub mod ffi;
-mod make_current_guard;
 
 pub use self::egl::Egl;
-use self::make_current_guard::MakeCurrentGuard;
 
 use crate::config::{
     Api, ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapInterval, SwapIntervalRange, Version,
@@ -22,7 +20,6 @@ use crate::context::{ContextBuilderWrapper, ReleaseBehaviour, Robustness};
 use crate::surface::{PBuffer, Pixmap, SurfaceType, SurfaceTypeTrait, Window};
 
 use glutin_interface::{NativeDisplay, RawDisplay};
-use parking_lot::Mutex;
 #[cfg(any(
     target_os = "android",
     target_os = "windows",
@@ -39,9 +36,8 @@ use winit_types::platform::OsError;
 use std::convert::TryInto;
 use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 use std::os::raw;
-use std::ptr;
 use std::sync::Arc;
 
 lazy_static! {
@@ -687,7 +683,7 @@ impl Config {
             return Err(errors);
         }
 
-        let mut confs: Vec<_> = conf_selector(confs, &display)
+        let confs: Vec<_> = conf_selector(confs, &display)
             .into_iter()
             .filter_map(|conf| match conf {
                 Err(err) => {
@@ -759,7 +755,7 @@ impl Config {
                 }
                 let (attribs, conf) = conf.unwrap();
 
-                let mut confs = vec![(attribs, conf)];
+                let mut confs = vec![(attribs.clone(), conf)];
 
                 if cf.srgb.is_none() {
                     let mut attribs = attribs.clone();
@@ -774,6 +770,7 @@ impl Config {
                 }
 
                 if cf.double_buffer.is_none() && cf.srgb.is_none() {
+                    let mut attribs = attribs.clone();
                     attribs.srgb = true;
                     attribs.double_buffer = false;
                     confs.push((attribs, conf));
@@ -833,7 +830,7 @@ impl Context {
             Display::bind_api(api, display.egl_version)?;
         }
 
-        let share = match cb.sharing {
+        let sharing = match cb.sharing {
             Some(ctx) => ctx.context,
             None => std::ptr::null(),
         };
@@ -855,71 +852,39 @@ impl Context {
 
             // handling robustness
             let supports_robustness = display.egl_version >= (1, 5)
-                || display
-                    .extensions
-                    .iter()
-                    .find(|s| s == &"EGL_EXT_create_context_robustness")
-                    .is_some();
+                || display.has_extension("EGL_EXT_create_context_robustness");
+            let supports_no_error =
+                display.has_extension("EGL_KHR_create_context_no_error");
+
+            if !match cb.robustness {
+                Robustness::NoError => supports_no_error,
+                Robustness::RobustLoseContextOnReset | Robustness::RobustNoResetNotification => supports_robustness,
+                _ => true,
+            } {
+                return Err(make_error!(ErrorType::RobustnessNotSupported));
+            }
 
             match cb.robustness {
-                Robustness::NotRobust => (),
-
                 Robustness::NoError => {
-                    if display
-                        .extensions
-                        .iter()
-                        .find(|s| s == &"EGL_KHR_create_context_no_error")
-                        .is_some()
-                    {
-                        context_attributes
-                            .push(ffi::egl::CONTEXT_OPENGL_NO_ERROR_KHR as raw::c_int);
-                        context_attributes.push(1);
-                    }
+                    context_attributes
+                        .push(ffi::egl::CONTEXT_OPENGL_NO_ERROR_KHR as raw::c_int);
+                    context_attributes.push(1);
                 }
-
                 Robustness::RobustNoResetNotification => {
-                    if supports_robustness {
-                        context_attributes.push(
-                            ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY as raw::c_int,
-                        );
-                        context_attributes.push(ffi::egl::NO_RESET_NOTIFICATION as raw::c_int);
-                        flags = flags | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
-                    } else {
-                        return Err(make_error!(ErrorType::RobustnessNotSupported));
-                    }
+                    context_attributes.push(
+                        ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY as raw::c_int,
+                    );
+                    context_attributes.push(ffi::egl::NO_RESET_NOTIFICATION as raw::c_int);
+                    flags = flags | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
                 }
-
-                Robustness::TryRobustNoResetNotification => {
-                    if supports_robustness {
-                        context_attributes.push(
-                            ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY as raw::c_int,
-                        );
-                        context_attributes.push(ffi::egl::NO_RESET_NOTIFICATION as raw::c_int);
-                        flags = flags | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
-                    }
-                }
-
                 Robustness::RobustLoseContextOnReset => {
-                    if supports_robustness {
-                        context_attributes.push(
-                            ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY as raw::c_int,
-                        );
-                        context_attributes.push(ffi::egl::LOSE_CONTEXT_ON_RESET as raw::c_int);
-                        flags = flags | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
-                    } else {
-                        return Err(make_error!(ErrorType::RobustnessNotSupported));
-                    }
+                    context_attributes.push(
+                        ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY as raw::c_int,
+                    );
+                    context_attributes.push(ffi::egl::LOSE_CONTEXT_ON_RESET as raw::c_int);
+                    flags = flags | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
                 }
-
-                Robustness::TryRobustLoseContextOnReset => {
-                    if supports_robustness {
-                        context_attributes.push(
-                            ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY as raw::c_int,
-                        );
-                        context_attributes.push(ffi::egl::LOSE_CONTEXT_ON_RESET as raw::c_int);
-                        flags = flags | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
-                    }
-                }
+                _ => (),
             }
 
             if cb.debug {
@@ -983,7 +948,7 @@ impl Context {
             egl.CreateContext(
                 **display,
                 conf.config.config_id,
-                share,
+                sharing,
                 context_attributes.as_ptr(),
             )
         };
@@ -1017,7 +982,7 @@ impl Context {
         let egl = EGL.as_ref().unwrap();
 
         let ret = egl.MakeCurrent(**self.display, surf.surface, surf.surface, self.context);
-        Self::check_errors(ret)
+        Self::check_errors(Some(ret))
     }
 
     #[inline]
@@ -1034,7 +999,7 @@ impl Context {
             read_surf.surface,
             self.context,
         );
-        Self::check_errors(ret)
+        Self::check_errors(Some(ret))
     }
 
     #[inline]
@@ -1047,7 +1012,7 @@ impl Context {
             self.context,
         );
 
-        Self::check_errors(ret)
+        Self::check_errors(Some(ret))
     }
 
     #[inline]
@@ -1061,7 +1026,7 @@ impl Context {
             ffi::egl::NO_CONTEXT,
         );
 
-        Self::check_errors(ret)
+        Self::check_errors(Some(ret))
     }
 
     #[inline]
@@ -1073,11 +1038,6 @@ impl Context {
     #[inline]
     pub fn get_config(&self) -> ConfigWrapper<Config, ConfigAttribs> {
         self.config.clone()
-    }
-
-    #[inline]
-    pub fn get_api(&self) -> Api {
-        self.config.attribs.version.0
     }
 
     // FIXME: Needed for android support.
@@ -1153,15 +1113,11 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_native_visual_id(&self) -> Result<ffi::EGLint, Error> {
-        get_native_visual_id(**self.display, self.config.config.config_id)
-    }
-
-    #[inline]
-    unsafe fn check_errors(ret: u32) -> Result<(), Error> {
+    fn check_errors(ret: Option<u32>) -> Result<(), Error> {
         let egl = EGL.as_ref().unwrap();
-        if ret == 0 {
-            match egl.GetError() as u32 {
+        if ret == Some(ffi::egl::FALSE) || ret == None {
+            match unsafe{ egl.GetError() } as u32 {
+                ffi::egl::SUCCESS if ret == None => Ok(()),
                 ffi::egl::CONTEXT_LOST => Err(make_error!(ErrorType::ContextLost)),
                 err => Err(make_oserror!(OsError::Misc(format!(
                     "failed (eglGetError returned 0x{:x})",
@@ -1283,7 +1239,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
             ffi::egl::NO_CONTEXT,
         );
 
-        Context::check_errors(ret)
+        Context::check_errors(Some(ret))
     }
 }
 
@@ -1296,7 +1252,7 @@ impl Surface<Window> {
         let display = Arc::clone(&conf.config.display);
         let egl = EGL.as_ref().unwrap();
         let desc = Self::assemble_desc(conf.clone(), None);
-        let surf = unsafe {
+        let surface = unsafe {
             let surf =
                 egl.CreateWindowSurface(**display, conf.config.config_id, nwin, desc.as_ptr());
             if surf.is_null() {
@@ -1308,10 +1264,12 @@ impl Surface<Window> {
             surf
         };
 
+        Context::check_errors(None)?;
+
         Ok(Surface {
             display,
             config: conf.clone_inner(),
-            surface: surf,
+            surface,
             phantom: PhantomData,
         })
     }
@@ -1325,7 +1283,7 @@ impl Surface<Window> {
 
         let ret = unsafe { egl.SwapBuffers(**self.display, self.surface) };
 
-        Context::check_errors(ret)
+        Context::check_errors(Some(ret))
     }
 
     #[inline]
@@ -1364,7 +1322,7 @@ impl Surface<Window> {
             )
         };
 
-        Context::check_errors(ret)
+        Context::check_errors(Some(ret))
     }
 
     #[inline]

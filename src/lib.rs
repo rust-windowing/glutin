@@ -58,8 +58,6 @@
     missing_debug_implementations,
     //missing_docs,
 )]
-// FIXME: Remove before 0.23
-#![allow(unused_imports, unused_variables)]
 
 #[cfg(any(
     target_os = "windows",
@@ -84,8 +82,6 @@ extern crate objc;
 ))]
 #[macro_use]
 extern crate log;
-#[macro_use]
-extern crate bitflags;
 #[macro_use]
 extern crate winit_types;
 #[cfg(any(
