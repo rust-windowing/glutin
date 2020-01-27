@@ -654,7 +654,6 @@ impl Context {
 
             attributes.push(0);
 
-            println!("Okay freya, lets run ctx create");
             unsafe {
                 glx_extra.CreateContextAttribsARB(
                     *****disp as *mut _,
