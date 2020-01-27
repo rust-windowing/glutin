@@ -181,13 +181,46 @@ impl Display {
                 )
             }
 
-            RawDisplay::EGLExtDevice { egl_device_ext, .. }
+            RawDisplay::EglExtDevice { egl_device_ext, .. }
                 if has_client_extension("EGL_EXT_platform_device")
                     && egl.GetPlatformDisplay.is_loaded() =>
             unsafe {
                 egl.GetPlatformDisplay(
                     ffi::egl::PLATFORM_DEVICE_EXT,
                     egl_device_ext as *mut _,
+                    std::ptr::null(),
+                )
+            }
+
+            RawDisplay::EglExtDevice { egl_device_ext, .. }
+                if has_client_extension("EGL_EXT_platform_device")
+                    && egl.GetPlatformDisplayEXT.is_loaded() =>
+            unsafe {
+                egl.GetPlatformDisplayEXT(
+                    ffi::egl::PLATFORM_DEVICE_EXT,
+                    egl_device_ext as *mut _,
+                    std::ptr::null(),
+                )
+            }
+
+            RawDisplay::EglMesaSurfaceless { .. }
+                if has_client_extension("EGL_MESA_platform_surfaceless")
+                    && egl.GetPlatformDisplay.is_loaded() =>
+            unsafe {
+                egl.GetPlatformDisplay(
+                    ffi::egl::PLATFORM_SURFACELESS_MESA,
+                    ffi::egl::DEFAULT_DISPLAY as *mut _,
+                    std::ptr::null(),
+                )
+            }
+
+            RawDisplay::EglMesaSurfaceless { .. }
+                if has_client_extension("EGL_MESA_platform_surfaceless")
+                    && egl.GetPlatformDisplayEXT.is_loaded() =>
+            unsafe {
+                egl.GetPlatformDisplayEXT(
+                    ffi::egl::PLATFORM_SURFACELESS_MESA,
+                    ffi::egl::DEFAULT_DISPLAY as *mut _,
                     std::ptr::null(),
                 )
             }
@@ -203,10 +236,6 @@ impl Display {
             }
             | RawDisplay::Wayland {
                 wl_display: display,
-                ..
-            }
-            | RawDisplay::EGLExtDevice {
-                egl_device_ext: display,
                 ..
             }
             | RawDisplay::Windows {
@@ -1201,6 +1230,11 @@ impl<T: SurfaceTypeTrait> Surface<T> {
                 _ if conf.attribs.alpha_bits > 0 => ffi::egl::TEXTURE_RGBA,
                 _ => ffi::egl::TEXTURE_RGB,
             } as raw::c_int);
+            out.push(ffi::egl::TEXTURE_TARGET as raw::c_int);
+            out.push(match size {
+                (0, _) | (_, 0) => ffi::egl::NO_TEXTURE,
+                _ => ffi::egl::TEXTURE_2D,
+            } as raw::c_int);
 
             out.push(ffi::egl::WIDTH as raw::c_int);
             out.push(size.0 as raw::c_int);
@@ -1356,7 +1390,7 @@ impl Surface<PBuffer> {
 
         let desc = Self::assemble_desc(conf.clone(), Some(size));
         let surf = unsafe {
-            let pbuffer = egl.CreatePbufferSurface(**display, conf.config.config_id, desc.as_ptr());
+            let pbuffer = egl.CreatePbufferSurface(**display, conf.config.config_id, dbg!(desc).as_ptr());
             if pbuffer.is_null() || pbuffer == ffi::egl::NO_SURFACE {
                 return Err(make_oserror!(OsError::Misc(format!(
                     "eglCreatePbufferSurface failed with 0x{:x}",

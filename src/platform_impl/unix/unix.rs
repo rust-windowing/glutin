@@ -35,7 +35,7 @@ impl Config {
         nd: &ND,
     ) -> Result<Vec<(ConfigAttribs, Config)>, Error> {
         Ok(match nd.raw_display() {
-            RawDisplay::Wayland { .. } => {
+            RawDisplay::Wayland { .. } | RawDisplay::EglMesaSurfaceless { .. } => {
                 let configs = generic_egl::Config::new(cf, nd)?;
                 configs
                     .into_iter()
@@ -49,7 +49,7 @@ impl Config {
                     .map(|(attribs, config)| (attribs, Config::X11(config)))
                     .collect()
             }
-            // FIXME: GBM/EGLExtDevice/EGLMesaSurfaceless backends.
+            // FIXME: GBM/EGLExtDevice backends.
             _ => unimplemented!(),
         })
     }

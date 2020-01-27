@@ -15,6 +15,7 @@ use glutin::surface::{PBuffer, Surface};
 use winit::event_loop::EventLoop;
 use winit_types::dpi::PhysicalSize;
 use winit_types::error::{Error, ErrorType};
+use glutin_interface::{RawDisplay, NativeDisplay, Seal};
 
 use std::ffi::{c_void, CStr};
 
@@ -234,6 +235,32 @@ impl HeadlessBackend {
 
         if must_support_windows {
             return Err(errs);
+        }
+
+        struct EglMesaSurfaceless;
+        impl NativeDisplay for EglMesaSurfaceless {
+            fn raw_display(&self) -> RawDisplay {
+                RawDisplay::EglMesaSurfaceless {
+                    _non_exhaustive_do_not_use: Seal,
+                }
+            }
+        }
+
+        // You can also try to use PBuffers, but from experience that is very
+        // buggy.
+        match ConfigsFinder::new()
+            .with_must_support_surfaceless(true)
+            .with_must_support_windows(must_support_windows)
+            .with_gl((Api::OpenGl, Version(3, 0)))
+            .find(&EglMesaSurfaceless)
+        {
+            Ok(mut confs) => {
+                let conf = confs.drain(..1).next().unwrap();
+                println!("EGL Mesa Surfaceless configeration chosen: {:?}", conf);
+                let ctx = ContextBuilder::new().build(&conf).unwrap();
+                return Ok((HeadlessBackend::Surfaceless(ctx), Some(conf)));
+            }
+            Err(err) => errs.append(err),
         }
 
         #[cfg(any(

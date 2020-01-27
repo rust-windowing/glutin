@@ -55,6 +55,8 @@ fn main() {
 
     unsafe { ctx.make_current(&surf).unwrap() }
     let gl = support::Gl::load(|s| ctx.get_proc_address(s).unwrap());
+    // Please note that the surface's swap interval ranges could be different from
+    // the config's on some platforms. Maybe recheck?
     surf.modify_swap_interval(swap_interval).unwrap();
 
     el.run(move |event, _, control_flow| {
