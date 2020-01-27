@@ -685,6 +685,8 @@ impl Context {
         };
 
         // TODO: If BadMatch, it was either an unsupported sharing or version.
+        disp.check_errors()?;
+
         if context.is_null() {
             return Err(make_oserror!(OsError::Misc(
                 "GL context creation failed, no errors generated though".to_string(),
