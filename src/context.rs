@@ -283,9 +283,13 @@ pub type ContextBuilder<'a> = ContextBuilderWrapper<&'a Context>;
 impl<'a> ContextBuilder<'a> {
     /// Builds a [`Context`] that matches the specified requirements.
     ///
+    /// # Saftey
+    ///
+    /// Should not outlive the [`Config`]'s `ND`.
+    ///
     /// [`Context`]: crate::context::Context
     #[inline]
-    pub fn build(self, conf: &Config) -> Result<Context, Error> {
+    pub unsafe fn build(self, conf: &Config) -> Result<Context, Error> {
         let cb = self.map_sharing(|ctx| &ctx.0);
         platform_impl::Context::new(cb, conf.as_ref()).map(Context)
     }

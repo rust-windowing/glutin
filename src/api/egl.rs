@@ -129,7 +129,7 @@ impl Display {
             unsafe {
                 egl.GetPlatformDisplay(
                     ffi::egl::PLATFORM_GBM_KHR,
-                    gbm_device as *mut _,
+                    gbm_device.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _) as *mut _,
                     std::ptr::null(),
                 )
             }
@@ -140,7 +140,7 @@ impl Display {
             unsafe {
                 egl.GetPlatformDisplayEXT(
                     ffi::egl::PLATFORM_GBM_KHR,
-                    gbm_device as *mut _,
+                    gbm_device.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _) as *mut _,
                     std::ptr::null(),
                 )
             }
@@ -151,7 +151,7 @@ impl Display {
             unsafe {
                 egl.GetPlatformDisplay(
                     ffi::egl::PLATFORM_WAYLAND_KHR,
-                    wl_display as *mut _,
+                    wl_display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _) as *mut _,
                     std::ptr::null(),
                 )
             }
@@ -162,7 +162,7 @@ impl Display {
             unsafe {
                 egl.GetPlatformDisplayEXT(
                     ffi::egl::PLATFORM_WAYLAND_EXT,
-                    wl_display as *mut _,
+                    wl_display.unwrap_or(ffi::egl::DEFAULT_DISPLAY as *mut _) as *mut _,
                     std::ptr::null(),
                 )
             }
@@ -228,14 +228,6 @@ impl Display {
             RawDisplay::Xlib {
                 display,
                 screen: None,
-                ..
-            }
-            | RawDisplay::Gbm {
-                gbm_device: display,
-                ..
-            }
-            | RawDisplay::Wayland {
-                wl_display: display,
                 ..
             }
             | RawDisplay::Windows {
@@ -440,7 +432,7 @@ macro_rules! attrib {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
     display: Arc<Display>,
-    config_id: ffi::EGLConfig,
+    config: ffi::EGLConfig,
 }
 
 unsafe impl Send for Config {}
@@ -816,12 +808,12 @@ impl Config {
 
         Ok(confs
             .into_iter()
-            .map(|(attribs, config_id)| {
+            .map(|(attribs, config)| {
                 (
                     attribs,
                     Config {
                         display: Arc::clone(&display),
-                        config_id,
+                        config,
                     },
                 )
             })
@@ -830,7 +822,17 @@ impl Config {
 
     #[inline]
     pub fn get_native_visual_id(&self) -> Result<ffi::EGLint, Error> {
-        get_native_visual_id(**self.display, self.config_id)
+        get_native_visual_id(**self.display, self.config)
+    }
+
+    #[inline]
+    pub fn raw_config(&self) -> *mut raw::c_void {
+        self.config as *mut _
+    }
+
+    #[inline]
+    pub fn raw_display(&self) -> *mut raw::c_void {
+        **self.display as *mut _
     }
 }
 
@@ -974,7 +976,7 @@ impl Context {
         let context = unsafe {
             egl.CreateContext(
                 **display,
-                conf.config.config_id,
+                conf.config.config,
                 sharing,
                 context_attributes.as_ptr(),
             )
@@ -1083,7 +1085,7 @@ impl Context {
     //     }
     //     *surface = egl.CreateWindowSurface(
     //         **self.display,
-    //         self.config_id,
+    //         self.config,
     //         nwin,
     //         std::ptr::null(),
     //     );
@@ -1154,6 +1156,11 @@ impl Context {
         } else {
             Ok(())
         }
+    }
+
+    #[inline]
+    pub fn raw_context(&self) -> *mut raw::c_void {
+        self.context as *mut _
     }
 }
 
@@ -1273,6 +1280,11 @@ impl<T: SurfaceTypeTrait> Surface<T> {
 
         Context::check_errors(Some(ret))
     }
+
+    #[inline]
+    pub fn raw_surface(&self) -> *mut raw::c_void {
+        self.surface as *mut _
+    }
 }
 
 impl Surface<Window> {
@@ -1285,8 +1297,7 @@ impl Surface<Window> {
         let egl = EGL.as_ref().unwrap();
         let desc = Self::assemble_desc(conf.clone(), None);
         let surface = unsafe {
-            let surf =
-                egl.CreateWindowSurface(**display, conf.config.config_id, nwin, desc.as_ptr());
+            let surf = egl.CreateWindowSurface(**display, conf.config.config, nwin, desc.as_ptr());
             if surf.is_null() {
                 return Err(make_oserror!(OsError::Misc(format!(
                     "eglCreateWindowSurface failed with 0x{:x}",
@@ -1390,7 +1401,8 @@ impl Surface<PBuffer> {
 
         let desc = Self::assemble_desc(conf.clone(), Some(size));
         let surf = unsafe {
-            let pbuffer = egl.CreatePbufferSurface(**display, conf.config.config_id, dbg!(desc).as_ptr());
+            let pbuffer =
+                egl.CreatePbufferSurface(**display, conf.config.config, dbg!(desc).as_ptr());
             if pbuffer.is_null() || pbuffer == ffi::egl::NO_SURFACE {
                 return Err(make_oserror!(OsError::Misc(format!(
                     "eglCreatePbufferSurface failed with 0x{:x}",

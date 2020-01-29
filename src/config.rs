@@ -480,9 +480,13 @@ impl ConfigsFinder {
 
     /// Finds all the [`Config`]s that match the specified requirements.
     ///
+    /// # Saftey
+    ///
+    /// Should not outlive `ND`.
+    ///
     /// [`Config`]: crate::config::ConfigWrapper
     #[inline]
-    pub fn find<ND: NativeDisplay>(self, nd: &ND) -> Result<Vec<Config>, Error> {
+    pub unsafe fn find<ND: NativeDisplay>(self, nd: &ND) -> Result<Vec<Config>, Error> {
         self.desired_swap_interval_ranges
             .iter()
             .map(|sir| sir.validate())

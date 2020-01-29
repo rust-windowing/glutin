@@ -8,87 +8,151 @@
 
 pub mod osmesa;
 
-pub use crate::api::egl::ffi::{EGLConfig, EGLContext, EGLDisplay, EGLSurface};
-pub use crate::api::glx::ffi::{Display as GLXDisplay, GLXContext, GLXDrawable, GLXFBConfig};
 use crate::config::{Config, ConfigsFinder};
 use crate::context::Context;
 use crate::surface::{Surface, SurfaceTypeTrait};
 
 use std::os::raw;
 
-// FIXME DOCS
-
+/// The raw config type from the underlying API.
 #[non_exhaustive]
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum NativeConfig {
-    Egl(EGLConfig),
-    Glx(GLXFBConfig),
+pub enum RawConfig {
+    /// An EGLContext
+    Egl(*mut raw::c_void),
+    /// An GLXFBConfig
+    Glx(*mut raw::c_void),
 }
 
+/// The raw display type from the underlying API.
 #[non_exhaustive]
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum NativeDisplay {
-    Egl(EGLDisplay),
-    Glx(*mut GLXDisplay),
+pub enum RawDisplay {
+    /// An EGLDisplay
+    Egl(*mut raw::c_void),
+    /// An Display
+    Glx(*mut raw::c_void),
 }
 
+/// The raw surface type from the underlying API.
 #[non_exhaustive]
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum NativeSurface {
-    Egl(EGLSurface),
-    Glx(GLXDrawable),
+pub enum RawSurface {
+    /// An EGLSurface
+    Egl(*mut raw::c_void),
+    /// An GLXDrawable
+    Glx(*mut raw::c_void),
 }
 
+/// The raw context type from the underlying API.
 #[non_exhaustive]
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum NativeContext {
-    Egl(EGLContext),
-    Glx(GLXContext),
+pub enum RawContext {
+    /// An EGLContext
+    Egl(*mut raw::c_void),
+    /// An GLXContext
+    Glx(*mut raw::c_void),
 }
 
+/// An extention implemented on [`Config`] for getting the [`Config`]'s
+/// [`RawConfig`] and [`RawDisplay`].
+///
+/// [`Config`]: crate::config::Config
+/// [`RawConfig`]: crate::platform::unix::RawConfig
+/// [`RawDisplay`]: crate::platform::unix::RawDisplay
 pub trait ConfigExt {
-    fn config(&self) -> NativeConfig;
-    fn display(&self) -> NativeDisplay;
+    /// Returns this [`Config`]'s [`RawConfig`].
+    ///
+    /// # Saftey
+    ///
+    /// Should not outlive the underlying display. The underlying display is only
+    /// released when all of the following have been released:
+    ///
+    ///  * This [`Config`],
+    ///  * All the sister [`Config`]s returned alongside this [`Config`] by the [`ConfigsFinder`],
+    ///  * All the [`Surface`]s and [`Context`]s made with this [`Config`]; and
+    ///  * All the [`Surface`]s and [`Context`]s made with this [`Config`]'s sister [`Config`]s.
+    ///
+    /// [`Config`]: crate::config::Config
+    /// [`ConfigsFinder`]: crate::config::ConfigsFinder
+    /// [`Surface`]: crate::surface::Surface
+    /// [`Context`]: crate::context::Context
+    /// [`RawConfig`]: crate::platform::unix::RawConfig
+    unsafe fn raw_config(&self) -> RawConfig;
+
+    /// Returns this [`Config`]'s [`RawDisplay`].
+    ///
+    /// # Saftey
+    ///
+    /// See [`ConfigExt::config`].
+    ///
+    /// [`Config`]: crate::config::Config
+    /// [`RawDisplay`]: crate::platform::unix::RawDisplay
+    /// [`ConfigExt::config`]: crate::platform::unix::ConfigExt::config
+    unsafe fn raw_display(&self) -> RawDisplay;
 }
 
 impl ConfigExt for Config {
     #[inline]
-    fn config(&self) -> NativeConfig {
-        // FIXME
-        unimplemented!()
+    unsafe fn raw_config(&self) -> RawConfig {
+        self.config.raw_config()
     }
+
     #[inline]
-    fn display(&self) -> NativeDisplay {
-        // FIXME
-        unimplemented!()
+    unsafe fn raw_display(&self) -> RawDisplay {
+        self.config.raw_display()
     }
 }
 
+/// An extention implemented on [`Surface`] for getting the [`Surface`]'s
+/// and [`RawSurface`].
+///
+/// [`Surface`]: crate::config::Surface
+/// [`RawSurface`]: crate::platform::unix::RawSurface
 pub trait SurfaceExt {
-    fn surface(&self) -> NativeSurface;
+    /// Returns this [`Surface`]'s [`RawSurface`].
+    ///
+    /// # Saftey
+    ///
+    /// Should not outlive this [`Surface`].
+    ///
+    /// [`Surface`]: crate::config::Surface
+    /// [`RawSurface`]: crate::platform::unix::RawSurface
+    unsafe fn raw_surface(&self) -> RawSurface;
 }
 
 impl<T: SurfaceTypeTrait> SurfaceExt for Surface<T> {
     #[inline]
-    fn surface(&self) -> NativeSurface {
-        // FIXME
-        unimplemented!()
+    unsafe fn raw_surface(&self) -> RawSurface {
+        self.0.raw_surface()
     }
 }
 
+/// An extention implemented on [`Context`] for getting the [`Context`]'s
+/// and [`RawContext`].
+///
+/// [`Context`]: crate::context::Context
+/// [`RawContext`]: crate::platform::unix::RawContext
 pub trait ContextExt {
-    fn context(&self) -> NativeContext;
+    /// Returns this [`Context`]'s [`RawContext`].
+    ///
+    /// # Saftey
+    ///
+    /// Should not outlive this [`Context`].
+    ///
+    /// [`Context`]: crate::context::Context
+    /// [`RawContext`]: crate::platform::unix::RawContext
+    unsafe fn context(&self) -> RawContext;
 }
 
 impl ContextExt for Context {
     #[inline]
-    fn context(&self) -> NativeContext {
-        // FIXME
-        unimplemented!()
+    unsafe fn context(&self) -> RawContext {
+        self.0.raw_context()
     }
 }
 
-/// Which backing api should Glutin use. Wayland requires EGL.
+/// Which backing api should Glutin use. Non-X11 requires EGL.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BackingApi {
     GlxThenEgl,

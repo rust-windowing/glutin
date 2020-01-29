@@ -12,10 +12,10 @@ use glutin::platform::unix::osmesa::{OsMesaBuffer, OsMesaContext, OsMesaContextB
 use glutin::config::{Api, Config, ConfigsFinder, Version};
 use glutin::context::{Context, ContextBuilder};
 use glutin::surface::{PBuffer, Surface};
+use glutin_interface::{NativeDisplay, RawDisplay, Seal};
 use winit::event_loop::EventLoop;
 use winit_types::dpi::PhysicalSize;
 use winit_types::error::{Error, ErrorType};
-use glutin_interface::{RawDisplay, NativeDisplay, Seal};
 
 use std::ffi::{c_void, CStr};
 
@@ -191,7 +191,7 @@ pub enum HeadlessBackend {
 }
 
 impl HeadlessBackend {
-    pub fn new<T>(
+    pub unsafe fn new<T>(
         el: &EventLoop<T>,
         size: &PhysicalSize<u32>,
         must_support_windows: bool,
@@ -226,7 +226,7 @@ impl HeadlessBackend {
                 println!("PBuffer configeration chosen: {:?}", conf);
 
                 let ctx = ContextBuilder::new().build(&conf).unwrap();
-                let surf = unsafe { Surface::new_pbuffer(&conf, size).unwrap() };
+                let surf = Surface::new_pbuffer(&conf, size).unwrap();
 
                 return Ok((HeadlessBackend::PBuffer(ctx, surf), Some(conf)));
             }
@@ -237,30 +237,39 @@ impl HeadlessBackend {
             return Err(errs);
         }
 
-        struct EglMesaSurfaceless;
-        impl NativeDisplay for EglMesaSurfaceless {
-            fn raw_display(&self) -> RawDisplay {
-                RawDisplay::EglMesaSurfaceless {
-                    _non_exhaustive_do_not_use: Seal,
+        #[cfg(any(
+            target_os = "linux",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd",
+        ))]
+        {
+            struct EglMesaSurfaceless;
+            impl NativeDisplay for EglMesaSurfaceless {
+                fn raw_display(&self) -> RawDisplay {
+                    RawDisplay::EglMesaSurfaceless {
+                        _non_exhaustive_do_not_use: Seal,
+                    }
                 }
             }
-        }
 
-        // You can also try to use PBuffers, but from experience that is very
-        // buggy.
-        match ConfigsFinder::new()
-            .with_must_support_surfaceless(true)
-            .with_must_support_windows(must_support_windows)
-            .with_gl((Api::OpenGl, Version(3, 0)))
-            .find(&EglMesaSurfaceless)
-        {
-            Ok(mut confs) => {
-                let conf = confs.drain(..1).next().unwrap();
-                println!("EGL Mesa Surfaceless configeration chosen: {:?}", conf);
-                let ctx = ContextBuilder::new().build(&conf).unwrap();
-                return Ok((HeadlessBackend::Surfaceless(ctx), Some(conf)));
+            // You can also try to use PBuffers, but from experience that is very
+            // buggy.
+            match ConfigsFinder::new()
+                .with_must_support_surfaceless(true)
+                .with_must_support_windows(must_support_windows)
+                .with_gl((Api::OpenGl, Version(3, 0)))
+                .find(&EglMesaSurfaceless)
+            {
+                Ok(mut confs) => {
+                    let conf = confs.drain(..1).next().unwrap();
+                    println!("EGL Mesa Surfaceless configeration chosen: {:?}", conf);
+                    let ctx = ContextBuilder::new().build(&conf).unwrap();
+                    return Ok((HeadlessBackend::Surfaceless(ctx), Some(conf)));
+                }
+                Err(err) => errs.append(err),
             }
-            Err(err) => errs.append(err),
         }
 
         #[cfg(any(

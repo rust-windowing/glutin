@@ -3,6 +3,7 @@ use crate::api::glx::{self, ffi};
 use crate::config::{ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapInterval};
 use crate::context::ContextBuilderWrapper;
 use crate::platform::unix::BackingApi;
+use crate::platform::unix::{RawConfig, RawContext, RawDisplay as GlutinRawDisplay, RawSurface};
 use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
 
 use glutin_interface::{
@@ -164,6 +165,22 @@ impl Config {
             Config::Glx(conf) => conf.screen(),
         }
     }
+
+    #[inline]
+    pub fn raw_display(&self) -> GlutinRawDisplay {
+        match self {
+            Config::Egl { config, .. } => GlutinRawDisplay::Egl(config.raw_display()),
+            Config::Glx(conf) => GlutinRawDisplay::Glx(***conf.display() as *mut _),
+        }
+    }
+
+    #[inline]
+    pub fn raw_config(&self) -> RawConfig {
+        match self {
+            Config::Egl { config, .. } => RawConfig::Egl(config.raw_config()),
+            Config::Glx(conf) => RawConfig::Glx(conf.raw_config()),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -303,6 +320,14 @@ impl Context {
     }
 
     #[inline]
+    pub fn raw_context(&self) -> RawContext {
+        match self {
+            Context::Egl { context, .. } => RawContext::Egl(context.raw_context()),
+            Context::Glx(ref ctx) => RawContext::Glx(ctx.raw_context()),
+        }
+    }
+
+    #[inline]
     pub fn get_proc_address(&self, addr: &str) -> Result<*const raw::c_void, Error> {
         match self {
             Context::Egl { context, .. } => context.get_proc_address(addr),
@@ -343,6 +368,14 @@ impl<T: SurfaceTypeTrait> Surface<T> {
         match self {
             Surface::Egl { surface, .. } => surface.is_current(),
             Surface::Glx(ref surf) => surf.is_current(),
+        }
+    }
+
+    #[inline]
+    pub fn raw_surface(&self) -> RawSurface {
+        match self {
+            Surface::Egl { surface, .. } => RawSurface::Egl(surface.raw_surface()),
+            Surface::Glx(ref surf) => RawSurface::Glx(surf.raw_surface()),
         }
     }
 

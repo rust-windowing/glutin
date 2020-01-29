@@ -2,12 +2,13 @@ use crate::api::egl;
 use crate::config::{ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapInterval};
 use crate::context::ContextBuilderWrapper;
 use crate::platform::unix::BackingApi;
+use crate::platform::unix::{RawConfig, RawContext, RawDisplay as GlutinRawDisplay, RawSurface};
 use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
 use crate::utils::{NoCmp, NoPrint};
 
 use glutin_interface::{
-    NativeDisplay, NativePixmap, NativePixmapSource, NativeWindow, NativeWindowSource, RawDisplay,
-    RawWindow, Seal, WaylandWindowParts,
+    GbmWindowParts, NativeDisplay, NativePixmap, NativePixmapSource, NativeWindow,
+    NativeWindowSource, RawDisplay, RawWindow, Seal, WaylandWindowParts,
 };
 use wayland_client::egl as wegl;
 pub use wayland_client::sys::client::wl_display;
@@ -21,12 +22,14 @@ use std::os::raw;
 pub enum Backend {
     Wayland,
     EglMesaSurfaceless,
+    Gbm,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Config {
     Wayland(egl::Config),
     EglMesaSurfaceless(egl::Config),
+    Gbm(egl::Config),
 }
 
 impl Deref for Config {
@@ -36,6 +39,7 @@ impl Deref for Config {
         match self {
             Config::Wayland(conf) => conf,
             Config::EglMesaSurfaceless(conf) => conf,
+            Config::Gbm(conf) => conf,
         }
     }
 }
@@ -76,6 +80,7 @@ impl Config {
                     match nd.raw_display() {
                         RawDisplay::Wayland { .. } => Config::Wayland(config),
                         RawDisplay::EglMesaSurfaceless { .. } => Config::EglMesaSurfaceless(config),
+                        RawDisplay::Gbm { .. } => Config::Gbm(config),
                         _ => unreachable!(),
                     },
                 )
@@ -88,7 +93,18 @@ impl Config {
         match self {
             Config::Wayland(_) => Backend::Wayland,
             Config::EglMesaSurfaceless(_) => Backend::EglMesaSurfaceless,
+            Config::Gbm(_) => Backend::Gbm,
         }
+    }
+
+    #[inline]
+    pub fn raw_config(&self) -> RawConfig {
+        RawConfig::Egl((**self).raw_config())
+    }
+
+    #[inline]
+    pub fn raw_display(&self) -> GlutinRawDisplay {
+        GlutinRawDisplay::Egl((**self).raw_display())
     }
 }
 
@@ -100,6 +116,7 @@ pub(crate) enum Surface<T: SurfaceTypeTrait> {
     },
     WaylandPbuffer(egl::Surface<T>),
     EglMesaSurfaceless(egl::Surface<T>),
+    Gbm(egl::Surface<T>),
 }
 
 impl<T: SurfaceTypeTrait> Deref for Surface<T> {
@@ -109,6 +126,7 @@ impl<T: SurfaceTypeTrait> Deref for Surface<T> {
         match self {
             Surface::WaylandWindow { surface, .. } | Surface::WaylandPbuffer(surface) => surface,
             Surface::EglMesaSurfaceless(surf) => surf,
+            Surface::Gbm(surf) => surf,
         }
     }
 }
@@ -126,6 +144,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
             .map_config(|conf| match self.backend() {
                 Backend::Wayland => Config::Wayland(conf),
                 Backend::EglMesaSurfaceless => Config::EglMesaSurfaceless(conf),
+                Backend::Gbm => Config::Gbm(conf),
             })
     }
 
@@ -139,7 +158,13 @@ impl<T: SurfaceTypeTrait> Surface<T> {
         match self {
             Surface::WaylandWindow { .. } | Surface::WaylandPbuffer(_) => Backend::Wayland,
             Surface::EglMesaSurfaceless(_) => Backend::EglMesaSurfaceless,
+            Surface::Gbm(_) => Backend::Gbm,
         }
+    }
+
+    #[inline]
+    pub fn raw_surface(&self) -> RawSurface {
+        RawSurface::Egl((**self).raw_surface())
     }
 }
 
@@ -161,11 +186,20 @@ impl Surface<Window> {
                 )?;
                 Self::new_existing(conf, &nw).map(|surf| (nw, surf))
             }
-            _ => {
-                Err(make_error!(ErrorType::NotSupported(
-                    "Non-Wayland backends do not support native surface types.".to_string(),
-                )))
+            Backend::Gbm => {
+                #[allow(deprecated)]
+                let nw = nws.build_gbm(
+                    wb,
+                    GbmWindowParts {
+                        color_format: (**conf.config).get_native_visual_id()? as u32,
+                        _non_exhaustive_do_not_use: Seal,
+                    },
+                )?;
+                Self::new_existing(conf, &nw).map(|surf| (nw, surf))
             }
+            _ => Err(make_error!(ErrorType::NotSupported(
+                "Only Wayland and GBM support native window surfaces.".to_string(),
+            ))),
         }
     }
 
@@ -174,11 +208,10 @@ impl Surface<Window> {
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         nw: &NW,
     ) -> Result<Self, Error> {
-        let (width, height): (u32, u32) = nw.size().into();
-
         let surface = nw.raw_window();
         match surface {
             RawWindow::Wayland { wl_surface, .. } => {
+                let (width, height): (u32, u32) = nw.size().into();
                 let wl_surface = wegl::WlEglSurface::new_from_raw(
                     wl_surface as *mut _,
                     width as i32,
@@ -194,11 +227,13 @@ impl Surface<Window> {
                     surface,
                 })
             }
-            _ => {
-                Err(make_error!(ErrorType::NotSupported(
-                    "Non-Wayland backends do not support native surface types.".to_string(),
-                )))
+            RawWindow::Gbm { gbm_surface, .. } => {
+                egl::Surface::<Window>::new(conf.map_config(|conf| &**conf), gbm_surface)
+                    .map(|surf| Surface::Gbm(surf))
             }
+            _ => Err(make_error!(ErrorType::NotSupported(
+                "Non-Wayland backends do not support native surface types.".to_string(),
+            ))),
         }
     }
 
@@ -240,6 +275,7 @@ impl Surface<PBuffer> {
             |surf| match backend {
                 Backend::Wayland => Surface::WaylandPbuffer(surf),
                 Backend::EglMesaSurfaceless => Surface::EglMesaSurfaceless(surf),
+                Backend::Gbm => Surface::Gbm(surf),
             },
         )
     }
@@ -272,6 +308,7 @@ impl Surface<Pixmap> {
 pub enum Context {
     Wayland(egl::Context),
     EglMesaSurfaceless(egl::Context),
+    Gbm(egl::Context),
 }
 
 impl Deref for Context {
@@ -281,6 +318,7 @@ impl Deref for Context {
         match self {
             Context::Wayland(ctx) => ctx,
             Context::EglMesaSurfaceless(ctx) => ctx,
+            Context::Gbm(ctx) => ctx,
         }
     }
 }
@@ -299,6 +337,7 @@ impl Context {
         .map(|ctx| match backend {
             Backend::Wayland => Context::Wayland(ctx),
             Backend::EglMesaSurfaceless => Context::EglMesaSurfaceless(ctx),
+            Backend::Gbm => Context::Gbm(ctx),
         })
     }
 
@@ -358,6 +397,7 @@ impl Context {
             .map_config(|conf| match self.backend() {
                 Backend::Wayland => Config::Wayland(conf),
                 Backend::EglMesaSurfaceless => Config::EglMesaSurfaceless(conf),
+                Backend::Gbm => Config::Gbm(conf),
             })
     }
 
@@ -366,6 +406,12 @@ impl Context {
         match self {
             Context::Wayland(_) => Backend::Wayland,
             Context::EglMesaSurfaceless(_) => Backend::EglMesaSurfaceless,
+            Context::Gbm(_) => Backend::Gbm,
         }
+    }
+
+    #[inline]
+    pub fn raw_context(&self) -> RawContext {
+        RawContext::Egl((**self).raw_context())
     }
 }

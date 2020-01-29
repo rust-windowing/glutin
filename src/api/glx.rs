@@ -526,6 +526,11 @@ impl Config {
     pub fn get_visual_info(&self) -> ffi::XVisualInfo {
         *self.visual_info
     }
+
+    #[inline]
+    pub fn raw_config(&self) -> *mut raw::c_void {
+        self.config as *mut _
+    }
 }
 
 #[inline]
@@ -777,6 +782,11 @@ impl Context {
         }
         Ok(())
     }
+
+    #[inline]
+    pub fn raw_context(&self) -> *mut raw::c_void {
+        self.context as *mut _
+    }
 }
 
 impl Drop for Context {
@@ -820,6 +830,11 @@ impl<T: SurfaceTypeTrait> Surface<T> {
         let glx = GLX.as_ref().unwrap();
         let res = glx.MakeCurrent(****self.display as *mut _, 0, std::ptr::null());
         Context::check_errors(&self.display, res)
+    }
+
+    #[inline]
+    pub fn raw_surface(&self) -> *mut raw::c_void {
+        self.surface as *mut _
     }
 }
 

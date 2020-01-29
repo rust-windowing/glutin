@@ -12,6 +12,7 @@ pub mod x11;
 use crate::config::{ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapInterval};
 use crate::context::ContextBuilderWrapper;
 pub use crate::platform::unix::ConfigPlatformAttributes;
+use crate::platform::unix::{RawConfig, RawContext, RawDisplay as GlutinRawDisplay, RawSurface};
 use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
 
 use glutin_interface::{
@@ -35,7 +36,9 @@ impl Config {
         nd: &ND,
     ) -> Result<Vec<(ConfigAttribs, Config)>, Error> {
         Ok(match nd.raw_display() {
-            RawDisplay::Wayland { .. } | RawDisplay::EglMesaSurfaceless { .. } => {
+            RawDisplay::Wayland { .. }
+            | RawDisplay::EglMesaSurfaceless { .. }
+            | RawDisplay::Gbm { .. } => {
                 let configs = generic_egl::Config::new(cf, nd)?;
                 configs
                     .into_iter()
@@ -52,6 +55,22 @@ impl Config {
             // FIXME: GBM/EGLExtDevice backends.
             _ => unimplemented!(),
         })
+    }
+
+    #[inline]
+    pub fn raw_config(&self) -> RawConfig {
+        match self {
+            Config::GenericEgl(ref conf) => conf.raw_config(),
+            Config::X11(ref conf) => conf.raw_config(),
+        }
+    }
+
+    #[inline]
+    pub fn raw_display(&self) -> GlutinRawDisplay {
+        match self {
+            Config::GenericEgl(ref conf) => conf.raw_display(),
+            Config::X11(ref conf) => conf.raw_display(),
+        }
     }
 }
 
@@ -178,6 +197,14 @@ impl Context {
     }
 
     #[inline]
+    pub fn raw_context(&self) -> RawContext {
+        match self {
+            Context::GenericEgl(ref ctx) => ctx.raw_context(),
+            Context::X11(ref ctx) => ctx.raw_context(),
+        }
+    }
+
+    #[inline]
     pub fn get_proc_address(&self, addr: &str) -> Result<*const raw::c_void, Error> {
         match self {
             Context::GenericEgl(ref ctx) => ctx.get_proc_address(addr),
@@ -206,6 +233,14 @@ impl<T: SurfaceTypeTrait> Surface<T> {
         match self {
             Surface::GenericEgl(ref surf) => surf.is_current(),
             Surface::X11(ref surf) => surf.is_current(),
+        }
+    }
+
+    #[inline]
+    pub fn raw_surface(&self) -> RawSurface {
+        match self {
+            Surface::GenericEgl(ref surf) => surf.raw_surface(),
+            Surface::X11(ref surf) => surf.raw_surface(),
         }
     }
 

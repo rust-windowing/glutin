@@ -195,7 +195,9 @@ impl Surface<Pixmap> {
     /// Takes an `NPS` and its `NPS::PixmapBuilder` type, returning a
     /// `NPS::Pixmap` plus a `Surface<`[`Pixmap`]`>`.
     ///
-    /// **WARNING** The `Surface` must be dropped before the `NPS::Pixmap`.
+    /// # Saftey
+    ///
+    /// Should not outlive the returned `NPS::Pixmap` nor the [`Config`]'s `ND`.
     ///
     /// [`Pixmap`]: crate::surface::Pixmap
     #[inline]
@@ -230,7 +232,9 @@ impl Surface<Pixmap> {
     ///  * X11: FIXME determine when implemented
     ///  FIXME missing plats
     ///
-    /// **WARNING** The `Surface` must be dropped before the pixmap.
+    /// # Saftey
+    ///
+    /// Should not outlive `NP` nor the [`Config`]'s `ND`.
     ///
     /// [`new_pixmap`]: crate::surface::Surface::new_pixmap()
     /// [`Pixmap`]: crate::surface::Pixmap
@@ -253,7 +257,12 @@ impl Surface<Pixmap> {
 impl Surface<PBuffer> {
     /// Creates a [`PBuffer`] surface.
     ///
+    /// # Saftey
+    ///
+    /// Should not outlive the [`Config`]'s `ND`.
+    ///
     /// [`PBuffer`]: crate::surface::PBuffer
+    /// [`Config`]: crate::config::Config
     #[inline]
     pub unsafe fn new_pbuffer(conf: &Config, size: &dpi::PhysicalSize<u32>) -> Result<Self, Error> {
         if !conf.attribs().supports_pbuffers {
@@ -271,9 +280,12 @@ impl Surface<Window> {
     /// Takes an `NWS` and its `NWS::WindowBuilder` type, returning a
     /// `NWS::Window` plus a `Surface<`[`Window`]`>`.
     ///
-    /// **WARNING** The `Surface` must be dropped before the `NWS::Window`.
+    /// # Saftey
+    ///
+    /// Should not outlive the returned `NWS::Window` nor the [`Config`]'s `ND`.
     ///
     /// [`Window`]: crate::surface::Window
+    /// [`Config`]: crate::config::Config
     #[inline]
     pub unsafe fn new_window<NWS: NativeWindowSource>(
         conf: &Config,
@@ -307,7 +319,9 @@ impl Surface<Window> {
     ///  the window's.
     ///  FIXME missing plats
     ///
-    /// **WARNING** The `Surface` must be dropped before the window.
+    /// # Saftey
+    ///
+    /// Should not outlive `NW` nor the [`Config`]'s `ND`.
     ///
     /// [`new_window`]: crate::surface::Surface::new_window()
     /// [`Window`]: crate::surface::Window
