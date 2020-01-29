@@ -49,11 +49,11 @@ fn main() {
     let el = EventLoop::new();
     let wb = WindowBuilder::new().with_title("A fantastic window!");
 
-    let confs = ConfigsFinder::new().find(&*el).unwrap();
+    let confs = unsafe { ConfigsFinder::new().find(&*el).unwrap() };
     let conf = &confs[0];
     println!("Configeration chosen: {:?}", conf);
 
-    let ctx = ContextBuilder::new().build(conf).unwrap();
+    let ctx = unsafe { ContextBuilder::new().build(conf).unwrap() };
     let (win, surf) = unsafe { Surface::new_window(conf, &*el, wb).unwrap() };
 
     unsafe { ctx.make_current(&surf).unwrap() }

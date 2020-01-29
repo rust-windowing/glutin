@@ -131,11 +131,7 @@ fn main() {
     let dims = PhysicalSize::new(dims.0 as u32, dims.1 as u32);
     let flags = BufferObjectFlags::SCANOUT | BufferObjectFlags::RENDERING;
 
-    let confs = unsafe {
-        ConfigsFinder::new()
-            .find(&gbm)
-            .unwrap()
-    };
+    let confs = unsafe { ConfigsFinder::new().find(&gbm).unwrap() };
     let conf = unsafe { choose_conf(&gbm, &confs, flags) };
     println!("Configeration chosen: {:?}", conf);
 

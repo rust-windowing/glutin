@@ -11,11 +11,11 @@ fn main() {
     simple_logger::init().unwrap();
     let el = EventLoop::new();
 
-    let confs = ConfigsFinder::new().find(&*el).unwrap();
+    let confs = unsafe { ConfigsFinder::new().find(&*el).unwrap() };
     let conf = &confs[0];
     println!("Configeration chosen: {:?}", conf);
 
-    let ctx = ContextBuilder::new().build(conf).unwrap();
+    let ctx = unsafe { ContextBuilder::new().build(conf).unwrap() };
 
     let mut wins = std::collections::HashMap::new();
     for index in 0..3 {

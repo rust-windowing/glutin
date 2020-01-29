@@ -34,11 +34,11 @@ fn main() {
     ))]
     let conf_finder = conf_finder.with_x11_transparency(Some(true));
 
-    let confs = conf_finder.find(&*el).unwrap();
+    let confs = unsafe { conf_finder.find(&*el).unwrap() };
     let conf = &confs[0];
     println!("Configeration chosen: {:?}", conf);
 
-    let ctx = ContextBuilder::new().build(conf).unwrap();
+    let ctx = unsafe { ContextBuilder::new().build(conf).unwrap() };
     let (win, surf) = unsafe { Surface::new_window(conf, &*el, wb).unwrap() };
 
     unsafe { ctx.make_current(&surf).unwrap() }

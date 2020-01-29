@@ -14,7 +14,7 @@ fn main() {
     let mut size = PhysicalSize::new(512, 512);
     let el = EventLoop::new();
 
-    let (backend, conf) = HeadlessBackend::new(&el, &size, true).unwrap();
+    let (backend, conf) = unsafe { HeadlessBackend::new(&el, &size, true).unwrap() };
     let conf = conf.unwrap();
     let hgl = backend.load_symbols().unwrap();
 
@@ -28,10 +28,12 @@ fn main() {
     let wb = WindowBuilder::new()
         .with_title("A fantastic window!")
         .with_inner_size(size);
-    let ctx = ContextBuilder::new()
-        .with_sharing(Some(backend.context()))
-        .build(&conf)
-        .unwrap();
+    let ctx = unsafe {
+        ContextBuilder::new()
+            .with_sharing(Some(backend.context()))
+            .build(&conf)
+            .unwrap()
+    };
     let (win, surf) = unsafe { Surface::new_window(&conf, &*el, wb).unwrap() };
 
     unsafe { ctx.make_current(&surf).unwrap() }
