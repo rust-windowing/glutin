@@ -15,7 +15,7 @@ use drm::control::connector::Info as ConnectorInfo;
 use drm::control::{crtc, framebuffer, Device as ControlDevice, Mode, ResourceInfo};
 use drm::Device as BasicDevice;
 use gbm::{BufferObjectFlags, Device, DeviceGlutinWrapper, Format};
-use glutin::config::{Config, ConfigsFinder, SwapInterval, SwapIntervalRange};
+use glutin::config::{Config, ConfigsFinder};
 use glutin::context::ContextBuilder;
 use glutin::platform::unix::{ConfigExt, RawConfig, RawDisplay};
 use glutin::surface::Surface;
@@ -133,7 +133,6 @@ fn main() {
 
     let confs = unsafe {
         ConfigsFinder::new()
-            .with_desired_swap_interval_ranges(vec![SwapIntervalRange::Wait(1..2)])
             .find(&gbm)
             .unwrap()
     };
@@ -146,22 +145,40 @@ fn main() {
         Surface::new_window(conf, &gbm, (dims, flags)).unwrap()
     };
     unsafe { ctx.make_current(&surf).unwrap() }
-    surf.modify_swap_interval(SwapInterval::Wait(1)).unwrap();
     let gl = support::Gl::load(|s| ctx.get_proc_address(s).unwrap());
 
-    loop {
+    let mut has_modsetted = false;
+    'frame: loop {
         gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
         surf.swap_buffers().unwrap();
         let bo = unsafe { gbmsurf.lock_front_buffer().unwrap() };
         let fb_info = framebuffer::create(&gbm, &*bo).unwrap();
-        crtc::set(
+        if !has_modsetted {
+            crtc::set(
+                &gbm,
+                crtc_handle,
+                fb_info.handle(),
+                &[con],
+                (0, 0),
+                Some(mode),
+            )
+            .unwrap();
+            has_modsetted = true;
+        }
+        crtc::page_flip(
             &gbm,
             crtc_handle,
             fb_info.handle(),
-            &[con],
-            (0, 0),
-            Some(mode),
+            &[crtc::PageFlipFlags::PageFlipEvent],
         )
         .unwrap();
+        loop {
+            for e in crtc::receive_events(&gbm).unwrap() {
+                match e {
+                    crtc::Event::PageFlip(_) => continue 'frame,
+                    _ => (),
+                }
+            }
+        }
     }
 }
