@@ -84,11 +84,11 @@ pub trait ConfigExt {
     ///
     /// # Saftey
     ///
-    /// See [`ConfigExt::config`].
+    /// See [`ConfigExt::raw_config`].
     ///
     /// [`Config`]: crate::config::Config
     /// [`RawDisplay`]: crate::platform::unix::RawDisplay
-    /// [`ConfigExt::config`]: crate::platform::unix::ConfigExt::config
+    /// [`ConfigExt::raw_config`]: crate::platform::unix::ConfigExt::raw_config
     unsafe fn raw_display(&self) -> RawDisplay;
 }
 
@@ -107,7 +107,7 @@ impl ConfigExt for Config {
 /// An extention implemented on [`Surface`] for getting the [`Surface`]'s
 /// and [`RawSurface`].
 ///
-/// [`Surface`]: crate::config::Surface
+/// [`Surface`]: crate::surface::Surface
 /// [`RawSurface`]: crate::platform::unix::RawSurface
 pub trait SurfaceExt {
     /// Returns this [`Surface`]'s [`RawSurface`].
@@ -116,7 +116,7 @@ pub trait SurfaceExt {
     ///
     /// Should not outlive this [`Surface`].
     ///
-    /// [`Surface`]: crate::config::Surface
+    /// [`Surface`]: crate::surface::Surface
     /// [`RawSurface`]: crate::platform::unix::RawSurface
     unsafe fn raw_surface(&self) -> RawSurface;
 }

@@ -115,6 +115,11 @@ jobs:
         repository: goddessfreya/winit
         path: winit
         ref: winit-glutin-next
+    - uses: actions/checkout@v1
+      with:
+        repository: goddessfreya/gbm.rs
+        path: gbm.rs
+        ref: glutin-fun
 
     - uses: actions/checkout@v1
     # Used to cache cargo-web
