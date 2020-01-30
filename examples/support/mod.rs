@@ -25,9 +25,9 @@ use winit::event_loop::EventLoop;
 use winit_types::dpi::PhysicalSize;
 use winit_types::error::{Error, ErrorType};
 
-use std::path::Path;
 use std::ffi::CStr;
 use std::os::raw;
+use std::path::Path;
 
 #[cfg(any(
     target_os = "linux",
@@ -51,7 +51,7 @@ pub unsafe fn load_egl_sym(lib: &libloading::Library, name: &str) -> *const raw:
         Ok(sym) => {
             assert!(!(*sym).is_null());
             *sym
-        },
+        }
     }
 }
 

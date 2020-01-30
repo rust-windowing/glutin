@@ -8,10 +8,10 @@
 
 mod support;
 
-use glutin_interface::{NativeDisplay, RawDisplay, Seal};
 use glutin::config::{Api, ConfigsFinder, Version};
 use glutin::context::ContextBuilder;
 use glutin::surface::Surface;
+use glutin_interface::{NativeDisplay, RawDisplay, Seal};
 use winit_types::dpi::PhysicalSize;
 
 use std::ffi::CStr;
@@ -27,7 +27,7 @@ fn main() {
         egl.QueryDevicesEXT(0, std::ptr::null_mut(), &mut num_device);
 
         let mut devices = Vec::with_capacity(num_device as usize);
-        devices.resize_with(num_device as usize, || std::mem::zeroed() );
+        devices.resize_with(num_device as usize, || std::mem::zeroed());
 
         let mut new_num_device = 0;
         egl.QueryDevicesEXT(num_device, devices.as_mut_ptr(), &mut new_num_device);
@@ -48,29 +48,33 @@ fn main() {
     }
 
     for device in &devices {
-        let exts = unsafe { CStr::from_ptr(
-            egl.QueryDeviceStringEXT(*device, glutin_egl_sys::egl::EXTENSIONS as _)
-        ) };
+        let exts = unsafe {
+            CStr::from_ptr(egl.QueryDeviceStringEXT(*device, glutin_egl_sys::egl::EXTENSIONS as _))
+        };
         println!("Device {:?} has these exts: {:?}", device, exts);
 
         let nd = DeviceDisplay(*device);
 
         let mut choosen_confs = vec![];
-        let mut confs = unsafe { ConfigsFinder::new()
-            .with_must_support_pbuffers(true)
-            .with_must_support_windows(false)
-            .with_gl((Api::OpenGl, Version(3, 3)))
-            .find(&nd)
-            .unwrap() };
+        let mut confs = unsafe {
+            ConfigsFinder::new()
+                .with_must_support_pbuffers(true)
+                .with_must_support_windows(false)
+                .with_gl((Api::OpenGl, Version(3, 3)))
+                .find(&nd)
+                .unwrap()
+        };
         let conf = confs.drain(..1).next().unwrap();
         choosen_confs.push(conf);
 
-        let mut confs = unsafe { ConfigsFinder::new()
-            .with_must_support_surfaceless(true)
-            .with_must_support_windows(false)
-            .with_gl((Api::OpenGl, Version(3, 3)))
-            .find(&nd)
-            .unwrap() };
+        let mut confs = unsafe {
+            ConfigsFinder::new()
+                .with_must_support_surfaceless(true)
+                .with_must_support_windows(false)
+                .with_gl((Api::OpenGl, Version(3, 3)))
+                .find(&nd)
+                .unwrap()
+        };
         let conf = confs.drain(..1).next().unwrap();
         choosen_confs.push(conf);
 
@@ -89,8 +93,9 @@ fn main() {
                 match i {
                     0 => ctx.make_current(&surf.as_ref().unwrap()),
                     1 => ctx.make_current_surfaceless(),
-                    _  => unreachable!(),
-                }.unwrap();
+                    _ => unreachable!(),
+                }
+                .unwrap();
             }
 
             let gl = support::Gl::load(|s| ctx.get_proc_address(s).unwrap());
@@ -113,7 +118,10 @@ fn main() {
             }
             gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
 
-            gl.export_to_file(&size, &Path::new(&("headless".to_string() + &i.to_string() + ".png")));
+            gl.export_to_file(
+                &size,
+                &Path::new(&("headless".to_string() + &i.to_string() + ".png")),
+            );
 
             match i {
                 0 => (),
