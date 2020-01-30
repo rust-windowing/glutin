@@ -5,6 +5,7 @@
     target_os = "netbsd",
     target_os = "openbsd",
 ))]
+#![cfg(target_arch="x86_64")]
 
 #[macro_use]
 extern crate log;

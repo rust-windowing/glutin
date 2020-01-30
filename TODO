@@ -1,5 +1,4 @@
 pixmap examples
 new_existing examples
-fix drm w/ 32-bit CI
 Test srgb and flush w/ egl
 clippy
