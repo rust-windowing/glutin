@@ -1,6 +1,5 @@
 pixmap examples
 new_existing examples
-make_current_rw examples
 Test srgb and flush w/ egl
 remove { path = ... } in cargo tomls
 clippy
