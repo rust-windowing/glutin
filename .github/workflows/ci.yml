@@ -140,7 +140,7 @@ jobs:
 
     - name: Install GBM
       if: matrix.platform.os == 'ubuntu-latest'
-      run: sudo apt-get update && sudo apt-get install libgbm-dev
+      run: sudo apt-get update && sudo apt-get install libgbm-dev libdrm-dev
 
     - name: Install cargo-web
       continue-on-error: true
