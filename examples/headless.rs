@@ -12,7 +12,7 @@ fn main() {
     let size = PhysicalSize::new(512, 512);
     let el = EventLoop::new();
 
-    let (backend, _) = unsafe { HeadlessBackend::new(&el, &size, false).unwrap() };
+    let (backend, size, _) = unsafe { HeadlessBackend::new(&el, &size, false).unwrap() };
     let gl = backend.load_symbols().unwrap();
 
     let mut fb = None;

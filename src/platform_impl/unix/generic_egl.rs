@@ -175,6 +175,11 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     pub fn raw_surface(&self) -> RawSurface {
         RawSurface::Egl((**self).raw_surface())
     }
+
+    #[inline]
+    pub fn size(&self) -> Result<dpi::PhysicalSize<u32>, Error> {
+        (**self).size()
+    }
 }
 
 impl Surface<Window> {
@@ -278,16 +283,17 @@ impl Surface<PBuffer> {
     pub unsafe fn new(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         size: &dpi::PhysicalSize<u32>,
+        largest: bool,
     ) -> Result<Self, Error> {
         let backend = conf.config.backend();
-        egl::Surface::<PBuffer>::new(conf.map_config(|conf| &**conf), size).map(
-            |surf| match backend {
+        egl::Surface::<PBuffer>::new(conf.map_config(|conf| &**conf), size, largest).map(|surf| {
+            match backend {
                 Backend::Wayland => Surface::WaylandPbuffer(surf),
                 Backend::EglMesaSurfaceless => Surface::EglMesaSurfaceless(surf),
                 Backend::Gbm => Surface::Gbm(surf),
                 Backend::EglExtDevice => Surface::EglExtDevice(surf),
-            },
-        )
+            }
+        })
     }
 }
 

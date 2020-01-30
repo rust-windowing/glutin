@@ -836,6 +836,32 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     pub fn raw_surface(&self) -> *mut raw::c_void {
         self.surface as *mut _
     }
+
+    #[inline]
+    pub fn size(&self) -> Result<dpi::PhysicalSize<u32>, Error> {
+        let glx = GLX.as_ref().unwrap();
+        let mut width = 0;
+        let mut height = 0;
+
+        unsafe {
+            glx.QueryDrawable(
+                ****self.display as *mut _,
+                self.surface,
+                ffi::glx::WIDTH as _,
+                &mut width,
+            );
+            self.display.check_errors()?;
+            glx.QueryDrawable(
+                ****self.display as *mut _,
+                self.surface,
+                ffi::glx::HEIGHT as _,
+                &mut height,
+            );
+            self.display.check_errors()?;
+        }
+
+        Ok(dpi::PhysicalSize::new(width, height))
+    }
 }
 
 impl Surface<Window> {
@@ -958,6 +984,7 @@ impl Surface<PBuffer> {
     pub fn new(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         size: &dpi::PhysicalSize<u32>,
+        largest: bool,
     ) -> Result<Self, Error> {
         let glx = GLX.as_ref().unwrap();
         let size: (u32, u32) = (*size).into();
@@ -968,6 +995,8 @@ impl Surface<PBuffer> {
             size.0 as raw::c_int,
             ffi::glx::PBUFFER_HEIGHT as raw::c_int,
             size.1 as raw::c_int,
+            ffi::glx::LARGEST_PBUFFER as raw::c_int,
+            if largest { ffi::True } else { ffi::False },
             0,
         ];
 

@@ -260,6 +260,14 @@ impl<T: SurfaceTypeTrait> Surface<T> {
             Surface::X11(ref surf) => surf.make_not_current(),
         }
     }
+
+    #[inline]
+    pub fn size(&self) -> Result<dpi::PhysicalSize<u32>, Error> {
+        match self {
+            Surface::GenericEgl(ref surf) => surf.size(),
+            Surface::X11(ref surf) => surf.size(),
+        }
+    }
 }
 
 impl Surface<PBuffer> {
@@ -267,14 +275,16 @@ impl Surface<PBuffer> {
     pub unsafe fn new(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         size: &dpi::PhysicalSize<u32>,
+        largest: bool,
     ) -> Result<Self, Error> {
         match conf.config {
             Config::GenericEgl(config) => {
-                generic_egl::Surface::<PBuffer>::new(conf.map_config(|_| config), size)
+                generic_egl::Surface::<PBuffer>::new(conf.map_config(|_| config), size, largest)
                     .map(Surface::GenericEgl)
             }
             Config::X11(config) => {
-                x11::Surface::<PBuffer>::new(conf.map_config(|_| config), size).map(Surface::X11)
+                x11::Surface::<PBuffer>::new(conf.map_config(|_| config), size, largest)
+                    .map(Surface::X11)
             }
         }
     }

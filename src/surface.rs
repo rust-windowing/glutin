@@ -189,6 +189,12 @@ impl<T: SurfaceTypeTrait> Surface<T> {
             false => Ok(()),
         }
     }
+
+    /// Returns the size of this surface.
+    #[inline]
+    pub fn size(&self) -> Result<dpi::PhysicalSize<u32>, Error> {
+        self.0.size()
+    }
 }
 
 impl Surface<Pixmap> {
@@ -257,6 +263,10 @@ impl Surface<Pixmap> {
 impl Surface<PBuffer> {
     /// Creates a [`PBuffer`] surface.
     ///
+    /// If `largest` is true, glutin will try to acquire the largest available
+    /// pbuffer smaller than `size` if allocating a pbuffer at the requested
+    /// size would have otherwise failed.
+    ///
     /// # Saftey
     ///
     /// Should not outlive the [`Config`]'s `ND`.
@@ -264,7 +274,11 @@ impl Surface<PBuffer> {
     /// [`PBuffer`]: crate::surface::PBuffer
     /// [`Config`]: crate::config::Config
     #[inline]
-    pub unsafe fn new_pbuffer(conf: &Config, size: &dpi::PhysicalSize<u32>) -> Result<Self, Error> {
+    pub unsafe fn new_pbuffer(
+        conf: &Config,
+        size: &dpi::PhysicalSize<u32>,
+        largest: bool,
+    ) -> Result<Self, Error> {
         if !conf.attribs().supports_pbuffers {
             return Err(make_error!(ErrorType::BadApiUsage(
                 "Tried to make pbuffer surface with config without `supports_pbuffers`."
@@ -272,7 +286,7 @@ impl Surface<PBuffer> {
             )));
         }
 
-        platform_impl::Surface::<PBuffer>::new(conf.as_ref(), size).map(Surface)
+        platform_impl::Surface::<PBuffer>::new(conf.as_ref(), size, largest).map(Surface)
     }
 }
 

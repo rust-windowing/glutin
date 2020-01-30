@@ -263,7 +263,7 @@ impl HeadlessBackend {
         el: &EventLoop<T>,
         size: &PhysicalSize<u32>,
         must_support_windows: bool,
-    ) -> Result<(Self, Option<Config>), Error> {
+    ) -> Result<(Self, PhysicalSize<u32>, Option<Config>), Error> {
         let mut errs = winit_types::make_error!(ErrorType::NotSupported(
             "None of the backends seem to work!".to_string()
         ));
@@ -278,7 +278,7 @@ impl HeadlessBackend {
                 let conf = confs.drain(..1).next().unwrap();
                 println!("Surfaceless configeration chosen: {:?}", conf);
                 let ctx = ContextBuilder::new().build(&conf).unwrap();
-                return Ok((HeadlessBackend::Surfaceless(ctx), Some(conf)));
+                return Ok((HeadlessBackend::Surfaceless(ctx), size.clone(), Some(conf)));
             }
             Err(err) => errs.append(err),
         }
@@ -294,9 +294,10 @@ impl HeadlessBackend {
                 println!("PBuffer configeration chosen: {:?}", conf);
 
                 let ctx = ContextBuilder::new().build(&conf).unwrap();
-                let surf = Surface::new_pbuffer(&conf, size).unwrap();
+                let surf = Surface::new_pbuffer(&conf, size, true).unwrap();
+                let size = surf.size().unwrap();
 
-                return Ok((HeadlessBackend::PBuffer(ctx, surf), Some(conf)));
+                return Ok((HeadlessBackend::PBuffer(ctx, surf), size, Some(conf)));
             }
             Err(err) => errs.append(err),
         }
@@ -334,7 +335,7 @@ impl HeadlessBackend {
                     let conf = confs.drain(..1).next().unwrap();
                     println!("EGL Mesa Surfaceless configeration chosen: {:?}", conf);
                     let ctx = ContextBuilder::new().build(&conf).unwrap();
-                    return Ok((HeadlessBackend::Surfaceless(ctx), Some(conf)));
+                    return Ok((HeadlessBackend::Surfaceless(ctx), size.clone(), Some(conf)));
                 }
                 Err(err) => errs.append(err),
             }
@@ -351,7 +352,7 @@ impl HeadlessBackend {
             Ok(ctx) => match OsMesaBuffer::new(size) {
                 Ok(buf) => {
                     println!("OsMesa chosen");
-                    return Ok((HeadlessBackend::OsMesa(ctx, buf), None));
+                    return Ok((HeadlessBackend::OsMesa(ctx, buf), size.clone(), None));
                 }
                 Err(err) => errs.append(err),
             },

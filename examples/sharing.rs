@@ -11,10 +11,10 @@ use winit_types::dpi::PhysicalSize;
 
 fn main() {
     simple_logger::init().unwrap();
-    let mut size = PhysicalSize::new(512, 512);
+    let size = PhysicalSize::new(512, 512);
     let el = EventLoop::new();
 
-    let (backend, conf) = unsafe { HeadlessBackend::new(&el, &size, true).unwrap() };
+    let (backend, mut size, conf) = unsafe { HeadlessBackend::new(&el, &size, true).unwrap() };
     let conf = conf.unwrap();
     let hgl = backend.load_symbols().unwrap();
 

@@ -1,7 +1,6 @@
 pixmap examples
 new_existing examples
 make_current_rw examples
-GLX_LARGEST_PBUFFER & egl equiv
 Test srgb and flush w/ egl
 remove { path = ... } in cargo tomls
 clippy

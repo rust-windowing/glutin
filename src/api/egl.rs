@@ -1204,7 +1204,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     #[inline]
     fn assemble_desc(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        size: Option<&dpi::PhysicalSize<u32>>,
+        size: Option<(&dpi::PhysicalSize<u32>, bool)>,
     ) -> Vec<raw::c_int> {
         let mut out = Vec::new();
         match conf.attribs.srgb {
@@ -1233,7 +1233,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
             }
         }
 
-        if let Some(size) = size {
+        if let Some((size, largest)) = size {
             let size: (u32, u32) = (*size).into();
             out.push(ffi::egl::TEXTURE_FORMAT as raw::c_int);
             out.push(match size {
@@ -1251,6 +1251,13 @@ impl<T: SurfaceTypeTrait> Surface<T> {
             out.push(size.0 as raw::c_int);
             out.push(ffi::egl::HEIGHT as raw::c_int);
             out.push(size.1 as raw::c_int);
+
+            out.push(ffi::egl::LARGEST_PBUFFER as raw::c_int);
+            out.push(if largest {
+                ffi::egl::TRUE
+            } else {
+                ffi::egl::FALSE
+            } as raw::c_int)
         }
 
         out.push(ffi::egl::NONE as raw::c_int);
@@ -1288,6 +1295,30 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     #[inline]
     pub fn raw_surface(&self) -> *mut raw::c_void {
         self.surface as *mut _
+    }
+
+    #[inline]
+    pub fn size(&self) -> Result<dpi::PhysicalSize<u32>, Error> {
+        let egl = EGL.as_ref().unwrap();
+        let mut width = 0;
+        let mut height = 0;
+
+        unsafe {
+            Context::check_errors(Some(egl.QuerySurface(
+                **self.display,
+                self.surface,
+                ffi::egl::WIDTH as _,
+                &mut width,
+            )))?;
+            Context::check_errors(Some(egl.QuerySurface(
+                **self.display,
+                self.surface,
+                ffi::egl::HEIGHT as _,
+                &mut height,
+            )))?;
+        }
+
+        Ok(dpi::PhysicalSize::new(width as _, height as _))
     }
 }
 
@@ -1399,11 +1430,12 @@ impl Surface<PBuffer> {
     pub fn new(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         size: &dpi::PhysicalSize<u32>,
+        largest: bool,
     ) -> Result<Self, Error> {
         let display = Arc::clone(&conf.config.display);
         let egl = EGL.as_ref().unwrap();
 
-        let desc = Self::assemble_desc(conf.clone(), Some(size));
+        let desc = Self::assemble_desc(conf.clone(), Some((size, largest)));
         let surf = unsafe {
             let pbuffer = egl.CreatePbufferSurface(**display, conf.config.config, desc.as_ptr());
             if pbuffer.is_null() || pbuffer == ffi::egl::NO_SURFACE {

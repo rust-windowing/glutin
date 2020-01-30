@@ -402,6 +402,14 @@ impl<T: SurfaceTypeTrait> Surface<T> {
             Surface::Glx(ref surf) => surf.make_not_current(),
         }
     }
+
+    #[inline]
+    pub fn size(&self) -> Result<dpi::PhysicalSize<u32>, Error> {
+        match self {
+            Surface::Egl { surface, .. } => surface.size(),
+            Surface::Glx(ref surf) => surf.size(),
+        }
+    }
 }
 
 impl Surface<PBuffer> {
@@ -409,21 +417,23 @@ impl Surface<PBuffer> {
     pub fn new(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         size: &dpi::PhysicalSize<u32>,
+        largest: bool,
     ) -> Result<Self, Error> {
         match conf.config {
             Config::Egl {
                 config,
                 display,
                 screen,
-            } => egl::Surface::<PBuffer>::new(conf.map_config(|_| config), size).map(|surface| {
-                Surface::Egl {
+            } => egl::Surface::<PBuffer>::new(conf.map_config(|_| config), size, largest).map(
+                |surface| Surface::Egl {
                     surface,
                     display: Arc::clone(&display),
                     screen: *screen,
-                }
-            }),
+                },
+            ),
             Config::Glx(config) => {
-                glx::Surface::<PBuffer>::new(conf.map_config(|_| config), size).map(Surface::Glx)
+                glx::Surface::<PBuffer>::new(conf.map_config(|_| config), size, largest)
+                    .map(Surface::Glx)
             }
         }
     }

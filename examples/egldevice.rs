@@ -84,8 +84,14 @@ fn main() {
         for (i, conf) in choosen_confs.iter().enumerate() {
             let ctx = unsafe { ContextBuilder::new().build(&conf).unwrap() };
             let surf = match i {
-                0 => unsafe { Some(Surface::new_pbuffer(&conf, &size).unwrap()) },
+                0 => unsafe { Some(Surface::new_pbuffer(&conf, &size, true).unwrap()) },
                 1 => None,
+                _ => unreachable!(),
+            };
+
+            let size = match i {
+                0 => surf.as_ref().unwrap().size().unwrap(),
+                1 => size.clone(),
                 _ => unreachable!(),
             };
 
