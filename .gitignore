@@ -3,4 +3,4 @@ target/
 .DS_Store
 *~
 #*#
-headless.png
+headless*.png

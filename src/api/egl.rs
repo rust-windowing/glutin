@@ -225,7 +225,11 @@ impl Display {
                 )
             }
 
-            RawDisplay::Xlib {
+            RawDisplay::Gbm {
+                gbm_device: Some(display),
+                ..
+            }
+            | RawDisplay::Xlib {
                 display,
                 screen: None,
                 ..
@@ -1402,7 +1406,7 @@ impl Surface<PBuffer> {
         let desc = Self::assemble_desc(conf.clone(), Some(size));
         let surf = unsafe {
             let pbuffer =
-                egl.CreatePbufferSurface(**display, conf.config.config, dbg!(desc).as_ptr());
+                egl.CreatePbufferSurface(**display, conf.config.config, desc.as_ptr());
             if pbuffer.is_null() || pbuffer == ffi::egl::NO_SURFACE {
                 return Err(make_oserror!(OsError::Misc(format!(
                     "eglCreatePbufferSurface failed with 0x{:x}",

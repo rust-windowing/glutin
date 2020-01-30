@@ -23,6 +23,7 @@ pub enum Backend {
     Wayland,
     EglMesaSurfaceless,
     Gbm,
+    EglExtDevice,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -30,6 +31,7 @@ pub enum Config {
     Wayland(egl::Config),
     EglMesaSurfaceless(egl::Config),
     Gbm(egl::Config),
+    EglExtDevice(egl::Config),
 }
 
 impl Deref for Config {
@@ -40,6 +42,7 @@ impl Deref for Config {
             Config::Wayland(conf) => conf,
             Config::EglMesaSurfaceless(conf) => conf,
             Config::Gbm(conf) => conf,
+            Config::EglExtDevice(conf) => conf,
         }
     }
 }
@@ -81,6 +84,7 @@ impl Config {
                         RawDisplay::Wayland { .. } => Config::Wayland(config),
                         RawDisplay::EglMesaSurfaceless { .. } => Config::EglMesaSurfaceless(config),
                         RawDisplay::Gbm { .. } => Config::Gbm(config),
+                        RawDisplay::EglExtDevice { .. } => Config::EglExtDevice(config),
                         _ => unreachable!(),
                     },
                 )
@@ -94,6 +98,7 @@ impl Config {
             Config::Wayland(_) => Backend::Wayland,
             Config::EglMesaSurfaceless(_) => Backend::EglMesaSurfaceless,
             Config::Gbm(_) => Backend::Gbm,
+            Config::EglExtDevice(_) => Backend::EglExtDevice,
         }
     }
 
@@ -117,6 +122,7 @@ pub(crate) enum Surface<T: SurfaceTypeTrait> {
     WaylandPbuffer(egl::Surface<T>),
     EglMesaSurfaceless(egl::Surface<T>),
     Gbm(egl::Surface<T>),
+    EglExtDevice(egl::Surface<T>),
 }
 
 impl<T: SurfaceTypeTrait> Deref for Surface<T> {
@@ -127,6 +133,7 @@ impl<T: SurfaceTypeTrait> Deref for Surface<T> {
             Surface::WaylandWindow { surface, .. } | Surface::WaylandPbuffer(surface) => surface,
             Surface::EglMesaSurfaceless(surf) => surf,
             Surface::Gbm(surf) => surf,
+            Surface::EglExtDevice(surf) => surf,
         }
     }
 }
@@ -145,6 +152,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
                 Backend::Wayland => Config::Wayland(conf),
                 Backend::EglMesaSurfaceless => Config::EglMesaSurfaceless(conf),
                 Backend::Gbm => Config::Gbm(conf),
+                Backend::EglExtDevice => Config::EglExtDevice(conf),
             })
     }
 
@@ -159,6 +167,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
             Surface::WaylandWindow { .. } | Surface::WaylandPbuffer(_) => Backend::Wayland,
             Surface::EglMesaSurfaceless(_) => Backend::EglMesaSurfaceless,
             Surface::Gbm(_) => Backend::Gbm,
+            Surface::EglExtDevice(_) => Backend::EglExtDevice,
         }
     }
 
@@ -276,6 +285,7 @@ impl Surface<PBuffer> {
                 Backend::Wayland => Surface::WaylandPbuffer(surf),
                 Backend::EglMesaSurfaceless => Surface::EglMesaSurfaceless(surf),
                 Backend::Gbm => Surface::Gbm(surf),
+                Backend::EglExtDevice => Surface::EglExtDevice(surf),
             },
         )
     }
@@ -309,6 +319,7 @@ pub enum Context {
     Wayland(egl::Context),
     EglMesaSurfaceless(egl::Context),
     Gbm(egl::Context),
+    EglExtDevice(egl::Context),
 }
 
 impl Deref for Context {
@@ -319,6 +330,7 @@ impl Deref for Context {
             Context::Wayland(ctx) => ctx,
             Context::EglMesaSurfaceless(ctx) => ctx,
             Context::Gbm(ctx) => ctx,
+            Context::EglExtDevice(ctx) => ctx,
         }
     }
 }
@@ -338,6 +350,7 @@ impl Context {
             Backend::Wayland => Context::Wayland(ctx),
             Backend::EglMesaSurfaceless => Context::EglMesaSurfaceless(ctx),
             Backend::Gbm => Context::Gbm(ctx),
+            Backend::EglExtDevice => Context::EglExtDevice(ctx),
         })
     }
 
@@ -398,6 +411,7 @@ impl Context {
                 Backend::Wayland => Config::Wayland(conf),
                 Backend::EglMesaSurfaceless => Config::EglMesaSurfaceless(conf),
                 Backend::Gbm => Config::Gbm(conf),
+                Backend::EglExtDevice => Config::EglExtDevice(conf),
             })
     }
 
@@ -407,6 +421,7 @@ impl Context {
             Context::Wayland(_) => Backend::Wayland,
             Context::EglMesaSurfaceless(_) => Backend::EglMesaSurfaceless,
             Context::Gbm(_) => Backend::Gbm,
+            Context::EglExtDevice(_) => Backend::EglExtDevice,
         }
     }
 

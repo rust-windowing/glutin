@@ -1,6 +1,6 @@
 mod support;
 
-use support::{gl, HeadlessBackend};
+use support::HeadlessBackend;
 
 use winit::event_loop::EventLoop;
 use winit_types::dpi::PhysicalSize;
@@ -32,35 +32,7 @@ fn main() {
     }
     gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
 
-    let mut pixels: Vec<gl::types::GLubyte> = vec![];
-    pixels.resize(3 * size.width as usize * size.height as usize, 0);
-    unsafe {
-        gl.gl.ReadPixels(
-            0,
-            0,
-            size.width as _,
-            size.height as _,
-            gl::RGB,
-            gl::UNSIGNED_BYTE,
-            pixels.as_mut_ptr() as *mut _,
-        );
-    }
-
-    let mut pixels_flipped: Vec<gl::types::GLubyte> = vec![];
-    for v in (0..size.height as _).rev() {
-        let s = 3 * v as usize * size.width as usize;
-        let o = 3 * size.width as usize;
-        pixels_flipped.extend_from_slice(&pixels[s..(s + o)]);
-    }
-
-    image::save_buffer(
-        &Path::new("headless.png"),
-        &pixels_flipped,
-        size.width as u32,
-        size.height as u32,
-        image::RGB(8),
-    )
-    .unwrap();
+    gl.export_to_file(&size, &Path::new("headless.png"));
 
     match backend {
         HeadlessBackend::Surfaceless(_) => unsafe {

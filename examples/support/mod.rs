@@ -9,15 +9,51 @@
 ))]
 use glutin::platform::unix::osmesa::{OsMesaBuffer, OsMesaContext, OsMesaContextBuilder};
 
+#[cfg(any(
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+))]
+use glutin_interface::{NativeDisplay, RawDisplay, Seal};
+
 use glutin::config::{Api, Config, ConfigsFinder, Version};
 use glutin::context::{Context, ContextBuilder};
 use glutin::surface::{PBuffer, Surface};
-use glutin_interface::{NativeDisplay, RawDisplay, Seal};
 use winit::event_loop::EventLoop;
 use winit_types::dpi::PhysicalSize;
 use winit_types::error::{Error, ErrorType};
 
-use std::ffi::{c_void, CStr};
+use std::path::Path;
+use std::ffi::CStr;
+use std::os::raw;
+
+#[cfg(any(
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+))]
+pub unsafe fn load_egl_sym(lib: &libloading::Library, name: &str) -> *const raw::c_void {
+    type FnEglGetProcAddress = unsafe extern "C" fn(*mut raw::c_char) -> *mut raw::c_void;
+
+    let name = std::ffi::CString::new(name.as_bytes()).unwrap();
+
+    let name = name.as_bytes_with_nul();
+    match lib.get::<*const raw::c_void>(name) {
+        Err(_) => {
+            let egl_get_proc_address_fn: libloading::Symbol<FnEglGetProcAddress> =
+                lib.get(b"eglGetProcAddress\0").unwrap();
+            (egl_get_proc_address_fn)(name.as_ptr() as *mut raw::c_char) as *const _
+        }
+        Ok(sym) => {
+            assert!(!(*sym).is_null());
+            *sym
+        },
+    }
+}
 
 pub mod gl {
     pub use self::Gles2 as Gl;
@@ -31,7 +67,7 @@ pub struct Gl {
 impl Gl {
     pub fn load<F>(loadfn: F) -> Self
     where
-        F: FnMut(&'static str) -> *const c_void,
+        F: FnMut(&'static str) -> *const raw::c_void,
     {
         let gl = gl::Gl::load_with(loadfn);
 
@@ -148,6 +184,38 @@ impl Gl {
 
             fb
         }
+    }
+
+    pub fn export_to_file(&self, size: &PhysicalSize<u32>, path: &Path) {
+        let mut pixels: Vec<gl::types::GLubyte> = vec![];
+        pixels.resize(3 * size.width as usize * size.height as usize, 0);
+        unsafe {
+            self.gl.ReadPixels(
+                0,
+                0,
+                size.width as _,
+                size.height as _,
+                gl::RGB,
+                gl::UNSIGNED_BYTE,
+                pixels.as_mut_ptr() as *mut _,
+            );
+        }
+
+        let mut pixels_flipped: Vec<gl::types::GLubyte> = vec![];
+        for v in (0..size.height as _).rev() {
+            let s = 3 * v as usize * size.width as usize;
+            let o = 3 * size.width as usize;
+            pixels_flipped.extend_from_slice(&pixels[s..(s + o)]);
+        }
+
+        image::save_buffer(
+            path,
+            &pixels_flipped,
+            size.width as u32,
+            size.height as u32,
+            image::RGB(8),
+        )
+        .unwrap();
     }
 }
 

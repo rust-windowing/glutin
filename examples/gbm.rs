@@ -23,7 +23,6 @@ use libloading;
 use winit_types::dpi::PhysicalSize;
 
 use std::fs::{File, OpenOptions};
-use std::os::raw;
 use std::os::unix::io::{AsRawFd, RawFd};
 
 struct Card(File);
@@ -45,39 +44,14 @@ fn init_drm_device() -> Card {
     Card(file)
 }
 
-type FnNull = unsafe extern "C" fn();
-unsafe fn load_egl_sym(lib: &libloading::Library, name: &str) -> FnNull {
-    type FnEglGetProcAddress = unsafe extern "C" fn(*mut raw::c_char) -> *mut raw::c_void;
-
-    let name = std::ffi::CString::new(name.as_bytes()).unwrap();
-
-    let name = name.as_bytes_with_nul();
-    match lib.get::<Option<FnNull>>(name) {
-        Ok(sym) => (*sym).unwrap(),
-        Err(_) => {
-            let egl_get_proc_address_fn: libloading::Symbol<FnEglGetProcAddress> =
-                lib.get(b"eglGetProcAddress\0").unwrap();
-            let func = (egl_get_proc_address_fn)(name.as_ptr() as *mut raw::c_char);
-            std::mem::transmute::<*mut raw::c_void, Option<FnNull>>(func).unwrap()
-        }
-    }
-}
-
 unsafe fn choose_conf<'a, T: AsRawFd>(
     gbm: &Device<T>,
     confs: &'a [Config],
     flags: BufferObjectFlags,
 ) -> &'a Config {
-    type FnEglGetConfigAttrib =
-        unsafe extern "C" fn(*mut raw::c_void, *mut raw::c_void, i32, *mut i32) -> raw::c_uint;
-    type FnEglGetError = unsafe extern "C" fn() -> i32;
-
     let lib = libloading::Library::new("libEGL.so.1")
         .unwrap_or_else(|_| libloading::Library::new("libEGL.so").unwrap());
-    let egl_get_config_attrib_fn: FnEglGetConfigAttrib =
-        std::mem::transmute(load_egl_sym(&lib, "eglGetConfigAttrib"));
-
-    let egl_get_error_fn: FnEglGetError = std::mem::transmute(load_egl_sym(&lib, "eglGetError"));
+    let egl = glutin_egl_sys::egl::Egl::load_with(|f| support::load_egl_sym(&lib, f));
 
     for conf in confs {
         let raw_conf = match conf.raw_config() {
@@ -92,12 +66,12 @@ unsafe fn choose_conf<'a, T: AsRawFd>(
 
         let mut format = 0;
         const NATIVE_VISUAL_ID: i32 = 0x302E;
-        if (egl_get_config_attrib_fn)(raw_disp, raw_conf, NATIVE_VISUAL_ID, &mut format) == 0 {
+        if egl.GetConfigAttrib(raw_disp, raw_conf, NATIVE_VISUAL_ID, &mut format) == 0 {
             warn!(
                 "Failed to get NATIVE_VISUAL_ID for disp {:?} w/ conf {:?}, err {:?}",
                 raw_disp,
                 raw_conf,
-                (egl_get_error_fn)()
+                egl.GetError()
             );
         } else {
             match Format::from_ffi(format as _) {
@@ -144,7 +118,7 @@ fn main() {
     let gl = support::Gl::load(|s| ctx.get_proc_address(s).unwrap());
 
     let mut has_modsetted = false;
-    'frame: loop {
+    loop {
         gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
         surf.swap_buffers().unwrap();
         let bo = unsafe { gbmsurf.lock_front_buffer().unwrap() };
@@ -168,12 +142,10 @@ fn main() {
             &[crtc::PageFlipFlags::PageFlipEvent],
         )
         .unwrap();
-        loop {
-            for e in crtc::receive_events(&gbm).unwrap() {
-                match e {
-                    crtc::Event::PageFlip(_) => continue 'frame,
-                    _ => (),
-                }
+        for e in crtc::receive_events(&gbm).unwrap() {
+            match e {
+                crtc::Event::PageFlip(_) => break,
+                _ => (),
             }
         }
     }

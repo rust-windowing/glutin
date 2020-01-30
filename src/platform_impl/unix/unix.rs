@@ -38,6 +38,7 @@ impl Config {
         Ok(match nd.raw_display() {
             RawDisplay::Wayland { .. }
             | RawDisplay::EglMesaSurfaceless { .. }
+            | RawDisplay::EglExtDevice { .. }
             | RawDisplay::Gbm { .. } => {
                 let configs = generic_egl::Config::new(cf, nd)?;
                 configs
