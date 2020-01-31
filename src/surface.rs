@@ -201,9 +201,16 @@ impl Surface<Pixmap> {
     /// Takes an `NPS` and its `NPS::PixmapBuilder` type, returning a
     /// `NPS::Pixmap` plus a `Surface<`[`Pixmap`]`>`.
     ///
+    /// Pixmaps are only supported on X11 and Windows.
+    ///
+    /// On X11, both [`Config`]'s `ND` and `NWS` must provide an X11 connection
+    /// to the same display and screen.
+    /// FIXME: windows?
+    ///
     /// # Saftey
     ///
-    /// Should not outlive the returned `NPS::Pixmap` nor the [`Config`]'s `ND`.
+    /// The returned surface should not outlive the returned `NPS::Pixmap` nor
+    /// the [`Config`]'s `ND`.
     ///
     /// [`Pixmap`]: crate::surface::Pixmap
     #[inline]
@@ -232,15 +239,17 @@ impl Surface<Pixmap> {
     ///
     /// Please prefer to use [`new_pixmap`] when possible.
     ///
+    /// Pixmaps are only supported on X11 and Windows.
+    ///
     /// Some platforms place additional restrictions on what [`Config`]s can be
     /// used with the pixmap:
-    ///  * Wayland: Does not support pixmaps.
-    ///  * X11: FIXME determine when implemented
-    ///  FIXME missing plats
+    ///  * X11: The [`Config`] and the pixmap must have been made with X11
+    ///  connections to the same display and screen.
+    ///  * Windows: FIXME determine when implemented
     ///
     /// # Saftey
     ///
-    /// Should not outlive `NP` nor the [`Config`]'s `ND`.
+    /// The returned surface should not outlive `NP` nor the [`Config`]'s `ND`.
     ///
     /// [`new_pixmap`]: crate::surface::Surface::new_pixmap()
     /// [`Pixmap`]: crate::surface::Pixmap
@@ -269,7 +278,7 @@ impl Surface<PBuffer> {
     ///
     /// # Saftey
     ///
-    /// Should not outlive the [`Config`]'s `ND`.
+    /// The returned surface should not outlive the [`Config`]'s `ND`.
     ///
     /// [`PBuffer`]: crate::surface::PBuffer
     /// [`Config`]: crate::config::Config
@@ -294,9 +303,18 @@ impl Surface<Window> {
     /// Takes an `NWS` and its `NWS::WindowBuilder` type, returning a
     /// `NWS::Window` plus a `Surface<`[`Window`]`>`.
     ///
+    /// On Wayland, the [`Config`]'s `ND` must provide the same Wayland
+    /// connection as `NWS`. X11 is more lenient on this matter, allowing
+    /// different connections to the same display and screen. Other platforms
+    /// have not been tested.
+    ///
+    /// `EGL_EXT_platform_device` and `EGL_MESA_platform_surfaceless` do not
+    /// support windows.
+    ///
     /// # Saftey
     ///
-    /// Should not outlive the returned `NWS::Window` nor the [`Config`]'s `ND`.
+    /// The returned surface should not outlive the returned `NWS::Window` nor
+    /// the [`Config`]'s `ND`.
     ///
     /// [`Window`]: crate::surface::Window
     /// [`Config`]: crate::config::Config
@@ -326,16 +344,22 @@ impl Surface<Window> {
     ///
     /// Please prefer to use [`new_window`] when possible.
     ///
+    /// `EGL_EXT_platform_device` and `EGL_MESA_platform_surfaceless` do not
+    /// support windows.
+    ///
     /// Some platforms place additional restrictions on what [`Config`]s can be
     /// used with the window:
-    ///  * Wayland: FIXME
+    ///  * Wayland: The [`Config`] and the window must have been made with the
+    ///  same Wayland connection.
     ///  * X11: The [`Config`]'s `XVisualInfo`'s `depth` and `visual` must match
-    ///  the window's.
+    ///  the window's. The [`Config`] and the window must have been made with
+    ///  connections to the same display and screen.
+    ///
     ///  FIXME missing plats
     ///
     /// # Saftey
     ///
-    /// Should not outlive `NW` nor the [`Config`]'s `ND`.
+    /// The returned surface should not outlive `NW` nor the [`Config`]'s `ND`.
     ///
     /// [`new_window`]: crate::surface::Surface::new_window()
     /// [`Window`]: crate::surface::Window

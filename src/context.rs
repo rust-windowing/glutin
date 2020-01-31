@@ -285,7 +285,7 @@ impl<'a> ContextBuilder<'a> {
     ///
     /// # Saftey
     ///
-    /// Should not outlive the [`Config`]'s `ND`.
+    /// The returned surface should not outlive the [`Config`]'s `ND`.
     ///
     /// [`Context`]: crate::context::Context
     #[inline]
@@ -381,7 +381,11 @@ impl<T> ContextBuilderWrapper<T> {
     /// Share the display lists with the given [`Context`].
     ///
     /// One notable limitation of the Wayland backend when it comes to shared
-    /// [`Context`]s is that both contexts must use the same events loop.
+    /// [`Context`]s is that both contexts must use the same Wayland connection,
+    /// i.e. both [`Context`]s' [`Config`]s must have been made with `ND`s that
+    /// provided the same Wayland connection. X11 is more lenient on this matter,
+    /// allowing different connections to the same display and screen. Other
+    /// platforms have not been tested.
     ///
     /// It should come to no one's surprise that [`Context`]s can only share
     /// display lists if they use the same implementation of OpenGL.
