@@ -362,7 +362,7 @@ impl ConfigsFinder {
         self
     }
 
-    /// Sets the number of bits in the color buffer. `None` means "don't care".
+    /// Sets the minimum number of bits in the color/alpha buffers. `None` means "don't care".
     #[inline]
     pub fn with_pixel_format(mut self, color_bits: Option<u8>, alpha_bits: Option<u8>) -> Self {
         self.color_bits = color_bits;
