@@ -50,7 +50,7 @@ mod implementation {
             }
         }
 
-        for device in &devices {
+        for (i, device) in devices.iter().enumerate() {
             let exts = unsafe {
                 CStr::from_ptr(
                     egl.QueryDeviceStringEXT(*device, glutin_egl_sys::egl::EXTENSIONS as _),
@@ -86,7 +86,7 @@ mod implementation {
             println!("Chose following confs {:#?}", choosen_confs);
 
             let size = PhysicalSize::new(512, 512);
-            for (i, conf) in choosen_confs.iter().enumerate() {
+            for (j, conf) in choosen_confs.iter().enumerate() {
                 let ctx = unsafe { ContextBuilder::new().build(&conf).unwrap() };
                 let surf = match i {
                     0 => unsafe { Some(Surface::new_pbuffer(&conf, &size, true).unwrap()) },
@@ -127,11 +127,11 @@ mod implementation {
                 unsafe {
                     gl.gl.Viewport(0, 0, size.width as _, size.height as _);
                 }
-                gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
+                gl.draw_frame([0.0, 0.0, 0.0, 1.0]);
 
                 gl.export_to_file(
                     &size,
-                    &Path::new(&("headless".to_string() + &i.to_string() + ".png")),
+                    &Path::new(&("headless".to_string() + &i.to_string() + "_" + &j.to_string() + ".png")),
                 );
 
                 match i {
