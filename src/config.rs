@@ -288,9 +288,9 @@ impl Default for ConfigsFinder {
         ConfigsFinder {
             hardware_accelerated: Some(true),
             color_bits: Some(24),
+            alpha_bits: Some(0),
             // FIXME EGL_EXT_pixel_format_float
             float_color_buffer: None,
-            alpha_bits: None,
             depth_bits: None,
             stencil_bits: None,
             double_buffer: None,
@@ -336,14 +336,14 @@ impl ConfigsFinder {
 
     /// Contains the minimum number of samples per pixel in the color, depth
     /// and stencil buffers. `None` means "don't care".
-    /// A value of `None` indicates that multisampling must not be enabled.
+    /// A value of `Some(0)` indicates that multisampling must not be enabled.
     ///
     /// # Panic
     ///
-    /// Will panic if `samples` is not a power of two.
+    /// Will panic if `samples` is not a power of two or is equal to 1.
     #[inline]
     pub fn with_multisampling(mut self, samples: Option<u16>) -> Self {
-        assert!(samples.unwrap_or(2).is_power_of_two());
+        assert!(samples.unwrap_or(2).is_power_of_two() && samples != Some(1));
         self.multisampling = samples;
         self
     }
@@ -362,7 +362,7 @@ impl ConfigsFinder {
         self
     }
 
-    /// Sets the minimum number of bits in the color/alpha buffers. `None` means "don't care".
+    /// Sets the number of bits in the color/alpha buffers. `None` means "don't care".
     #[inline]
     pub fn with_pixel_format(mut self, color_bits: Option<u8>, alpha_bits: Option<u8>) -> Self {
         self.color_bits = color_bits;

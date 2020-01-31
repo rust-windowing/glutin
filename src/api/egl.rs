@@ -459,16 +459,42 @@ impl Config {
         // TODO: Alternatively, allow EGL_MESA_platform_surfaceless.
         // FIXME: Also check for the GL_OES_surfaceless_context *CONTEXT*
         // extension
-        if cf.must_support_surfaceless && !display.has_extension("EGL_KHR_surfaceless_context") {
-            return Err(make_error!(ErrorType::NotSupported(
-                "EGL surfaceless not supported".to_string(),
-            )));
+        let supports_surfaceless = display.has_extension("EGL_KHR_surfaceless_context");
+        if cf.must_support_surfaceless && !supports_surfaceless {
+            return Err(make_error!(ErrorType::SurfaceTypesNotSupported {
+                change_surfaceless: true,
+                change_window: false,
+                change_pixmap: false,
+                change_pbuffer: false,
+            }));
         }
 
         if cf.float_color_buffer == Some(true) {
             errors.append(make_error!(ErrorType::FloatingPointSurfaceNotSupported));
             return Err(errors);
         }
+
+        if cf.stereoscopy {
+            return Err(errors);
+        }
+
+        if let Some(srgb) = cf.srgb {
+            if srgb && !display.has_extension("EGL_KHR_gl_colorspace") {
+                errors.append(make_error!(ErrorType::SrgbSurfaceNotSupported));
+                return Err(errors);
+            }
+        }
+
+        match cf.version {
+            (Api::OpenGl, _) | (Api::OpenGlEs, Version(2, _)) | (Api::OpenGlEs, Version(3, _)) => {
+                if display.egl_version < (1, 3) {
+                    errors.append(make_error!(ErrorType::OpenGlVersionNotSupported));
+                    return Err(errors);
+                }
+            }
+            (Api::OpenGlEs, Version(1, _)) => (),
+            (_, _) => unimplemented!(),
+        };
 
         // binding the right API and choosing the version
         unsafe { Display::bind_api(cf.version.0, display.egl_version)? };
@@ -487,140 +513,8 @@ impl Config {
             return Err(errors);
         }
 
-        let descriptor = {
-            let mut out: Vec<raw::c_int> = Vec::with_capacity(37);
-
-            if display.egl_version >= (1, 2) {
-                out.push(ffi::egl::COLOR_BUFFER_TYPE as raw::c_int);
-                out.push(ffi::egl::RGB_BUFFER as raw::c_int);
-            }
-
-            out.push(ffi::egl::SURFACE_TYPE as raw::c_int);
-            let mut surface_type = 0;
-            if cf.must_support_windows {
-                surface_type = surface_type | ffi::egl::WINDOW_BIT;
-            }
-            if cf.must_support_pbuffers {
-                surface_type = surface_type | ffi::egl::PBUFFER_BIT;
-            }
-            if cf.must_support_pixmaps {
-                surface_type = surface_type | ffi::egl::PIXMAP_BIT;
-            }
-            out.push(surface_type as raw::c_int);
-
-            match cf.version {
-                (Api::OpenGlEs, Version(3, _)) => {
-                    if display.egl_version < (1, 3) {
-                        errors.append(make_error!(ErrorType::OpenGlVersionNotSupported));
-                        return Err(errors);
-                    }
-                    out.push(ffi::egl::RENDERABLE_TYPE as raw::c_int);
-                    out.push(ffi::egl::OPENGL_ES3_BIT as raw::c_int);
-                    out.push(ffi::egl::CONFORMANT as raw::c_int);
-                    out.push(ffi::egl::OPENGL_ES3_BIT as raw::c_int);
-                }
-                (Api::OpenGlEs, Version(2, _)) => {
-                    if display.egl_version < (1, 3) {
-                        errors.append(make_error!(ErrorType::OpenGlVersionNotSupported));
-                        return Err(errors);
-                    }
-                    out.push(ffi::egl::RENDERABLE_TYPE as raw::c_int);
-                    out.push(ffi::egl::OPENGL_ES2_BIT as raw::c_int);
-                    out.push(ffi::egl::CONFORMANT as raw::c_int);
-                    out.push(ffi::egl::OPENGL_ES2_BIT as raw::c_int);
-                }
-                (Api::OpenGlEs, Version(1, _)) => {
-                    if display.egl_version >= (1, 3) {
-                        out.push(ffi::egl::RENDERABLE_TYPE as raw::c_int);
-                        out.push(ffi::egl::OPENGL_ES_BIT as raw::c_int);
-                        out.push(ffi::egl::CONFORMANT as raw::c_int);
-                        out.push(ffi::egl::OPENGL_ES_BIT as raw::c_int);
-                    }
-                }
-                (Api::OpenGlEs, _) => unimplemented!(),
-                (Api::OpenGl, _) => {
-                    if display.egl_version < (1, 3) {
-                        errors.append(make_error!(ErrorType::OpenGlVersionNotSupported));
-                        return Err(errors);
-                    }
-                    out.push(ffi::egl::RENDERABLE_TYPE as raw::c_int);
-                    out.push(ffi::egl::OPENGL_BIT as raw::c_int);
-                    out.push(ffi::egl::CONFORMANT as raw::c_int);
-                    out.push(ffi::egl::OPENGL_BIT as raw::c_int);
-                }
-                (_, _) => unimplemented!(),
-            };
-
-            if let Some(hardware_accelerated) = cf.hardware_accelerated {
-                out.push(ffi::egl::CONFIG_CAVEAT as raw::c_int);
-                out.push(if hardware_accelerated {
-                    ffi::egl::NONE as raw::c_int
-                } else {
-                    ffi::egl::SLOW_CONFIG as raw::c_int
-                });
-            }
-
-            if let Some(color) = cf.color_bits {
-                out.push(ffi::egl::RED_SIZE as raw::c_int);
-                out.push((color / 3) as raw::c_int);
-                out.push(ffi::egl::GREEN_SIZE as raw::c_int);
-                out.push((color / 3 + if color % 3 != 0 { 1 } else { 0 }) as raw::c_int);
-                out.push(ffi::egl::BLUE_SIZE as raw::c_int);
-                out.push((color / 3 + if color % 3 == 2 { 1 } else { 0 }) as raw::c_int);
-            }
-
-            if let Some(alpha) = cf.alpha_bits {
-                out.push(ffi::egl::ALPHA_SIZE as raw::c_int);
-                out.push(alpha as raw::c_int);
-            }
-
-            if let Some(depth) = cf.depth_bits {
-                out.push(ffi::egl::DEPTH_SIZE as raw::c_int);
-                out.push(depth as raw::c_int);
-            }
-
-            if let Some(stencil) = cf.stencil_bits {
-                out.push(ffi::egl::STENCIL_SIZE as raw::c_int);
-                out.push(stencil as raw::c_int);
-            }
-
-            if let Some(multisampling) = cf.multisampling {
-                out.push(ffi::egl::SAMPLES as raw::c_int);
-                out.push(multisampling as raw::c_int);
-            }
-
-            if cf.stereoscopy {
-                return Err(errors);
-            }
-
-            if let Some(xid) = cf.plat_attr.x11_visual_xid {
-                out.push(ffi::egl::NATIVE_VISUAL_ID as raw::c_int);
-                out.push(xid as raw::c_int);
-            }
-
-            if let Some(srgb) = cf.srgb {
-                if srgb && !display.has_extension("EGL_KHR_gl_colorspace") {
-                    errors.append(make_error!(ErrorType::SrgbSurfaceNotSupported));
-                    return Err(errors);
-                }
-            }
-
-            out.push(ffi::egl::NONE as raw::c_int);
-            out
-        };
-
-        // calling `eglChooseConfig`
         let mut num_confs = 0;
-        if unsafe {
-            egl.ChooseConfig(
-                **display,
-                descriptor.as_ptr(),
-                std::ptr::null_mut(),
-                0,
-                &mut num_confs,
-            )
-        } == 0
-        {
+        if unsafe { egl.GetConfigs(**display, std::ptr::null_mut(), 0, &mut num_confs) } == 0 {
             errors.append(make_oserror!(OsError::Misc(format!(
                 "eglChooseConfig failed with 0x{:x}",
                 unsafe { egl.GetError() },
@@ -634,15 +528,7 @@ impl Config {
 
         let mut confs = Vec::with_capacity(num_confs as usize);
         confs.resize_with(num_confs as usize, || unsafe { std::mem::zeroed() });
-        if unsafe {
-            egl.ChooseConfig(
-                **display,
-                descriptor.as_ptr(),
-                confs.as_mut_ptr(),
-                num_confs,
-                &mut num_confs,
-            )
-        } == 0
+        if unsafe { egl.GetConfigs(**display, confs.as_mut_ptr(), num_confs, &mut num_confs) } == 0
         {
             errors.append(make_oserror!(OsError::Misc(format!(
                 "eglChooseConfig failed with 0x{:x}",
@@ -651,15 +537,15 @@ impl Config {
             return Err(errors);
         }
 
-        let confs = if cf.desired_swap_interval_ranges.is_empty() {
-            confs
-        } else {
-            let conv_range = |sir: &_| match sir {
-                SwapIntervalRange::DontWait => 0..1,
-                SwapIntervalRange::Wait(r) => r.clone(),
-                SwapIntervalRange::AdaptiveWait(_) => unreachable!(),
-            };
+        let conv_range = |sir: &_| match sir {
+            SwapIntervalRange::DontWait => 0..1,
+            SwapIntervalRange::Wait(r) => r.clone(),
+            SwapIntervalRange::AdaptiveWait(_) => unreachable!(),
+        };
 
+        let dsir = if cf.desired_swap_interval_ranges.is_empty() {
+            None
+        } else {
             let mut dsir = conv_range(&cf.desired_swap_interval_ranges[0]);
 
             for ndsir in &cf.desired_swap_interval_ranges[1..] {
@@ -668,45 +554,8 @@ impl Config {
                 dsir.end = u32::max(dsir.end, ndsir.end);
             }
 
-            confs
-                .into_iter()
-                .filter_map(|conf| {
-                    let min_swap_interval =
-                        attrib!(egl, display, conf, ffi::egl::MIN_SWAP_INTERVAL);
-                    match min_swap_interval {
-                        Err(err) => {
-                            errors.append(err);
-                            return None;
-                        }
-                        Ok(min) if (dsir.start as i32) < min => {
-                            errors.append(make_error!(ErrorType::SwapControlRangeNotSupported));
-                            return None;
-                        }
-                        _ => (),
-                    }
-
-                    let max_swap_interval =
-                        attrib!(egl, display, conf, ffi::egl::MAX_SWAP_INTERVAL);
-                    match max_swap_interval {
-                        Err(err) => {
-                            errors.append(err);
-                            return None;
-                        }
-                        Ok(max) if (dsir.end as i32) > (max + 1) => {
-                            errors.append(make_error!(ErrorType::SwapControlRangeNotSupported));
-                            return None;
-                        }
-                        _ => (),
-                    }
-
-                    Some(conf)
-                })
-                .collect()
+            Some(dsir)
         };
-
-        if confs.is_empty() {
-            return Err(errors);
-        }
 
         let confs: Vec<_> = conf_selector(confs, &display)
             .into_iter()
@@ -718,6 +567,52 @@ impl Config {
                 Ok(conf) => Some(conf),
             })
             .map(|conf| {
+                let check_match = |attr, val| {
+                    let fval = attrib!(egl, display, conf, attr)? as u32;
+                    if fval != val {
+                        return Err(make_oserror!(OsError::Misc(format!(
+                            "attr {}, {} != {} for {:?}",
+                            attr, fval, val, conf,
+                        ))));
+                    }
+                    Ok(fval)
+                };
+
+                let check_mask = |attr, val| {
+                    let fval = attrib!(egl, display, conf, attr)? as u32;
+                    if (fval & val) != val {
+                        return Err(make_oserror!(OsError::Misc(format!(
+                            "attr {}, {} & {} for {:?}",
+                            attr, fval, val, conf,
+                        ))));
+                    }
+                    Ok(fval)
+                };
+
+                if display.egl_version >= (1, 2) {
+                    check_match(ffi::egl::COLOR_BUFFER_TYPE, ffi::egl::RGB_BUFFER)?;
+                }
+
+                if let Some(xid) = cf.plat_attr.x11_visual_xid {
+                    check_match(ffi::egl::NATIVE_VISUAL_ID, xid.try_into().unwrap())?;
+                }
+
+                if let Some(version_bit) = match cf.version {
+                    (Api::OpenGlEs, Version(3, _)) => Some(ffi::egl::OPENGL_ES3_BIT),
+                    (Api::OpenGlEs, Version(2, _)) => Some(ffi::egl::OPENGL_ES2_BIT),
+                    (Api::OpenGlEs, Version(1, _)) if display.egl_version >= (1, 3) => {
+                        Some(ffi::egl::OPENGL_ES_BIT)
+                    }
+                    (Api::OpenGlEs, Version(1, _)) => None,
+                    (Api::OpenGl, _) => Some(ffi::egl::OPENGL_BIT),
+                    (_, _) => unreachable!(),
+                } {
+                    check_mask(ffi::egl::RENDERABLE_TYPE, version_bit)
+                        .map_err(|_| make_error!(ErrorType::OpenGlVersionNotSupported))?;
+                    check_mask(ffi::egl::CONFORMANT, version_bit)
+                        .map_err(|_| make_error!(ErrorType::OpenGlVersionNotSupported))?;
+                }
+
                 // Try into to panic if value is negative. Never trust the driver.
                 let min_swap_interval: u32 =
                     attrib!(egl, display, conf, ffi::egl::MIN_SWAP_INTERVAL)?
@@ -742,15 +637,32 @@ impl Config {
                     )],
                 };
 
+                if let Some(ref dsir) = dsir {
+                    if dsir.start < min_swap_interval || dsir.end > max_swap_interval {
+                        return Err(make_error!(ErrorType::SwapControlRangeNotSupported));
+                    }
+                }
+
                 let surf_type = attrib!(egl, display, conf, ffi::egl::SURFACE_TYPE)? as u32;
                 let attribs = ConfigAttribs {
                     version: cf.version,
                     supports_windows: (surf_type & ffi::egl::WINDOW_BIT) != 0,
                     supports_pixmaps: (surf_type & ffi::egl::PIXMAP_BIT) != 0,
                     supports_pbuffers: (surf_type & ffi::egl::PBUFFER_BIT) != 0,
-                    supports_surfaceless: display.has_extension("EGL_KHR_surfaceless_context"),
-                    hardware_accelerated: attrib!(egl, display, conf, ffi::egl::CONFIG_CAVEAT)?
-                        != ffi::egl::SLOW_CONFIG as i32,
+                    supports_surfaceless,
+                    hardware_accelerated: check_mask(
+                        ffi::egl::CONFIG_CAVEAT,
+                        if let Some(hwa) = cf.hardware_accelerated {
+                            if hwa {
+                                ffi::egl::NONE
+                            } else {
+                                ffi::egl::SLOW_CONFIG
+                            }
+                        } else {
+                            0
+                        },
+                    )? != ffi::egl::SLOW_CONFIG,
+
                     color_bits: attrib!(egl, display, conf, ffi::egl::RED_SIZE)? as u8
                         + attrib!(egl, display, conf, ffi::egl::BLUE_SIZE)? as u8
                         + attrib!(egl, display, conf, ffi::egl::GREEN_SIZE)? as u8,
@@ -767,6 +679,68 @@ impl Config {
                     double_buffer: cf.double_buffer.unwrap_or(true),
                     swap_interval_ranges,
                 };
+
+                let change_window = cf.must_support_windows && !attribs.supports_windows;
+                let change_pbuffer = cf.must_support_pbuffers && !attribs.supports_pbuffers;
+                let change_pixmap = cf.must_support_pixmaps && !attribs.supports_pixmaps;
+                if change_window || change_pixmap || change_pbuffer {
+                    return Err(make_error!(ErrorType::SurfaceTypesNotSupported {
+                        change_pbuffer,
+                        change_window,
+                        change_pixmap,
+                        change_surfaceless: false
+                    }));
+                }
+
+                if let Some(multisampling) = cf.multisampling {
+                    let ms = attribs.multisampling.unwrap_or(0);
+                    if ms != multisampling {
+                        return Err(make_error!(ErrorType::MultisamplingNotSupported));
+                    }
+                    if ms != 0 {
+                        let msb = attrib!(egl, display, conf, ffi::egl::SAMPLE_BUFFERS)?;
+                        if msb == 0 {
+                            return Err(make_error!(ErrorType::MultisamplingNotSupported));
+                        }
+                    }
+                }
+
+                use winit_types::error::BitType;
+                if let Some(depth) = cf.depth_bits {
+                    if depth != attribs.depth_bits {
+                        return Err(make_error!(ErrorType::NumberOfBitsNotSupported(
+                            BitType::Depth,
+                            attribs.depth_bits
+                        )));
+                    }
+                }
+
+                if let Some(alpha) = cf.alpha_bits {
+                    if alpha != attribs.alpha_bits {
+                        return Err(make_error!(ErrorType::NumberOfBitsNotSupported(
+                            BitType::Alpha,
+                            attribs.alpha_bits
+                        )));
+                    }
+                }
+
+                if let Some(stencil) = cf.stencil_bits {
+                    if stencil != attribs.stencil_bits {
+                        return Err(make_error!(ErrorType::NumberOfBitsNotSupported(
+                            BitType::Stencil,
+                            attribs.stencil_bits
+                        )));
+                    }
+                }
+
+                if let Some(color) = cf.color_bits {
+                    if color != attribs.color_bits {
+                        return Err(make_error!(ErrorType::NumberOfBitsNotSupported(
+                            BitType::Color,
+                            attribs.color_bits
+                        )));
+                    }
+                }
 
                 Ok((attribs, conf))
             })

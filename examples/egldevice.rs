@@ -131,7 +131,9 @@ mod implementation {
 
                 gl.export_to_file(
                     &size,
-                    &Path::new(&("headless".to_string() + &i.to_string() + "_" + &j.to_string() + ".png")),
+                    &Path::new(
+                        &("headless".to_string() + &i.to_string() + "_" + &j.to_string() + ".png"),
+                    ),
                 );
 
                 match i {
