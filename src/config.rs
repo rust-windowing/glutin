@@ -272,7 +272,7 @@ pub struct ConfigsFinder {
     pub stencil_bits: Option<u8>,
     pub double_buffer: Option<bool>,
     pub multisampling: Option<u16>,
-    pub stereoscopy: bool,
+    pub stereoscopy: Option<bool>,
     pub srgb: Option<bool>,
     pub desired_swap_interval_ranges: Vec<SwapIntervalRange>,
     pub must_support_pbuffers: bool,
@@ -289,13 +289,12 @@ impl Default for ConfigsFinder {
             hardware_accelerated: Some(true),
             color_bits: Some(24),
             alpha_bits: Some(0),
-            // FIXME EGL_EXT_pixel_format_float
+            stereoscopy: Some(false),
             float_color_buffer: None,
             depth_bits: None,
             stencil_bits: None,
             double_buffer: None,
             multisampling: None,
-            stereoscopy: false,
             srgb: None,
             desired_swap_interval_ranges: vec![],
             must_support_pbuffers: false,
@@ -370,10 +369,9 @@ impl ConfigsFinder {
         self
     }
 
-    /// If true, only stereoscopic formats will be considered. If false, only
-    /// non-stereoscopic formats.
+    /// If stereoscopic formats will be considered. If `None`, don't care.
     #[inline]
-    pub fn with_stereoscopy(mut self, stereo: bool) -> Self {
+    pub fn with_stereoscopy(mut self, stereo: Option<bool>) -> Self {
         self.stereoscopy = stereo;
         self
     }

@@ -469,12 +469,16 @@ impl Config {
             }));
         }
 
+        let floating_ext_present = display.has_extension("EGL_EXT_pixel_format_float");
         if cf.float_color_buffer == Some(true) {
-            errors.append(make_error!(ErrorType::FloatingPointSurfaceNotSupported));
-            return Err(errors);
+            if !floating_ext_present {
+                errors.append(make_error!(ErrorType::FloatingPointSurfaceNotSupported));
+                return Err(errors);
+            }
         }
 
-        if cf.stereoscopy {
+        if cf.stereoscopy == Some(true) {
+            errors.append(make_error!(ErrorType::StereoscopyNotSupported));
             return Err(errors);
         }
 
@@ -567,37 +571,36 @@ impl Config {
                 Ok(conf) => Some(conf),
             })
             .map(|conf| {
-                let check_match = |attr, val| {
-                    let fval = attrib!(egl, display, conf, attr)? as u32;
-                    if fval != val {
-                        return Err(make_oserror!(OsError::Misc(format!(
-                            "attr {}, {} != {} for {:?}",
-                            attr, fval, val, conf,
-                        ))));
-                    }
-                    Ok(fval)
-                };
-
-                let check_mask = |attr, val| {
-                    let fval = attrib!(egl, display, conf, attr)? as u32;
-                    if (fval & val) != val {
-                        return Err(make_oserror!(OsError::Misc(format!(
-                            "attr {}, {} & {} for {:?}",
-                            attr, fval, val, conf,
-                        ))));
-                    }
-                    Ok(fval)
-                };
-
                 if display.egl_version >= (1, 2) {
-                    check_match(ffi::egl::COLOR_BUFFER_TYPE, ffi::egl::RGB_BUFFER)?;
+                    let cbt = attrib!(egl, display, conf, ffi::egl::COLOR_BUFFER_TYPE)?;
+                    if cbt as u32 != ffi::egl::RGB_BUFFER {
+                        return Err(make_oserror!(OsError::Misc(format!(
+                            "Got color buffer type of {} for {:?}",
+                            cbt, conf,
+                        ))));
+                    }
                 }
 
-                if let Some(xid) = cf.plat_attr.x11_visual_xid {
-                    check_match(ffi::egl::NATIVE_VISUAL_ID, xid.try_into().unwrap())?;
+                #[cfg(any(
+                    target_os = "linux",
+                    target_os = "dragonfly",
+                    target_os = "freebsd",
+                    target_os = "netbsd",
+                    target_os = "openbsd",
+                ))]
+                {
+                    if let Some(xid) = cf.plat_attr.x11_visual_xid {
+                        let avid = attrib!(egl, display, conf, ffi::egl::NATIVE_VISUAL_ID)?;
+                        if avid != xid.try_into().unwrap() {
+                            return Err(make_oserror!(OsError::Misc(format!(
+                                "Xid of {} doesn't match requested {} for {:?}",
+                                avid, xid, conf,
+                            ))));
+                        }
+                    }
                 }
 
-                if let Some(version_bit) = match cf.version {
+                if let Some(vbit) = match cf.version {
                     (Api::OpenGlEs, Version(3, _)) => Some(ffi::egl::OPENGL_ES3_BIT),
                     (Api::OpenGlEs, Version(2, _)) => Some(ffi::egl::OPENGL_ES2_BIT),
                     (Api::OpenGlEs, Version(1, _)) if display.egl_version >= (1, 3) => {
@@ -607,10 +610,11 @@ impl Config {
                     (Api::OpenGl, _) => Some(ffi::egl::OPENGL_BIT),
                     (_, _) => unreachable!(),
                 } {
-                    check_mask(ffi::egl::RENDERABLE_TYPE, version_bit)
-                        .map_err(|_| make_error!(ErrorType::OpenGlVersionNotSupported))?;
-                    check_mask(ffi::egl::CONFORMANT, version_bit)
-                        .map_err(|_| make_error!(ErrorType::OpenGlVersionNotSupported))?;
+                    if attrib!(egl, display, conf, ffi::egl::RENDERABLE_TYPE)? as u32 & vbit != vbit
+                        || attrib!(egl, display, conf, ffi::egl::CONFORMANT)? as u32 & vbit != vbit
+                    {
+                        return Err(make_error!(ErrorType::OpenGlVersionNotSupported));
+                    }
                 }
 
                 // Try into to panic if value is negative. Never trust the driver.
@@ -650,18 +654,8 @@ impl Config {
                     supports_pixmaps: (surf_type & ffi::egl::PIXMAP_BIT) != 0,
                     supports_pbuffers: (surf_type & ffi::egl::PBUFFER_BIT) != 0,
                     supports_surfaceless,
-                    hardware_accelerated: check_mask(
-                        ffi::egl::CONFIG_CAVEAT,
-                        if let Some(hwa) = cf.hardware_accelerated {
-                            if hwa {
-                                ffi::egl::NONE
-                            } else {
-                                ffi::egl::SLOW_CONFIG
-                            }
-                        } else {
-                            0
-                        },
-                    )? != ffi::egl::SLOW_CONFIG,
+                    hardware_accelerated: attrib!(egl, display, conf, ffi::egl::CONFIG_CAVEAT)?
+                        != ffi::egl::SLOW_CONFIG as raw::c_int,
 
                     color_bits: attrib!(egl, display, conf, ffi::egl::RED_SIZE)? as u8
                         + attrib!(egl, display, conf, ffi::egl::BLUE_SIZE)? as u8
@@ -669,76 +663,33 @@ impl Config {
                     alpha_bits: attrib!(egl, display, conf, ffi::egl::ALPHA_SIZE)? as u8,
                     depth_bits: attrib!(egl, display, conf, ffi::egl::DEPTH_SIZE)? as u8,
                     stencil_bits: attrib!(egl, display, conf, ffi::egl::STENCIL_SIZE)? as u8,
-                    float_color_buffer: false,
+                    float_color_buffer: match floating_ext_present {
+                        false => false,
+                        true => {
+                            match attrib!(egl, display, conf, ffi::egl::COLOR_COMPONENT_TYPE_EXT)?
+                                as _
+                            {
+                                ffi::egl::COLOR_COMPONENT_TYPE_FIXED_EXT => false,
+                                ffi::egl::COLOR_COMPONENT_TYPE_FLOAT_EXT => true,
+                                _ => panic!(),
+                            }
+                        }
+                    },
                     stereoscopy: false,
-                    multisampling: match attrib!(egl, display, conf, ffi::egl::SAMPLES)? {
-                        0 | 1 => None,
-                        a => Some(a as u16),
+                    multisampling: match attrib!(egl, display, conf, ffi::egl::SAMPLE_BUFFERS)? {
+                        0 => None,
+                        _ => Some(attrib!(egl, display, conf, ffi::egl::SAMPLES)? as u16),
                     },
                     srgb: cf.srgb.unwrap_or(false),
                     double_buffer: cf.double_buffer.unwrap_or(true),
                     swap_interval_ranges,
                 };
 
-                let change_window = cf.must_support_windows && !attribs.supports_windows;
-                let change_pbuffer = cf.must_support_pbuffers && !attribs.supports_pbuffers;
-                let change_pixmap = cf.must_support_pixmaps && !attribs.supports_pixmaps;
-                if change_window || change_pixmap || change_pbuffer {
-                    return Err(make_error!(ErrorType::SurfaceTypesNotSupported {
-                        change_pbuffer,
-                        change_window,
-                        change_pixmap,
-                        change_surfaceless: false
-                    }));
-                }
+                crate::utils::common_attribs_match(&attribs, cf)?;
 
-                if let Some(multisampling) = cf.multisampling {
-                    let ms = attribs.multisampling.unwrap_or(0);
-                    if ms != multisampling {
-                        return Err(make_error!(ErrorType::MultisamplingNotSupported));
-                    }
-                    if ms != 0 {
-                        let msb = attrib!(egl, display, conf, ffi::egl::SAMPLE_BUFFERS)?;
-                        if msb == 0 {
-                            return Err(make_error!(ErrorType::MultisamplingNotSupported));
-                        }
-                    }
-                }
-
-                use winit_types::error::BitType;
-                if let Some(depth) = cf.depth_bits {
-                    if depth != attribs.depth_bits {
-                        return Err(make_error!(ErrorType::NumberOfBitsNotSupported(
-                            BitType::Depth,
-                            attribs.depth_bits
-                        )));
-                    }
-                }
-
-                if let Some(alpha) = cf.alpha_bits {
-                    if alpha != attribs.alpha_bits {
-                        return Err(make_error!(ErrorType::NumberOfBitsNotSupported(
-                            BitType::Alpha,
-                            attribs.alpha_bits
-                        )));
-                    }
-                }
-
-                if let Some(stencil) = cf.stencil_bits {
-                    if stencil != attribs.stencil_bits {
-                        return Err(make_error!(ErrorType::NumberOfBitsNotSupported(
-                            BitType::Stencil,
-                            attribs.stencil_bits
-                        )));
-                    }
-                }
-
-                if let Some(color) = cf.color_bits {
-                    if color != attribs.color_bits {
-                        return Err(make_error!(ErrorType::NumberOfBitsNotSupported(
-                            BitType::Color,
-                            attribs.color_bits
-                        )));
+                if let Some(float_color_buffer) = cf.float_color_buffer {
+                    if float_color_buffer != attribs.float_color_buffer {
+                        return Err(make_error!(ErrorType::FloatingPointSurfaceNotSupported));
                     }
                 }
 

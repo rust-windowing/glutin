@@ -23,6 +23,7 @@ use winit_types::dpi;
 use winit_types::error::{Error, ErrorType};
 use winit_types::platform::OsError;
 
+use std::convert::TryInto;
 use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
 use std::ops::Deref;
@@ -160,9 +161,12 @@ impl Config {
         let mut errors = make_error!(ErrorType::NoAvailableConfig);
 
         if cf.must_support_surfaceless {
-            errors.append(make_error!(ErrorType::NotSupported(
-                "EGL surfaceless not supported with GLX".to_string(),
-            )));
+            errors.append(make_error!(ErrorType::SurfaceTypesNotSupported {
+                change_window: false,
+                change_pixmap: false,
+                change_pbuffer: false,
+                change_surfaceless: true
+            }));
             return Err(errors);
         }
 
@@ -171,144 +175,42 @@ impl Config {
             return Err(errors);
         }
 
-        let descriptor = {
-            let mut out: Vec<raw::c_int> = Vec::with_capacity(37);
+        let floating_arb_present = disp.has_extension("GLX_ARB_fbconfig_float");
+        if cf.float_color_buffer == Some(true) && !floating_arb_present {
+            errors.append(make_error!(ErrorType::FloatingPointSurfaceNotSupported));
+            return Err(errors);
+        }
 
-            out.push(ffi::glx::X_RENDERABLE as raw::c_int);
-            out.push(1);
+        // The ARB ext says that if we don't pass GLX_FRAMEBUFFER_SRGB_CAPABLE_ARB
+        // it is treated as don't care, which is what we want.
+        //
+        // The ARB ext was ammended to say so in
+        // https://github.com/KhronosGroup/OpenGL-Registry/issues/199.
+        //
+        // The EXT ext doesn't specify, but given that they should both behave
+        // (nearly) the same, it is safe to assume that this is also the case
+        // for the EXT ext.
+        let srgb_arb_present = disp.has_extension("GLX_ARB_framebuffer_sRGB");
+        let srgb_ext_present = disp.has_extension("GLX_EXT_framebuffer_sRGB");
+        if cf.srgb.is_some() && !srgb_arb_present && !srgb_ext_present {
+            errors.append(make_error!(ErrorType::SrgbSurfaceNotSupported));
+            return Err(make_error!(ErrorType::NoAvailableConfig));
+        }
 
-            if let Some(xid) = cf.plat_attr.x11_visual_xid {
-                // getting the visual infos
-                let fvi = crate::platform_impl::x11::utils::get_visual_info_from_xid(&**disp, xid)?;
+        let multisampling_arb_present = disp.has_extension("GLX_ARB_multisample");
+        if cf.multisampling.is_some() && !multisampling_arb_present && disp.version < (1, 4) {
+            errors.append(make_error!(ErrorType::MultisamplingNotSupported));
+            return Err(errors);
+        }
 
-                out.push(ffi::glx::X_VISUAL_TYPE as raw::c_int);
-                out.push(fvi.class as raw::c_int);
-
-                out.push(ffi::glx::VISUAL_ID as raw::c_int);
-                out.push(xid as raw::c_int);
-            } else {
-                out.push(ffi::glx::X_VISUAL_TYPE as raw::c_int);
-                out.push(ffi::glx::TRUE_COLOR as raw::c_int);
-            }
-
-            out.push(ffi::glx::DRAWABLE_TYPE as raw::c_int);
-            let mut surface_type = 0;
-            if cf.must_support_windows {
-                surface_type = surface_type | ffi::glx::WINDOW_BIT;
-            }
-            if cf.must_support_pbuffers {
-                surface_type = surface_type | ffi::glx::PBUFFER_BIT;
-            }
-            if cf.must_support_pixmaps {
-                surface_type = surface_type | ffi::glx::PIXMAP_BIT;
-            }
-            out.push(surface_type as raw::c_int);
-
-            if let Some(color) = cf.color_bits {
-                out.push(ffi::glx::RED_SIZE as raw::c_int);
-                out.push((color / 3) as raw::c_int);
-                out.push(ffi::glx::GREEN_SIZE as raw::c_int);
-                out.push((color / 3 + if color % 3 != 0 { 1 } else { 0 }) as raw::c_int);
-                out.push(ffi::glx::BLUE_SIZE as raw::c_int);
-                out.push((color / 3 + if color % 3 == 2 { 1 } else { 0 }) as raw::c_int);
-            }
-
-            if let Some(alpha) = cf.alpha_bits {
-                out.push(ffi::glx::ALPHA_SIZE as raw::c_int);
-                out.push(alpha as raw::c_int);
-            }
-
-            match cf.float_color_buffer {
-                Some(true) => {
-                    if !disp.has_extension("GLX_ARB_fbconfig_float") {
-                        errors.append(make_error!(ErrorType::FloatingPointSurfaceNotSupported));
-                        return Err(errors);
-                    }
-                    out.push(ffi::glx::RENDER_TYPE as raw::c_int);
-                    out.push(ffi::glx_extra::RGBA_FLOAT_BIT_ARB as raw::c_int);
-                }
-                Some(false) => {
-                    out.push(ffi::glx::RENDER_TYPE as raw::c_int);
-                    out.push(ffi::glx::RGBA_BIT as raw::c_int);
-                }
-                _ => (),
-            }
-
-            if let Some(depth) = cf.depth_bits {
-                out.push(ffi::glx::DEPTH_SIZE as raw::c_int);
-                out.push(depth as raw::c_int);
-            }
-
-            if let Some(stencil) = cf.stencil_bits {
-                out.push(ffi::glx::STENCIL_SIZE as raw::c_int);
-                out.push(stencil as raw::c_int);
-            }
-
-            let double_buffer = cf.double_buffer.unwrap_or(true);
-            out.push(ffi::glx::DOUBLEBUFFER as raw::c_int);
-            out.push(if double_buffer { 1 } else { 0 });
-
-            if let Some(multisampling) = cf.multisampling {
-                if disp.version >= (1, 4) {
-                    out.push(ffi::glx::SAMPLE_BUFFERS as raw::c_int);
-                    out.push(if multisampling == 0 { 0 } else { 1 });
-                    out.push(ffi::glx::SAMPLES as raw::c_int);
-                    out.push(multisampling as raw::c_int);
-                } else if disp.has_extension("GLX_ARB_multisample") {
-                    out.push(ffi::glx_extra::SAMPLE_BUFFERS_ARB as raw::c_int);
-                    out.push(if multisampling == 0 { 0 } else { 1 });
-                    out.push(ffi::glx_extra::SAMPLES_ARB as raw::c_int);
-                    out.push(multisampling as raw::c_int);
-                } else {
-                    errors.append(make_error!(ErrorType::MultisamplingNotSupported));
-                    return Err(errors);
-                }
-            }
-
-            out.push(ffi::glx::STEREO as raw::c_int);
-            out.push(if cf.stereoscopy { 1 } else { 0 });
-
-            // The ARB ext says that if we don't pass GLX_FRAMEBUFFER_SRGB_CAPABLE_ARB
-            // it is treated as don't care, which is what we want.
-            //
-            // The ARB ext was ammended to say so in
-            // https://github.com/KhronosGroup/OpenGL-Registry/issues/199.
-            //
-            // The EXT ext doesn't specify, but given that they should both behave
-            // (nearly) the same, it is safe to assume that this is also the case
-            // for the EXT ext.
-            if let Some(srgb) = cf.srgb {
-                let srgb = if srgb { 1 } else { 0 };
-                if disp.has_extension("GLX_ARB_framebuffer_sRGB") {
-                    out.push(ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as raw::c_int);
-                    out.push(srgb);
-                } else if disp.has_extension("GLX_EXT_framebuffer_sRGB") {
-                    out.push(ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as raw::c_int);
-                    out.push(srgb);
-                } else {
-                    errors.append(make_error!(ErrorType::SrgbSurfaceNotSupported));
-                    return Err(make_error!(ErrorType::NoAvailableConfig));
-                }
-            }
-
-            out.push(ffi::glx::CONFIG_CAVEAT as raw::c_int);
-            out.push(ffi::glx::DONT_CARE as raw::c_int);
-
-            out.push(0);
-            out
-        };
-
-        let swap_control_supported = disp.has_extension("GLX_EXT_swap_control")
-            || disp.has_extension("GLX_MESA_swap_control")
-            || disp.has_extension("GLX_SGI_swap_control");
+        let swap_control_ext_present = disp.has_extension("GLX_EXT_swap_control");
+        let swap_control_mesa_present = disp.has_extension("GLX_MESA_swap_control");
+        let swap_control_sgi_present = disp.has_extension("GLX_SGI_swap_control");
+        let swap_control_supported =
+            swap_control_ext_present || swap_control_mesa_present || swap_control_sgi_present;
         let swap_control_tear_supported = disp.has_extension("GLX_EXT_swap_control_tear");
 
         if !cf.desired_swap_interval_ranges.is_empty() {
-            if !swap_control_supported {
-                errors.append(make_error!(ErrorType::SwapControlRangeNotSupported));
-                return Err(errors);
-            }
-
             if !swap_control_tear_supported {
                 for dsir in &cf.desired_swap_interval_ranges[..] {
                     match dsir {
@@ -321,18 +223,15 @@ impl Config {
                     }
                 }
             }
+
+            if !swap_control_supported {
+                errors.append(make_error!(ErrorType::SwapControlRangeNotSupported));
+                return Err(errors);
+            }
         }
 
-        // calling glXChooseFBConfig
         let mut num_confs = 0;
-        let confs_ptr = unsafe {
-            glx.ChooseFBConfig(
-                ****disp as *mut _,
-                screen,
-                descriptor.as_ptr(),
-                &mut num_confs,
-            )
-        };
+        let confs_ptr = unsafe { glx.GetFBConfigs(****disp as *mut _, screen, &mut num_confs) };
 
         if let Err(err) = disp.check_errors() {
             errors.append(err);
@@ -382,6 +281,35 @@ impl Config {
                     swap_interval_ranges.push(SwapIntervalRange::AdaptiveWait(1..1000));
                 }
 
+                if (cf.must_support_windows || cf.must_support_pixmaps)
+                    && attrib!(glx, disp, conf, ffi::glx::X_RENDERABLE)? == 0
+                {
+                    return Err(make_error!(ErrorType::SurfaceTypesNotSupported {
+                        change_window: cf.must_support_windows,
+                        change_pixmap: cf.must_support_pixmaps,
+                        change_pbuffer: false,
+                        change_surfaceless: false
+                    }));
+                }
+
+                if let Some(xid) = cf.plat_attr.x11_visual_xid {
+                    let axid = attrib!(glx, disp, conf, ffi::glx::VISUAL_ID)?;
+                    if axid != xid.try_into().unwrap() {
+                        return Err(make_oserror!(OsError::Misc(format!(
+                            "Xid of {} doesn't match requested {} for {:?}",
+                            axid, xid, conf,
+                        ))));
+                    }
+                } else {
+                    let vis_type = attrib!(glx, disp, conf, ffi::glx::X_VISUAL_TYPE)?;
+                    if vis_type as u32 != ffi::glx::TRUE_COLOR {
+                        return Err(make_oserror!(OsError::Misc(format!(
+                            "Visual type {} is not TRUE_COLOR for {:?}",
+                            vis_type, conf,
+                        ))));
+                    }
+                }
+
                 let surf_type = attrib!(glx, disp, conf, ffi::glx::DRAWABLE_TYPE)? as u32;
                 let attribs = ConfigAttribs {
                     version: cf.version,
@@ -402,17 +330,23 @@ impl Config {
                     // Gets populated later.
                     float_color_buffer: false,
 
-                    multisampling: match disp.has_extension("GLX_ARB_multisample") {
-                        false => None,
-                        true => match attrib!(glx, disp, conf, ffi::glx::SAMPLE_BUFFERS)? {
+                    multisampling: match (disp.version >= (1, 4), multisampling_arb_present) {
+                        (false, false) => None,
+                        (true, _) => match attrib!(glx, disp, conf, ffi::glx::SAMPLE_BUFFERS)? {
                             0 => None,
                             _ => Some(attrib!(glx, disp, conf, ffi::glx::SAMPLES)? as u16),
                         },
+                        (_, true) => {
+                            match attrib!(glx, disp, conf, ffi::glx_extra::SAMPLE_BUFFERS_ARB)? {
+                                0 => None,
+                                _ => {
+                                    Some(attrib!(glx, disp, conf, ffi::glx_extra::SAMPLES_ARB)?
+                                        as u16)
+                                }
+                            }
+                        }
                     },
-                    srgb: match (
-                        disp.has_extension("GLX_ARB_framebuffer_sRGB"),
-                        disp.has_extension("GLX_EXT_framebuffer_sRGB"),
-                    ) {
+                    srgb: match (srgb_arb_present, srgb_ext_present) {
                         (true, _) => {
                             attrib!(
                                 glx,
@@ -439,6 +373,20 @@ impl Config {
                     swap_interval_ranges,
                 };
 
+                crate::utils::common_attribs_match(&attribs, cf)?;
+
+                if let Some(double_buffer) = cf.double_buffer {
+                    if double_buffer != attribs.double_buffer {
+                        return Err(make_error!(ErrorType::DoubleBufferNotSupported));
+                    }
+                }
+
+                if let Some(srgb) = cf.srgb {
+                    if srgb != attribs.srgb {
+                        return Err(make_error!(ErrorType::SrgbSurfaceNotSupported));
+                    }
+                }
+
                 Ok((attribs, conf, visual_info))
             })
             // FIXME: Pleasing borrowck. Lokathor demands unrolling this loop.
@@ -462,8 +410,8 @@ impl Config {
                 let wants_floating_point = cf.float_color_buffer != Some(false);
                 let wants_standard = cf.float_color_buffer != Some(true);
 
-                let is_floating_point = disp.has_extension("GLX_ARB_fbconfig_float")
-                    && (render_type & ffi::glx_extra::RGBA_FLOAT_BIT_ARB) != 0;
+                let is_floating_point =
+                    floating_arb_present && (render_type & ffi::glx_extra::RGBA_FLOAT_BIT_ARB) != 0;
                 let is_standard = (render_type & ffi::glx::RGBA_BIT) != 0;
 
                 let mut confs = vec![];
