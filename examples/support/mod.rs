@@ -187,6 +187,8 @@ impl Gl {
     }
 
     pub fn export_to_file(&self, size: &PhysicalSize<u32>, path: &Path) {
+        println!("Exporting to file {}", path.display());
+
         let mut pixels: Vec<gl::types::GLubyte> = vec![];
         pixels.resize(3 * size.width as usize * size.height as usize, 0);
         unsafe {
@@ -268,39 +270,39 @@ impl HeadlessBackend {
             "None of the backends seem to work!".to_string()
         ));
 
-        match ConfigsFinder::new()
-            .with_must_support_surfaceless(true)
-            .with_must_support_windows(must_support_windows)
-            .with_gl((Api::OpenGl, Version(3, 0)))
-            .find(&**el)
-        {
-            Ok(mut confs) => {
-                let conf = confs.drain(..1).next().unwrap();
-                println!("Surfaceless configeration chosen: {:?}", conf);
-                let ctx = ContextBuilder::new().build(&conf).unwrap();
-                return Ok((HeadlessBackend::Surfaceless(ctx), size.clone(), Some(conf)));
-            }
-            Err(err) => errs.append(err),
-        }
+        //match ConfigsFinder::new()
+        //    .with_must_support_surfaceless(true)
+        //    .with_must_support_windows(must_support_windows)
+        //    .with_gl((Api::OpenGl, Version(3, 0)))
+        //    .find(&**el)
+        //{
+        //    Ok(mut confs) => {
+        //        let conf = confs.drain(..1).next().unwrap();
+        //        println!("Surfaceless configeration chosen: {:#?}", conf);
+        //        let ctx = ContextBuilder::new().build(&conf).unwrap();
+        //        return Ok((HeadlessBackend::Surfaceless(ctx), size.clone(), Some(conf)));
+        //    }
+        //    Err(err) => errs.append(err),
+        //}
 
-        match ConfigsFinder::new()
-            .with_must_support_pbuffers(true)
-            .with_must_support_windows(must_support_windows)
-            .with_gl((Api::OpenGl, Version(3, 0)))
-            .find(&**el)
-        {
-            Ok(mut confs) => {
-                let conf = confs.drain(..1).next().unwrap();
-                println!("PBuffer configeration chosen: {:?}", conf);
+        //match ConfigsFinder::new()
+        //    .with_must_support_pbuffers(true)
+        //    .with_must_support_windows(must_support_windows)
+        //    .with_gl((Api::OpenGl, Version(3, 0)))
+        //    .find(&**el)
+        //{
+        //    Ok(mut confs) => {
+        //        let conf = confs.drain(..1).next().unwrap();
+        //        println!("PBuffer configeration chosen: {:#?}", conf);
 
-                let ctx = ContextBuilder::new().build(&conf).unwrap();
-                let surf = Surface::new_pbuffer(&conf, size, true).unwrap();
-                let size = surf.size().unwrap();
+        //        let ctx = ContextBuilder::new().build(&conf).unwrap();
+        //        let surf = Surface::new_pbuffer(&conf, size, true).unwrap();
+        //        let size = surf.size().unwrap();
 
-                return Ok((HeadlessBackend::PBuffer(ctx, surf), size, Some(conf)));
-            }
-            Err(err) => errs.append(err),
-        }
+        //        return Ok((HeadlessBackend::PBuffer(ctx, surf), size, Some(conf)));
+        //    }
+        //    Err(err) => errs.append(err),
+        //}
 
         if must_support_windows {
             return Err(errs);
@@ -323,41 +325,58 @@ impl HeadlessBackend {
                 }
             }
 
-            // You can also try to use PBuffers, but from experience that is very
-            // buggy.
+            //match ConfigsFinder::new()
+            //    .with_must_support_surfaceless(true)
+            //    .with_must_support_windows(must_support_windows)
+            //    .with_gl((Api::OpenGl, Version(3, 0)))
+            //    .find(&EglMesaSurfaceless)
+            //{
+            //    Ok(mut confs) => {
+            //        let conf = confs.drain(..1).next().unwrap();
+            //        println!("EGL Mesa Surfaceless configeration chosen: {:#?}", conf);
+            //        let ctx = ContextBuilder::new().build(&conf).unwrap();
+            //        return Ok((HeadlessBackend::Surfaceless(ctx), size.clone(), Some(conf)));
+            //    }
+            //    Err(err) => errs.append(err),
+            //}
+
             match ConfigsFinder::new()
-                .with_must_support_surfaceless(true)
+                .with_must_support_pbuffers(true)
                 .with_must_support_windows(must_support_windows)
                 .with_gl((Api::OpenGl, Version(3, 0)))
                 .find(&EglMesaSurfaceless)
             {
                 Ok(mut confs) => {
                     let conf = confs.drain(..1).next().unwrap();
-                    println!("EGL Mesa Surfaceless configeration chosen: {:?}", conf);
+                    println!("Egl Mesa Surfaceless PBuffer configeration chosen: {:#?}", conf);
+
                     let ctx = ContextBuilder::new().build(&conf).unwrap();
-                    return Ok((HeadlessBackend::Surfaceless(ctx), size.clone(), Some(conf)));
+                    let surf = Surface::new_pbuffer(&conf, size, true).unwrap();
+                    let size = surf.size().unwrap();
+
+                    return Ok((HeadlessBackend::PBuffer(ctx, surf), size, Some(conf)));
                 }
                 Err(err) => errs.append(err),
             }
         }
 
-        #[cfg(any(
-            target_os = "linux",
-            target_os = "dragonfly",
-            target_os = "freebsd",
-            target_os = "netbsd",
-            target_os = "openbsd",
-        ))]
-        match OsMesaContextBuilder::new().build(Version(3, 0)) {
-            Ok(ctx) => match OsMesaBuffer::new(size) {
-                Ok(buf) => {
-                    println!("OsMesa chosen");
-                    return Ok((HeadlessBackend::OsMesa(ctx, buf), size.clone(), None));
-                }
-                Err(err) => errs.append(err),
-            },
-            Err(err) => errs.append(err),
-        }
+        //#[cfg(any(
+        //    target_os = "linux",
+        //    target_os = "dragonfly",
+        //    target_os = "freebsd",
+        //    target_os = "netbsd",
+        //    target_os = "openbsd",
+        //))]
+        //match OsMesaContextBuilder::new().build(Version(3, 0)) {
+        //    Ok(ctx) => match OsMesaBuffer::new(size) {
+        //        Ok(buf) => {
+        //            println!("OsMesa chosen");
+        //            return Ok((HeadlessBackend::OsMesa(ctx, buf), size.clone(), None));
+        //        }
+        //        Err(err) => errs.append(err),
+        //    },
+        //    Err(err) => errs.append(err),
+        //}
 
         return Err(errs);
     }
