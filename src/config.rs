@@ -30,8 +30,6 @@ pub enum Api {
     OpenGl,
     /// OpenGL embedded system. Available on Unix operating systems, Android.
     OpenGlEs,
-    /// OpenGL for the web. Very similar to OpenGL ES.
-    WebGl,
 }
 
 /// The OpenGL version you want. Major then Minor, so `Version(3, 2)` equals
