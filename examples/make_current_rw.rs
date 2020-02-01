@@ -27,7 +27,7 @@ fn main() {
     println!("Configeration chosen: {:?}", conf);
 
     let ctx = unsafe { ContextBuilder::new().build(&conf).unwrap() };
-    let mut psurf = unsafe { Surface::new_pbuffer(&conf, &size, true).unwrap() };
+    let mut psurf = unsafe { Surface::new_pbuffer(&conf, size, true).unwrap() };
     let mut size = psurf.size().unwrap();
     let wb = WindowBuilder::new()
         .with_title("A fantastic window!")
@@ -71,9 +71,9 @@ fn main() {
             Event::WindowEvent { ref event, .. } => match event {
                 WindowEvent::Resized(nsize) => unsafe {
                     size = *nsize;
-                    psurf = Surface::new_pbuffer(&conf, &size, true).unwrap();
+                    psurf = Surface::new_pbuffer(&conf, size, true).unwrap();
                     ctx.make_current(&wsurf).unwrap();
-                    wsurf.update_after_resize(&size);
+                    wsurf.update_after_resize(size);
                     gl.gl.Viewport(0, 0, size.width as _, size.height as _);
                 },
                 WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,

@@ -67,7 +67,7 @@ fn main() {
                         ctx.update_after_resize();
                     }
 
-                    surf.update_after_resize(&size);
+                    surf.update_after_resize(size);
                     *wsize = size;
                 }
                 WindowEvent::CloseRequested => {

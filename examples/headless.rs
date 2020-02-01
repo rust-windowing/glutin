@@ -12,7 +12,7 @@ fn main() {
     let size = PhysicalSize::new(512, 512);
     let el = EventLoop::new();
 
-    let (backend, size, _) = unsafe { HeadlessBackend::new(&el, &size, false).unwrap() };
+    let (backend, size, _) = unsafe { HeadlessBackend::new(&el, size, false).unwrap() };
     let gl = backend.load_symbols().unwrap();
 
     let mut fb = None;
@@ -32,7 +32,7 @@ fn main() {
     }
     gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
 
-    gl.export_to_file(&size, &Path::new("headless.png"));
+    gl.export_to_file(size, &Path::new("headless.png"));
 
     match backend {
         HeadlessBackend::Surfaceless(_) => unsafe {

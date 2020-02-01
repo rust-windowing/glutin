@@ -149,7 +149,7 @@ mod implementation {
                         psurf = npsurf;
                         pix = npix;
                         ctx.make_current(&wsurf).unwrap();
-                        wsurf.update_after_resize(&size);
+                        wsurf.update_after_resize(size);
                         gl.gl.Viewport(0, 0, size.width as _, size.height as _);
                     },
                     WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,

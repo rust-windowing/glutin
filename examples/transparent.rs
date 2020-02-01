@@ -61,7 +61,7 @@ fn main() {
             Event::WindowEvent { ref event, .. } => match event {
                 WindowEvent::Resized(size) => {
                     ctx.update_after_resize();
-                    surf.update_after_resize(size);
+                    surf.update_after_resize(*size);
                     unsafe {
                         gl.gl.Viewport(0, 0, size.width as _, size.height as _);
                     }

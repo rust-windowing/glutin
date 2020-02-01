@@ -14,7 +14,7 @@ fn main() {
     let size = PhysicalSize::new(512, 512);
     let el = EventLoop::new();
 
-    let (backend, mut size, conf) = unsafe { HeadlessBackend::new(&el, &size, true).unwrap() };
+    let (backend, mut size, conf) = unsafe { HeadlessBackend::new(&el, size, true).unwrap() };
     let conf = conf.unwrap();
     let hgl = backend.load_symbols().unwrap();
 
@@ -89,7 +89,7 @@ fn main() {
                 WindowEvent::Resized(nsize) => unsafe {
                     size = *nsize;
                     ctx.make_current(&surf).unwrap();
-                    surf.update_after_resize(&size);
+                    surf.update_after_resize(size);
                     wgl.gl.Viewport(0, 0, size.width as _, size.height as _);
                     wgl.gl.BindRenderbuffer(gl::RENDERBUFFER, render_buf);
                     wgl.gl.RenderbufferStorage(

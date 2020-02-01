@@ -89,7 +89,7 @@ mod implementation {
             for (j, conf) in choosen_confs.iter().enumerate() {
                 let ctx = unsafe { ContextBuilder::new().build(&conf).unwrap() };
                 let surf = match i {
-                    0 => unsafe { Some(Surface::new_pbuffer(&conf, &size, true).unwrap()) },
+                    0 => unsafe { Some(Surface::new_pbuffer(&conf, size, true).unwrap()) },
                     1 => None,
                     _ => unreachable!(),
                 };
@@ -130,7 +130,7 @@ mod implementation {
                 gl.draw_frame([0.0, 0.0, 0.0, 1.0]);
 
                 gl.export_to_file(
-                    &size,
+                    size,
                     &Path::new(
                         &("headless".to_string() + &i.to_string() + "_" + &j.to_string() + ".png"),
                     ),
