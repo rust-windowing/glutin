@@ -3,9 +3,9 @@
 - *Breaking:* Winit's types are no longer reexported by glutin.
 - *Breaking:* The `Rect` type has been moved to the winit_types crate.
 - *Breaking:* The `Context` type has been split into three separate parts, 
-the `Config`, the `Surface`, and the `Context`. Please refer to their module
-docs. The `ContextBuilder` type has been split between split between two new 
-types: `ConfigsFinder` and `ContextBuilder`.
+the `Config`, the `Surface`, and the `Context`. Please refer to their module's
+docs. The `ContextBuilder` type has been split between two new types:
+`ConfigsFinder` and `ContextBuilder`.
 - *Breaking:* Glutin has been decoupled from Winit via the glutin_interface crate.
 The `RawContext` type, `RawContextExt` trait, as well as the `split` function have
 all been removed.
