@@ -96,5 +96,5 @@ pub fn examine_visual_info(
         }
     }
 
-    return Ok(());
+    Ok(())
 }

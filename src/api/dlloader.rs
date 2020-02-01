@@ -27,10 +27,10 @@ impl<T: SymTrait> SymWrapper<T> {
     pub fn new(lib_paths: Vec<&str>) -> Result<Self, ()> {
         for path in lib_paths {
             let lib = Library::new(path);
-            if lib.is_ok() {
+            if let Ok(lib) = lib {
                 return Ok(SymWrapper {
-                    inner: T::load_with(lib.as_ref().unwrap()),
-                    _lib: Arc::new(lib.unwrap()),
+                    inner: T::load_with(&lib),
+                    _lib: Arc::new(lib),
                 });
             }
         }

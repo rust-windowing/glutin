@@ -186,7 +186,7 @@ impl Gl {
         }
     }
 
-    pub fn export_to_file(&self, size: &PhysicalSize<u32>, path: &Path) {
+    pub fn export_to_file(&self, size: PhysicalSize<u32>, path: &Path) {
         println!("Exporting to file {}", path.display());
 
         let mut pixels: Vec<gl::types::GLubyte> = vec![];
@@ -272,7 +272,7 @@ pub enum HeadlessBackend {
 impl HeadlessBackend {
     pub unsafe fn new<T>(
         el: &EventLoop<T>,
-        size: &PhysicalSize<u32>,
+        size: PhysicalSize<u32>,
         must_support_windows: bool,
     ) -> Result<(Self, PhysicalSize<u32>, Option<Config>), Error> {
         let mut errs = winit_types::make_error!(ErrorType::NotSupported(

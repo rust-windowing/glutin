@@ -57,7 +57,7 @@ pub struct Display {
 impl Display {
     #[inline]
     fn has_extension(&self, e: &str) -> bool {
-        self.extensions.iter().find(|s| s == &e).is_some()
+        self.extensions.iter().any(|s| s == e)
     }
 
     #[inline]
@@ -67,7 +67,7 @@ impl Display {
     ) -> Result<*const raw::c_void, Error> {
         let egl = EGL.as_ref().unwrap();
 
-        let has_client_extension = |e: &str| client_extensions.iter().find(|s| s == &e).is_some();
+        let has_client_extension = |e: &str| client_extensions.iter().any(|s| s == e);
 
         let disp = match *ndisp {
             // Note: Some EGL implementations are missing the
@@ -332,17 +332,16 @@ impl Display {
     #[inline]
     unsafe fn bind_api(api: Api, egl_version: EglVersion) -> Result<(), Error> {
         let egl = EGL.as_ref().unwrap();
-        if egl_version >= (1, 2) {
-            if match api {
+        if egl_version >= (1, 2)
+            && match api {
                 Api::OpenGl if egl_version >= (1, 4) => egl.BindAPI(ffi::egl::OPENGL_API),
                 Api::OpenGl => ffi::egl::FALSE,
                 Api::OpenGlEs if egl_version >= (1, 2) => egl.BindAPI(ffi::egl::OPENGL_ES_API),
                 Api::OpenGlEs => ffi::egl::TRUE,
                 _ => ffi::egl::FALSE,
             } == ffi::egl::FALSE
-            {
-                return Err(make_error!(ErrorType::OpenGlVersionNotSupported));
-            }
+        {
+            return Err(make_error!(ErrorType::OpenGlVersionNotSupported));
         }
 
         Ok(())
@@ -470,11 +469,9 @@ impl Config {
         }
 
         let floating_ext_present = display.has_extension("EGL_EXT_pixel_format_float");
-        if cf.float_color_buffer == Some(true) {
-            if !floating_ext_present {
-                errors.append(make_error!(ErrorType::FloatingPointSurfaceNotSupported));
-                return Err(errors);
-            }
+        if cf.float_color_buffer == Some(true) && !floating_ext_present {
+            errors.append(make_error!(ErrorType::FloatingPointSurfaceNotSupported));
+            return Err(errors);
         }
 
         if cf.stereoscopy == Some(true) {
@@ -503,15 +500,10 @@ impl Config {
         // binding the right API and choosing the version
         unsafe { Display::bind_api(cf.version.0, display.egl_version)? };
 
-        if cf
-            .desired_swap_interval_ranges
-            .iter()
-            .find(|si| match si {
-                SwapIntervalRange::AdaptiveWait(_) => true,
-                _ => false,
-            })
-            .is_some()
-        {
+        if cf.desired_swap_interval_ranges.iter().any(|si| match si {
+            SwapIntervalRange::AdaptiveWait(_) => true,
+            _ => false,
+        }) {
             errors.append(make_error!(ErrorType::AdaptiveSwapControlNotSupported));
             errors.append(make_error!(ErrorType::SwapControlRangeNotSupported));
             return Err(errors);
@@ -663,17 +655,15 @@ impl Config {
                     alpha_bits: attrib!(egl, display, conf, ffi::egl::ALPHA_SIZE)? as u8,
                     depth_bits: attrib!(egl, display, conf, ffi::egl::DEPTH_SIZE)? as u8,
                     stencil_bits: attrib!(egl, display, conf, ffi::egl::STENCIL_SIZE)? as u8,
-                    float_color_buffer: match floating_ext_present {
-                        false => false,
-                        true => {
-                            match attrib!(egl, display, conf, ffi::egl::COLOR_COMPONENT_TYPE_EXT)?
-                                as _
-                            {
-                                ffi::egl::COLOR_COMPONENT_TYPE_FIXED_EXT => false,
-                                ffi::egl::COLOR_COMPONENT_TYPE_FLOAT_EXT => true,
-                                _ => panic!(),
-                            }
+                    float_color_buffer: if floating_ext_present {
+                        match attrib!(egl, display, conf, ffi::egl::COLOR_COMPONENT_TYPE_EXT)? as _
+                        {
+                            ffi::egl::COLOR_COMPONENT_TYPE_FIXED_EXT => false,
+                            ffi::egl::COLOR_COMPONENT_TYPE_FLOAT_EXT => true,
+                            _ => panic!(),
                         }
+                    } else {
+                        false
                     },
                     stereoscopy: false,
                     multisampling: match attrib!(egl, display, conf, ffi::egl::SAMPLE_BUFFERS)? {
@@ -703,7 +693,7 @@ impl Config {
                     errors.append(err);
                     return None;
                 }
-                let (attribs, conf) = conf.unwrap();
+                let (mut attribs, conf) = conf.unwrap();
 
                 let mut confs = vec![(attribs.clone(), conf)];
 
@@ -720,7 +710,6 @@ impl Config {
                 }
 
                 if cf.double_buffer.is_none() && cf.srgb.is_none() {
-                    let mut attribs = attribs.clone();
                     attribs.srgb = true;
                     attribs.double_buffer = false;
                     confs.push((attribs, conf));
@@ -798,13 +787,7 @@ impl Context {
         let mut context_attributes = Vec::with_capacity(10);
         let mut flags = 0;
 
-        if display.egl_version >= (1, 5)
-            || display
-                .extensions
-                .iter()
-                .find(|s| s == &"EGL_KHR_create_context")
-                .is_some()
-        {
+        if display.egl_version >= (1, 5) || display.has_extension("EGL_KHR_create_context") {
             context_attributes.push(ffi::egl::CONTEXT_MAJOR_VERSION as raw::c_int);
             context_attributes.push(version.0 as raw::c_int);
             context_attributes.push(ffi::egl::CONTEXT_MINOR_VERSION as raw::c_int);
@@ -834,13 +817,13 @@ impl Context {
                     context_attributes
                         .push(ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY as raw::c_int);
                     context_attributes.push(ffi::egl::NO_RESET_NOTIFICATION as raw::c_int);
-                    flags = flags | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
+                    flags |= ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
                 }
                 Robustness::RobustLoseContextOnReset => {
                     context_attributes
                         .push(ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY as raw::c_int);
                     context_attributes.push(ffi::egl::LOSE_CONTEXT_ON_RESET as raw::c_int);
-                    flags = flags | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
+                    flags |= ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
                 }
                 _ => (),
             }
@@ -1129,37 +1112,29 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     #[inline]
     fn assemble_desc(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        size: Option<(&dpi::PhysicalSize<u32>, bool)>,
+        size: Option<(dpi::PhysicalSize<u32>, bool)>,
     ) -> Vec<ffi::EGLAttrib> {
         let mut out = Vec::new();
-        match conf.attribs.srgb {
-            false => {
-                if conf.config.display.has_extension("EGL_KHR_gl_colorspace") {
-                    // With how shitty drivers are, never hurts to be explicit
-                    out.push(ffi::egl::GL_COLORSPACE_KHR as ffi::EGLAttrib);
-                    out.push(ffi::egl::GL_COLORSPACE_LINEAR_KHR as ffi::EGLAttrib);
-                }
-            }
-            true => {
-                out.push(ffi::egl::GL_COLORSPACE_KHR as ffi::EGLAttrib);
-                out.push(ffi::egl::GL_COLORSPACE_SRGB_KHR as ffi::EGLAttrib);
-            }
+        if conf.attribs.srgb {
+            out.push(ffi::egl::GL_COLORSPACE_KHR as ffi::EGLAttrib);
+            out.push(ffi::egl::GL_COLORSPACE_SRGB_KHR as ffi::EGLAttrib);
+        } else if conf.config.display.has_extension("EGL_KHR_gl_colorspace") {
+            // With how shitty drivers are, never hurts to be explicit
+            out.push(ffi::egl::GL_COLORSPACE_KHR as ffi::EGLAttrib);
+            out.push(ffi::egl::GL_COLORSPACE_LINEAR_KHR as ffi::EGLAttrib);
         }
 
         if T::surface_type() == SurfaceType::Window {
             out.push(ffi::egl::RENDER_BUFFER as ffi::EGLAttrib);
-            match conf.attribs.double_buffer {
-                false => {
-                    out.push(ffi::egl::SINGLE_BUFFER as ffi::EGLAttrib);
-                }
-                true => {
-                    out.push(ffi::egl::BACK_BUFFER as ffi::EGLAttrib);
-                }
+            if conf.attribs.double_buffer {
+                out.push(ffi::egl::BACK_BUFFER as ffi::EGLAttrib);
+            } else {
+                out.push(ffi::egl::SINGLE_BUFFER as ffi::EGLAttrib);
             }
         }
 
         if let Some((size, largest)) = size {
-            let size: (u32, u32) = (*size).into();
+            let size: (u32, u32) = size.into();
             out.push(ffi::egl::TEXTURE_FORMAT as ffi::EGLAttrib);
             out.push(match size {
                 (0, _) | (_, 0) => ffi::egl::NO_TEXTURE,
@@ -1387,7 +1362,7 @@ impl Surface<PBuffer> {
     #[inline]
     pub fn new(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        size: &dpi::PhysicalSize<u32>,
+        size: dpi::PhysicalSize<u32>,
         largest: bool,
     ) -> Result<Self, Error> {
         let display = Arc::clone(&conf.config.display);

@@ -189,9 +189,10 @@ impl Context {
     /// [`Flush`]: crate::context::ReleaseBehaviour::Flush
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), Error> {
-        match self.is_current() {
-            true => self.0.make_not_current(),
-            false => Ok(()),
+        if self.is_current() {
+            self.0.make_not_current()
+        } else {
+            Ok(())
         }
     }
 

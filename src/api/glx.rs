@@ -102,7 +102,7 @@ impl Display {
 
     #[inline]
     fn has_extension(&self, e: &str) -> bool {
-        self.extensions.iter().find(|s| s == &e).is_some()
+        self.extensions.iter().any(|s| s == e)
     }
 }
 
@@ -213,13 +213,10 @@ impl Config {
         if !cf.desired_swap_interval_ranges.is_empty() {
             if !swap_control_tear_supported {
                 for dsir in &cf.desired_swap_interval_ranges[..] {
-                    match dsir {
-                        SwapIntervalRange::AdaptiveWait(_) => {
-                            errors.append(make_error!(ErrorType::AdaptiveSwapControlNotSupported));
-                            errors.append(make_error!(ErrorType::SwapControlRangeNotSupported));
-                            return Err(errors);
-                        }
-                        _ => (),
+                    if let SwapIntervalRange::AdaptiveWait(_) = dsir {
+                        errors.append(make_error!(ErrorType::AdaptiveSwapControlNotSupported));
+                        errors.append(make_error!(ErrorType::SwapControlRangeNotSupported));
+                        return Err(errors);
                     }
                 }
             }
@@ -247,10 +244,7 @@ impl Config {
         }
 
         let confs: Vec<ffi::glx::types::GLXFBConfig> = unsafe {
-            let confs = slice::from_raw_parts(confs_ptr, num_confs as usize)
-                .iter()
-                .cloned()
-                .collect();
+            let confs = slice::from_raw_parts(confs_ptr, num_confs as usize).to_vec();
             (xlib.XFree)(confs_ptr as *mut _);
             confs
         };
@@ -547,8 +541,7 @@ impl Context {
                             );
                             attributes
                                 .push(ffi::glx_extra::NO_RESET_NOTIFICATION_ARB as raw::c_int);
-                            flags =
-                                flags | ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as raw::c_int;
+                            flags |= ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as raw::c_int;
                         }
                         Robustness::RobustLoseContextOnReset => {
                             attributes.push(
@@ -557,8 +550,7 @@ impl Context {
                             );
                             attributes
                                 .push(ffi::glx_extra::LOSE_CONTEXT_ON_RESET_ARB as raw::c_int);
-                            flags =
-                                flags | ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as raw::c_int;
+                            flags |= ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as raw::c_int;
                         }
                         Robustness::NoError => {
                             return Err(make_error!(ErrorType::RobustnessNotSupported));
@@ -577,7 +569,7 @@ impl Context {
                 }
 
                 if cb.debug {
-                    flags = flags | ffi::glx_extra::CONTEXT_DEBUG_BIT_ARB as raw::c_int;
+                    flags | -ffi::glx_extra::CONTEXT_DEBUG_BIT_ARB as raw::c_int;
                 }
 
                 flags
@@ -960,11 +952,11 @@ impl Surface<PBuffer> {
     #[inline]
     pub fn new(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        size: &dpi::PhysicalSize<u32>,
+        size: dpi::PhysicalSize<u32>,
         largest: bool,
     ) -> Result<Self, Error> {
         let glx = GLX.as_ref().unwrap();
-        let size: (u32, u32) = (*size).into();
+        let size: (u32, u32) = size.into();
         let disp = &conf.config.display;
 
         let attributes: Vec<raw::c_int> = vec![

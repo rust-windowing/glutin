@@ -65,16 +65,14 @@ impl Config {
             _ => (),
         }
 
-        let configs = egl::Config::new(cf, nd, |confs, _| {
-            confs.into_iter().map(|config| Ok(config)).collect()
-        })
-        .map_err(|mut err| match backing_api {
-            BackingApi::GlxThenEgl => {
-                err.append(glx_not_supported_error);
-                err
-            }
-            _ => err,
-        })?;
+        let configs = egl::Config::new(cf, nd, |confs, _| confs.into_iter().map(Ok).collect())
+            .map_err(|mut err| match backing_api {
+                BackingApi::GlxThenEgl => {
+                    err.append(glx_not_supported_error);
+                    err
+                }
+                _ => err,
+            })?;
         Ok(configs
             .into_iter()
             .map(|(attribs, config)| {
@@ -243,7 +241,7 @@ impl Surface<Window> {
             }
             RawWindow::Gbm { gbm_surface, .. } => {
                 egl::Surface::<Window>::new(conf.map_config(|conf| &**conf), gbm_surface)
-                    .map(|surf| Surface::Gbm(surf))
+                    .map(Surface::Gbm)
             }
             _ => Err(make_error!(ErrorType::NotSupported(
                 "Non-Wayland backends do not support native surface types.".to_string(),
@@ -252,13 +250,10 @@ impl Surface<Window> {
     }
 
     #[inline]
-    pub fn update_after_resize(&self, size: &dpi::PhysicalSize<u32>) {
-        match self {
-            Surface::WaylandWindow { wsurface, .. } => {
-                let (width, height): (u32, u32) = (*size).into();
-                wsurface.resize(width as i32, height as i32, 0, 0)
-            }
-            _ => (),
+    pub fn update_after_resize(&self, size: dpi::PhysicalSize<u32>) {
+        if let Surface::WaylandWindow { wsurface, .. } = self {
+            let (width, height): (u32, u32) = size.into();
+            wsurface.resize(width as i32, height as i32, 0, 0)
         }
     }
 
@@ -282,7 +277,7 @@ impl Surface<PBuffer> {
     #[inline]
     pub unsafe fn new(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        size: &dpi::PhysicalSize<u32>,
+        size: dpi::PhysicalSize<u32>,
         largest: bool,
     ) -> Result<Self, Error> {
         let backend = conf.config.backend();
@@ -303,9 +298,9 @@ impl Surface<Pixmap> {
         _conf: ConfigWrapper<&Config, &ConfigAttribs>,
         _np: &NP,
     ) -> Result<Self, Error> {
-        return Err(make_error!(ErrorType::NotSupported(
+        Err(make_error!(ErrorType::NotSupported(
             "None of generic_egl's backends (Wayland, GBM, ect) support pixmaps.".to_string(),
-        )));
+        )))
     }
 
     #[inline]
@@ -314,9 +309,9 @@ impl Surface<Pixmap> {
         _nps: &NPS,
         _pb: NPS::PixmapBuilder,
     ) -> Result<(NPS::Pixmap, Self), Error> {
-        return Err(make_error!(ErrorType::NotSupported(
+        Err(make_error!(ErrorType::NotSupported(
             "None of generic_egl's backends (Wayland, GBM, ect) support pixmaps.".to_string(),
-        )));
+        )))
     }
 }
 

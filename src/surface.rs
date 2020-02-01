@@ -184,9 +184,10 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     /// [`Flush`]: crate::context::ReleaseBehaviour::Flush
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), Error> {
-        match self.is_current() {
-            true => self.0.make_not_current(),
-            false => Ok(()),
+        if self.is_current() {
+            self.0.make_not_current()
+        } else {
+            Ok(())
         }
     }
 
@@ -289,7 +290,7 @@ impl Surface<PBuffer> {
     #[inline]
     pub unsafe fn new_pbuffer(
         conf: &Config,
-        size: &dpi::PhysicalSize<u32>,
+        size: dpi::PhysicalSize<u32>,
         largest: bool,
     ) -> Result<Self, Error> {
         if !conf.attribs().supports_pbuffers {
@@ -428,7 +429,7 @@ impl Surface<Window> {
     /// [`Context`]: crate::context::Context
     /// [`update_after_resize`]: crate::context::Context::update_after_resize
     #[inline]
-    pub fn update_after_resize(&self, size: &dpi::PhysicalSize<u32>) {
+    pub fn update_after_resize(&self, size: dpi::PhysicalSize<u32>) {
         #![cfg(any(
             target_os = "linux",
             target_os = "dragonfly",

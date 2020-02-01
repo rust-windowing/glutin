@@ -416,7 +416,7 @@ impl Surface<PBuffer> {
     #[inline]
     pub fn new(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        size: &dpi::PhysicalSize<u32>,
+        size: dpi::PhysicalSize<u32>,
         largest: bool,
     ) -> Result<Self, Error> {
         match conf.config {
@@ -612,7 +612,7 @@ impl Surface<Window> {
 // https://bugs.freedesktop.org/show_bug.cgi?id=67676
 // I'm working on a patch.
 #[inline]
-pub fn select_configs<'a, T, I: IntoIterator<Item = T>, F>(
+pub fn select_configs<T, I: IntoIterator<Item = T>, F>(
     disp: &Arc<Display>,
     target_transparency: Option<bool>,
     target_visual_xid: Option<raw::c_ulong>,

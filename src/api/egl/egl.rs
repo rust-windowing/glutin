@@ -36,16 +36,15 @@ mod egl {
             let f = move |s: &'static str| -> *const raw::c_void {
                 // Check if the symbol is available in the library directly. If
                 // it is, just return it.
-                match unsafe {
+                if let Ok(sym) = unsafe {
                     lib.get(
                         std::ffi::CString::new(s.as_bytes())
                             .unwrap()
                             .as_bytes_with_nul(),
                     )
                 } {
-                    Ok(sym) => return *sym,
-                    Err(_) => (),
-                };
+                    return *sym;
+                }
 
                 let mut egl_get_proc_address = (*EGL_GET_PROC_ADDRESS).lock();
                 if egl_get_proc_address.is_none() {
