@@ -472,7 +472,7 @@ impl Surface<Window> {
             if attribs
                 .swap_interval_ranges
                 .iter()
-                .find(|r| r.contains(&swap_interval))
+                .find(|r| r.contains(swap_interval))
                 .is_none()
             {
                 return Err(make_error!(ErrorType::BadApiUsage(format!(

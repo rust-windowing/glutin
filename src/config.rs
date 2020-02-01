@@ -80,7 +80,7 @@ impl SwapInterval {
     #[inline]
     pub(crate) fn validate(self) -> Result<(), Error> {
         match self {
-            SwapInterval::Wait(n) | SwapInterval::AdaptiveWait(n) if *n == 0 => {
+            SwapInterval::Wait(n) | SwapInterval::AdaptiveWait(n) if n == 0 => {
                 Err(make_error!(ErrorType::BadApiUsage(
                     "SwapInterval of `0` not allowed. Use `SwapInterval::DontWait`.".to_string()
                 )))
@@ -135,8 +135,8 @@ impl SwapIntervalRange {
     pub fn contains(&self, swap_interval: SwapInterval) -> bool {
         match (self, swap_interval) {
             (SwapIntervalRange::DontWait, SwapInterval::DontWait) => true,
-            (SwapIntervalRange::Wait(nr), SwapInterval::Wait(n)) => nr.contains(n),
-            (SwapIntervalRange::AdaptiveWait(nr), SwapInterval::AdaptiveWait(n)) => nr.contains(n),
+            (SwapIntervalRange::Wait(nr), SwapInterval::Wait(n)) => nr.contains(&n),
+            (SwapIntervalRange::AdaptiveWait(nr), SwapInterval::AdaptiveWait(n)) => nr.contains(&n),
             _ => false,
         }
     }

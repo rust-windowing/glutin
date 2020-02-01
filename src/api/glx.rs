@@ -569,7 +569,7 @@ impl Context {
                 }
 
                 if cb.debug {
-                    flags | -ffi::glx_extra::CONTEXT_DEBUG_BIT_ARB as raw::c_int;
+                    flags |= ffi::glx_extra::CONTEXT_DEBUG_BIT_ARB as raw::c_int;
                 }
 
                 flags
