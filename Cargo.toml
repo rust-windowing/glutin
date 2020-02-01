@@ -1,11 +1,77 @@
-[workspace]
-members = [
-    "glutin",
-    "glutin_examples",
-    "glutin_examples/ios-example/rust",
-    "glutin_egl_sys",
-    "glutin_glx_sys",
-    "glutin_wgl_sys",
-    "glutin_gles2_sys",
-    "glutin_emscripten_sys",
+[package]
+name = "glutin"
+version = "0.23.0-alpha1"
+authors = ["The glutin contributors", "Pierre Krieger <pierre.krieger1708@gmail.com>"]
+description = "Cross-platform OpenGL context provider."
+keywords = ["windowing", "opengl"]
+license = "Apache-2.0"
+readme = "../README.md"
+repository = "https://github.com/rust-windowing/glutin"
+documentation = "https://docs.rs/glutin"
+edition = "2018"
+build = "build.rs"
+
+[package.metadata.docs.rs]
+features = ["serde_feature"]
+
+[features]
+serde_feature = ["winit_types/serde_feature"]
+
+[dependencies]
+lazy_static = "1.4.0"
+winit_types = { version = "0.1.0", path = "../winit_types" }
+glutin_interface = { version = "0.1.0", path = "../glutin_interface" }
+log = "0.4.8"
+
+[build-dependencies]
+gl_generator = "0.14.0"
+
+[dev-dependencies]
+winit = { path = "../winit" }
+takeable-option = "0.5.0"
+image = "0.22.4"
+simple_logger = "1.4.0"
+
+[target.'cfg(all(any(target_os = "linux", target_os = "freebsd", target_os = "dragonfly", target_os = "netbsd", target_os = "openbsd"), target_arch="x86_64"))'.dev-dependencies]
+gbm = { path = "../gbm.rs" }
+drm = "0.3.4"
+
+[target.'cfg(target_os = "android")'.dependencies]
+android_glue = "0.2.3"
+glutin_egl_sys = { version = "0.1.4", path = "../glutin_sys/glutin_egl_sys" }
+parking_lot = "0.10.0"
+
+[target.'cfg(any(target_os = "ios", target_os = "macos"))'.dependencies]
+objc = "0.2.7"
+glutin_gles2_sys = { version = "0.1.3", path = "../glutin_sys/glutin_gles2_sys" }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+cgl = "0.3.2"
+cocoa = "0.20.0"
+core-foundation = "0.7.0"
+core-graphics = "0.19.0"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+libloading = "0.5.2"
+glutin_wgl_sys = { version = "0.1.3", path = "../glutin_sys/glutin_wgl_sys" }
+glutin_egl_sys = { version = "0.1.5", path = "../glutin_sys/glutin_egl_sys" }
+parking_lot = "0.10.0"
+
+[target.'cfg(target_os = "windows")'.dependencies.winapi]
+version = "0.3.8"
+features = [
+    "winnt",
+    "winuser",
+    "wingdi",
+    "libloaderapi",
 ]
+
+[target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "dragonfly", target_os = "netbsd", target_os = "openbsd"))'.dependencies]
+glutin_osmesa_sys = { version = "0.1.0", path = "../glutin_sys/glutin_osmesa_sys" }
+wayland-client = { version = "0.23", features = ["egl", "dlopen"] }
+libloading = "0.5.2"
+glutin_egl_sys = { version = "0.1.4", path = "../glutin_sys/glutin_egl_sys" }
+glutin_glx_sys = { version = "0.2.0", path = "../glutin_sys/glutin_glx_sys" }
+parking_lot = "0.10.0"
+glutin_x11_sym = { version = "0.1.0", path = "../glutin_x11_sym" }
+x11-dl = "2.18.4"

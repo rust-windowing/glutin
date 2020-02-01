@@ -17,6 +17,39 @@ jobs:
   Check_Formatting:
     runs-on: ubuntu-latest
     steps:
+
+    # FIXME
+    - uses: actions/checkout@v1
+      with:
+        repository: rust-windowing/glutin_interface
+        path: glutin_interface
+        ref: master
+    - uses: actions/checkout@v1
+      with:
+        repository: rust-windowing/glutin_x11_sym
+        path: glutin_x11_sym
+        ref: master
+    - uses: actions/checkout@v1
+      with:
+        repository: rust-windowing/winit_types
+        path: winit_types
+        ref: master
+    - uses: actions/checkout@v1
+      with:
+        repository: rust-windowing/glutin_sys
+        path: glutin_sys
+        ref: master
+    - uses: actions/checkout@v1
+      with:
+        repository: goddessfreya/winit
+        path: winit
+        ref: winit-glutin-next
+    - uses: actions/checkout@v1
+      with:
+        repository: goddessfreya/gbm.rs
+        path: gbm.rs
+        ref: glutin-fun
+
     - uses: actions/checkout@v1
     - uses: hecrj/setup-rust-action@v1
       with:
@@ -55,6 +88,39 @@ jobs:
 
     runs-on: ${{ matrix.platform.os }}
     steps:
+        
+    # FIXME
+    - uses: actions/checkout@v1
+      with:
+        repository: rust-windowing/glutin_interface
+        path: glutin_interface
+        ref: master
+    - uses: actions/checkout@v1
+      with:
+        repository: rust-windowing/glutin_x11_sym
+        path: glutin_x11_sym
+        ref: master
+    - uses: actions/checkout@v1
+      with:
+        repository: rust-windowing/winit_types
+        path: winit_types
+        ref: master
+    - uses: actions/checkout@v1
+      with:
+        repository: rust-windowing/glutin_sys
+        path: glutin_sys
+        ref: master
+    - uses: actions/checkout@v1
+      with:
+        repository: goddessfreya/winit
+        path: winit
+        ref: winit-glutin-next
+    - uses: actions/checkout@v1
+      with:
+        repository: goddessfreya/gbm.rs
+        path: gbm.rs
+        ref: glutin-fun
+
     - uses: actions/checkout@v1
     # Used to cache cargo-web
     - name: Cache cargo folder
@@ -71,6 +137,11 @@ jobs:
     - name: Install GCC Multilib
       if: (matrix.platform.os == 'ubuntu-latest') && contains(matrix.platform.target, 'i686')
       run: sudo apt-get update && sudo apt-get install gcc-multilib
+
+    - name: Install GBM
+      if: matrix.platform.os == 'ubuntu-latest'
+      run: sudo apt-get update && sudo apt-get install libgbm-dev libdrm-dev
+
     - name: Install cargo-web
       continue-on-error: true
       if: contains(matrix.platform.target, 'wasm32')
@@ -79,37 +150,21 @@ jobs:
     - name: Check documentation
       shell: bash
       if: matrix.platform.target != 'wasm32-unknown-unknown'
-      run: cd glutin && cargo doc --no-deps --target ${{ matrix.platform.target }} --features $FEATURES
+      run: cargo doc --no-deps --target ${{ matrix.platform.target }} --features $FEATURES
 
-    - name: Build glutin
+    - name: Build 
       shell: bash
-      run: cd glutin && cargo $WEB build --verbose --target ${{ matrix.platform.target }} --features $FEATURES
-    - name: Build all
-      shell: bash
-      if: (!contains(matrix.platform.target, 'wasm32'))
-      run: cargo $WEB build --verbose --target ${{ matrix.platform.target }}
+      run: cargo $WEB build --verbose --target ${{ matrix.platform.target }} --features $FEATURES
 
     - name: Build tests
       shell: bash
-      run: cd glutin && cargo $WEB test --no-run --verbose --target ${{ matrix.platform.target }} --features $FEATURES
-    - name: Build tests all
-      shell: bash
-      if: (!contains(matrix.platform.target, 'wasm32'))
-      run: cargo $WEB test --no-run --verbose --target ${{ matrix.platform.target }}
+      run: cargo $WEB test --no-run --verbose --target ${{ matrix.platform.target }} --features $FEATURES
     - name: Run tests
       shell: bash
       if: (!contains(matrix.platform.target, 'ios') && !contains(matrix.platform.target, 'wasm32'))
-      run: cd glutin && cargo $WEB test --verbose --target ${{ matrix.platform.target }} --features $FEATURES
+      run: cargo $WEB test --verbose --target ${{ matrix.platform.target }} --features $FEATURES
 
-
-    - name: Build with serde enabled
+    - name: iOS example
       shell: bash
-      run: cd glutin && cargo $WEB build --verbose --target ${{ matrix.platform.target }} --features serde,$FEATURES
-
-    - name: Build tests with serde enabled
-      shell: bash
-      run: cd glutin && cargo $WEB test --no-run --verbose --target ${{ matrix.platform.target }} --features serde,$FEATURES
-    - name: Run tests with serde enabled
-      shell: bash
-      if: (!contains(matrix.platform.target, 'ios') && !contains(matrix.platform.target, 'wasm32'))
-      run: cd glutin && cargo $WEB test --verbose --target ${{ matrix.platform.target }} --features serde,$FEATURES
+      if: contains(matrix.platform.target, 'ios')
+      run: cd ios-example && make -C glutin_examples/ios-example ci

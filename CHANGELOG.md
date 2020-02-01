@@ -1,5 +1,57 @@
 # Unreleased
 
+- *Breaking:* Winit's types are no longer reexported by glutin.
+- *Breaking:* The `Rect` type has been moved to the winit_types crate.
+- *Breaking:* The `Context` type has been split into three separate parts, 
+the `Config`, the `Surface`, and the `Context`. Please refer to their module
+docs. The `ContextBuilder` type has been split between split between two new 
+types: `ConfigsFinder` and `ContextBuilder`.
+- *Breaking:* Glutin has been decoupled from Winit via the glutin_interface crate.
+The `RawContext` type, `RawContextExt` trait, as well as the `split` function have
+all been removed.
+    - If you want to make a `Surface` from a preexisting window, please use
+    `new_from_existing_window`.
+- *Breaking:* The type `PixelFormat` has been renamed to `ConfigAttribs`. You
+can get a `Config` via `get_config()` and then immutably access its 
+`ConfigAttribs` via `attribs()`.
+- *Breaking:* The type-level context currency tracking has been removed as it 
+was pretty useless and terrible for ergonomics.
+- *Breaking:* The ability to modify your window's vsync via `ContextBuilder`'s 
+`with_vsync` has been replaced with `Surface`'s `modify_swap_interval`.
+- *Breaking:* The `ContextError` and `CreationError` types have been replaced
+with winit_types' `Error` type.
+- *Breaking:* `GlRequest` has been removed. You must now always select a specific
+`Api` and `Version`.
+- *Breaking:* The `GL_CORE` constant has been removed.
+- *Breaking:* The `Context` type's `resize` function has been replaced with two 
+slightly better yet identically named functions: `Context::update_after_resize`
+and `Surface::update_after_resize`.
+- *Breaking:* The function `build_surfaceless` has been removed. Instead find
+a `Config` with `with_must_support_surfaceless(true)` then create a `Context`
+with that `Config`. After doing so, use the newly created function 
+`make_current_surfaceless`.
+- *Breaking:* The `Try*` variants of `Robustness` have been removed.
+- *Breaking:* `Api::WebGl` has been removed. Given that Emscripten support has
+been dropped, there were no platforms which supported this API.
+- *Breaking:* On Unix, reworked the API for getting raw types from the underlying 
+APIs. Removed `ContextTraitExt`. Please refer to the docs.
+- Added support for GBM, EGLDevice, and EGL_MESA_platform_surfaceless.
+- Added support for Pixmaps.
+- On EGL/GLX, when requesting a `Config` with a certain number of color, depth, 
+alpha, and/or stencil bits, glutin will no longer return a `Config` with more
+bits than the requested amount (e.g. getting a color depth of 30 when you've only 
+requested 24).
+- On EGL/GLX, glutin now provides more details on why no matching `Config` was
+found, listing the reason that each `Config` was rejected. No longer shall you 
+be faced with the non-easily-debug-able `NoAvailablePixelFormat` error.
+- Added the `make_current_rw` function for when you want to read and write from 
+two different `Surface`s.
+- Glutin's examples now call `glViewport`, demonstrating how to properly support
+window resizing.
+- On EGL, sRGB is now taken account.
+- On EGL, `ReleaseBehavior::None` is now supported.
+- On Unix, added the ability to choose between GLX and EGL.
+
 # Version 0.21.1 (2020-01-29)
 
 - Fixed incorrectly documented default value for `ContextBuilder::with_srgb`

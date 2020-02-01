@@ -59,7 +59,7 @@ Emscripten support has been deprecated in favor of platforms like stdweb. To get
 
 ### X11
 
-The plan is that glutin tries to dynamically link-to and use Wayland w/EGL if possible. If it doesn't work, it will try Xlib w/GLX follow by Xlib w/EGL instead. This is work-in-progress.
+The plan is that glutin tries to dynamically link-to and use Wayland w/EGL if possible. If it doesn't work, it will try Xlib w/GLX followed by Xlib w/EGL instead. This is work-in-progress.
 
 ### Wayland
 
