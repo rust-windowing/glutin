@@ -812,6 +812,35 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     }
 }
 
+impl Surface<Pixmap> {
+    #[inline]
+    pub fn new(
+        conf: ConfigWrapper<&Config, &ConfigAttribs>,
+        npix: ffi::Pixmap,
+    ) -> Result<Self, Error> {
+        let glx = GLX.as_ref().unwrap();
+        let disp = &conf.config.display;
+
+        let surface = unsafe {
+            glx.CreatePixmap(
+                *****disp as *mut _,
+                conf.config.config,
+                npix,
+                std::ptr::null_mut(),
+            )
+        };
+
+        disp.check_errors()?;
+
+        Ok(Surface {
+            display: Arc::clone(&disp),
+            surface,
+            config: conf.clone_inner(),
+            phantom: PhantomData,
+        })
+    }
+}
+
 impl Surface<Window> {
     #[inline]
     pub fn new(
@@ -821,7 +850,7 @@ impl Surface<Window> {
         let glx = GLX.as_ref().unwrap();
         let disp = &conf.config.display;
 
-        let window = unsafe {
+        let surface = unsafe {
             glx.CreateWindow(
                 *****disp as *mut _,
                 conf.config.config,
@@ -834,7 +863,7 @@ impl Surface<Window> {
 
         Ok(Surface {
             display: Arc::clone(&disp),
-            surface: window,
+            surface,
             config: conf.clone_inner(),
             phantom: PhantomData,
         })
@@ -948,7 +977,7 @@ impl Surface<PBuffer> {
             0,
         ];
 
-        let pbuffer = unsafe {
+        let surface = unsafe {
             glx.CreatePbuffer(*****disp as *mut _, conf.config.config, attributes.as_ptr())
         };
 
@@ -956,7 +985,7 @@ impl Surface<PBuffer> {
 
         Ok(Surface {
             display: Arc::clone(&disp),
-            surface: pbuffer,
+            surface,
             config: conf.clone_inner(),
             phantom: PhantomData,
         })

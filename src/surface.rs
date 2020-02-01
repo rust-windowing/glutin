@@ -243,7 +243,8 @@ impl Surface<Pixmap> {
     ///
     /// Some platforms place additional restrictions on what [`Config`]s can be
     /// used with the pixmap:
-    ///  * X11: The [`Config`] and the pixmap must have been made with X11
+    ///  * X11: The [`Config`]'s `XVisualInfo`'s `depth` and must match the
+    ///  pixmap's. The [`Config`] and the pixmap must have been made with X11
     ///  connections to the same display and screen.
     ///  * Windows: FIXME determine when implemented
     ///
@@ -274,7 +275,10 @@ impl Surface<PBuffer> {
     ///
     /// If `largest` is true, glutin will try to acquire the largest available
     /// pbuffer smaller than `size` if allocating a pbuffer at the requested
-    /// size would have otherwise failed.
+    /// size would have otherwise failed. This will preserve the aspect ratio
+    /// of size.
+    ///
+    /// Not all platforms support non-size-of-two PBuffers.
     ///
     /// # Saftey
     ///

@@ -234,7 +234,7 @@ impl Surface<Window> {
 
                 egl::Surface::<Window>::new(
                     conf.map_config(|conf| &**conf),
-                    wl_surface.ptr() as *const _,
+                    wl_surface.ptr() as *mut _,
                 )
                 .map(|surface| Surface::WaylandWindow {
                     wsurface: NoCmp(NoPrint(wl_surface)),

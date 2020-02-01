@@ -1130,62 +1130,62 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     fn assemble_desc(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         size: Option<(&dpi::PhysicalSize<u32>, bool)>,
-    ) -> Vec<raw::c_int> {
+    ) -> Vec<ffi::EGLAttrib> {
         let mut out = Vec::new();
         match conf.attribs.srgb {
             false => {
                 if conf.config.display.has_extension("EGL_KHR_gl_colorspace") {
                     // With how shitty drivers are, never hurts to be explicit
-                    out.push(ffi::egl::GL_COLORSPACE_KHR as raw::c_int);
-                    out.push(ffi::egl::GL_COLORSPACE_LINEAR_KHR as raw::c_int);
+                    out.push(ffi::egl::GL_COLORSPACE_KHR as ffi::EGLAttrib);
+                    out.push(ffi::egl::GL_COLORSPACE_LINEAR_KHR as ffi::EGLAttrib);
                 }
             }
             true => {
-                out.push(ffi::egl::GL_COLORSPACE_KHR as raw::c_int);
-                out.push(ffi::egl::GL_COLORSPACE_SRGB_KHR as raw::c_int);
+                out.push(ffi::egl::GL_COLORSPACE_KHR as ffi::EGLAttrib);
+                out.push(ffi::egl::GL_COLORSPACE_SRGB_KHR as ffi::EGLAttrib);
             }
         }
 
         if T::surface_type() == SurfaceType::Window {
-            out.push(ffi::egl::RENDER_BUFFER as raw::c_int);
+            out.push(ffi::egl::RENDER_BUFFER as ffi::EGLAttrib);
             match conf.attribs.double_buffer {
                 false => {
-                    out.push(ffi::egl::SINGLE_BUFFER as raw::c_int);
+                    out.push(ffi::egl::SINGLE_BUFFER as ffi::EGLAttrib);
                 }
                 true => {
-                    out.push(ffi::egl::BACK_BUFFER as raw::c_int);
+                    out.push(ffi::egl::BACK_BUFFER as ffi::EGLAttrib);
                 }
             }
         }
 
         if let Some((size, largest)) = size {
             let size: (u32, u32) = (*size).into();
-            out.push(ffi::egl::TEXTURE_FORMAT as raw::c_int);
+            out.push(ffi::egl::TEXTURE_FORMAT as ffi::EGLAttrib);
             out.push(match size {
                 (0, _) | (_, 0) => ffi::egl::NO_TEXTURE,
                 _ if conf.attribs.alpha_bits > 0 => ffi::egl::TEXTURE_RGBA,
                 _ => ffi::egl::TEXTURE_RGB,
-            } as raw::c_int);
-            out.push(ffi::egl::TEXTURE_TARGET as raw::c_int);
+            } as ffi::EGLAttrib);
+            out.push(ffi::egl::TEXTURE_TARGET as ffi::EGLAttrib);
             out.push(match size {
                 (0, _) | (_, 0) => ffi::egl::NO_TEXTURE,
                 _ => ffi::egl::TEXTURE_2D,
-            } as raw::c_int);
+            } as ffi::EGLAttrib);
 
-            out.push(ffi::egl::WIDTH as raw::c_int);
-            out.push(size.0 as raw::c_int);
-            out.push(ffi::egl::HEIGHT as raw::c_int);
-            out.push(size.1 as raw::c_int);
+            out.push(ffi::egl::WIDTH as ffi::EGLAttrib);
+            out.push(size.0 as ffi::EGLAttrib);
+            out.push(ffi::egl::HEIGHT as ffi::EGLAttrib);
+            out.push(size.1 as ffi::EGLAttrib);
 
-            out.push(ffi::egl::LARGEST_PBUFFER as raw::c_int);
+            out.push(ffi::egl::LARGEST_PBUFFER as ffi::EGLAttrib);
             out.push(if largest {
                 ffi::egl::TRUE
             } else {
                 ffi::egl::FALSE
-            } as raw::c_int)
+            } as ffi::EGLAttrib)
         }
 
-        out.push(ffi::egl::NONE as raw::c_int);
+        out.push(ffi::egl::NONE as ffi::EGLAttrib);
         out
     }
 
@@ -1247,20 +1247,53 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     }
 }
 
-impl Surface<Window> {
+impl Surface<Pixmap> {
     #[inline]
     pub fn new(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        nwin: ffi::EGLNativeWindowType,
+        npix: *mut raw::c_void,
     ) -> Result<Self, Error> {
         let display = Arc::clone(&conf.config.display);
         let egl = EGL.as_ref().unwrap();
         let desc = Self::assemble_desc(conf.clone(), None);
         let surface = unsafe {
-            let surf = egl.CreateWindowSurface(**display, conf.config.config, nwin, desc.as_ptr());
+            let surf =
+                egl.CreatePlatformPixmapSurface(**display, conf.config.config, npix, desc.as_ptr());
             if surf.is_null() {
                 return Err(make_oserror!(OsError::Misc(format!(
-                    "eglCreateWindowSurface failed with 0x{:x}",
+                    "eglCreatePlatformPixmapSurface failed with 0x{:x}",
+                    egl.GetError()
+                ))));
+            }
+            surf
+        };
+
+        Context::check_errors(None)?;
+
+        Ok(Surface {
+            display,
+            config: conf.clone_inner(),
+            surface,
+            phantom: PhantomData,
+        })
+    }
+}
+
+impl Surface<Window> {
+    #[inline]
+    pub fn new(
+        conf: ConfigWrapper<&Config, &ConfigAttribs>,
+        nwin: *mut raw::c_void,
+    ) -> Result<Self, Error> {
+        let display = Arc::clone(&conf.config.display);
+        let egl = EGL.as_ref().unwrap();
+        let desc = Self::assemble_desc(conf.clone(), None);
+        let surface = unsafe {
+            let surf =
+                egl.CreatePlatformWindowSurface(**display, conf.config.config, nwin, desc.as_ptr());
+            if surf.is_null() {
+                return Err(make_oserror!(OsError::Misc(format!(
+                    "eglCreatePlatformWindowSurface failed with 0x{:x}",
                     egl.GetError()
                 ))));
             }
@@ -1360,7 +1393,10 @@ impl Surface<PBuffer> {
         let display = Arc::clone(&conf.config.display);
         let egl = EGL.as_ref().unwrap();
 
-        let desc = Self::assemble_desc(conf.clone(), Some((size, largest)));
+        let desc: Vec<_> = Self::assemble_desc(conf.clone(), Some((size, largest)))
+            .into_iter()
+            .map(|v| v as ffi::EGLint)
+            .collect();
         let surf = unsafe {
             let pbuffer = egl.CreatePbufferSurface(**display, conf.config.config, desc.as_ptr());
             if pbuffer.is_null() || pbuffer == ffi::egl::NO_SURFACE {

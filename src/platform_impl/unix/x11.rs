@@ -8,7 +8,7 @@ use crate::surface::{PBuffer, Pixmap, SurfaceTypeTrait, Window};
 
 use glutin_interface::{
     NativeDisplay, NativePixmap, NativePixmapSource, NativeWindow, NativeWindowSource, RawDisplay,
-    RawWindow, Seal, X11WindowParts,
+    RawPixmap, RawWindow, Seal, X11PixmapParts, X11WindowParts,
 };
 use glutin_x11_sym::Display;
 use winit_types::dpi;
@@ -446,29 +446,17 @@ impl Surface<Pixmap> {
         nps: &NPS,
         pb: NPS::PixmapBuilder,
     ) -> Result<(NPS::Pixmap, Self), Error> {
-        // FIXME
-        unimplemented!()
-        //match (disp, conf.config) {
-        //    (Display::Egl(disp), Config::Egl(config)) => {
-        //        egl::Surface::<Pixmap>::new(
-        //            disp,
-        //            conf.map_config(|_| config),
-        //            nps,
-        //        )
-        //        .map(|(pix, surf)| (pix, Surface::Egl(surf)))
-        //    },
-        //    (Display::Glx(disp), Config::Glx(config)) => {
-        //        glx::Surface::<Pixmap>::new(
-        //            disp,
-        //            conf.map_config(|_| config),
-        //            nps,
-        //        )
-        //        .map(|(pix, surf)| (pix, Surface::Glx(surf)))
-        //    },
-        //    (_, _) => Err(make_error!(ErrorType::BadApiUsage(
-        //        "Incompatible display and config backends.".to_string()
-        //    )))
-        //}
+        // Get the screen_id for the window being built.
+        let visual_info: ffi::XVisualInfo = conf.config.get_visual_info()?;
+        #[allow(deprecated)]
+        let np = nps.build_x11(
+            pb,
+            X11PixmapParts {
+                depth: visual_info.depth as u16,
+                _non_exhaustive_do_not_use: Seal,
+            },
+        )?;
+        Self::new_existing(conf, &np).map(|surf| (np, surf))
     }
 
     #[inline]
@@ -476,28 +464,30 @@ impl Surface<Pixmap> {
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         np: &NP,
     ) -> Result<Self, Error> {
-        unimplemented!()
-        //match (disp, conf.config) {
-        //    (Display::Egl(disp), Config::Egl(config)) => {
-        //        egl::Surface::<Pixmap>::new_existing(
-        //            disp,
-        //            conf.map_config(|_| config),
-        //            np,
-        //        )
-        //        .map(Surface::Egl)
-        //    },
-        //    (Display::Glx(disp), Config::Glx(config)) => {
-        //        glx::Surface::<Pixmap>::new_existing(
-        //            disp,
-        //            conf.map_config(|_| config),
-        //            np,
-        //        )
-        //        .map(Surface::Glx)
-        //    },
-        //    (_, _) => Err(make_error!(ErrorType::BadApiUsage(
-        //        "Incompatible display and config backends.".to_string()
-        //    )))
-        //}
+        let surface = np.raw_pixmap();
+        let mut surface = match surface {
+            RawPixmap::Xlib { pixmap, .. } => pixmap,
+            _ => unreachable!(),
+        };
+
+        match conf.config {
+            Config::Egl {
+                config,
+                display,
+                screen,
+            } => egl::Surface::<Pixmap>::new(
+                conf.map_config(|_| config),
+                &mut surface as *mut _ as *mut _,
+            )
+            .map(|surface| Surface::Egl {
+                surface,
+                display: Arc::clone(display),
+                screen: *screen,
+            }),
+            Config::Glx(config) => {
+                glx::Surface::<Pixmap>::new(conf.map_config(|_| config), surface).map(Surface::Glx)
+            }
+        }
     }
 }
 
@@ -529,7 +519,7 @@ impl Surface<Window> {
     ) -> Result<Self, Error> {
         let xlib = syms!(XLIB);
         let surface = nw.raw_window();
-        let surface = match surface {
+        let mut surface = match surface {
             RawWindow::Xlib { window, .. } => window,
             _ => unreachable!(),
         };
@@ -575,13 +565,15 @@ impl Surface<Window> {
                 config,
                 display,
                 screen,
-            } => egl::Surface::<Window>::new(conf.map_config(|_| config), surface as *const _).map(
-                |surface| Surface::Egl {
-                    surface,
-                    display: Arc::clone(display),
-                    screen: *screen,
-                },
-            ),
+            } => egl::Surface::<Window>::new(
+                conf.map_config(|_| config),
+                &mut surface as *mut _ as *mut _,
+            )
+            .map(|surface| Surface::Egl {
+                surface,
+                display: Arc::clone(display),
+                screen: *screen,
+            }),
             Config::Glx(config) => {
                 glx::Surface::<Window>::new(conf.map_config(|_| config), surface).map(Surface::Glx)
             }

@@ -26,13 +26,13 @@ fn main() {
     let conf = confs.drain(..1).next().unwrap();
     println!("Configeration chosen: {:?}", conf);
 
+    let ctx = unsafe { ContextBuilder::new().build(&conf).unwrap() };
+    let mut psurf = unsafe { Surface::new_pbuffer(&conf, &size, true).unwrap() };
+    let mut size = psurf.size().unwrap();
     let wb = WindowBuilder::new()
         .with_title("A fantastic window!")
         .with_inner_size(size);
-    let ctx = unsafe { ContextBuilder::new().build(&conf).unwrap() };
     let (win, wsurf) = unsafe { Surface::new_window(&conf, &*el, wb).unwrap() };
-    let mut psurf = unsafe { Surface::new_pbuffer(&conf, &size, true).unwrap() };
-    let mut size = psurf.size().unwrap();
 
     unsafe { ctx.make_current(&wsurf).unwrap() }
     let gl = support::Gl::load(|s| ctx.get_proc_address(s).unwrap());
