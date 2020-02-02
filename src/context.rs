@@ -13,6 +13,25 @@
 //! of [`ContextBuilder`]'s methods are only visible on
 //! [`ContextBuilderWrapper`], which exception of the [`build`] function which
 //! can only be found on the former.
+///
+/// ```no_run
+/// // You need a `Config`. Take a look at the `config` module.
+/// let conf = /* ... */;
+///
+/// let cb = ContextBuilder::new();
+///
+/// // If you have another context, you can try sharing them.
+/// //
+/// // Just make sure they are compatible. Refer to `with_sharing`'s docs
+/// // for details.
+/// let ctx = /* ... */;
+/// let cb = cb.with_sharing(&ctx);
+///
+/// // Build it!
+/// let ctx2 = cb.build(&conf).unwrap();
+///
+/// // Enjoy!
+/// ```
 //!
 //! [`ContextBuilder`]: crate::context::ContextBuilder
 //! [`Context`]: crate::context::Context

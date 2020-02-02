@@ -9,6 +9,28 @@
 //! not [`ConfigWrapper`]. If I had a choice, I'd hide that type, but alas, due
 //! to limitations in rustdoc, I cannot. Unfortunately, all of [`Config`]'s
 //! methods are only visible on [`ConfigWrapper`].
+///
+/// ```no_run
+/// // You need a type that implements `NativeDisplay`.
+//! let nd = /* ... */;
+//!
+/// // Just make your `ConfigsFinder`.
+/// let configs = ConfigsFinder::new()
+///     // Then specify what you care about.
+///     .with_alpha_bits(Some(8))
+///     .with_srgb(Some(true))
+///     // Or maybe what you don't care about.
+///     .with_hardware_acceleration(None)
+///     // Don't forget the version, if you don't want the default.
+///     .with_gl((Api::OpenGl, Version(2, 1))
+///     // Finally, let glutin do the searching.
+///     .find(&nd)
+///     // Panic if we don't find any (or maybe try falling back to more lax
+///     // requirements)
+///     .unwrap();
+///
+/// // Now you have a vector of `Config`s to pick from!
+/// ```
 //!
 //! [`Config`]: crate::config::Config
 //! [`ConfigWrapper`]: crate::config::ConfigWrapper
@@ -173,9 +195,9 @@ pub struct ConfigAttribs {
     pub float_color_buffer: bool,
 }
 
-/// A type that contains the [`ConfigAttribs`] along side with the native api's
+/// A type that contains the [`ConfigAttribs`] along side with the native API's
 /// config type and (depending on the native API) possibly the connection to the
-/// native API..
+/// native API.
 ///
 /// Please refer to [`ConfigAttribs`] for more information.
 ///
@@ -347,22 +369,28 @@ impl ConfigsFinder {
 
     /// Sets the number of bits in the depth buffer. `None` means "don't care".
     #[inline]
-    pub fn with_depth_buffer(mut self, bits: Option<u8>) -> Self {
+    pub fn with_depth_bits(mut self, bits: Option<u8>) -> Self {
         self.depth_bits = bits;
         self
     }
 
     /// Sets the number of bits in the stencil buffer. `None` means "don't care".
     #[inline]
-    pub fn with_stencil_buffer(mut self, bits: Option<u8>) -> Self {
+    pub fn with_stencil_bits(mut self, bits: Option<u8>) -> Self {
         self.stencil_bits = bits;
         self
     }
 
-    /// Sets the number of bits in the color/alpha buffers. `None` means "don't care".
+    /// Sets the number of bits in the color buffers. `None` means "don't care".
     #[inline]
-    pub fn with_pixel_format(mut self, color_bits: Option<u8>, alpha_bits: Option<u8>) -> Self {
+    pub fn with_color_bits(mut self, color_bits: Option<u8>) -> Self {
         self.color_bits = color_bits;
+        self
+    }
+
+    /// Sets the number of bits in the alpha buffers. `None` means "don't care".
+    #[inline]
+    pub fn with_alpha_bits(mut self, calpha_bits: Option<u8>) -> Self {
         self.alpha_bits = alpha_bits;
         self
     }

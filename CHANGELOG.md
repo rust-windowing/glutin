@@ -35,6 +35,11 @@ with that `Config`. After doing so, use the newly created function
 been dropped, there were no platforms which supported this API.
 - *Breaking:* On Unix, reworked the API for getting raw types from the underlying 
 APIs. Removed `ContextTraitExt`. Please refer to the docs.
+- *Breaking:* Split `ConfigsFinder`s `with_pixel_format` function into two
+separate functions: `with_alpha_bits` and `with_color_bits`.
+- *Breaking:* Renamed `ConfigsFinder`s `with_depth_buffer` and 
+`with_stencil_buffer` functions into `with_depth_bits` and `with_stencil_bits`,
+respectively.
 - Added support for GBM, EGLDevice, and EGL_MESA_platform_surfaceless.
 - Added support for Pixmaps.
 - On EGL/GLX, when requesting a `Config` with a certain number of color, depth, 
