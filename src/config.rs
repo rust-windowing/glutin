@@ -9,28 +9,28 @@
 //! not [`ConfigWrapper`]. If I had a choice, I'd hide that type, but alas, due
 //! to limitations in rustdoc, I cannot. Unfortunately, all of [`Config`]'s
 //! methods are only visible on [`ConfigWrapper`].
-///
-/// ```no_run
-/// // You need a type that implements `NativeDisplay`.
+//!
+//! ```no_run
+//! // You need a type that implements `NativeDisplay`.
 //! let nd = /* ... */;
 //!
-/// // Just make your `ConfigsFinder`.
-/// let configs = ConfigsFinder::new()
-///     // Then specify what you care about.
-///     .with_alpha_bits(Some(8))
-///     .with_srgb(Some(true))
-///     // Or maybe what you don't care about.
-///     .with_hardware_acceleration(None)
-///     // Don't forget the version, if you don't want the default.
-///     .with_gl((Api::OpenGl, Version(2, 1))
-///     // Finally, let glutin do the searching.
-///     .find(&nd)
-///     // Panic if we don't find any (or maybe try falling back to more lax
-///     // requirements)
-///     .unwrap();
-///
-/// // Now you have a vector of `Config`s to pick from!
-/// ```
+//! // Just make your `ConfigsFinder`.
+//! let configs = ConfigsFinder::new()
+//!     // Then specify what you care about.
+//!     .with_alpha_bits(Some(8))
+//!     .with_srgb(Some(true))
+//!     // Or maybe what you don't care about.
+//!     .with_hardware_acceleration(None)
+//!     // Don't forget the version, if you don't want the default.
+//!     .with_gl((Api::OpenGl, Version(2, 1))
+//!     // Finally, let glutin do the searching.
+//!     .find(&nd)
+//!     // Panic if we don't find any (or maybe try falling back to more lax
+//!     // requirements)
+//!     .unwrap();
+//!
+//! // Now you have a vector of `Config`s to pick from!
+//! ```
 //!
 //! [`Config`]: crate::config::Config
 //! [`ConfigWrapper`]: crate::config::ConfigWrapper
