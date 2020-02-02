@@ -338,7 +338,6 @@ impl Display {
                 Api::OpenGl => ffi::egl::FALSE,
                 Api::OpenGlEs if egl_version >= (1, 2) => egl.BindAPI(ffi::egl::OPENGL_ES_API),
                 Api::OpenGlEs => ffi::egl::TRUE,
-                _ => ffi::egl::FALSE,
             } == ffi::egl::FALSE
         {
             return Err(make_error!(ErrorType::OpenGlVersionNotSupported));

@@ -1,58 +1,309 @@
-//! The purpose of this library is to provide an OpenGL [`Context`] on as many
-//! platforms as possible, as well as a [`Surface`] to go along with it. Before
-//! you can do that, however, you need to decide on a [`Config`] for your
-//! [`Context`]s and [`Surface`]s.
+//! The purpose of this library is to provide an OpenGL [context] on as many
+//! platforms as possible, as well as optionnaly a [surface] to go along with it.
 //!
-//! You can use a [`ConfigsFinder`] to get a selection of [`Config`]s
-//! that match your criteria. Among many things, you must specify in advance
-//! what types of [`Surface`]s you're going to use the [`Config`] with.
+//! Before either can be created, however, you need to decide on a [config] for
+//! your [context]s and [surface]s.
 //!
-//! After settling on a [`Config`], you can make your [`Context`]s and
-//! [`Surface`]s in any order you want, as long as your [`Surface`]'s and
-//! [`Context`]'s [`Config`] are the same.
+//! # Basic Usage
+//! ```rust,ignore
+//! // First you must find a set of configerations that match your criteria.
+//! //
+//! // You need any type that implements glutin_interface's `NativeDisplay`
+//! // trait, e.g. winit's `EventLoopWindowTarget`.
+//! use glutin::config::ConfigsFinder;
+//! let nd = /* ... */;
+//! let confs = unsafe { ConfigsFinder::new().find(&nd).unwrap() };
+//! //                                                    ^
+//! //                               Notice this unwrap? -/
+//! // If we don't find any configerations, glutin will provide a list of reasons
+//! // for why each config was excluded. Maybe retry with some more lax settings?
 //!
-//! Similar to how [`Config`]s are acquired via a [`ConfigsFinder`], so
-//! too are [`Context`]s from a [`ContextBuilder`]. At this stage if you decide
-//! to make multiple [`Context`]s you can also choose to share them. Some
-//! platform specific restrictions are mentioned in [`ContextBuilderWrapper`]'s
-//! [`with_sharing`] function.
+//! // You then need to choose which one of the configs you want. If you don't
+//! // care, generally the first one is fine.
+//! let conf = &confs[0];
 //!
-//! [`Surface`]s come in three flavors, [`Pixmap`]s, [`PBuffer`]s, and
-//! [`Window`]s. They are created with the [`Surface::new_pixmap`],
-//! [`Surface::new_pbuffer`], and [`Surface::new_window`] functions,
-//! respectively. Alternatively, if you have already created your [`Window`]'s
-//! or [`Pixmap`]'s native API's object, you can use
-//! [`Surface::new_from_existing_window`] and
-//! [`Surface::new_from_existing_pixmap`] to create your [`Surface`],
-//! respectively.
+//! // Then you need to make a Context or Surface, the order doesn't particularly
+//! // matter.
+//! //
+//! // Lets make a context first.
+//! use glutin::context::ContextBuilder;
+//! let ctx = unsafe { ContextBuilder::new().build(conf).unwrap() };
 //!
-//! Once you've made a [`Context`] and a [`Surface`], you can make them current
-//! with the [`Context::make_current`] function. Sometimes the backends support
-//! using two different [`Surface`]s for reading and writing. If you hope to use
-//! this functionality, try using [`Context::make_current_rw`].
+//! // Now lets make a `Surface<Window>`.
+//! //
+//! // You can only do this if your `NativeDisplay` type also implements
+//! // glutin_interface's `NativeWindowSource` trait.
+//! //
+//! // You also need to pass the `NativeWindowSource`'s `WindowBuilder` type.
+//! let wb = /* ... */;
+//! use glutin::surface::Surface;
+//! let (win, surf) = unsafe { Surface::new_window(conf, &nd, wb).unwrap() };
+//! //    ^    ^                                          ^
+//! //    |    \- Surface<Window>                         |
+//! //    \- `NativeWindowSource::Window`.     Make sure this is the same
+//! //                                               nd as before!
 //!
-//! Alternatively, you can try to use [`Context::make_current_surfaceless`] if
-//! you don't want to make a [`Surface`]. Do make sure that the [`Config`] you
-//! made the [`Context`] with supports surfaceless.
+//! // Now, just make everything current!
+//! unsafe { ctx.make_current(&surf).unwrap() }
+//! //        ^                 ^
+//! //        \--------\/-------/
+//! //                 |
+//! // These two thing's configs need to be compatible. Compatibility is a
+//! // highly platform-dependent type of thing.
+//! //
+//! // Safest just to keep their two configs the same.
 //!
-//! [`Context`]: crate::context::Context
-//! [`ContextBuilder`]: crate::context::ContextBuilder
-//! [`ContextBuilderWrapper`]: crate::context::ContextBuilderWrapper
-//! [`with_sharing`]: crate::context::ContextBuilderWrapper::with_sharing()
-//! [`Surface`]: crate::surface::Surface
-//! [`Config`]: crate::config::ConfigWrapper
-//! [`ConfigsFinder`]: crate::config::ConfigsFinder
-//! [`Window`]: crate::surface::Window
-//! [`PBuffer`]: crate::surface::PBuffer
-//! [`Pixmap`]: crate::surface::Pixmap
-//! [`Surface::new_pixmap`]: crate::surface::Surface::new_pixmap()
-//! [`Surface::new_pbuffer`]: crate::surface::Surface::new_pbuffer()
-//! [`Surface::new_window`]: crate::surface::Surface::new_window()
-//! [`Surface::new_from_existing_pixmap`]: crate::surface::Surface::new_from_existing_window()
-//! [`Surface::new_from_existing_window`]: crate::surface::Surface::new_from_existing_pixmap()
-//! [`Context::make_current`]: crate::context::Context::make_current()
-//! [`Context::make_current_rw`]: crate::context::Context::make_current_rw()
-//! [`Context::make_current_surfaceless`]: crate::context::Context::make_current_surfaceless()
+//! // ...
+//! // Do your OpenGL magic here!
+//! // ...
+//!
+//! // What if you made a second window?
+//! let win2 = /* ... */;
+//!
+//! // If this window implements `NativeWindow` and is compatible with your
+//! // `NativeDisplay`, you can make a surface out of it.
+//! let surf2 = unsafe { Surface::new_from_existing_window(conf, &win2).unwrap() };
+//! //    ^                                                        ^
+//! //    \- Surface<Window> too                                   |
+//! //                              You can't use `win` here, however as it currently
+//! //                                 in use by `surf`. Only one surface can use a
+//! //                                               window at a time.
+//!
+//! // You can make it current too, if its config is compatible with the
+//! // context's, which it is, since you made it with the same config.
+//! unsafe { ctx.make_current(&surf2).unwrap() }
+//!
+//! // You can also read from one surface and write to a different one.
+//! //
+//! // Just make sure all three configs are compatible.
+//! unsafe { ctx.make_current_rw(&surf, &surf2).unwrap() }
+//!
+//! // Don't forget to drop your surfaces before your windows.
+//! //
+//! // You can drop your configs at any time, as long as the `NativeDisplay` is
+//! // still alive.
+//! //
+//! // Be sure to drop the `NativeDisplay` last.
+//! //
+//! // Failing to do so will result in a segmentation fault if you are lucky!
+//! ```
+//!
+//! # How about Pixmaps?
+//!
+//! ```rust,ignore
+//! // Use your `NativeDisplay`-implementing type as usual, for example winit's
+//! // `EventLoopWindowTarget`.
+//! let nd = /* ... */;
+//!
+//! // You need to find a configuration like usual.
+//! use glutin::config::ConfigsFinder;
+//! let confs = unsafe {
+//!     ConfigsFinder::new()
+//!         .find(&nd)
+//!         // You need to tell us in advanced that you want to support pixmaps.
+//!         .with_must_support_pixmaps(true)
+//!         // If you don't want to support windows, consider not requesting it.
+//!         // Doing so will give you more options.
+//!         .with_must_support_windows(false)
+//!         .unwrap()
+//! };
+//!
+//! // Proceed as usual
+//! let conf = &confs[0];
+//! let ctx = /* ... */;
+//!
+//! // Unfortunately, you probably have to write your own types implementing
+//! // `NativePixmapSource` and `NativePixmap`, as winit currently doesn't
+//! // suppport pixmaps.
+//! //
+//! // Luckily, this is pretty easy, being only a small handfull of lines. Please
+//! // refer to our pixmap example on github at `examples/pixmap.rs`.
+//! use glutin::surface::Surface;
+//! let your_custom_nd = /* ... */;
+//! let your_custom_wb = /* ... */;
+//! let (pix, surf) = unsafe {
+//!     Surface::new_pixmap(conf, &your_custom_nd, &your_custom_wb).unwrap()
+//! };
+//! //    ^    ^
+//! //    |    \- Surface<Pixmap>
+//! //    \- `NativePixmapSource::Window`.
+//!
+//! // Like windows, you can also use new_from_existing_pixmap to make a
+//! // Surface<Pixmap> from a prexisting pixmap.
+//!
+//! // Proceed as usual
+//! unsafe { ctx.make_current(&surf).unwrap() }
+//!
+//! // ...
+//! // Do your OpenGL magic here!
+//! // ...
+//!
+//! // Remember to drop your surface before your pixmap!
+//! ```
+//!
+//! # How about PBuffers?
+//!
+//! ```rust,ignore
+//! // Use your `NativeDisplay`-implementing type as usual, for example winit's
+//! // `EventLoopWindowTarget`.
+//! let nd = /* ... */;
+//!
+//! // You need to find a configuration like usual.
+//! use glutin::config::ConfigsFinder;
+//! let confs = unsafe {
+//!     ConfigsFinder::new()
+//!         .find(&nd)
+//!         // You need to tell us in advanced that you want to support pbuffers.
+//!         .with_must_support_pbuffers(true)
+//!         // If you don't want to support windows, consider not requesting it.
+//!         // Doing so will give you more options.
+//!         .with_must_support_windows(false)
+//!         .unwrap()
+//! };
+//!
+//! // Proceed as usual
+//! let conf = &confs[0];
+//! let ctx = /* ... */;
+//!
+//! // PBuffers don't need the native APIs, instead being allocated by the GL
+//! // driver.
+//! //
+//! // We do need to know the size, however.
+//! let size = winit_types::dpi::PhysicalSize::new(256, 256);
+//! //                                              ^
+//! //                                              |
+//! //        Some drivers only support powers of two! You have been warned!
+//!
+//! // Sometimes drivers don't have enough memory. If you set `largest` to true
+//! // and the driver doesn't have enough space then glutin will try to give
+//! // you the largest PBuffer it can provide.
+//! //
+//! // The drivers will preserve the aspect ratio of your size.
+//! //
+//! // Lets set `largest` to false, since we want to panic if the driver can't
+//! // meet our demands.
+//! let largest = false;
+//!
+//! use glutin::surface::Surface;
+//! let surf = unsafe { Surface::new_pbuffer(conf, size, largest).unwrap() };
+//! //   ^
+//! //   \- Surface<PBuffer>
+//!
+//! // Proceed as usual
+//! unsafe { ctx.make_current(&surf).unwrap() }
+//!
+//! // ...
+//! // Do your OpenGL magic here!
+//! // ...
+//!
+//! // Remember to drop your surface before your pixmap!
+//!
+//! ```
+//!
+//! # How about EGL Surfaceless?
+//!
+//! ```rust,ignore
+//! // Use your `NativeDisplay`-implementing type as usual, for example winit's
+//! // `EventLoopWindowTarget`.
+//! let nd = /* ... */;
+//!
+//! // You need to find a configuration like usual.
+//! use glutin::config::ConfigsFinder;
+//! let confs = unsafe {
+//!     ConfigsFinder::new()
+//!         .find(&nd)
+//!         // Surfaceless is an all or nothing type of thing- either all your
+//!         // configs support it, or none of them do.
+//!         .with_must_support_surfaceless(true)
+//!         .unwrap()
+//! };
+//!
+//! // Proceed as usual
+//! let conf = &confs[0];
+//! let ctx = /* ... */;
+//!
+//! // And as promiced, you don't need a surface!
+//! unsafe { ctx.make_current_surfaceless().unwrap() }
+//!
+//! // ...
+//! // Do your OpenGL magic here!
+//! // ...
+//!
+//! // Remember: `NativeDisplay` drops last!
+//!
+//! ```
+//!
+//! # A high-level overview
+//! ```text
+//! +-| glutin |---------------------------------------------------------------------+
+//! | +-| context |----------------+ +-| surface |----------------------------------+|
+//! | | +-----------+             | | +-----------+                                 ||
+//! | | | `Context` |             | | | `Surface` |                                 ||
+//! | | +-----------+             | | +-----------+                                 ||
+//! | |      ^                    | |    ^   ^                                      ||
+//! | |      |                    | |    |   |                                      ||
+//! | | +----+----+               | |    |   |    +-------------------+             ||
+//! | | | Creates |               | |    |   \----+    Specializes    |             ||
+//! | | +---------+               | |    |        +-------------------+             ||
+//! | |       ^                   | |    |          ^         ^   ^                 ||
+//! | |       |                   | |    |          |         |   \------\          ||
+//! | | +-----+------------+      | |    |  +-------+---+ +---+------+ +-+--------+ ||
+//! | | | `ContextBuilder` |      | |    |  | `PBuffer` | | `Pixmap` | | `Window` | ||
+//! | | +------------------+      | |    |  +-----------+ +----------+ +----------+ ||
+//! | |           ^               | |    |                    ^          ^          ||
+//! | +---------< | >-------------+ |    |                    |          |          ||
+//! |             |                 +--< | >----------------< | >------< | >--------+|
+//! | +-----------+--------------+       |                    |          |           |
+//! | | Needed when creating     +-------/                    |          |           |
+//! | | the Context and Surface. |                            |          |           |
+//! | +--------------------------+                            |          |           |
+//! |        ^                                                |          |           |
+//! |        |                                                |          |           |
+//! | +----< | >-----| config |-----+                         |          |           |
+//! | |      |                      |                         |          |           |
+//! | | +----+-----+                |           /-------------/          |           |
+//! | | | `Config` |<-----\         |           |                        |           |
+//! | | +----------+      |         |           |                        |           |
+//! | |               +---+---+     |           |                        |           |
+//! | |               | Finds |     |           |                        |           |
+//! | |               +-------+     |           |                        |           |
+//! | |                   ^         |           |                        |           |
+//! | |                   |         |           |                        |           |
+//! | |         +---------+-------+ |           |                        |           |
+//! | |         | `ConfigsFinder` | |           |                        |           |
+//! | |         +-----------------+ |           |                        |           |
+//! | |                ^            |           |                        |           |
+//! | +--------------< | >----------+           |                        |           |
+//! +----------------< | >--------------------< | >--------------------< | >---------+
+//!                    |                        |                        |
+//! +------------------+------+ +---------------+----------+ +-----------+--------------+
+//! | Needs type implementing | | Needs types implementing | | Needs types implementing |
+//! | trait.                  | | both traits.             | | both traits.             |
+//! +-------------------------+ +--------------------------+ +--------------------------+
+//!     ^                                 ^                           ^
+//! +-< | >--| glutin_interface |-------< | >-----------------------< | >----------+
+//! |   |                                 |                           |            |
+//! |   |                        /--------/       /------------------/ \------\    |
+//! |   |                        |                |                           |    |
+//! | +-+-----------------------+ | +--------------+----------+ +-------------+--+ |
+//! | | `NativeDisplay`         | | | `NativeWindowSource`    | | `NativeWindow` | |
+//! | | e.g. gbm-rs's `Device`  | | | e.g. gbm-rs's           | | e.g. winit's   | |
+//! | | type or winit's         | | | `DeviceGlutinWrapper`   | | `Window` type  | |
+//! | | `EventLoopWindowTarget` | | | type or winit's         | | or gbm-rs's    | |
+//! | | type.                   | | | `EventLoopWindowTarget` | | `Surface` type | |
+//! | |                         | | | type.                   | |                | |
+//! | +-------------------------+ | +-------------------------+ +----------------+ |
+//! |                 /----------/ \--\                                            |
+//! |                 |               |                                            |
+//! |     +-----------+----------+ +--+-------------+                              |
+//! |     | `NativePixmapSource` | | `NativePixmap` |                              |
+//! |     +----------------------+ +----------------+                              |
+//! +------------------------------------------------------------------------------+
+//! ```
+//!
+//! [context]: crate::context
+//! [surface]: crate::surface
+//! [config]: crate::config
 
 #![deny(
     missing_debug_implementations,
