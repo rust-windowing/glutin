@@ -5,7 +5,7 @@
 //! your [context]s and [surface]s.
 //!
 //! # Basic Usage
-//! ```no_run
+//! ```rust,ignore
 //! // First you must find a set of configerations that match your criteria.
 //! //
 //! // You need any type that implements glutin_interface's `NativeDisplay`
@@ -51,7 +51,7 @@
 //! // These two thing's configs need to be compatible. Compatibility is a
 //! // highly platform-dependent type of thing.
 //! //
-//! // Safest just to keep their two configs' the same.
+//! // Safest just to keep their two configs the same.
 //!
 //! // ...
 //! // Do your OpenGL magic here!
@@ -90,7 +90,7 @@
 //!
 //! # How about Pixmaps?
 //!
-//! ```no_run
+//! ```rust,ignore
 //! // Use your `NativeDisplay`-implementing type as usual, for example winit's
 //! // `EventLoopWindowTarget`.
 //! let nd = /* ... */;
@@ -143,7 +143,7 @@
 //!
 //! # How about PBuffers?
 //!
-//! ```no_run
+//! ```rust,ignore
 //! // Use your `NativeDisplay`-implementing type as usual, for example winit's
 //! // `EventLoopWindowTarget`.
 //! let nd = /* ... */;
@@ -202,7 +202,7 @@
 //!
 //! # How about EGL Surfaceless?
 //!
-//! ```no_run
+//! ```rust,ignore
 //! // Use your `NativeDisplay`-implementing type as usual, for example winit's
 //! // `EventLoopWindowTarget`.
 //! let nd = /* ... */;

@@ -14,7 +14,7 @@
 //! [`ContextBuilderWrapper`], which exception of the [`build`] function which
 //! can only be found on the former.
 //!
-//! ```no_run
+//! ```rust,ignore
 //! // You need a `Config`. Take a look at the `config` module.
 //! let conf = /* ... */;
 //!

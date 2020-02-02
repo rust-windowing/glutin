@@ -10,7 +10,7 @@
 //! to limitations in rustdoc, I cannot. Unfortunately, all of [`Config`]'s
 //! methods are only visible on [`ConfigWrapper`].
 //!
-//! ```no_run
+//! ```rust,ignore
 //! // You need a type that implements `NativeDisplay`.
 //! let nd = /* ... */;
 //!
@@ -390,7 +390,7 @@ impl ConfigsFinder {
 
     /// Sets the number of bits in the alpha buffers. `None` means "don't care".
     #[inline]
-    pub fn with_alpha_bits(mut self, calpha_bits: Option<u8>) -> Self {
+    pub fn with_alpha_bits(mut self, alpha_bits: Option<u8>) -> Self {
         self.alpha_bits = alpha_bits;
         self
     }
