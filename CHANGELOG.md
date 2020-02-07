@@ -1,6 +1,11 @@
 # Unreleased
 
-# Version 0.21.1 (2020-01-29)
+# Version 0.23.0 (2020-02-06)
+
+- Updated winit dependency to 0.21.0. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/blob/master/CHANGELOG.md#0210-2020-02-04) for more info.
+- Removed broken CI for the `armv7-apple-ios` target.
+
+# Version 0.22.1 (2020-01-29)
 
 - Fixed incorrectly documented default value for `ContextBuilder::with_srgb`
 

@@ -1,6 +1,6 @@
 [package]
 name = "glutin"
-version = "0.22.1"
+version = "0.23.0"
 authors = ["The glutin contributors", "Pierre Krieger <pierre.krieger1708@gmail.com>"]
 description = "Cross-platform OpenGL context provider."
 keywords = ["windowing", "opengl"]
@@ -18,7 +18,7 @@ serde = ["winit/serde"]
 
 [dependencies]
 lazy_static = "1.3"
-winit = "0.20.0"
+winit = "0.21.0"
 
 [target.'cfg(target_os = "android")'.dependencies]
 android_glue = "0.2"
