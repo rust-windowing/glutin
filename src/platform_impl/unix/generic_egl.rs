@@ -26,7 +26,7 @@ pub enum Backend {
     EglExtDevice,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Config {
     Wayland(egl::Config),
     EglMesaSurfaceless(egl::Config),

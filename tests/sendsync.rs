@@ -14,6 +14,15 @@ impl<'a> FailToCompileIfNotSendSync for ContextBuilder<'a> {}
 impl FailToCompileIfNotSendSync for Config {}
 impl FailToCompileIfNotSendSync for ConfigsFinder {}
 
+pub trait FailToCompileIfNotClone
+where
+    Self: Clone,
+{
+}
+impl FailToCompileIfNotClone for Config {}
+impl FailToCompileIfNotClone for ConfigsFinder {}
+impl<'a> FailToCompileIfNotClone for ContextBuilder<'a> {}
+
 #[cfg(any(
     target_os = "linux",
     target_os = "dragonfly",
