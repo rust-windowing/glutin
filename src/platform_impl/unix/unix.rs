@@ -23,7 +23,7 @@ use winit_types::error::{Error, ErrorType};
 
 use std::os::raw;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Config {
     X11(x11::Config),
     GenericEgl(generic_egl::Config),

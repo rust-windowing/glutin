@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 pub mod utils;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Config {
     Egl {
         config: egl::Config,
