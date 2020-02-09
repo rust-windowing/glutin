@@ -202,18 +202,16 @@ impl Surface<Pixmap> {
     /// Takes an `NPS` and its `NPS::PixmapBuilder` type, returning a
     /// `NPS::Pixmap` plus a `Surface<`[`Pixmap`]`>`.
     ///
-    /// Pixmaps are only supported on X11 and Windows.
+    /// See [`build_pixmap`] and [`new_from_existing_pixmap`] for details.
     ///
-    /// On X11, both [`Config`]'s `ND` and `NWS` must provide an X11 connection
-    /// to the same display and screen.
-    /// FIXME: windows?
-    ///
-    /// # Saftey
+    /// # Safety
     ///
     /// The returned surface should not outlive the returned `NPS::Pixmap` nor
     /// the [`Config`]'s `ND`.
     ///
     /// [`Pixmap`]: crate::surface::Pixmap
+    /// [`build_pixmap`]: crate::surface::Surface::build_pixmap
+    /// [`new_from_existing_pixmap`]: crate::surface::Surface::new_from_existing_pixmap
     #[inline]
     pub unsafe fn new_pixmap<NPS: NativePixmapSource>(
         conf: &Config,
@@ -226,8 +224,38 @@ impl Surface<Pixmap> {
             )));
         }
 
-        platform_impl::Surface::<Pixmap>::new(conf.as_ref(), nps, pb)
-            .map(|(pix, surf)| (pix, Surface(surf)))
+        let pixmap = platform_impl::Surface::<Pixmap>::build_pixmap(conf.as_ref(), nps, pb)?;
+        let surface = platform_impl::Surface::<Pixmap>::new_existing(conf.as_ref(), &pixmap)?;
+        Ok((pixmap, Surface(surface)))
+    }
+
+    /// Takes an `NPS` and its `NPS::PixmapBuilder` type, returning a
+    /// `NPS::Pixmap`.
+    ///
+    /// Pixmaps are only supported on X11 and Windows.
+    ///
+    /// On X11, both [`Config`]'s `ND` and `NWS` must provide an X11 connection
+    /// to the same display and screen.
+    /// FIXME: windows?
+    ///
+    /// # Safety
+    ///
+    /// The returned surface should not outlive the [`Config`]'s `ND`.
+    ///
+    /// [`Pixmap`]: crate::surface::Pixmap
+    #[inline]
+    pub unsafe fn build_pixmap<NPS: NativePixmapSource>(
+        conf: &Config,
+        nps: &NPS,
+        pb: NPS::PixmapBuilder,
+    ) -> Result<NPS::Pixmap, Error> {
+        if !conf.attribs().supports_pixmaps {
+            return Err(make_error!(ErrorType::BadApiUsage(
+                "Tried to make pixmap surface with config without `supports_pixmaps`.".to_string()
+            )));
+        }
+
+        platform_impl::Surface::<Pixmap>::build_pixmap(conf.as_ref(), nps, pb)
     }
 
     /// Takes an pre-existing pixmap, returning a `Surface<`[`Pixmap`]`>`.
@@ -249,7 +277,7 @@ impl Surface<Pixmap> {
     ///  to the same display and screen.
     ///  * Windows: FIXME determine when implemented
     ///
-    /// # Saftey
+    /// # Safety
     ///
     /// The returned surface should not outlive `NP` nor the [`Config`]'s `ND`.
     ///
@@ -281,7 +309,7 @@ impl Surface<PBuffer> {
     ///
     /// Not all platforms support non-size-of-two PBuffers.
     ///
-    /// # Saftey
+    /// # Safety
     ///
     /// The returned surface should not outlive the [`Config`]'s `ND`.
     ///
@@ -308,21 +336,16 @@ impl Surface<Window> {
     /// Takes an `NWS` and its `NWS::WindowBuilder` type, returning a
     /// `NWS::Window` plus a `Surface<`[`Window`]`>`.
     ///
-    /// On Wayland, the [`Config`]'s `ND` must provide the same Wayland
-    /// connection as `NWS`. X11 is more lenient on this matter, allowing
-    /// different connections to the same display and screen. Other platforms
-    /// have not been tested.
+    /// See [`build_window`] and [`new_from_existing_window`] for details.
     ///
-    /// `EGL_EXT_platform_device` and `EGL_MESA_platform_surfaceless` do not
-    /// support windows.
-    ///
-    /// # Saftey
+    /// # Safety
     ///
     /// The returned surface should not outlive the returned `NWS::Window` nor
     /// the [`Config`]'s `ND`.
     ///
     /// [`Window`]: crate::surface::Window
-    /// [`Config`]: crate::config::Config
+    /// [`build_window`]: crate::surface::Surface::build_window
+    /// [`new_from_existing_window`]: crate::surface::Surface::new_from_existing_window
     #[inline]
     pub unsafe fn new_window<NWS: NativeWindowSource>(
         conf: &Config,
@@ -335,8 +358,41 @@ impl Surface<Window> {
             )));
         }
 
-        platform_impl::Surface::<Window>::new(conf.as_ref(), nws, wb)
-            .map(|(win, surf)| (win, Surface(surf)))
+        let window = platform_impl::Surface::<Window>::build_window(conf.as_ref(), nws, wb)?;
+        let surface = platform_impl::Surface::<Window>::new_existing(conf.as_ref(), &window)?;
+        Ok((window, Surface(surface)))
+    }
+
+    /// Takes an `NWS` and its `NWS::WindowBuilder` type, returning a
+    /// `NWS::Window`.
+    ///
+    /// On Wayland, the [`Config`]'s `ND` must provide the same Wayland
+    /// connection as `NWS`. X11 is more lenient on this matter, allowing
+    /// different connections to the same display and screen. Other platforms
+    /// have not been tested.
+    ///
+    /// `EGL_EXT_platform_device` and `EGL_MESA_platform_surfaceless` do not
+    /// support windows.
+    ///
+    /// # Safety
+    ///
+    /// The returned surface should not outlive the [`Config`]'s `ND`.
+    ///
+    /// [`Config`]: crate::config::Config
+    /// [`Window`]: crate::surface::Window
+    #[inline]
+    pub unsafe fn build_window<NWS: NativeWindowSource>(
+        conf: &Config,
+        nws: &NWS,
+        wb: NWS::WindowBuilder,
+    ) -> Result<NWS::Window, Error> {
+        if !conf.attribs().supports_windows {
+            return Err(make_error!(ErrorType::BadApiUsage(
+                "Tried to make window surface with config without `supports_windows`.".to_string()
+            )));
+        }
+
+        platform_impl::Surface::<Window>::build_window(conf.as_ref(), nws, wb)
     }
 
     /// Takes an pre-existing window, returning a `Surface<`[`Window`]`>`.
@@ -362,7 +418,7 @@ impl Surface<Window> {
     ///
     ///  FIXME missing plats
     ///
-    /// # Saftey
+    /// # Safety
     ///
     /// The returned surface should not outlive `NW` nor the [`Config`]'s `ND`.
     ///
@@ -429,15 +485,15 @@ impl Surface<Window> {
     /// [`Context`]: crate::context::Context
     /// [`update_after_resize`]: crate::context::Context::update_after_resize
     #[inline]
-    pub fn update_after_resize(&self, size: dpi::PhysicalSize<u32>) {
-        #![cfg(any(
+    pub fn update_after_resize(&self, _size: dpi::PhysicalSize<u32>) {
+        #[cfg(any(
             target_os = "linux",
             target_os = "dragonfly",
             target_os = "freebsd",
             target_os = "netbsd",
             target_os = "openbsd",
         ))]
-        self.0.update_after_resize(size);
+        self.0.update_after_resize(_size);
     }
 
     /// Modifies the `Surface`'s [`SwapInterval`] to the requested one.

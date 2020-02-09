@@ -292,19 +292,17 @@ impl Surface<PBuffer> {
 
 impl Surface<Pixmap> {
     #[inline]
-    pub unsafe fn new<NPS: NativePixmapSource>(
+    pub unsafe fn build_pixmap<NPS: NativePixmapSource>(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         nps: &NPS,
         pb: NPS::PixmapBuilder,
-    ) -> Result<(NPS::Pixmap, Self), Error> {
+    ) -> Result<NPS::Pixmap, Error> {
         match conf.config {
             Config::GenericEgl(config) => {
-                generic_egl::Surface::<Pixmap>::new(conf.map_config(|_| config), nps, pb)
-                    .map(|(pix, surf)| (pix, Surface::GenericEgl(surf)))
+                generic_egl::Surface::<Pixmap>::build_pixmap(conf.map_config(|_| config), nps, pb)
             }
             Config::X11(config) => {
-                x11::Surface::<Pixmap>::new(conf.map_config(|_| config), nps, pb)
-                    .map(|(pix, surf)| (pix, Surface::X11(surf)))
+                x11::Surface::<Pixmap>::build_pixmap(conf.map_config(|_| config), nps, pb)
             }
         }
     }
@@ -329,19 +327,17 @@ impl Surface<Pixmap> {
 
 impl Surface<Window> {
     #[inline]
-    pub unsafe fn new<NWS: NativeWindowSource>(
+    pub unsafe fn build_window<NWS: NativeWindowSource>(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         nws: &NWS,
         wb: NWS::WindowBuilder,
-    ) -> Result<(NWS::Window, Self), Error> {
+    ) -> Result<NWS::Window, Error> {
         match conf.config {
             Config::GenericEgl(config) => {
-                generic_egl::Surface::<Window>::new(conf.map_config(|_| config), nws, wb)
-                    .map(|(win, surf)| (win, Surface::GenericEgl(surf)))
+                generic_egl::Surface::<Window>::build_window(conf.map_config(|_| config), nws, wb)
             }
             Config::X11(config) => {
-                x11::Surface::<Window>::new(conf.map_config(|_| config), nws, wb)
-                    .map(|(win, surf)| (win, Surface::X11(surf)))
+                x11::Surface::<Window>::build_window(conf.map_config(|_| config), nws, wb)
             }
         }
     }
