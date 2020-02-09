@@ -321,7 +321,10 @@ impl Default for ConfigsFinder {
             must_support_windows: true,
             must_support_pixmaps: false,
             must_support_surfaceless: false,
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             version: (Api::OpenGl, Version(3, 3)),
+            #[cfg(any(target_os = "android", target_os = "ios"))]
+            version: (Api::OpenGlEs, Version(2, 0)),
             plat_attr: Default::default(),
         }
     }
