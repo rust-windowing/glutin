@@ -17,7 +17,15 @@ use crate::config::{
     Api, ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapInterval, SwapIntervalRange, Version,
 };
 use crate::context::{ContextBuilderWrapper, ReleaseBehaviour, Robustness};
-use crate::surface::{PBuffer, Pixmap, SurfaceType, SurfaceTypeTrait, Window};
+#[cfg(any(
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+))]
+use crate::surface::Pixmap;
+use crate::surface::{PBuffer, SurfaceType, SurfaceTypeTrait, Window};
 
 use glutin_interface::{NativeDisplay, RawDisplay};
 #[cfg(any(
@@ -1154,6 +1162,13 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     }
 }
 
+#[cfg(any(
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+))]
 impl Surface<Pixmap> {
     #[inline]
     pub fn new(
