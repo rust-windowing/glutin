@@ -167,9 +167,6 @@ impl Display {
                 )
             }
 
-            // TODO: This will never be reached right now, as the android egl
-            // bindings use the static generator, so can't rely on
-            // GetPlatformDisplay(EXT).
             RawDisplay::Android { .. }
                 if has_client_extension("EGL_KHR_platform_android")
                     && egl.GetPlatformDisplay.is_loaded() =>

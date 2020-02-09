@@ -22,6 +22,7 @@ lazy_static = "1.4.0"
 winit_types = { version = "0.1.0", path = "../winit_types" }
 glutin_interface = { version = "0.1.0", path = "../glutin_interface" }
 log = "0.4.8"
+libloading = "0.5.2"
 
 [build-dependencies]
 gl_generator = "0.14.0"
@@ -69,7 +70,6 @@ features = [
 [target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "dragonfly", target_os = "netbsd", target_os = "openbsd"))'.dependencies]
 glutin_osmesa_sys = { version = "0.1.0", path = "../glutin_sys/glutin_osmesa_sys" }
 wayland-client = { version = "0.23", features = ["egl", "dlopen"] }
-libloading = "0.5.2"
 glutin_egl_sys = { version = "0.1.4", path = "../glutin_sys/glutin_egl_sys" }
 glutin_glx_sys = { version = "0.2.0", path = "../glutin_sys/glutin_glx_sys" }
 parking_lot = "0.10.0"
