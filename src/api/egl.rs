@@ -1231,8 +1231,26 @@ impl Surface<Pixmap> {
         let egl = EGL.as_ref().unwrap();
         let desc = Self::assemble_desc(conf.clone(), None);
         let surface = unsafe {
-            let surf =
-                egl.CreatePlatformPixmapSurface(**display, conf.config.config, npix, desc.as_ptr());
+            let surf = if display.egl_version >= (1, 5)
+                && egl.CreatePlatformWindowSurface.is_loaded()
+            {
+                egl.CreatePlatformPixmapSurface(**display, conf.config.config, npix, desc.as_ptr())
+            } else if display.has_extension("EGL_EXT_platform_base")
+                && egl.CreatePlatformPixmapSurfaceEXT.is_loaded()
+            {
+                let desc: Vec<ffi::EGLint> =
+                    desc.into_iter().map(|attr| attr as ffi::EGLint).collect();
+                egl.CreatePlatformPixmapSurfaceEXT(
+                    **display,
+                    conf.config.config,
+                    npix,
+                    desc.as_ptr(),
+                )
+            } else {
+                let desc: Vec<ffi::EGLint> =
+                    desc.into_iter().map(|attr| attr as ffi::EGLint).collect();
+                egl.CreatePixmapSurface(**display, conf.config.config, npix, desc.as_ptr())
+            };
             if surf.is_null() {
                 return Err(make_oserror!(OsError::Misc(format!(
                     "eglCreatePlatformPixmapSurface failed with 0x{:x}",
@@ -1261,10 +1279,30 @@ impl Surface<Window> {
     ) -> Result<Self, Error> {
         let display = Arc::clone(&conf.config.display);
         let egl = EGL.as_ref().unwrap();
+
         let desc = Self::assemble_desc(conf.clone(), None);
+
         let surface = unsafe {
-            let surf =
-                egl.CreatePlatformWindowSurface(**display, conf.config.config, nwin, desc.as_ptr());
+            let surf = if display.egl_version >= (1, 5)
+                && egl.CreatePlatformWindowSurface.is_loaded()
+            {
+                egl.CreatePlatformWindowSurface(**display, conf.config.config, nwin, desc.as_ptr())
+            } else if display.has_extension("EGL_EXT_platform_base")
+                && egl.CreatePlatformWindowSurfaceEXT.is_loaded()
+            {
+                let desc: Vec<ffi::EGLint> =
+                    desc.into_iter().map(|attr| attr as ffi::EGLint).collect();
+                egl.CreatePlatformWindowSurfaceEXT(
+                    **display,
+                    conf.config.config,
+                    nwin,
+                    desc.as_ptr(),
+                )
+            } else {
+                let desc: Vec<ffi::EGLint> =
+                    desc.into_iter().map(|attr| attr as ffi::EGLint).collect();
+                egl.CreateWindowSurface(**display, conf.config.config, nwin, desc.as_ptr())
+            };
             if surf.is_null() {
                 return Err(make_oserror!(OsError::Misc(format!(
                     "eglCreatePlatformWindowSurface failed with 0x{:x}",
