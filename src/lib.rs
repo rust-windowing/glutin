@@ -331,6 +331,7 @@ extern crate lazy_static;
 #[macro_use]
 extern crate objc;
 #[cfg(any(
+    target_os = "android",
     target_os = "linux",
     target_os = "dragonfly",
     target_os = "freebsd",

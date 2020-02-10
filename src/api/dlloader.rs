@@ -1,4 +1,5 @@
 #![cfg(any(
+    target_os = "android",
     target_os = "windows",
     target_os = "linux",
     target_os = "dragonfly",

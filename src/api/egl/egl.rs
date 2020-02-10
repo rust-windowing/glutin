@@ -1,4 +1,3 @@
-#[cfg(not(target_os = "android"))]
 mod egl {
     use crate::api::dlloader::{SymTrait, SymWrapper};
     use crate::api::egl::ffi;
@@ -86,23 +85,6 @@ mod egl {
             SymWrapper::new(paths)
                 .map(|i| Egl(i))
                 .map_err(|_| make_oserror!(OsError::Misc("Could not load EGL symbols".to_string())))
-        }
-    }
-}
-
-#[cfg(target_os = "android")]
-mod egl {
-    use crate::api::egl::ffi;
-
-    use winit_types::error::Error;
-
-    #[derive(Clone)]
-    pub struct Egl(pub ffi::egl::Egl);
-
-    impl Egl {
-        #[inline]
-        pub fn new() -> Result<Self, Error> {
-            Ok(Egl(ffi::egl::Egl))
         }
     }
 }

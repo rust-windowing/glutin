@@ -441,22 +441,21 @@ impl Surface<PBuffer> {
 
 impl Surface<Pixmap> {
     #[inline]
-    pub fn new<NPS: NativePixmapSource>(
+    pub fn build_pixmap<NPS: NativePixmapSource>(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         nps: &NPS,
         pb: NPS::PixmapBuilder,
-    ) -> Result<(NPS::Pixmap, Self), Error> {
+    ) -> Result<NPS::Pixmap, Error> {
         // Get the screen_id for the window being built.
         let visual_info: ffi::XVisualInfo = conf.config.get_visual_info()?;
         #[allow(deprecated)]
-        let np = nps.build_x11(
+        nps.build_x11(
             pb,
             X11PixmapParts {
                 depth: visual_info.depth as u16,
                 _non_exhaustive_do_not_use: Seal,
             },
-        )?;
-        Self::new_existing(conf, &np).map(|surf| (np, surf))
+        )
     }
 
     #[inline]
@@ -493,23 +492,22 @@ impl Surface<Pixmap> {
 
 impl Surface<Window> {
     #[inline]
-    pub fn new<NWS: NativeWindowSource>(
+    pub fn build_window<NWS: NativeWindowSource>(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         nws: &NWS,
         wb: NWS::WindowBuilder,
-    ) -> Result<(NWS::Window, Self), Error> {
+    ) -> Result<NWS::Window, Error> {
         // Get the screen_id for the window being built.
         let visual_info: ffi::XVisualInfo = conf.config.get_visual_info()?;
         #[allow(deprecated)]
-        let nw = nws.build_x11(
+        nws.build_x11(
             wb,
             X11WindowParts {
                 x_visual_info: &visual_info as *const _ as *const _,
                 screen: conf.config.screen(),
                 _non_exhaustive_do_not_use: Seal,
             },
-        )?;
-        Self::new_existing(conf, &nw).map(|surf| (nw, surf))
+        )
     }
 
     #[inline]

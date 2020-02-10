@@ -1,4 +1,3 @@
-pub mod android;
 pub mod dlloader;
 pub mod egl;
 pub mod glx;

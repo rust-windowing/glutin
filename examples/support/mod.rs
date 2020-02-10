@@ -266,7 +266,16 @@ void main() {
 pub enum HeadlessBackend {
     Surfaceless(Context),
     PBuffer(Context, Surface<PBuffer>),
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd",
+    ))]
     OsMesa(OsMesaContext, OsMesaBuffer),
+    #[doc(hidden)]
+    __Nonexhaustive,
 }
 
 impl HeadlessBackend {
@@ -397,7 +406,15 @@ impl HeadlessBackend {
         match self {
             HeadlessBackend::Surfaceless(ctx) => ctx.make_current_surfaceless(),
             HeadlessBackend::PBuffer(ctx, surf) => ctx.make_current(surf),
+            #[cfg(any(
+                target_os = "linux",
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "netbsd",
+                target_os = "openbsd",
+            ))]
             HeadlessBackend::OsMesa(ctx, buf) => ctx.make_current(buf),
+            _ => panic!(),
         }
     }
 
@@ -409,7 +426,15 @@ impl HeadlessBackend {
             HeadlessBackend::Surfaceless(ctx) | HeadlessBackend::PBuffer(ctx, _) => {
                 Gl::load(|s| ctx.get_proc_address(s).unwrap())
             }
+            #[cfg(any(
+                target_os = "linux",
+                target_os = "dragonfly",
+                target_os = "freebsd",
+                target_os = "netbsd",
+                target_os = "openbsd",
+            ))]
             HeadlessBackend::OsMesa(ctx, _) => Gl::load(|s| ctx.get_proc_address(s).unwrap()),
+            _ => panic!(),
         };
         Ok(gl)
     }

@@ -17,7 +17,15 @@ use crate::config::{
     Api, ConfigAttribs, ConfigWrapper, ConfigsFinder, SwapInterval, SwapIntervalRange, Version,
 };
 use crate::context::{ContextBuilderWrapper, ReleaseBehaviour, Robustness};
-use crate::surface::{PBuffer, Pixmap, SurfaceType, SurfaceTypeTrait, Window};
+#[cfg(any(
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+))]
+use crate::surface::Pixmap;
+use crate::surface::{PBuffer, SurfaceType, SurfaceTypeTrait, Window};
 
 use glutin_interface::{NativeDisplay, RawDisplay};
 #[cfg(any(
@@ -167,9 +175,6 @@ impl Display {
                 )
             }
 
-            // TODO: This will never be reached right now, as the android egl
-            // bindings use the static generator, so can't rely on
-            // GetPlatformDisplay(EXT).
             RawDisplay::Android { .. }
                 if has_client_extension("EGL_KHR_platform_android")
                     && egl.GetPlatformDisplay.is_loaded() =>
@@ -980,70 +985,6 @@ impl Context {
         self.config.clone()
     }
 
-    // FIXME: Needed for android support.
-    // winit doesn't have it, I'll add this back in when it does.
-    //
-    // // Handle Android Life Cycle.
-    // // Android has started the activity or sent it to foreground.
-    // // Create a new surface and attach it to the recreated ANativeWindow.
-    // // Restore the EGLContext.
-    // #[cfg(target_os = "android")]
-    // pub unsafe fn on_surface_created(&self, nwin: ffi::EGLNativeWindowType) {
-    //     let egl = EGL.as_ref().unwrap();
-    //     let mut surface = self.surface.as_ref().unwrap().lock();
-    //     if *surface != ffi::egl::NO_SURFACE {
-    //         return;
-    //     }
-    //     *surface = egl.CreateWindowSurface(
-    //         **self.display,
-    //         self.config,
-    //         nwin,
-    //         std::ptr::null(),
-    //     );
-    //     if surface.is_null() {
-    //         panic!(
-    //             "[glutin] on_surface_created: eglCreateWindowSurface failed with
-    // 0x{:x}",             egl.GetError()
-    //         )
-    //     }
-    //     let ret =
-    //         egl.MakeCurrent(**self.display, *surface, *surface,
-    // self.context);     if ret == 0 {
-    //         panic!(
-    //             "[glutin] on_surface_created: eglMakeCurrent failed with 0x{:x}",
-    //             egl.GetError()
-    //         )
-    //     }
-    // }
-    //
-    // // Handle Android Life Cycle.
-    // // Android has stopped the activity or sent it to background.
-    // // Release the surface attached to the destroyed ANativeWindow.
-    // // The EGLContext is not destroyed so it can be restored later.
-    // #[cfg(target_os = "android")]
-    // pub unsafe fn on_surface_destroyed(&self) {
-    //     let egl = EGL.as_ref().unwrap();
-    //     let mut surface = self.surface.as_ref().unwrap().lock();
-    //     if *surface == ffi::egl::NO_SURFACE {
-    //         return;
-    //     }
-    //     let ret = egl.MakeCurrent(
-    //         **self.display,
-    //         ffi::egl::NO_SURFACE,
-    //         ffi::egl::NO_SURFACE,
-    //         ffi::egl::NO_CONTEXT,
-    //     );
-    //     if ret == 0 {
-    //         panic!(
-    //             "[glutin] on_surface_destroyed: eglMakeCurrent failed with 0x{:x}",
-    //             egl.GetError()
-    //         )
-    //     }
-    //
-    //     egl.DestroySurface(**self.display, *surface);
-    //     *surface = ffi::egl::NO_SURFACE;
-    // }
-
     #[inline]
     pub fn get_proc_address(&self, addr: &str) -> Result<*const raw::c_void, Error> {
         let egl = EGL.as_ref().unwrap();
@@ -1221,6 +1162,13 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     }
 }
 
+#[cfg(any(
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+))]
 impl Surface<Pixmap> {
     #[inline]
     pub fn new(
@@ -1231,8 +1179,26 @@ impl Surface<Pixmap> {
         let egl = EGL.as_ref().unwrap();
         let desc = Self::assemble_desc(conf.clone(), None);
         let surface = unsafe {
-            let surf =
-                egl.CreatePlatformPixmapSurface(**display, conf.config.config, npix, desc.as_ptr());
+            let surf = if display.egl_version >= (1, 5)
+                && egl.CreatePlatformWindowSurface.is_loaded()
+            {
+                egl.CreatePlatformPixmapSurface(**display, conf.config.config, npix, desc.as_ptr())
+            } else if display.has_extension("EGL_EXT_platform_base")
+                && egl.CreatePlatformPixmapSurfaceEXT.is_loaded()
+            {
+                let desc: Vec<ffi::EGLint> =
+                    desc.into_iter().map(|attr| attr as ffi::EGLint).collect();
+                egl.CreatePlatformPixmapSurfaceEXT(
+                    **display,
+                    conf.config.config,
+                    npix,
+                    desc.as_ptr(),
+                )
+            } else {
+                let desc: Vec<ffi::EGLint> =
+                    desc.into_iter().map(|attr| attr as ffi::EGLint).collect();
+                egl.CreatePixmapSurface(**display, conf.config.config, npix, desc.as_ptr())
+            };
             if surf.is_null() {
                 return Err(make_oserror!(OsError::Misc(format!(
                     "eglCreatePlatformPixmapSurface failed with 0x{:x}",
@@ -1261,10 +1227,30 @@ impl Surface<Window> {
     ) -> Result<Self, Error> {
         let display = Arc::clone(&conf.config.display);
         let egl = EGL.as_ref().unwrap();
+
         let desc = Self::assemble_desc(conf.clone(), None);
+
         let surface = unsafe {
-            let surf =
-                egl.CreatePlatformWindowSurface(**display, conf.config.config, nwin, desc.as_ptr());
+            let surf = if display.egl_version >= (1, 5)
+                && egl.CreatePlatformWindowSurface.is_loaded()
+            {
+                egl.CreatePlatformWindowSurface(**display, conf.config.config, nwin, desc.as_ptr())
+            } else if display.has_extension("EGL_EXT_platform_base")
+                && egl.CreatePlatformWindowSurfaceEXT.is_loaded()
+            {
+                let desc: Vec<ffi::EGLint> =
+                    desc.into_iter().map(|attr| attr as ffi::EGLint).collect();
+                egl.CreatePlatformWindowSurfaceEXT(
+                    **display,
+                    conf.config.config,
+                    nwin,
+                    desc.as_ptr(),
+                )
+            } else {
+                let desc: Vec<ffi::EGLint> =
+                    desc.into_iter().map(|attr| attr as ffi::EGLint).collect();
+                egl.CreateWindowSurface(**display, conf.config.config, nwin, desc.as_ptr())
+            };
             if surf.is_null() {
                 return Err(make_oserror!(OsError::Misc(format!(
                     "eglCreatePlatformWindowSurface failed with 0x{:x}",

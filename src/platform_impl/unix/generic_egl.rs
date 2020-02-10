@@ -182,32 +182,32 @@ impl<T: SurfaceTypeTrait> Surface<T> {
 
 impl Surface<Window> {
     #[inline]
-    pub unsafe fn new<NWS: NativeWindowSource>(
+    pub unsafe fn build_window<NWS: NativeWindowSource>(
         conf: ConfigWrapper<&Config, &ConfigAttribs>,
         nws: &NWS,
         wb: NWS::WindowBuilder,
-    ) -> Result<(NWS::Window, Self), Error> {
+    ) -> Result<NWS::Window, Error> {
         match conf.config.backend() {
-            Backend::Wayland => {
+            Backend::Wayland =>
+            {
                 #[allow(deprecated)]
-                let nw = nws.build_wayland(
+                nws.build_wayland(
                     wb,
                     WaylandWindowParts {
                         _non_exhaustive_do_not_use: Seal,
                     },
-                )?;
-                Self::new_existing(conf, &nw).map(|surf| (nw, surf))
+                )
             }
-            Backend::Gbm => {
+            Backend::Gbm =>
+            {
                 #[allow(deprecated)]
-                let nw = nws.build_gbm(
+                nws.build_gbm(
                     wb,
                     GbmWindowParts {
                         color_format: (**conf.config).get_native_visual_id()? as u32,
                         _non_exhaustive_do_not_use: Seal,
                     },
-                )?;
-                Self::new_existing(conf, &nw).map(|surf| (nw, surf))
+                )
             }
             _ => Err(make_error!(ErrorType::NotSupported(
                 "Only Wayland and GBM support native window surfaces.".to_string(),
@@ -294,21 +294,21 @@ impl Surface<PBuffer> {
 
 impl Surface<Pixmap> {
     #[inline]
-    pub unsafe fn new_existing<NP: NativePixmap>(
+    pub unsafe fn build_pixmap<NPS: NativePixmapSource>(
         _conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        _np: &NP,
-    ) -> Result<Self, Error> {
+        _nps: &NPS,
+        _pb: NPS::PixmapBuilder,
+    ) -> Result<NPS::Pixmap, Error> {
         Err(make_error!(ErrorType::NotSupported(
             "None of generic_egl's backends (Wayland, GBM, ect) support pixmaps.".to_string(),
         )))
     }
 
     #[inline]
-    pub unsafe fn new<NPS: NativePixmapSource>(
+    pub unsafe fn new_existing<NP: NativePixmap>(
         _conf: ConfigWrapper<&Config, &ConfigAttribs>,
-        _nps: &NPS,
-        _pb: NPS::PixmapBuilder,
-    ) -> Result<(NPS::Pixmap, Self), Error> {
+        _np: &NP,
+    ) -> Result<Self, Error> {
         Err(make_error!(ErrorType::NotSupported(
             "None of generic_egl's backends (Wayland, GBM, ect) support pixmaps.".to_string(),
         )))
