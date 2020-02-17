@@ -1,0 +1,26 @@
+[package]
+name = "android-examples"
+version = "0.1.0"
+authors = ["David Craven <david@craven.ch>"]
+edition = "2018"
+publish = false
+build = "../build.rs"
+
+[dependencies]
+glutin = { path = ".." }
+
+[build-dependencies]
+gl_generator = "0.14.0"
+
+[dev-dependencies]
+image = "0.22.4"
+ndk-glue = { path = "../../android-ndk-rs/ndk-glue" }
+simple_logger = "1.4.0"
+takeable-option = "0.5.0"
+winit = { path = "../../winit" }
+winit_types = { path = "../../winit_types" }
+
+[[example]]
+name = "window"
+path = "../examples/window.rs"
+crate-type = ["cdylib"]

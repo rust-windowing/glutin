@@ -49,9 +49,10 @@ Glutin is only officially supported on the latest stable version of the Rust com
 
 ### Android
 
-To compile the examples for android, you have to use the `cargo apk` utility.
+To compile the examples for android, you have to use the `cargo apk` utility. You can run an example
+with `cargo apk run --example $EXAMPLE --manifest-path android/Cargo.toml`.
 
-See [the `android-ndk-rs` repository](https://github.com/rust-windowing/android-ndk-rs) for instructions.
+See [the `android-ndk-rs` repository](https://github.com/rust-windowing/android-ndk-rs) for more information.
 
 ### Emscripten with asmjs
 
