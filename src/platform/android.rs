@@ -1,29 +1,43 @@
 #![cfg(any(target_os = "android"))]
-
-use crate::platform::ContextTraitExt;
-use crate::{Context, ContextCurrentState};
-use crate::{SupportsPBuffersTrait, SupportsSurfacelessTrait, SupportsWindowSurfacesTrait};
-
-pub use glutin_egl_sys::EGLContext;
-
+use crate::config::Config;
+use crate::context::Context;
+use crate::surface::{Surface, SurfaceTypeTrait};
 use std::os::raw;
 
-impl<
-        IC: ContextCurrentState,
-        PBT: SupportsPBuffersTrait,
-        WST: SupportsWindowSurfacesTrait,
-        ST: SupportsSurfacelessTrait,
-    > ContextTraitExt for Context<IC, PBT, WST, ST>
-{
-    type Handle = EGLContext;
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct ConfigPlatformAttributes;
 
-    #[inline]
-    unsafe fn raw_handle(&self) -> Self::Handle {
-        self.context.raw_handle()
+pub trait ConfigExt {
+    unsafe fn raw_config(&self) -> *const raw::c_void;
+    unsafe fn raw_display(&self) -> *mut raw::c_void;
+}
+
+impl ConfigExt for Config {
+    unsafe fn raw_config(&self) -> *const raw::c_void {
+        self.config.raw_config()
     }
 
-    #[inline]
-    unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
-        Some(self.context.get_egl_display())
+    unsafe fn raw_display(&self) -> *mut raw::c_void {
+        self.config.raw_display()
+    }
+}
+
+pub trait SurfaceExt {
+    unsafe fn raw_surface(&self) -> *const raw::c_void;
+}
+
+impl<T: SurfaceTypeTrait> SurfaceExt for Surface<T> {
+    unsafe fn raw_surface(&self) -> *const raw::c_void {
+        self.0.raw_surface()
+    }
+}
+
+pub trait ContextExt {
+    unsafe fn raw_context(&self) -> *mut raw::c_void;
+}
+
+impl ContextExt for Context {
+    unsafe fn raw_context(&self) -> *mut raw::c_void {
+        self.0.raw_context()
     }
 }

@@ -15,9 +15,9 @@ mod platform_impl;
 //#[cfg(target_os = "macos")]
 //#[path = "platform_impl/macos/macos.rs"]
 //mod platform_impl;
-//#[cfg(target_os = "android")]
-//#[path = "platform_impl/android/android.rs"]
-//mod platform_impl;
+#[cfg(target_os = "android")]
+#[path = "platform_impl/android/android.rs"]
+mod platform_impl;
 //#[cfg(target_os = "ios")]
 //#[path = "platform_impl/ios/ios.rs"]
 //mod platform_impl;

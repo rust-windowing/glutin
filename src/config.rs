@@ -324,7 +324,7 @@ impl Default for ConfigsFinder {
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             version: (Api::OpenGl, Version(3, 3)),
             #[cfg(any(target_os = "android", target_os = "ios"))]
-            version: (Api::OpenGlEs, Version(2, 0)),
+            version: (Api::OpenGlEs, Version(3, 1)),
             plat_attr: Default::default(),
         }
     }
