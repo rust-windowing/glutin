@@ -381,16 +381,20 @@ impl Context {
                 // That way, they'll try their fallback if available, unless
                 // it was their only option and they have already tried it.
                 if !force_prefer_unless_only {
-                    match (&*GLX, &*EGL, prefer_egl) {
-                        (Some(_), _, false) => return glx(builder_glx_u),
-                        (_, Some(_), true) => return egl(builder_egl_u),
-                        _ => (),
-                    }
-
-                    match (&*GLX, &*EGL, prefer_egl) {
-                        (_, Some(_), false) => return egl(builder_egl_u),
-                        (Some(_), _, true) => return glx(builder_glx_u),
-                        _ => (),
+                    // If the preferred choice works, don't spend time testing
+                    // if the other works.
+                    if prefer_egl {
+                        if let Some(_) = &*EGL {
+                            return egl(builder_egl_u);
+                        } else if let Some(_) = &*GLX {
+                            return glx(builder_glx_u);
+                        }
+                    } else {
+                        if let Some(_) = &*GLX {
+                            return glx(builder_glx_u);
+                        } else if let Some(_) = &*EGL {
+                            return egl(builder_egl_u);
+                        }
                     }
 
                     return Err(CreationError::NotSupported(
