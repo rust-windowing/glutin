@@ -1,5 +1,7 @@
 # Unreleased
 
+- Updated winit dependency to 0.22.0. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/blob/master/CHANGELOG.md#0220-2020-03-09) for more info.
+
 # Version 0.23.0 (2020-02-06)
 
 - Updated winit dependency to 0.21.0. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/blob/master/CHANGELOG.md#0210-2020-02-04) for more info.
