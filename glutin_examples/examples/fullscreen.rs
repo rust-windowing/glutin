@@ -28,6 +28,8 @@ fn main() {
         _ => panic!("Please enter a valid number"),
     });
 
+    println!("Press (F) to toggle fullscreen, (D) to toggle window decorations, and (M) to toggle maximized/minimized.");
+
     let mut is_maximized = false;
     let mut decorations = true;
 
@@ -49,6 +51,9 @@ fn main() {
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => {
                     *control_flow = ControlFlow::Exit
+                }
+                WindowEvent::Resized(physical_size) => {
+                    windowed_context.resize(physical_size);
                 }
                 WindowEvent::KeyboardInput {
                     input:
