@@ -1180,7 +1180,14 @@ where
                     out.push(ffi::egl::OPENGL_ES_BIT as raw::c_int);
                 }
             }
-            (Api::OpenGlEs, _) => unimplemented!(),
+            (Api::OpenGlEs, None) => {
+                if egl_version >= &(1, 3) {
+                    out.push(ffi::egl::RENDERABLE_TYPE as raw::c_int);
+                    out.push(ffi::egl::OPENGL_ES_BIT as raw::c_int);
+                    out.push(ffi::egl::CONFORMANT as raw::c_int);
+                    out.push(ffi::egl::OPENGL_ES_BIT as raw::c_int);
+                }
+            }
             (Api::OpenGl, _) => {
                 if egl_version < &(1, 3) {
                     return Err(CreationError::NoAvailablePixelFormat);
