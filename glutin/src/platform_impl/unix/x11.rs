@@ -401,10 +401,14 @@ impl Context {
                         "both libGL and libEGL are not present".to_string(),
                     ));
                 } else {
-                    match (&*GLX, &*EGL, prefer_egl) {
-                        (Some(_), Some(_), true) => return egl(builder_egl_u),
-                        (Some(_), Some(_), false) => return glx(builder_glx_u),
-                        _ => (),
+                    if prefer_egl {
+                        if let Some(_) = &*EGL {
+                            return egl(builder_egl_u);
+                        }
+                    } else {
+                        if let Some(_) = &*GLX {
+                            return glx(builder_glx_u);
+                        }
                     }
 
                     return Err(CreationError::NotSupported(
