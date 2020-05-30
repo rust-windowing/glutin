@@ -1,5 +1,9 @@
 # Unreleased
 
+# Version 0.24.1 (2020-05-26)
+
+- On X11, Fixed unnecessary instantiation of GLX/EGL
+
 # Version 0.24.0 (2020-03-11)
 
 - Updated winit dependency to 0.22.0. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/blob/master/CHANGELOG.md#0220-2020-03-09) for more info.
