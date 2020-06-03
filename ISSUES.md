@@ -33,7 +33,7 @@ requesting from `ChoosePixelFormatARB`/`ChoosePixelFormat`/`eglChooseConfig`,
 however figuring out what to compare them to is less trivial.
 
 The simplest solution I know of is to download the [OpenGL Extension Viewer by
-realtech](http://realtech-vr.com/admin/glview). You can then go to the "Display
+realtech](http://realtech-vr.com/home/glview). You can then go to the "Display
 modes & pixel formats" tab and take a look at all the configs supported by WGL,
 I believe? I'm not what the equivalent for EGL is, unfortunately.
 
