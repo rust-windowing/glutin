@@ -171,10 +171,8 @@ impl<W> ContextWrapper<PossiblyCurrent, W> {
     /// their window or surface is resized.
     ///
     /// The easiest way of doing this is to take every [`Resized`] window event
-    /// that is received with a [`LogicalSize`] and convert it to a
-    /// [`PhysicalSize`] and pass it into this function.
+    /// that is received and pass its [`PhysicalSize`] into this function.
     ///
-    /// [`LogicalSize`]: dpi/struct.LogicalSize.html
     /// [`PhysicalSize`]: dpi/struct.PhysicalSize.html
     /// [`Resized`]: event/enum.WindowEvent.html#variant.Resized
     pub fn resize(&self, size: dpi::PhysicalSize<u32>) {
