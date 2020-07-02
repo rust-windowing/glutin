@@ -1,5 +1,7 @@
 # Unreleased
 
+- Avoid loading libEGL.dll from PATH on Windows.
+
 # Version 0.24.1 (2020-05-26)
 
 - On X11, Fixed unnecessary instantiation of GLX/EGL

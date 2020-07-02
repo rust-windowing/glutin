@@ -9,6 +9,12 @@
 
 use libloading::Library;
 
+#[cfg(target_os = "windows")]
+use libloading::os::windows;
+
+#[cfg(target_os = "windows")]
+use winapi::um::libloaderapi::*;
+
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
@@ -25,7 +31,17 @@ pub trait SymTrait {
 impl<T: SymTrait> SymWrapper<T> {
     pub fn new(lib_paths: Vec<&str>) -> Result<Self, ()> {
         for path in lib_paths {
+            // Avoid loading from PATH
+            #[cfg(target_os = "windows")]
+            let lib = windows::Library::load_with_flags(
+                path,
+                LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
+            )
+            .map(From::from);
+
+            #[cfg(not(target_os = "windows"))]
             let lib = Library::new(path);
+
             if lib.is_ok() {
                 return Ok(SymWrapper {
                     inner: T::load_with(lib.as_ref().unwrap()),
