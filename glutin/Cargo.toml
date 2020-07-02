@@ -1,6 +1,6 @@
 [package]
 name = "glutin"
-version = "0.24.0"
+version = "0.24.1"
 authors = ["The glutin contributors", "Pierre Krieger <pierre.krieger1708@gmail.com>"]
 description = "Cross-platform OpenGL context provider."
 keywords = ["windowing", "opengl"]
@@ -34,9 +34,9 @@ glutin_gles2_sys = { version = "0.1.4", path = "../glutin_gles2_sys" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 cgl = "0.3"
-cocoa = "0.19"
-core-foundation = "0.6"
-core-graphics = "0.17"
+cocoa = "0.20"
+core-foundation = "0.7"
+core-graphics = "0.19"
 
 [target.'cfg(target_os = "windows")'.dependencies.winapi]
 version = "0.3"
