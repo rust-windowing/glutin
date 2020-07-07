@@ -42,6 +42,10 @@ fn main() {
         );
 
         if target.contains("android") || target.contains("ios") {
+            // FIXME: Without it we have unresolved links on Android and also possibly on IOS but I don't tested.
+            if target.contains("android") {
+                println!("cargo:rustc-link-lib=EGL");
+            }
             reg.write_bindings(gl_generator::StaticStructGenerator, &mut file)
         } else {
             reg.write_bindings(gl_generator::StructGenerator, &mut file)
