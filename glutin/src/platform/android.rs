@@ -21,3 +21,18 @@ impl<T: ContextCurrentState> ContextTraitExt for Context<T> {
         Some(self.context.get_egl_display())
     }
 }
+
+pub trait AndroidContextExt {
+    fn suspend(&self);
+    fn resume(&self);
+}
+
+impl<T: ContextCurrentState> AndroidContextExt for Context<T> {
+    fn suspend(&self) {
+        self.context.suspend()
+    }
+
+    fn resume(&self) {
+        self.context.resume()
+    }
+}

@@ -61,7 +61,8 @@ impl Context {
     ) -> Result<(winit::window::Window, Self), CreationError> {
         let win = wb.build(el)?;
         let gl_attr = gl_attr.clone().map_sharing(|c| &c.0.egl_context);
-        let nwin = unsafe { ndk_glue::native_window() };
+        let nwin = ndk_glue::native_window();
+        // FIXME: The native window is null until winit's `Resumed` event, so context should be created after.
         if nwin.is_none() {
             return Err(OsError("Android's native window is null".to_string()));
         }
@@ -107,6 +108,33 @@ impl Context {
         })));*/
 
         Ok((win, context))
+    }
+
+    #[inline]
+    pub fn suspend(&self) {
+        let ctx = &self.0;
+        let mut stopped = ctx.stopped.as_ref().unwrap().lock();
+        *stopped = true;
+        // Android has stopped the activity or sent it to background.
+        // Release the EGL surface and stop the animation loop.
+        unsafe {
+            ctx.egl_context.on_surface_destroyed();
+        }
+    }
+
+    #[inline]
+    pub fn resume(&self) {
+        let ctx = &self.0;
+        let mut stopped = ctx.stopped.as_ref().unwrap().lock();
+        *stopped = false;
+        // Android has started the activity or sent it to foreground.
+        // Restore the EGL surface and animation loop.
+        unsafe {
+            let nwin = ndk_glue::native_window();
+            ctx.egl_context.on_surface_created(
+                nwin.as_ref().unwrap().ptr().as_ptr() as *const _,
+            );
+        }
     }
 
     #[inline]
