@@ -55,7 +55,8 @@ parking_lot = "0.10"
 
 [target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "dragonfly", target_os = "netbsd", target_os = "openbsd"))'.dependencies]
 osmesa-sys = "0.1"
-wayland-client = { version = "0.23", features = ["egl", "dlopen"] }
+wayland-client = { version = "0.27", features = ["dlopen"] }
+wayland-egl = "0.27"
 libloading = "0.6.1"
 glutin_egl_sys = { version = "0.1.4", path = "../glutin_egl_sys" }
 glutin_glx_sys = { version = "0.1.6", path = "../glutin_glx_sys" }
