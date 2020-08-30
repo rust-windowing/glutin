@@ -8,7 +8,6 @@ use crate::{
 
 use crate::platform::unix::{EventLoopWindowTargetExtUnix, WindowExtUnix};
 use glutin_egl_sys as ffi;
-use wayland_client::egl as wegl;
 pub use wayland_client::sys::client::wl_display;
 use winit;
 use winit::dpi;
@@ -19,7 +18,7 @@ use std::ops::Deref;
 use std::os::raw;
 use std::sync::Arc;
 
-pub struct EglSurface(Arc<wegl::WlEglSurface>);
+pub struct EglSurface(Arc<wayland_egl::WlEglSurface>);
 
 impl std::fmt::Debug for EglSurface {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -128,7 +127,7 @@ impl Context {
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<Self, CreationError> {
         let egl_surface = unsafe {
-            wegl::WlEglSurface::new_from_raw(
+            wayland_egl::WlEglSurface::new_from_raw(
                 surface as *mut _,
                 width as i32,
                 height as i32,
