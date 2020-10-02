@@ -6,17 +6,25 @@
     target_os = "openbsd",
 ))]
 
+#[cfg(not(any(feature = "x11", feature = "wayland")))]
+compile_error!(
+    "at least one of the 'x11' or 'wayland' features must be enabled"
+);
+
 mod wayland;
 mod x11;
 
+#[cfg(feature = "x11")]
 use self::x11::X11Context;
 use crate::api::osmesa;
 use crate::{
     Api, ContextCurrentState, ContextError, CreationError, GlAttributes,
     NotCurrent, PixelFormat, PixelFormatRequirements, Rect,
 };
+#[cfg(feature = "x11")]
 pub use x11::utils as x11_utils;
 
+#[cfg(feature = "x11")]
 use crate::platform::unix::x11::XConnection;
 use crate::platform::unix::EventLoopWindowTargetExtUnix;
 use winit::dpi;
@@ -25,12 +33,14 @@ use winit::window::{Window, WindowBuilder};
 
 use std::marker::PhantomData;
 use std::os::raw;
+#[cfg(feature = "x11")]
 use std::sync::Arc;
 
 /// Context handles available on Unix-like platforms.
 #[derive(Clone, Debug)]
 pub enum RawHandle {
     /// Context handle for a glx context.
+    #[cfg(feature = "x11")]
     Glx(glutin_glx_sys::GLXContext),
     /// Context handle for a egl context.
     Egl(glutin_egl_sys::EGLContext),
@@ -38,14 +48,18 @@ pub enum RawHandle {
 
 #[derive(Debug)]
 pub enum ContextType {
+    #[cfg(feature = "x11")]
     X11,
+    #[cfg(feature = "wayland")]
     Wayland,
     OsMesa,
 }
 
 #[derive(Debug)]
 pub enum Context {
+    #[cfg(feature = "x11")]
     X11(x11::Context),
+    #[cfg(feature = "wayland")]
     Wayland(wayland::Context),
     OsMesa(osmesa::OsMesaContext),
 }
@@ -66,6 +80,7 @@ impl Context {
                         ));
                     }
                 },
+                #[cfg(feature = "x11")]
                 ContextType::X11 => match *c {
                     Context::X11(_) => Ok(()),
                     _ => {
@@ -75,6 +90,7 @@ impl Context {
                         ));
                     }
                 },
+                #[cfg(feature = "wayland")]
                 ContextType::Wayland => match *c {
                     Context::Wayland(_) => Ok(()),
                     _ => {
@@ -97,6 +113,7 @@ impl Context {
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<(Window, Self), CreationError> {
+        #[cfg(feature = "wayland")]
         if el.is_wayland() {
             Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
 
@@ -104,17 +121,20 @@ impl Context {
                 Context::Wayland(ref ctx) => ctx,
                 _ => unreachable!(),
             });
-            wayland::Context::new(wb, el, pf_reqs, &gl_attr)
-                .map(|(win, context)| (win, Context::Wayland(context)))
-        } else {
+            return wayland::Context::new(wb, el, pf_reqs, &gl_attr)
+                .map(|(win, context)| (win, Context::Wayland(context)));
+        }
+        #[cfg(feature = "x11")]
+        if el.is_x11() {
             Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
             let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
                 Context::X11(ref ctx) => ctx,
                 _ => unreachable!(),
             });
-            x11::Context::new(wb, el, pf_reqs, &gl_attr)
-                .map(|(win, context)| (win, Context::X11(context)))
+            return x11::Context::new(wb, el, pf_reqs, &gl_attr)
+                .map(|(win, context)| (win, Context::X11(context)));
         }
+        panic!("glutin was not compiled with support for this display server")
     }
 
     #[inline]
@@ -133,29 +153,37 @@ impl Context {
         gl_attr: &GlAttributes<&Context>,
         size: Option<dpi::PhysicalSize<u32>>,
     ) -> Result<Self, CreationError> {
+        #[cfg(feature = "wayland")]
         if el.is_wayland() {
             Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
             let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
                 Context::Wayland(ref ctx) => ctx,
                 _ => unreachable!(),
             });
-            wayland::Context::new_headless(&el, pf_reqs, &gl_attr, size)
-                .map(|ctx| Context::Wayland(ctx))
-        } else {
+            return wayland::Context::new_headless(
+                &el, pf_reqs, &gl_attr, size,
+            )
+            .map(|ctx| Context::Wayland(ctx));
+        }
+        #[cfg(feature = "x11")]
+        if el.is_x11() {
             Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
             let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
                 Context::X11(ref ctx) => ctx,
                 _ => unreachable!(),
             });
-            x11::Context::new_headless(&el, pf_reqs, &gl_attr, size)
-                .map(|ctx| Context::X11(ctx))
+            return x11::Context::new_headless(&el, pf_reqs, &gl_attr, size)
+                .map(|ctx| Context::X11(ctx));
         }
+        panic!("glutin was not compiled with support for this display server")
     }
 
     #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
         match *self {
+            #[cfg(feature = "x11")]
             Context::X11(ref ctx) => ctx.make_current(),
+            #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.make_current(),
             Context::OsMesa(ref ctx) => ctx.make_current(),
         }
@@ -164,7 +192,9 @@ impl Context {
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
         match *self {
+            #[cfg(feature = "x11")]
             Context::X11(ref ctx) => ctx.make_not_current(),
+            #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.make_not_current(),
             Context::OsMesa(ref ctx) => ctx.make_not_current(),
         }
@@ -173,7 +203,9 @@ impl Context {
     #[inline]
     pub fn is_current(&self) -> bool {
         match *self {
+            #[cfg(feature = "x11")]
             Context::X11(ref ctx) => ctx.is_current(),
+            #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.is_current(),
             Context::OsMesa(ref ctx) => ctx.is_current(),
         }
@@ -182,7 +214,9 @@ impl Context {
     #[inline]
     pub fn get_api(&self) -> Api {
         match *self {
+            #[cfg(feature = "x11")]
             Context::X11(ref ctx) => ctx.get_api(),
+            #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.get_api(),
             Context::OsMesa(ref ctx) => ctx.get_api(),
         }
@@ -191,10 +225,12 @@ impl Context {
     #[inline]
     pub unsafe fn raw_handle(&self) -> RawHandle {
         match *self {
+            #[cfg(feature = "x11")]
             Context::X11(ref ctx) => match *ctx.raw_handle() {
                 X11Context::Glx(ref ctx) => RawHandle::Glx(ctx.raw_handle()),
                 X11Context::Egl(ref ctx) => RawHandle::Egl(ctx.raw_handle()),
             },
+            #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => RawHandle::Egl(ctx.raw_handle()),
             Context::OsMesa(ref ctx) => RawHandle::Egl(ctx.raw_handle()),
         }
@@ -203,7 +239,9 @@ impl Context {
     #[inline]
     pub unsafe fn get_egl_display(&self) -> Option<*const raw::c_void> {
         match *self {
+            #[cfg(feature = "x11")]
             Context::X11(ref ctx) => ctx.get_egl_display(),
+            #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.get_egl_display(),
             _ => None,
         }
@@ -211,8 +249,11 @@ impl Context {
 
     #[inline]
     pub fn resize(&self, width: u32, height: u32) {
+        #![allow(unused)]
         match *self {
+            #[cfg(feature = "x11")]
             Context::X11(_) => (),
+            #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.resize(width, height),
             _ => unreachable!(),
         }
@@ -221,7 +262,9 @@ impl Context {
     #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
         match *self {
+            #[cfg(feature = "x11")]
             Context::X11(ref ctx) => ctx.get_proc_address(addr),
+            #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.get_proc_address(addr),
             Context::OsMesa(ref ctx) => ctx.get_proc_address(addr),
         }
@@ -230,7 +273,9 @@ impl Context {
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
         match *self {
+            #[cfg(feature = "x11")]
             Context::X11(ref ctx) => ctx.swap_buffers(),
+            #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.swap_buffers(),
             _ => unreachable!(),
         }
@@ -242,7 +287,9 @@ impl Context {
         rects: &[Rect],
     ) -> Result<(), ContextError> {
         match *self {
+            #[cfg(feature = "x11")]
             Context::X11(ref ctx) => ctx.swap_buffers_with_damage(rects),
+            #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.swap_buffers_with_damage(rects),
             _ => unreachable!(),
         }
@@ -251,7 +298,9 @@ impl Context {
     #[inline]
     pub fn swap_buffers_with_damage_supported(&self) -> bool {
         match *self {
+            #[cfg(feature = "x11")]
             Context::X11(ref ctx) => ctx.swap_buffers_with_damage_supported(),
+            #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => {
                 ctx.swap_buffers_with_damage_supported()
             }
@@ -262,7 +311,9 @@ impl Context {
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         match *self {
+            #[cfg(feature = "x11")]
             Context::X11(ref ctx) => ctx.get_pixel_format(),
+            #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.get_pixel_format(),
             _ => unreachable!(),
         }
@@ -359,6 +410,7 @@ pub trait RawContextExt {
     /// Unsafe behaviour might happen if you:
     ///   - Provide us with invalid parameters.
     ///   - The surface/display_ptr is destroyed before the context
+    #[cfg(feature = "wayland")]
     unsafe fn build_raw_wayland_context(
         self,
         display_ptr: *const wayland::wl_display,
@@ -374,6 +426,7 @@ pub trait RawContextExt {
     /// Unsafe behaviour might happen if you:
     ///   - Provide us with invalid parameters.
     ///   - The xwin is destroyed before the context
+    #[cfg(feature = "x11")]
     unsafe fn build_raw_x11_context(
         self,
         xconn: Arc<XConnection>,
@@ -387,6 +440,7 @@ impl<'a, T: ContextCurrentState> RawContextExt
     for crate::ContextBuilder<'a, T>
 {
     #[inline]
+    #[cfg(feature = "wayland")]
     unsafe fn build_raw_wayland_context(
         self,
         display_ptr: *const wayland::wl_display,
@@ -424,6 +478,7 @@ impl<'a, T: ContextCurrentState> RawContextExt
     }
 
     #[inline]
+    #[cfg(feature = "x11")]
     unsafe fn build_raw_x11_context(
         self,
         xconn: Arc<XConnection>,

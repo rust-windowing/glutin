@@ -10,6 +10,7 @@ use crate::platform::ContextTraitExt;
 pub use crate::platform_impl::{HeadlessContextExt, RawContextExt, RawHandle};
 use crate::{Context, ContextCurrentState};
 pub use glutin_egl_sys::EGLContext;
+#[cfg(feature = "x11")]
 pub use glutin_glx_sys::GLXContext;
 
 pub use winit::platform::unix::*;

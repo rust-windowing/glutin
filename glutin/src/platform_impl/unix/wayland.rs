@@ -1,3 +1,5 @@
+#![cfg(feature = "wayland")]
+
 use crate::api::egl::{
     Context as EglContext, NativeDisplay, SurfaceType as EglSurfaceType,
 };
