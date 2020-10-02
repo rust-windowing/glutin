@@ -1,5 +1,6 @@
 # Unreleased
 
+- Updated winit dependency to 0.23.0. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/blob/master/CHANGELOG.md#0230-2020-10-02) for more info.
 - Avoid loading libEGL.dll from PATH on Windows.
 
 # Version 0.24.1 (2020-05-26)
