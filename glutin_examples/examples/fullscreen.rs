@@ -24,7 +24,7 @@ fn main() {
         1 => Fullscreen::Exclusive(prompt_for_video_mode(&prompt_for_monitor(
             &el,
         ))),
-        2 => Fullscreen::Borderless(prompt_for_monitor(&el)),
+        2 => Fullscreen::Borderless(Some(prompt_for_monitor(&el))),
         _ => panic!("Please enter a valid number"),
     });
 
