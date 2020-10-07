@@ -863,6 +863,7 @@ pub struct ContextPrototype<'a> {
     target_os = "netbsd",
     target_os = "openbsd",
 ))]
+#[cfg(feature = "x11")]
 pub fn get_native_visual_id(
     display: ffi::egl::types::EGLDisplay,
     config_id: ffi::egl::types::EGLConfig,
@@ -894,6 +895,7 @@ impl<'a> ContextPrototype<'a> {
         target_os = "netbsd",
         target_os = "openbsd",
     ))]
+    #[cfg(feature = "x11")]
     pub fn get_native_visual_id(&self) -> ffi::egl::types::EGLint {
         get_native_visual_id(self.display, self.config_id)
     }

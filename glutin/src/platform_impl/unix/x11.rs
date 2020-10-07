@@ -1,3 +1,5 @@
+#![cfg(feature = "x11")]
+
 use crate::api::egl::{
     self, Context as EglContext, NativeDisplay, SurfaceType as EglSurfaceType,
     EGL,

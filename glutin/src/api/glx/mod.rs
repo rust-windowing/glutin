@@ -5,6 +5,7 @@
     target_os = "netbsd",
     target_os = "openbsd",
 ))]
+#![cfg(feature = "x11")]
 
 mod make_current_guard;
 mod glx {

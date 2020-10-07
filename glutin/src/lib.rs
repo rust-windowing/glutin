@@ -318,6 +318,7 @@ impl CreationError {
         target_os = "netbsd",
         target_os = "openbsd",
     ))]
+    #[cfg(feature = "x11")]
     pub(crate) fn append(self, err: CreationError) -> Self {
         match self {
             CreationError::CreationErrors(mut errs) => {
