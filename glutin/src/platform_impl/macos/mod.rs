@@ -150,6 +150,8 @@ impl Context {
     ) -> Result<Self, CreationError> {
         let gl_profile = helpers::get_gl_profile(gl_attr, pf_reqs)?;
         let attributes = helpers::build_nsattributes(pf_reqs, gl_profile)?;
+        let share_ctx = gl_attr.sharing.map_or(nil, |c| *c.get_id());
+
         let context = unsafe {
             let pixelformat = NSOpenGLPixelFormat::alloc(nil).initWithAttributes_(&attributes);
             if pixelformat == nil {
@@ -158,7 +160,7 @@ impl Context {
                 ));
             }
             let context =
-                NSOpenGLContext::alloc(nil).initWithFormat_shareContext_(pixelformat, nil);
+                NSOpenGLContext::alloc(nil).initWithFormat_shareContext_(pixelformat, share_ctx);
             if context == nil {
                 return Err(CreationError::OsError(
                     "Could not create the rendering context".to_string(),
