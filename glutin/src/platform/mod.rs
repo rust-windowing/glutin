@@ -30,7 +30,7 @@ pub mod desktop {
         target_os = "netbsd",
         target_os = "openbsd",
     ))]
-    pub use winit::platform::desktop::*;
+    pub use winit::platform::run_return::*;
 }
 
 use std::os::raw;
