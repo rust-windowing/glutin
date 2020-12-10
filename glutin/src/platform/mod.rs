@@ -19,8 +19,8 @@ pub mod macos;
 pub mod unix;
 /// Platform-specific methods for Windows.
 pub mod windows;
-/// Platform-specific methods for desktop operating systems.
-pub mod desktop {
+/// Platform-specific methods for event loops independent from the application lifetime.
+pub mod run_return {
     #![cfg(any(
         target_os = "windows",
         target_os = "macos",
@@ -29,6 +29,7 @@ pub mod desktop {
         target_os = "freebsd",
         target_os = "netbsd",
         target_os = "openbsd",
+        target_os = "android",
     ))]
     pub use winit::platform::run_return::*;
 }
