@@ -1,5 +1,9 @@
 # Unreleased
 
+# Version 0.26.0 (2020-12-10)
+
+- Updated winit dependency to 0.24.0. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/releases/tag/v0.24.0) for more info.
+
 # Version 0.25.1 (2020-10-10)
 
 - X11 and Wayland are now optional features (enabled by default)
