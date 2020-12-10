@@ -112,13 +112,7 @@ impl<T: ContextCurrentState> WindowedContext<T> {
     /// [`Window`]: struct.Window.html
     /// [`Context`]: struct.Context.html
     pub unsafe fn split(self) -> (RawContext<T>, Window) {
-        (
-            RawContext {
-                context: self.context,
-                window: (),
-            },
-            self.window,
-        )
+        (RawContext { context: self.context, window: () }, self.window)
     }
 }
 
@@ -146,10 +140,7 @@ impl<W> ContextWrapper<PossiblyCurrent, W> {
     /// next time the screen is refreshed. However drivers can choose to
     /// override your vsync settings, which means that you can't know in
     /// advance whether `swap_buffers` will block or not.
-    pub fn swap_buffers_with_damage(
-        &self,
-        rects: &[Rect],
-    ) -> Result<(), ContextError> {
+    pub fn swap_buffers_with_damage(&self, rects: &[Rect]) -> Result<(), ContextError> {
         self.context.context.swap_buffers_with_damage(rects)
     }
 
@@ -249,9 +240,7 @@ impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
         let window = self.window;
         match self.context.make_current() {
             Ok(context) => Ok(ContextWrapper { window, context }),
-            Err((context, err)) => {
-                Err((ContextWrapper { window, context }, err))
-            }
+            Err((context, err)) => Err((ContextWrapper { window, context }, err)),
         }
     }
 
@@ -267,9 +256,7 @@ impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
         let window = self.window;
         match self.context.make_not_current() {
             Ok(context) => Ok(ContextWrapper { window, context }),
-            Err((context, err)) => {
-                Err((ContextWrapper { window, context }, err))
-            }
+            Err((context, err)) => Err((ContextWrapper { window, context }, err)),
         }
     }
 
@@ -285,10 +272,7 @@ impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
     /// [`make_not_current`]: struct.ContextWrapper.html#method.make_not_current
     /// [`make_current`]: struct.ContextWrapper.html#method.make_current
     pub unsafe fn treat_as_not_current(self) -> ContextWrapper<NotCurrent, W> {
-        ContextWrapper {
-            context: self.context.treat_as_not_current(),
-            window: self.window,
-        }
+        ContextWrapper { context: self.context.treat_as_not_current(), window: self.window }
     }
 
     /// Treats this context as current, even if it is not current. We do no
@@ -305,10 +289,7 @@ impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
     /// [`NotCurrent`]: enum.NotCurrent.html
     /// [`Context`]: struct.Context.html
     pub unsafe fn treat_as_current(self) -> ContextWrapper<PossiblyCurrent, W> {
-        ContextWrapper {
-            context: self.context.treat_as_current(),
-            window: self.window,
-        }
+        ContextWrapper { context: self.context.treat_as_current(), window: self.window }
     }
 
     /// Returns true if this context is the current one in this thread.
@@ -357,14 +338,8 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     ) -> Result<WindowedContext<NotCurrent>, CreationError> {
         let ContextBuilder { pf_reqs, gl_attr } = self;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
-        platform_impl::Context::new_windowed(wb, el, &pf_reqs, &gl_attr).map(
-            |(window, context)| WindowedContext {
-                window,
-                context: Context {
-                    context,
-                    phantom: PhantomData,
-                },
-            },
-        )
+        platform_impl::Context::new_windowed(wb, el, &pf_reqs, &gl_attr).map(|(window, context)| {
+            WindowedContext { window, context: Context { context, phantom: PhantomData } }
+        })
     }
 }

@@ -194,10 +194,7 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
         self,
         other: &'a Context<T2>,
     ) -> ContextBuilder<'a, T2> {
-        ContextBuilder {
-            gl_attr: self.gl_attr.set_sharing(Some(other)),
-            pf_reqs: self.pf_reqs,
-        }
+        ContextBuilder { gl_attr: self.gl_attr.set_sharing(Some(other)), pf_reqs: self.pf_reqs }
     }
 
     /// Sets the multisampling level to request. A value of `0` indicates that
@@ -286,10 +283,7 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     ///   * Windows using EGL or WGL
     ///   * Android using EGL
     #[inline]
-    pub fn with_hardware_acceleration(
-        mut self,
-        acceleration: Option<bool>,
-    ) -> Self {
+    pub fn with_hardware_acceleration(mut self, acceleration: Option<bool>) -> Self {
         self.pf_reqs.hardware_accelerated = acceleration;
         self
     }
@@ -325,17 +319,13 @@ impl CreationError {
                 errs.push(Box::new(err));
                 CreationError::CreationErrors(errs)
             }
-            _ => CreationError::CreationErrors(vec![
-                Box::new(err),
-                Box::new(self),
-            ]),
+            _ => CreationError::CreationErrors(vec![Box::new(err), Box::new(self)]),
         }
     }
 
     fn to_string(&self) -> &str {
         match *self {
-            CreationError::OsError(ref text)
-            | CreationError::NotSupported(ref text) => &text,
+            CreationError::OsError(ref text) | CreationError::NotSupported(ref text) => &text,
             CreationError::NoBackendAvailable(_) => "No backend is available",
             CreationError::RobustnessNotSupported => {
                 "You requested robustness, but it is not supported."
@@ -347,19 +337,14 @@ impl CreationError {
                 "Couldn't find any pixel format that matches the criteria."
             }
             CreationError::PlatformSpecific(ref text) => &text,
-            CreationError::Window(ref err) => {
-                std::error::Error::description(err)
-            }
+            CreationError::Window(ref err) => std::error::Error::description(err),
             CreationError::CreationErrors(_) => "Received multiple errors.",
         }
     }
 }
 
 impl std::fmt::Display for CreationError {
-    fn fmt(
-        &self,
-        formatter: &mut std::fmt::Formatter,
-    ) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         formatter.write_str(self.to_string())?;
 
         if let CreationError::CreationErrors(ref es) = *self {
@@ -421,10 +406,7 @@ impl ContextError {
 }
 
 impl std::fmt::Display for ContextError {
-    fn fmt(
-        &self,
-        formatter: &mut std::fmt::Formatter,
-    ) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         formatter.write_str(self.to_string())
     }
 }
@@ -489,12 +471,8 @@ impl GlRequest {
     /// Extract the desktop GL version, if any.
     pub fn to_gl_version(&self) -> Option<(u8, u8)> {
         match self {
-            &GlRequest::Specific(Api::OpenGl, opengl_version) => {
-                Some(opengl_version)
-            }
-            &GlRequest::GlThenGles { opengl_version, .. } => {
-                Some(opengl_version)
-            }
+            &GlRequest::Specific(Api::OpenGl, opengl_version) => Some(opengl_version),
+            &GlRequest::GlThenGles { opengl_version, .. } => Some(opengl_version),
             _ => None,
         }
     }

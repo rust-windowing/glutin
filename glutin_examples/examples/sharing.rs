@@ -7,20 +7,12 @@ use glutin::window::WindowBuilder;
 use glutin::ContextBuilder;
 use support::{gl, ContextCurrentWrapper, ContextTracker, ContextWrapper};
 
-fn make_renderbuf(
-    gl: &support::Gl,
-    size: PhysicalSize<u32>,
-) -> gl::types::GLuint {
+fn make_renderbuf(gl: &support::Gl, size: PhysicalSize<u32>) -> gl::types::GLuint {
     let mut render_buf = 0;
     unsafe {
         gl.gl.GenRenderbuffers(1, &mut render_buf);
         gl.gl.BindRenderbuffer(gl::RENDERBUFFER, render_buf);
-        gl.gl.RenderbufferStorage(
-            gl::RENDERBUFFER,
-            gl::RGB8,
-            size.width as _,
-            size.height as _,
-        );
+        gl.gl.RenderbufferStorage(gl::RENDERBUFFER, gl::RGB8, size.width as _, size.height as _);
     }
 
     render_buf
@@ -32,24 +24,17 @@ fn main() {
 
     let mut ct = ContextTracker::default();
 
-    let headless_context = ContextBuilder::new()
-        .build_headless(&el, PhysicalSize::new(1, 1))
-        .unwrap();
+    let headless_context =
+        ContextBuilder::new().build_headless(&el, PhysicalSize::new(1, 1)).unwrap();
 
-    let wb = WindowBuilder::new()
-        .with_title("A fantastic window!")
-        .with_inner_size(size);
-    let windowed_context = ContextBuilder::new()
-        .with_shared_lists(&headless_context)
-        .build_windowed(wb, &el)
-        .unwrap();
+    let wb = WindowBuilder::new().with_title("A fantastic window!").with_inner_size(size);
+    let windowed_context =
+        ContextBuilder::new().with_shared_lists(&headless_context).build_windowed(wb, &el).unwrap();
 
-    let headless_id = ct.insert(ContextCurrentWrapper::NotCurrent(
-        ContextWrapper::Headless(headless_context),
-    ));
-    let windowed_id = ct.insert(ContextCurrentWrapper::NotCurrent(
-        ContextWrapper::Windowed(windowed_context),
-    ));
+    let headless_id =
+        ct.insert(ContextCurrentWrapper::NotCurrent(ContextWrapper::Headless(headless_context)));
+    let windowed_id =
+        ct.insert(ContextCurrentWrapper::NotCurrent(ContextWrapper::Windowed(windowed_context)));
 
     let windowed_context = ct.get_current(windowed_id).unwrap();
     println!(
@@ -127,26 +112,14 @@ fn main() {
                             size.width as _,
                             size.height as _,
                         );
-                        glw.gl.Viewport(
-                            0,
-                            0,
-                            size.width as _,
-                            size.height as _,
-                        );
+                        glw.gl.Viewport(0, 0, size.width as _, size.height as _);
                         std::mem::drop(windowed_context);
 
                         let _ = ct.get_current(headless_id).unwrap();
-                        glc.gl.Viewport(
-                            0,
-                            0,
-                            size.width as _,
-                            size.height as _,
-                        );
+                        glc.gl.Viewport(0, 0, size.width as _, size.height as _);
                     }
                 }
-                WindowEvent::CloseRequested => {
-                    *control_flow = ControlFlow::Exit
-                }
+                WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                 _ => (),
             },
             Event::RedrawRequested(_) => {

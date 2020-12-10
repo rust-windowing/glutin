@@ -15,8 +15,7 @@ fn main() {
             .write_bindings(gl_generator::StaticGenerator, &mut file)
             .unwrap();
 
-        let mut file =
-            File::create(&dest.join("wgl_extra_bindings.rs")).unwrap();
+        let mut file = File::create(&dest.join("wgl_extra_bindings.rs")).unwrap();
         Registry::new(
             Api::Wgl,
             (1, 0),

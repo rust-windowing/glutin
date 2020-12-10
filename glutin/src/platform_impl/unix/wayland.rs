@@ -1,11 +1,8 @@
 #![cfg(feature = "wayland")]
 
-use crate::api::egl::{
-    Context as EglContext, NativeDisplay, SurfaceType as EglSurfaceType,
-};
+use crate::api::egl::{Context as EglContext, NativeDisplay, SurfaceType as EglSurfaceType};
 use crate::{
-    ContextError, CreationError, GlAttributes, PixelFormat,
-    PixelFormatRequirements, Rect,
+    ContextError, CreationError, GlAttributes, PixelFormat, PixelFormatRequirements, Rect,
 };
 
 use crate::platform::unix::{EventLoopWindowTargetExtUnix, WindowExtUnix};
@@ -57,8 +54,7 @@ impl Context {
     ) -> Result<Self, CreationError> {
         let gl_attr = gl_attr.clone().map_sharing(|c| &**c);
         let display_ptr = el.wayland_display().unwrap() as *const _;
-        let native_display =
-            NativeDisplay::Wayland(Some(display_ptr as *const _));
+        let native_display = NativeDisplay::Wayland(Some(display_ptr as *const _));
         if let Some(size) = size {
             let context = EglContext::new(
                 pf_reqs,
@@ -102,20 +98,11 @@ impl Context {
         let surface = match surface {
             Some(s) => s,
             None => {
-                return Err(CreationError::NotSupported(
-                    "Wayland not found".to_string(),
-                ));
+                return Err(CreationError::NotSupported("Wayland not found".to_string()));
             }
         };
 
-        let context = Self::new_raw_context(
-            display_ptr,
-            surface,
-            width,
-            height,
-            pf_reqs,
-            gl_attr,
-        )?;
+        let context = Self::new_raw_context(display_ptr, surface, width, height, pf_reqs, gl_attr)?;
         Ok((win, context))
     }
 
@@ -129,27 +116,17 @@ impl Context {
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<Self, CreationError> {
         let egl_surface = unsafe {
-            wayland_egl::WlEglSurface::new_from_raw(
-                surface as *mut _,
-                width as i32,
-                height as i32,
-            )
+            wayland_egl::WlEglSurface::new_from_raw(surface as *mut _, width as i32, height as i32)
         };
         let context = {
             let gl_attr = gl_attr.clone().map_sharing(|c| &**c);
-            let native_display =
-                NativeDisplay::Wayland(Some(display_ptr as *const _));
-            EglContext::new(
-                pf_reqs,
-                &gl_attr,
-                native_display,
-                EglSurfaceType::Window,
-                |c, _| Ok(c[0]),
-            )
+            let native_display = NativeDisplay::Wayland(Some(display_ptr as *const _));
+            EglContext::new(pf_reqs, &gl_attr, native_display, EglSurfaceType::Window, |c, _| {
+                Ok(c[0])
+            })
             .and_then(|p| p.finish(egl_surface.ptr() as *const _))?
         };
-        let context =
-            Context::Windowed(context, EglSurface(Arc::new(egl_surface)));
+        let context = Context::Windowed(context, EglSurface(Arc::new(egl_surface)));
         Ok(context)
     }
 
@@ -186,9 +163,7 @@ impl Context {
     #[inline]
     pub fn resize(&self, width: u32, height: u32) {
         match self {
-            Context::Windowed(_, surface) => {
-                surface.0.resize(width as i32, height as i32, 0, 0)
-            }
+            Context::Windowed(_, surface) => surface.0.resize(width as i32, height as i32, 0, 0),
             _ => unreachable!(),
         }
     }
@@ -204,10 +179,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn swap_buffers_with_damage(
-        &self,
-        rects: &[Rect],
-    ) -> Result<(), ContextError> {
+    pub fn swap_buffers_with_damage(&self, rects: &[Rect]) -> Result<(), ContextError> {
         (**self).swap_buffers_with_damage(rects)
     }
 

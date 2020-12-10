@@ -34,8 +34,8 @@ impl<'a, 'b> CurrentContextGuard<'a, 'b> {
         }
 
         Ok(CurrentContextGuard {
-            previous_hdc: previous_hdc,
-            previous_hglrc: previous_hglrc,
+            previous_hdc,
+            previous_hglrc,
             marker1: PhantomData,
             marker2: PhantomData,
         })

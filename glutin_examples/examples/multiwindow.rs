@@ -14,10 +14,8 @@ fn main() {
     for index in 0..3 {
         let title = format!("Charming Window #{}", index + 1);
         let wb = WindowBuilder::new().with_title(title);
-        let windowed_context =
-            ContextBuilder::new().build_windowed(wb, &el).unwrap();
-        let windowed_context =
-            unsafe { windowed_context.make_current().unwrap() };
+        let windowed_context = ContextBuilder::new().build_windowed(wb, &el).unwrap();
+        let windowed_context = unsafe { windowed_context.make_current().unwrap() };
         let gl = support::load(&windowed_context.context());
         let window_id = windowed_context.window().id();
         let context_id = ct.insert(ContextCurrentWrapper::PossiblyCurrent(
@@ -32,18 +30,14 @@ fn main() {
             Event::LoopDestroyed => return,
             Event::WindowEvent { event, window_id } => match event {
                 WindowEvent::Resized(physical_size) => {
-                    let windowed_context =
-                        ct.get_current(windows[&window_id].0).unwrap();
+                    let windowed_context = ct.get_current(windows[&window_id].0).unwrap();
                     let windowed_context = windowed_context.windowed();
                     windowed_context.resize(physical_size);
                 }
                 WindowEvent::CloseRequested => {
                     if let Some((cid, _, _)) = windows.remove(&window_id) {
                         ct.remove(cid);
-                        println!(
-                            "Window with ID {:?} has been closed",
-                            window_id
-                        );
+                        println!("Window with ID {:?} has been closed", window_id);
                     }
                 }
                 _ => (),
