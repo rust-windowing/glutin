@@ -155,8 +155,8 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
             target_os = "openbsd",
         )),
         doc = "\
-    [`build_surfaceless`]: os/index.html
-    [`build_osmesa`]: os/index.html
+    [`build_surfaceless`]: platform/index.html\n\
+    [`build_osmesa`]: platform/index.html\
     "
     )]
     #[cfg_attr(
@@ -168,8 +168,8 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
             target_os = "openbsd",
         ),
         doc = "\
-    [`build_surfaceless`]: os/unix/trait.HeadlessContextExt.html#tymethod.build_surfaceless
-    [`build_osmesa`]: os/unix/trait.HeadlessContextExt.html#tymethod.build_osmesa
+    [`build_surfaceless`]: platform/unix/trait.HeadlessContextExt.html#tymethod.build_surfaceless\n\
+    [`build_osmesa`]: platform/unix/trait.HeadlessContextExt.html#tymethod.build_osmesa\
     "
     )]
     pub fn build_headless<TE>(
