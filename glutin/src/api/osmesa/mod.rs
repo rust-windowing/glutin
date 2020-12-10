@@ -11,8 +11,8 @@ pub mod ffi {
 }
 
 use crate::{
-    Api, ContextError, CreationError, GlAttributes, GlProfile, GlRequest,
-    PixelFormatRequirements, Robustness,
+    Api, ContextError, CreationError, GlAttributes, GlProfile, GlRequest, PixelFormatRequirements,
+    Robustness,
 };
 
 use winit::dpi;
@@ -33,10 +33,7 @@ struct NoEsOrWebGlSupported;
 
 impl std::fmt::Display for NoEsOrWebGlSupported {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        write!(
-            f,
-            "OsMesa only works with desktop OpenGL; OpenGL ES or WebGL are not supported"
-        )
+        write!(f, "OsMesa only works with desktop OpenGL; OpenGL ES or WebGL are not supported")
     }
 }
 
@@ -82,8 +79,7 @@ impl OsMesaContext {
         }
 
         match opengl.robustness {
-            Robustness::RobustNoResetNotification
-            | Robustness::RobustLoseContextOnReset => {
+            Robustness::RobustNoResetNotification | Robustness::RobustLoseContextOnReset => {
                 return Err(CreationError::RobustnessNotSupported.into());
             }
             _ => (),
@@ -114,16 +110,10 @@ impl OsMesaContext {
                 attribs.push(osmesa_sys::OSMESA_CONTEXT_MINOR_VERSION);
                 attribs.push(minor as raw::c_int);
             }
-            GlRequest::Specific(Api::OpenGlEs, _)
-            | GlRequest::Specific(Api::WebGl, _) => {
-                return Err(CreationError::NoBackendAvailable(Box::new(
-                    NoEsOrWebGlSupported,
-                )));
+            GlRequest::Specific(Api::OpenGlEs, _) | GlRequest::Specific(Api::WebGl, _) => {
+                return Err(CreationError::NoBackendAvailable(Box::new(NoEsOrWebGlSupported)));
             }
-            GlRequest::GlThenGles {
-                opengl_version: (major, minor),
-                ..
-            } => {
+            GlRequest::GlThenGles { opengl_version: (major, minor), .. } => {
                 attribs.push(osmesa_sys::OSMESA_CONTEXT_MAJOR_VERSION);
                 attribs.push(major as raw::c_int);
                 attribs.push(osmesa_sys::OSMESA_CONTEXT_MINOR_VERSION);
@@ -143,10 +133,8 @@ impl OsMesaContext {
                 .take((size.0 * size.1) as usize)
                 .collect(),
             context: unsafe {
-                let ctx = osmesa_sys::OSMesaCreateContextAttribs(
-                    attribs.as_ptr(),
-                    std::ptr::null_mut(),
-                );
+                let ctx =
+                    osmesa_sys::OSMesaCreateContextAttribs(attribs.as_ptr(), std::ptr::null_mut());
                 if ctx.is_null() {
                     return Err(CreationError::OsError(
                         "OSMesaCreateContextAttribs failed".to_string(),
@@ -188,13 +176,8 @@ impl OsMesaContext {
             // and seeing if it work.
             //
             // https://gitlab.freedesktop.org/mesa/mesa/merge_requests/533
-            let ret = osmesa_sys::OSMesaMakeCurrent(
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                0,
-                0,
-                0,
-            );
+            let ret =
+                osmesa_sys::OSMesaMakeCurrent(std::ptr::null_mut(), std::ptr::null_mut(), 0, 0, 0);
 
             if ret == 0 {
                 unimplemented!(
@@ -225,9 +208,7 @@ impl OsMesaContext {
     pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
         unsafe {
             let c_str = CString::new(addr.as_bytes().to_vec()).unwrap();
-            core::mem::transmute(osmesa_sys::OSMesaGetProcAddress(
-                c_str.as_ptr() as *mut _,
-            ))
+            core::mem::transmute(osmesa_sys::OSMesaGetProcAddress(c_str.as_ptr() as *mut _))
         }
     }
 }

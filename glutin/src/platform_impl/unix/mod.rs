@@ -7,9 +7,7 @@
 ))]
 
 #[cfg(not(any(feature = "x11", feature = "wayland")))]
-compile_error!(
-    "at least one of the 'x11' or 'wayland' features must be enabled"
-);
+compile_error!("at least one of the 'x11' or 'wayland' features must be enabled");
 
 mod wayland;
 mod x11;
@@ -18,8 +16,8 @@ mod x11;
 use self::x11::X11Context;
 use crate::api::osmesa;
 use crate::{
-    Api, ContextCurrentState, ContextError, CreationError, GlAttributes,
-    NotCurrent, PixelFormat, PixelFormatRequirements, Rect,
+    Api, ContextCurrentState, ContextError, CreationError, GlAttributes, NotCurrent, PixelFormat,
+    PixelFormatRequirements, Rect,
 };
 #[cfg(feature = "x11")]
 pub use x11::utils as x11_utils;
@@ -65,19 +63,14 @@ pub enum Context {
 }
 
 impl Context {
-    fn is_compatible(
-        c: &Option<&Context>,
-        ct: ContextType,
-    ) -> Result<(), CreationError> {
+    fn is_compatible(c: &Option<&Context>, ct: ContextType) -> Result<(), CreationError> {
         if let Some(c) = *c {
             match ct {
                 ContextType::OsMesa => match *c {
                     Context::OsMesa(_) => Ok(()),
                     _ => {
                         let msg = "Cannot share an OSMesa context with a non-OSMesa context";
-                        return Err(CreationError::PlatformSpecific(
-                            msg.into(),
-                        ));
+                        return Err(CreationError::PlatformSpecific(msg.into()));
                     }
                 },
                 #[cfg(feature = "x11")]
@@ -85,9 +78,7 @@ impl Context {
                     Context::X11(_) => Ok(()),
                     _ => {
                         let msg = "Cannot share an X11 context with a non-X11 context";
-                        return Err(CreationError::PlatformSpecific(
-                            msg.into(),
-                        ));
+                        return Err(CreationError::PlatformSpecific(msg.into()));
                     }
                 },
                 #[cfg(feature = "wayland")]
@@ -95,9 +86,7 @@ impl Context {
                     Context::Wayland(_) => Ok(()),
                     _ => {
                         let msg = "Cannot share a Wayland context with a non-Wayland context";
-                        return Err(CreationError::PlatformSpecific(
-                            msg.into(),
-                        ));
+                        return Err(CreationError::PlatformSpecific(msg.into()));
                     }
                 },
             }
@@ -160,10 +149,8 @@ impl Context {
                 Context::Wayland(ref ctx) => ctx,
                 _ => unreachable!(),
             });
-            return wayland::Context::new_headless(
-                &el, pf_reqs, &gl_attr, size,
-            )
-            .map(|ctx| Context::Wayland(ctx));
+            return wayland::Context::new_headless(&el, pf_reqs, &gl_attr, size)
+                .map(|ctx| Context::Wayland(ctx));
         }
         #[cfg(feature = "x11")]
         if el.is_x11() {
@@ -282,10 +269,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn swap_buffers_with_damage(
-        &self,
-        rects: &[Rect],
-    ) -> Result<(), ContextError> {
+    pub fn swap_buffers_with_damage(&self, rects: &[Rect]) -> Result<(), ContextError> {
         match *self {
             #[cfg(feature = "x11")]
             Context::X11(ref ctx) => ctx.swap_buffers_with_damage(rects),
@@ -301,9 +285,7 @@ impl Context {
             #[cfg(feature = "x11")]
             Context::X11(ref ctx) => ctx.swap_buffers_with_damage_supported(),
             #[cfg(feature = "wayland")]
-            Context::Wayland(ref ctx) => {
-                ctx.swap_buffers_with_damage_supported()
-            }
+            Context::Wayland(ref ctx) => ctx.swap_buffers_with_damage_supported(),
             _ => unreachable!(),
         }
     }
@@ -354,9 +336,7 @@ pub trait HeadlessContextExt {
         Self: Sized;
 }
 
-impl<'a, T: ContextCurrentState> HeadlessContextExt
-    for crate::ContextBuilder<'a, T>
-{
+impl<'a, T: ContextCurrentState> HeadlessContextExt for crate::ContextBuilder<'a, T> {
     #[inline]
     fn build_osmesa(
         self,
@@ -374,10 +354,7 @@ impl<'a, T: ContextCurrentState> HeadlessContextExt
         });
         osmesa::OsMesaContext::new(&pf_reqs, &gl_attr, size)
             .map(|context| Context::OsMesa(context))
-            .map(|context| crate::Context {
-                context,
-                phantom: PhantomData,
-            })
+            .map(|context| crate::Context { context, phantom: PhantomData })
     }
 
     #[inline]
@@ -390,12 +367,8 @@ impl<'a, T: ContextCurrentState> HeadlessContextExt
     {
         let crate::ContextBuilder { pf_reqs, gl_attr } = self;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
-        Context::new_headless_impl(el, &pf_reqs, &gl_attr, None).map(
-            |context| crate::Context {
-                context,
-                phantom: PhantomData,
-            },
-        )
+        Context::new_headless_impl(el, &pf_reqs, &gl_attr, None)
+            .map(|context| crate::Context { context, phantom: PhantomData })
     }
 }
 
@@ -436,9 +409,7 @@ pub trait RawContextExt {
         Self: Sized;
 }
 
-impl<'a, T: ContextCurrentState> RawContextExt
-    for crate::ContextBuilder<'a, T>
-{
+impl<'a, T: ContextCurrentState> RawContextExt for crate::ContextBuilder<'a, T> {
     #[inline]
     #[cfg(feature = "wayland")]
     unsafe fn build_raw_wayland_context(
@@ -458,23 +429,10 @@ impl<'a, T: ContextCurrentState> RawContextExt
             Context::Wayland(ref ctx) => ctx,
             _ => unreachable!(),
         });
-        wayland::Context::new_raw_context(
-            display_ptr,
-            surface,
-            width,
-            height,
-            &pf_reqs,
-            &gl_attr,
-        )
-        .map(|context| Context::Wayland(context))
-        .map(|context| crate::Context {
-            context,
-            phantom: PhantomData,
-        })
-        .map(|context| crate::RawContext {
-            context,
-            window: (),
-        })
+        wayland::Context::new_raw_context(display_ptr, surface, width, height, &pf_reqs, &gl_attr)
+            .map(|context| Context::Wayland(context))
+            .map(|context| crate::Context { context, phantom: PhantomData })
+            .map(|context| crate::RawContext { context, window: () })
     }
 
     #[inline]
@@ -496,13 +454,7 @@ impl<'a, T: ContextCurrentState> RawContextExt
         });
         x11::Context::new_raw_context(xconn, xwin, &pf_reqs, &gl_attr)
             .map(|context| Context::X11(context))
-            .map(|context| crate::Context {
-                context,
-                phantom: PhantomData,
-            })
-            .map(|context| crate::RawContext {
-                context,
-                window: (),
-            })
+            .map(|context| crate::Context { context, phantom: PhantomData })
+            .map(|context| crate::RawContext { context, window: () })
     }
 }

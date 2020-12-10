@@ -1,6 +1,5 @@
 use crate::{
-    CreationError, GlAttributes, GlProfile, GlRequest, PixelFormatRequirements,
-    ReleaseBehavior,
+    CreationError, GlAttributes, GlProfile, GlRequest, PixelFormatRequirements, ReleaseBehavior,
 };
 
 use cocoa::appkit::*;
@@ -53,13 +52,9 @@ pub fn get_gl_profile<T>(
         attributes[current_idx] = NSOpenGLPFAOpenGLProfile as u32;
         current_idx += 1;
 
-        for &profile in
-            &[NSOpenGLProfileVersion4_1Core, NSOpenGLProfileVersion3_2Core]
-        {
+        for &profile in &[NSOpenGLProfileVersion4_1Core, NSOpenGLProfileVersion3_2Core] {
             attributes[current_idx] = profile as u32;
-            let id = unsafe {
-                NSOpenGLPixelFormat::alloc(nil).initWithAttributes_(&attributes)
-            };
+            let id = unsafe { NSOpenGLPixelFormat::alloc(nil).initWithAttributes_(&attributes) };
             if id != nil {
                 unsafe { msg_send![id, release] }
                 return Ok(profile);

@@ -3,10 +3,7 @@ use glutin_glx_sys as ffi;
 
 use std::sync::Arc;
 
-pub fn get_visual_info_from_xid(
-    xconn: &Arc<XConnection>,
-    xid: ffi::VisualID,
-) -> ffi::XVisualInfo {
+pub fn get_visual_info_from_xid(xconn: &Arc<XConnection>, xid: ffi::VisualID) -> ffi::XVisualInfo {
     assert_ne!(xid, 0);
     let mut template: ffi::XVisualInfo = unsafe { std::mem::zeroed() };
     template.visualid = xid;
@@ -20,9 +17,7 @@ pub fn get_visual_info_from_xid(
             &mut num_visuals,
         )
     };
-    xconn
-        .check_errors()
-        .expect("Failed to call `XGetVisualInfo`");
+    xconn.check_errors().expect("Failed to call `XGetVisualInfo`");
     assert!(!vi.is_null());
     assert!(num_visuals == 1);
 

@@ -7,7 +7,6 @@
 //!  - `macos`
 //!  - `unix`
 //!  - `windows`
-//!
 
 /// Platform-specific methods for android.
 pub mod android;
@@ -19,7 +18,8 @@ pub mod macos;
 pub mod unix;
 /// Platform-specific methods for Windows.
 pub mod windows;
-/// Platform-specific methods for event loops independent from the application lifetime.
+/// Platform-specific methods for event loops independent from the application
+/// lifetime.
 pub mod run_return {
     #![cfg(any(
         target_os = "windows",

@@ -1,20 +1,15 @@
 #![cfg(target_os = "macos")]
 use crate::{
-    ContextError, CreationError, GlAttributes, PixelFormat,
-    PixelFormatRequirements, Rect, Robustness,
+    ContextError, CreationError, GlAttributes, PixelFormat, PixelFormatRequirements, Rect,
+    Robustness,
 };
 
-use cgl::{
-    kCGLCECrashOnRemovedFunctions, kCGLCPSurfaceOpacity, CGLEnable,
-    CGLSetParameter,
-};
+use cgl::{kCGLCECrashOnRemovedFunctions, kCGLCPSurfaceOpacity, CGLEnable, CGLSetParameter};
 use cocoa::appkit::{self, NSOpenGLContext, NSOpenGLPixelFormat};
 use cocoa::base::{id, nil};
 use cocoa::foundation::NSAutoreleasePool;
 use core_foundation::base::TCFType;
-use core_foundation::bundle::{
-    CFBundleGetBundleWithIdentifier, CFBundleGetFunctionPointerForName,
-};
+use core_foundation::bundle::{CFBundleGetBundleWithIdentifier, CFBundleGetFunctionPointerForName};
 use core_foundation::string::CFString;
 use objc::runtime::{BOOL, NO};
 
@@ -62,8 +57,7 @@ impl Context {
         let share_ctx = gl_attr.sharing.map_or(nil, |c| *c.get_id());
 
         match gl_attr.robustness {
-            Robustness::RobustNoResetNotification
-            | Robustness::RobustLoseContextOnReset => {
+            Robustness::RobustNoResetNotification | Robustness::RobustLoseContextOnReset => {
                 return Err(CreationError::RobustnessNotSupported);
             }
             _ => (),
@@ -74,18 +68,15 @@ impl Context {
         let gl_profile = helpers::get_gl_profile(gl_attr, pf_reqs)?;
         let attributes = helpers::build_nsattributes(pf_reqs, gl_profile)?;
         unsafe {
-            let pixel_format = IdRef::new(
-                NSOpenGLPixelFormat::alloc(nil)
-                    .initWithAttributes_(&attributes),
-            );
+            let pixel_format =
+                IdRef::new(NSOpenGLPixelFormat::alloc(nil).initWithAttributes_(&attributes));
             let pixel_format = match pixel_format.non_nil() {
                 None => return Err(CreationError::NoAvailablePixelFormat),
                 Some(pf) => pf,
             };
 
             let gl_context = IdRef::new(
-                NSOpenGLContext::alloc(nil)
-                    .initWithFormat_shareContext_(*pixel_format, share_ctx),
+                NSOpenGLContext::alloc(nil).initWithFormat_shareContext_(*pixel_format, share_ctx),
             );
             let gl_context = match gl_context.non_nil() {
                 Some(gl_context) => gl_context,
@@ -97,35 +88,28 @@ impl Context {
             };
 
             let pixel_format = {
-                let get_attr =
-                    |attrib: appkit::NSOpenGLPixelFormatAttribute| -> i32 {
-                        let mut value = 0;
-                        NSOpenGLPixelFormat::getValues_forAttribute_forVirtualScreen_(
+                let get_attr = |attrib: appkit::NSOpenGLPixelFormatAttribute| -> i32 {
+                    let mut value = 0;
+                    NSOpenGLPixelFormat::getValues_forAttribute_forVirtualScreen_(
                         *pixel_format,
                         &mut value,
                         attrib,
                         NSOpenGLContext::currentVirtualScreen(*gl_context),
                     );
-                        value
-                    };
+                    value
+                };
 
                 PixelFormat {
-                    hardware_accelerated: get_attr(
-                        appkit::NSOpenGLPFAAccelerated,
-                    ) != 0,
+                    hardware_accelerated: get_attr(appkit::NSOpenGLPFAAccelerated) != 0,
                     color_bits: (get_attr(appkit::NSOpenGLPFAColorSize)
                         - get_attr(appkit::NSOpenGLPFAAlphaSize))
                         as u8,
                     alpha_bits: get_attr(appkit::NSOpenGLPFAAlphaSize) as u8,
                     depth_bits: get_attr(appkit::NSOpenGLPFADepthSize) as u8,
-                    stencil_bits: get_attr(appkit::NSOpenGLPFAStencilSize)
-                        as u8,
+                    stencil_bits: get_attr(appkit::NSOpenGLPFAStencilSize) as u8,
                     stereoscopy: get_attr(appkit::NSOpenGLPFAStereo) != 0,
-                    double_buffer: get_attr(appkit::NSOpenGLPFADoubleBuffer)
-                        != 0,
-                    multisampling: if get_attr(appkit::NSOpenGLPFAMultisample)
-                        > 0
-                    {
+                    double_buffer: get_attr(appkit::NSOpenGLPFADoubleBuffer) != 0,
+                    multisampling: if get_attr(appkit::NSOpenGLPFAMultisample) > 0 {
                         Some(get_attr(appkit::NSOpenGLPFASamples) as u16)
                     } else {
                         None
@@ -150,15 +134,9 @@ impl Context {
                 );
             }
 
-            CGLEnable(
-                gl_context.CGLContextObj() as *mut _,
-                kCGLCECrashOnRemovedFunctions,
-            );
+            CGLEnable(gl_context.CGLContextObj() as *mut _, kCGLCECrashOnRemovedFunctions);
 
-            let context = WindowedContext {
-                context: gl_context,
-                pixel_format: pixel_format,
-            };
+            let context = WindowedContext { context: gl_context, pixel_format };
             Ok((win, Context::WindowedContext(context)))
         }
     }
@@ -173,15 +151,14 @@ impl Context {
         let gl_profile = helpers::get_gl_profile(gl_attr, pf_reqs)?;
         let attributes = helpers::build_nsattributes(pf_reqs, gl_profile)?;
         let context = unsafe {
-            let pixelformat = NSOpenGLPixelFormat::alloc(nil)
-                .initWithAttributes_(&attributes);
+            let pixelformat = NSOpenGLPixelFormat::alloc(nil).initWithAttributes_(&attributes);
             if pixelformat == nil {
                 return Err(CreationError::OsError(
                     "Could not create the pixel format".to_string(),
                 ));
             }
-            let context = NSOpenGLContext::alloc(nil)
-                .initWithFormat_shareContext_(pixelformat, nil);
+            let context =
+                NSOpenGLContext::alloc(nil).initWithFormat_shareContext_(pixelformat, nil);
             if context == nil {
                 return Err(CreationError::OsError(
                     "Could not create the rendering context".to_string(),
@@ -258,18 +235,11 @@ impl Context {
 
     pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
         let symbol_name: CFString = FromStr::from_str(addr).unwrap();
-        let framework_name: CFString =
-            FromStr::from_str("com.apple.opengl").unwrap();
-        let framework = unsafe {
-            CFBundleGetBundleWithIdentifier(
-                framework_name.as_concrete_TypeRef(),
-            )
-        };
+        let framework_name: CFString = FromStr::from_str("com.apple.opengl").unwrap();
+        let framework =
+            unsafe { CFBundleGetBundleWithIdentifier(framework_name.as_concrete_TypeRef()) };
         let symbol = unsafe {
-            CFBundleGetFunctionPointerForName(
-                framework,
-                symbol_name.as_concrete_TypeRef(),
-            )
+            CFBundleGetFunctionPointerForName(framework, symbol_name.as_concrete_TypeRef())
         };
         symbol as *const _
     }
@@ -290,13 +260,8 @@ impl Context {
     }
 
     #[inline]
-    pub fn swap_buffers_with_damage(
-        &self,
-        _rects: &[Rect],
-    ) -> Result<(), ContextError> {
-        Err(ContextError::OsError(
-            "buffer damage not suported".to_string(),
-        ))
+    pub fn swap_buffers_with_damage(&self, _rects: &[Rect]) -> Result<(), ContextError> {
+        Err(ContextError::OsError("buffer damage not suported".to_string()))
     }
 
     #[inline]
@@ -320,12 +285,8 @@ impl Context {
     #[inline]
     pub unsafe fn raw_handle(&self) -> *mut raw::c_void {
         match self {
-            Context::WindowedContext(c) => {
-                c.context.deref().CGLContextObj() as *mut _
-            }
-            Context::HeadlessContext(c) => {
-                c.context.deref().CGLContextObj() as *mut _
-            }
+            Context::WindowedContext(c) => c.context.deref().CGLContextObj() as *mut _,
+            Context::HeadlessContext(c) => c.context.deref().CGLContextObj() as *mut _,
         }
     }
 

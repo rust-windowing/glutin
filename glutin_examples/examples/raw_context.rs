@@ -48,17 +48,11 @@ mod this_example {
                     let size = win.inner_size();
                     let (width, height): (u32, u32) = size.into();
 
-                    let display_ptr =
-                        win.wayland_display().unwrap() as *const _;
+                    let display_ptr = win.wayland_display().unwrap() as *const _;
                     let surface = win.wayland_surface().unwrap();
 
                     let raw_context = ContextBuilder::new()
-                        .build_raw_wayland_context(
-                            display_ptr,
-                            surface,
-                            width,
-                            height,
-                        )
+                        .build_raw_wayland_context(display_ptr, surface, width, height)
                         .unwrap();
 
                     (raw_context, el)
@@ -85,9 +79,8 @@ File a PR if you are interested in implementing the latter.
                     let win = wb.build(&el).unwrap();
                     let xconn = el.xlib_xconnection().unwrap();
                     let xwindow = win.xlib_window().unwrap();
-                    let raw_context = ContextBuilder::new()
-                        .build_raw_x11_context(xconn, xwindow)
-                        .unwrap();
+                    let raw_context =
+                        ContextBuilder::new().build_raw_x11_context(xconn, xwindow).unwrap();
 
                     (raw_context, el)
                 }
@@ -96,13 +89,10 @@ File a PR if you are interested in implementing the latter.
             #[cfg(target_os = "windows")]
             unsafe {
                 let win = wb.build(&el).unwrap();
-                use glutin::platform::windows::{
-                    RawContextExt, WindowExtWindows,
-                };
+                use glutin::platform::windows::{RawContextExt, WindowExtWindows};
 
                 let hwnd = win.hwnd();
-                let raw_context =
-                    ContextBuilder::new().build_raw_context(hwnd).unwrap();
+                let raw_context = ContextBuilder::new().build_raw_context(hwnd).unwrap();
 
                 (raw_context, el)
             }
@@ -110,10 +100,7 @@ File a PR if you are interested in implementing the latter.
 
         let raw_context = unsafe { raw_context.make_current().unwrap() };
 
-        println!(
-            "Pixel format of the window's GL context: {:?}",
-            raw_context.get_pixel_format()
-        );
+        println!("Pixel format of the window's GL context: {:?}", raw_context.get_pixel_format());
 
         let gl = support::load(&*raw_context);
 
@@ -128,20 +115,12 @@ File a PR if you are interested in implementing the latter.
                     return;
                 }
                 Event::WindowEvent { event, .. } => match event {
-                    WindowEvent::Resized(physical_size) => {
-                        raw_context.resize(physical_size)
-                    }
-                    WindowEvent::CloseRequested => {
-                        *control_flow = ControlFlow::Exit
-                    }
+                    WindowEvent::Resized(physical_size) => raw_context.resize(physical_size),
+                    WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                     _ => (),
                 },
                 Event::RedrawRequested(_) => {
-                    gl.draw_frame(if transparency {
-                        [0.0; 4]
-                    } else {
-                        [1.0, 0.5, 0.7, 1.0]
-                    });
+                    gl.draw_frame(if transparency { [0.0; 4] } else { [1.0, 0.5, 0.7, 1.0] });
                     raw_context.swap_buffers().unwrap();
                 }
                 _ => (),

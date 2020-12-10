@@ -90,12 +90,6 @@ pub const RTLD_LAZY: raw::c_int = 0x001;
 pub const RTLD_GLOBAL: raw::c_int = 0x100;
 
 extern "C" {
-    pub fn dlopen(
-        filename: *const raw::c_char,
-        flag: raw::c_int,
-    ) -> *mut raw::c_void;
-    pub fn dlsym(
-        handle: *mut raw::c_void,
-        symbol: *const raw::c_char,
-    ) -> *mut raw::c_void;
+    pub fn dlopen(filename: *const raw::c_char, flag: raw::c_int) -> *mut raw::c_void;
+    pub fn dlsym(handle: *mut raw::c_void, symbol: *const raw::c_char) -> *mut raw::c_void;
 }

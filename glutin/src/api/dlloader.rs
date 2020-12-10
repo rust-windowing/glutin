@@ -33,11 +33,8 @@ impl<T: SymTrait> SymWrapper<T> {
         for path in lib_paths {
             // Avoid loading from PATH
             #[cfg(target_os = "windows")]
-            let lib = windows::Library::load_with_flags(
-                path,
-                LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
-            )
-            .map(From::from);
+            let lib = windows::Library::load_with_flags(path, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS)
+                .map(From::from);
 
             #[cfg(not(target_os = "windows"))]
             let lib = Library::new(path);
