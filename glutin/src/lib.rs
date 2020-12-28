@@ -30,7 +30,7 @@
 //! You can also produce headless [`Context`]s via the
 //! [`ContextBuilder::build_headless`] function.
 //!
-//! [`Window`]: struct.Window.html
+//! [`Window`]: window/struct.Window.html
 //! [`Context`]: struct.Context.html
 //! [`WindowedContext<T>`]: type.WindowedContext.html
 //! [`RawContext<T>`]: type.RawContext.html
