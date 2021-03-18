@@ -157,8 +157,11 @@ impl Context {
                     "Could not create the pixel format".to_string(),
                 ));
             }
+
+            let share_ctx = gl_attr.sharing.map_or(nil, |c| *c.get_id());
+
             let context =
-                NSOpenGLContext::alloc(nil).initWithFormat_shareContext_(pixelformat, nil);
+                NSOpenGLContext::alloc(nil).initWithFormat_shareContext_(pixelformat, share_ctx);
             if context == nil {
                 return Err(CreationError::OsError(
                     "Could not create the rendering context".to_string(),
