@@ -314,7 +314,7 @@ impl Context {
                     let builder = gl_attr.clone();
                     *builder_u = Some(builder.map_sharing(|c| match c.context {
                         X11Context::Glx(ref c) => c,
-                        _ => panic!(),
+                        _ => panic!("context already exists but is wrong type"),
                     }));
                     Ok(Prototype::Glx(GlxContext::new(
                         Arc::clone(&xconn),
@@ -330,7 +330,7 @@ impl Context {
                     let builder = gl_attr.clone();
                     *builder_u = Some(builder.map_sharing(|c| match c.context {
                         X11Context::Egl(ref c) => c,
-                        _ => panic!(),
+                        _ => panic!("context already exists but is wrong type"),
                     }));
                     let native_display = NativeDisplay::X11(Some(xconn.display as *const _));
                     Ok(Prototype::Egl(EglContext::new(
@@ -341,6 +341,21 @@ impl Context {
                         select_config,
                     )?))
                 };
+
+                // if there is already a context, just use that.
+                // this prevents the "context already exists but is wrong type" panics above.
+                if let Some(c) = gl_attr.sharing {
+                    match c.context {
+                        X11Context::Glx(_) => {
+                            GLX.as_ref().expect("found GLX context but GLX not loaded");
+                            return glx(builder_glx_u);
+                        }
+                        X11Context::Egl(_) => {
+                            EGL.as_ref().expect("found EGL context but EGL not loaded");
+                            return egl(builder_egl_u);
+                        }
+                    }
+                }
 
                 // force_prefer_unless_only does what it says on the tin, it
                 // forces only the prefered method to happen unless it's the
