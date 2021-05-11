@@ -14,6 +14,7 @@ use winapi::shared::windef::{HGLRC, HWND};
 use winit;
 use winit::dpi;
 use winit::event_loop::EventLoopWindowTarget;
+use winit::platform::windows::WindowBuilderExtWindows;
 use winit::window::{Window, WindowBuilder};
 
 use std::marker::PhantomData;
@@ -170,7 +171,10 @@ impl Context {
             _ => (),
         }
 
-        let wb = WindowBuilder::new().with_visible(false).with_inner_size(size);
+        let wb = WindowBuilder::new()
+            .with_visible(false)
+            .with_inner_size(size)
+            .with_drag_and_drop(false);
         Self::new_windowed(wb, &el, pf_reqs, gl_attr).map(|(win, context)| match context {
             Context::Egl(context) => Context::HiddenWindowEgl(win, context),
             Context::Wgl(context) => Context::HiddenWindowWgl(win, context),
