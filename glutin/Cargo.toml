@@ -50,7 +50,7 @@ features = [
 ]
 
 [target.'cfg(target_os = "windows")'.dependencies]
-libloading = "0.6.1"
+libloading = "0.7"
 glutin_wgl_sys = { version = "0.1.4", path = "../glutin_wgl_sys" }
 glutin_egl_sys = { version = "0.1.4", path = "../glutin_egl_sys" }
 parking_lot = "0.11"
@@ -59,7 +59,7 @@ parking_lot = "0.11"
 osmesa-sys = "0.1"
 wayland-client = { version = "0.28", features = ["dlopen"], optional = true }
 wayland-egl = { version = "0.28", optional = true }
-libloading = "0.6.1"
+libloading = "0.7"
 glutin_egl_sys = { version = "0.1.4", path = "../glutin_egl_sys" }
 glutin_glx_sys = { version = "0.1.6", path = "../glutin_glx_sys", optional = true }
 parking_lot = "0.11"
