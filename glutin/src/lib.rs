@@ -323,29 +323,29 @@ impl CreationError {
         }
     }
 
-    fn to_string(&self) -> &str {
-        match *self {
-            CreationError::OsError(ref text) | CreationError::NotSupported(ref text) => &text,
-            CreationError::NoBackendAvailable(_) => "No backend is available",
+    fn to_string(&self) -> String {
+        match self {
+            CreationError::OsError(text) | CreationError::NotSupported(text) => text.clone(),
+            CreationError::NoBackendAvailable(_) => "No backend is available".to_string(),
             CreationError::RobustnessNotSupported => {
-                "You requested robustness, but it is not supported."
+                "You requested robustness, but it is not supported.".to_string()
             }
             CreationError::OpenGlVersionNotSupported => {
-                "The requested OpenGL version is not supported."
+                "The requested OpenGL version is not supported.".to_string()
             }
             CreationError::NoAvailablePixelFormat => {
-                "Couldn't find any pixel format that matches the criteria."
+                "Couldn't find any pixel format that matches the criteria.".to_string()
             }
-            CreationError::PlatformSpecific(ref text) => &text,
-            CreationError::Window(ref err) => std::error::Error::description(err),
-            CreationError::CreationErrors(_) => "Received multiple errors.",
+            CreationError::PlatformSpecific(text) => text.clone(),
+            CreationError::Window(err) => err.to_string(),
+            CreationError::CreationErrors(_) => "Received multiple errors.".to_string(),
         }
     }
 }
 
 impl std::fmt::Display for CreationError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        formatter.write_str(self.to_string())?;
+        formatter.write_str(&self.to_string())?;
 
         if let CreationError::CreationErrors(ref es) = *self {
             use std::fmt::Debug;
@@ -362,10 +362,6 @@ impl std::fmt::Display for CreationError {
 }
 
 impl std::error::Error for CreationError {
-    fn description(&self) -> &str {
-        self.to_string()
-    }
-
     fn cause(&self) -> Option<&dyn std::error::Error> {
         match *self {
             CreationError::NoBackendAvailable(ref err) => Some(&**err),
@@ -394,28 +390,23 @@ pub enum ContextError {
 }
 
 impl ContextError {
-    fn to_string(&self) -> &str {
-        use std::error::Error;
-        match *self {
-            ContextError::OsError(ref string) => string,
-            ContextError::IoError(ref err) => err.description(),
-            ContextError::ContextLost => "Context lost",
-            ContextError::FunctionUnavailable => "Function unavailable",
+    fn to_string(&self) -> String {
+        match self {
+            ContextError::OsError(string) => string.to_string(),
+            ContextError::IoError(err) => err.to_string(),
+            ContextError::ContextLost => "Context lost".to_string(),
+            ContextError::FunctionUnavailable => "Function unavailable".to_string(),
         }
     }
 }
 
 impl std::fmt::Display for ContextError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        formatter.write_str(self.to_string())
+        formatter.write_str(&self.to_string())
     }
 }
 
-impl std::error::Error for ContextError {
-    fn description(&self) -> &str {
-        self.to_string()
-    }
-}
+impl std::error::Error for ContextError {}
 
 /// All APIs related to OpenGL that you can possibly get while using glutin.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
