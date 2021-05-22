@@ -147,7 +147,7 @@ where
 
     match lacks_what {
         Some(Ok(())) => (),
-        Some(Err(Lacks::Transparency)) => warn!(
+        Some(Err(Lacks::Transparency)) => log::warn!(
             "Glutin could not a find fb config with an alpha mask. Transparency may be broken."
         ),
         Some(Err(Lacks::XID)) => panic!(),
