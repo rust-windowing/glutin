@@ -27,15 +27,11 @@ pub mod utils;
 #[derive(Debug)]
 struct NoX11Connection;
 
-impl std::error::Error for NoX11Connection {
-    fn description(&self) -> &str {
-        "failed to get x11 connection"
-    }
-}
+impl std::error::Error for NoX11Connection {}
 
 impl std::fmt::Display for NoX11Connection {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.write_str(std::error::Error::description(self))
+        f.write_str("failed to get x11 connection")
     }
 }
 
