@@ -380,20 +380,14 @@ pub enum ContextError {
     FunctionUnavailable,
 }
 
-impl ContextError {
-    fn to_string(&self) -> String {
-        match self {
-            ContextError::OsError(string) => string.to_string(),
-            ContextError::IoError(err) => err.to_string(),
-            ContextError::ContextLost => "Context lost".to_string(),
-            ContextError::FunctionUnavailable => "Function unavailable".to_string(),
-        }
-    }
-}
-
 impl std::fmt::Display for ContextError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        formatter.write_str(&self.to_string())
+        match self {
+            ContextError::OsError(string) => write!(formatter, "{}", string),
+            ContextError::IoError(err) => write!(formatter, "{}", err),
+            ContextError::ContextLost => write!(formatter, "Context lost"),
+            ContextError::FunctionUnavailable => write!(formatter, "Function unavailable"),
+        }
     }
 }
 
