@@ -108,9 +108,11 @@ mod make_current_guard;
 
 pub use self::egl::Egl;
 use self::make_current_guard::MakeCurrentGuard;
+#[cfg(not(target_os = "windows"))]
+use crate::Rect;
 use crate::{
     Api, ContextError, CreationError, GlAttributes, GlRequest, PixelFormat,
-    PixelFormatRequirements, Rect, ReleaseBehavior, Robustness,
+    PixelFormatRequirements, ReleaseBehavior, Robustness,
 };
 
 use glutin_egl_sys as ffi;
@@ -612,6 +614,7 @@ impl Context {
     }
 
     #[inline]
+    #[cfg(not(target_os = "windows"))]
     pub fn swap_buffers_with_damage(&self, rects: &[Rect]) -> Result<(), ContextError> {
         let egl = EGL.as_ref().unwrap();
 
@@ -655,6 +658,7 @@ impl Context {
     }
 
     #[inline]
+    #[cfg(not(target_os = "windows"))]
     pub fn swap_buffers_with_damage_supported(&self) -> bool {
         let egl = EGL.as_ref().unwrap();
         egl.SwapBuffersWithDamageKHR.is_loaded()
@@ -1217,7 +1221,7 @@ where
             }
             value
         }};
-    };
+    }
 
     let desc = PixelFormat {
         hardware_accelerated: attrib!(egl, display, config_id, ffi::egl::CONFIG_CAVEAT)
