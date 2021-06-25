@@ -1,6 +1,6 @@
 # Unreleased
 
-- Fixed possible panic (OleInitialize failed! Result was: `RPC_E_CHANGED_MODE`) for headless contexts on Windows because of active drag-and-drop
+- On Windows, fixed a panic for headless contexts because of active drag-and-drop (OleInitialize failed! Result was: `RPC_E_CHANGED_MODE`)
 
 # Version 0.27.0 (2021-06-01)
 
