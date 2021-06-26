@@ -1,5 +1,7 @@
 # Unreleased
 
+- On Windows, fixed a panic for headless contexts because of active drag-and-drop (OleInitialize failed! Result was: `RPC_E_CHANGED_MODE`)
+
 # Version 0.27.0 (2021-06-01)
 
 - Updated winit dependency to 0.25.0. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/releases/tag/v0.25.0) for more info.
