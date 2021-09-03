@@ -1,7 +1,7 @@
 # glutin -  OpenGL, UTilities and INput
 A low-level library for OpenGL context creation, written in pure Rust.
 
-[![](https://meritbadge.herokuapp.com/glutin)](https://crates.io/crates/glutin)
+[![](https://img.shields.io/crates/v/glutin.svg)](https://crates.io/crates/glutin)
 [![Docs.rs](https://docs.rs/glutin/badge.svg)](https://docs.rs/glutin)
 
 ```toml
