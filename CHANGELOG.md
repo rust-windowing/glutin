@@ -1,3 +1,7 @@
+# Unreleased
+
+- On macOS, add support for sharing of headless contexts.
+
 # Version 0.28.0 (2021-12-02)
 
 - On Windows, fixed a panic for headless contexts because of active drag-and-drop (OleInitialize failed! Result was: `RPC_E_CHANGED_MODE`)
