@@ -21,7 +21,7 @@ Join us in any of these:
 
 ## Usage Examples
 
-Warning: these are examples for master. For the [atest released version](https://github.com/rust-windowing/glutin/releases/tag/v0.27.0)
+Warning: these are examples for master. For the [latest released version](https://github.com/rust-windowing/glutin/releases/tag/v0.27.0)
 
 ### Try it!
 
