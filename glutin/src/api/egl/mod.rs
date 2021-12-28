@@ -176,8 +176,8 @@ pub struct Context {
     surface: Option<Mutex<ffi::egl::types::EGLSurface>>,
     api: Api,
     pixel_format: PixelFormat,
-    #[cfg(target_os = "android")]
-    config_id: ffi::egl::types::EGLConfig,
+    // #[cfg(target_os = "android")]
+    // config_id: ffi::egl::types::EGLConfig,
 }
 
 #[cfg(target_os = "android")]
@@ -541,47 +541,47 @@ impl Context {
     // Android has started the activity or sent it to foreground.
     // Create a new surface and attach it to the recreated ANativeWindow.
     // Restore the EGLContext.
-    #[cfg(target_os = "android")]
-    pub unsafe fn on_surface_created(&self, nwin: ffi::EGLNativeWindowType) {
-        let egl = EGL.as_ref().unwrap();
-        let mut surface = self.surface.as_ref().unwrap().lock();
-        if *surface != ffi::egl::NO_SURFACE {
-            return;
-        }
-        *surface = egl.CreateWindowSurface(self.display, self.config_id, nwin, std::ptr::null());
-        if surface.is_null() {
-            panic!("on_surface_created: eglCreateWindowSurface failed with 0x{:x}", egl.GetError())
-        }
-        let ret = egl.MakeCurrent(self.display, *surface, *surface, self.context);
-        if ret == 0 {
-            panic!("on_surface_created: eglMakeCurrent failed with 0x{:x}", egl.GetError())
-        }
-    }
+    // #[cfg(target_os = "android")]
+    // pub unsafe fn on_surface_created(&self, nwin: ffi::EGLNativeWindowType) {
+    //     let egl = EGL.as_ref().unwrap();
+    //     let mut surface = self.surface.as_ref().unwrap().lock();
+    //     if *surface != ffi::egl::NO_SURFACE {
+    //         return;
+    //     }
+    //     *surface = egl.CreateWindowSurface(self.display, self.config_id, nwin, std::ptr::null());
+    //     if surface.is_null() {
+    //         panic!("on_surface_created: eglCreateWindowSurface failed with 0x{:x}", egl.GetError())
+    //     }
+    //     let ret = egl.MakeCurrent(self.display, *surface, *surface, self.context);
+    //     if ret == 0 {
+    //         panic!("on_surface_created: eglMakeCurrent failed with 0x{:x}", egl.GetError())
+    //     }
+    // }
 
     // Handle Android Life Cycle.
     // Android has stopped the activity or sent it to background.
     // Release the surface attached to the destroyed ANativeWindow.
     // The EGLContext is not destroyed so it can be restored later.
-    #[cfg(target_os = "android")]
-    pub unsafe fn on_surface_destroyed(&self) {
-        let egl = EGL.as_ref().unwrap();
-        let mut surface = self.surface.as_ref().unwrap().lock();
-        if *surface == ffi::egl::NO_SURFACE {
-            return;
-        }
-        let ret = egl.MakeCurrent(
-            self.display,
-            ffi::egl::NO_SURFACE,
-            ffi::egl::NO_SURFACE,
-            ffi::egl::NO_CONTEXT,
-        );
-        if ret == 0 {
-            panic!("on_surface_destroyed: eglMakeCurrent failed with 0x{:x}", egl.GetError())
-        }
+    // #[cfg(target_os = "android")]
+    // pub unsafe fn on_surface_destroyed(&self) {
+    //     let egl = EGL.as_ref().unwrap();
+    //     let mut surface = self.surface.as_ref().unwrap().lock();
+    //     if *surface == ffi::egl::NO_SURFACE {
+    //         return;
+    //     }
+    //     let ret = egl.MakeCurrent(
+    //         self.display,
+    //         ffi::egl::NO_SURFACE,
+    //         ffi::egl::NO_SURFACE,
+    //         ffi::egl::NO_CONTEXT,
+    //     );
+    //     if ret == 0 {
+    //         panic!("on_surface_destroyed: eglMakeCurrent failed with 0x{:x}", egl.GetError())
+    //     }
 
-        egl.DestroySurface(self.display, *surface);
-        *surface = ffi::egl::NO_SURFACE;
-    }
+    //     egl.DestroySurface(self.display, *surface);
+    //     *surface = ffi::egl::NO_SURFACE;
+    // }
 
     #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
@@ -991,8 +991,8 @@ impl<'a> ContextPrototype<'a> {
             surface: surface.map(|s| Mutex::new(s)),
             api: self.api,
             pixel_format: self.pixel_format,
-            #[cfg(target_os = "android")]
-            config_id: self.config_id,
+            // #[cfg(target_os = "android")]
+            // config_id: self.config_id,
         })
     }
 }
