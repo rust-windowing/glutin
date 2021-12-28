@@ -5,6 +5,7 @@
     target_os = "netbsd",
     target_os = "openbsd",
 ))]
+#![cfg(feature = "x11")]
 
 mod make_current_guard;
 mod glx {
@@ -21,13 +22,9 @@ mod glx {
     impl SymTrait for ffi::glx::Glx {
         fn load_with(lib: &libloading::Library) -> Self {
             Self::load_with(|sym| unsafe {
-                lib.get(
-                    std::ffi::CString::new(sym.as_bytes())
-                        .unwrap()
-                        .as_bytes_with_nul(),
-                )
-                .map(|sym| *sym)
-                .unwrap_or(std::ptr::null_mut())
+                lib.get(std::ffi::CString::new(sym.as_bytes()).unwrap().as_bytes_with_nul())
+                    .map(|sym| *sym)
+                    .unwrap_or(std::ptr::null_mut())
             })
         }
     }
@@ -58,8 +55,8 @@ mod glx {
 pub use self::glx::Glx;
 use self::make_current_guard::MakeCurrentGuard;
 use crate::{
-    Api, ContextError, CreationError, GlAttributes, GlProfile, GlRequest,
-    PixelFormat, PixelFormatRequirements, ReleaseBehavior, Robustness,
+    Api, ContextError, CreationError, GlAttributes, GlProfile, GlRequest, PixelFormat,
+    PixelFormatRequirements, ReleaseBehavior, Robustness,
 };
 
 use crate::platform::unix::x11::XConnection;
@@ -112,14 +109,7 @@ impl Context {
 
         // finding the pixel format we want
         let (fb_config, pixel_format, visual_infos) = unsafe {
-            choose_fbconfig(
-                &extensions,
-                &xconn,
-                screen_id,
-                pf_reqs,
-                surface_type,
-                transparent,
-            )?
+            choose_fbconfig(&extensions, &xconn, screen_id, pf_reqs, surface_type, transparent)?
         };
 
         Ok(ContextPrototype {
@@ -132,16 +122,10 @@ impl Context {
         })
     }
 
-    unsafe fn check_make_current(
-        &self,
-        ret: Option<i32>,
-    ) -> Result<(), ContextError> {
+    unsafe fn check_make_current(&self, ret: Option<i32>) -> Result<(), ContextError> {
         if ret == Some(0) {
             let err = self.xconn.check_errors();
-            Err(ContextError::OsError(format!(
-                "`glXMakeCurrent` failed: {:?}",
-                err
-            )))
+            Err(ContextError::OsError(format!("`glXMakeCurrent` failed: {:?}", err)))
         } else {
             Ok(())
         }
@@ -150,25 +134,15 @@ impl Context {
     #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
         let glx = GLX.as_ref().unwrap();
-        let res = glx.MakeCurrent(
-            self.xconn.display as *mut _,
-            self.drawable,
-            self.context,
-        );
+        let res = glx.MakeCurrent(self.xconn.display as *mut _, self.drawable, self.context);
         self.check_make_current(Some(res))
     }
 
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
         let glx = GLX.as_ref().unwrap();
-        if self.drawable == glx.GetCurrentDrawable()
-            || self.context == glx.GetCurrentContext()
-        {
-            let res = glx.MakeCurrent(
-                self.xconn.display as *mut _,
-                0,
-                std::ptr::null(),
-            );
+        if self.drawable == glx.GetCurrentDrawable() || self.context == glx.GetCurrentContext() {
+            let res = glx.MakeCurrent(self.xconn.display as *mut _, 0, std::ptr::null());
             self.check_make_current(Some(res))
         } else {
             self.check_make_current(None)
@@ -206,10 +180,7 @@ impl Context {
             glx.SwapBuffers(self.xconn.display as *mut _, self.drawable);
         }
         if let Err(err) = self.xconn.check_errors() {
-            Err(ContextError::OsError(format!(
-                "`glXSwapBuffers` failed: {:?}",
-                err
-            )))
+            Err(ContextError::OsError(format!("`glXSwapBuffers` failed: {:?}", err)))
         } else {
             Ok(())
         }
@@ -229,15 +200,13 @@ impl Drop for Context {
         let glx = GLX.as_ref().unwrap();
         unsafe {
             // See `drop` for `crate::api::egl::Context` for rationale.
-            let mut guard =
-                MakeCurrentGuard::new(&self.xconn, self.drawable, self.context)
-                    .map_err(|err| ContextError::OsError(err))
-                    .unwrap();
+            let mut guard = MakeCurrentGuard::new(&self.xconn, self.drawable, self.context)
+                .map_err(|err| ContextError::OsError(err))
+                .unwrap();
 
             let gl_finish_fn = self.get_proc_address("glFinish");
             assert!(gl_finish_fn != std::ptr::null());
-            let gl_finish_fn =
-                std::mem::transmute::<_, extern "system" fn()>(gl_finish_fn);
+            let gl_finish_fn = std::mem::transmute::<_, extern "system" fn()>(gl_finish_fn);
             gl_finish_fn();
 
             if guard.old_context() == Some(self.context) {
@@ -267,9 +236,7 @@ impl<'a> ContextPrototype<'a> {
     }
 
     // creating GL context
-    fn create_context(
-        &self,
-    ) -> Result<(ffi::glx_extra::Glx, ffi::GLXContext), CreationError> {
+    fn create_context(&self) -> Result<(ffi::glx_extra::Glx, ffi::GLXContext), CreationError> {
         let glx = GLX.as_ref().unwrap();
         let share = match self.opengl.sharing {
             Some(ctx) => ctx.context,
@@ -279,9 +246,7 @@ impl<'a> ContextPrototype<'a> {
         // loading the extra GLX functions
         let extra_functions = ffi::glx_extra::Glx::load_with(|proc_name| {
             let c_str = CString::new(proc_name).unwrap();
-            unsafe {
-                glx.GetProcAddress(c_str.as_ptr() as *const u8) as *const _
-            }
+            unsafe { glx.GetProcAddress(c_str.as_ptr() as *const u8) as *const _ }
         });
 
         let context = match self.opengl.version {
@@ -355,10 +320,7 @@ impl<'a> ContextPrototype<'a> {
                 &self.visual_infos,
             )?,
             GlRequest::Specific(_, _) => panic!("Only OpenGL is supported"),
-            GlRequest::GlThenGles {
-                opengl_version: (major, minor),
-                ..
-            } => create_context(
+            GlRequest::GlThenGles { opengl_version: (major, minor), .. } => create_context(
                 &extra_functions,
                 &self.extensions,
                 &self.xconn.xlib,
@@ -376,10 +338,7 @@ impl<'a> ContextPrototype<'a> {
         Ok((extra_functions, context))
     }
 
-    pub fn finish_pbuffer(
-        self,
-        size: dpi::PhysicalSize<u32>,
-    ) -> Result<Context, CreationError> {
+    pub fn finish_pbuffer(self, size: dpi::PhysicalSize<u32>) -> Result<Context, CreationError> {
         let glx = GLX.as_ref().unwrap();
         let size: (u32, u32) = size.into();
         let (_extra_functions, context) = self.create_context()?;
@@ -393,11 +352,7 @@ impl<'a> ContextPrototype<'a> {
         ];
 
         let pbuffer = unsafe {
-            glx.CreatePbuffer(
-                self.xconn.display as *mut _,
-                self.fb_config,
-                attributes.as_ptr(),
-            )
+            glx.CreatePbuffer(self.xconn.display as *mut _, self.fb_config, attributes.as_ptr())
         };
 
         Ok(Context {
@@ -423,11 +378,7 @@ impl<'a> ContextPrototype<'a> {
         {
             // this should be the most common extension
             unsafe {
-                extra_functions.SwapIntervalEXT(
-                    self.xconn.display as *mut _,
-                    window,
-                    swap_mode,
-                );
+                extra_functions.SwapIntervalEXT(self.xconn.display as *mut _, window, swap_mode);
             }
 
             let mut swap = unsafe { std::mem::zeroed() };
@@ -473,10 +424,7 @@ impl<'a> ContextPrototype<'a> {
     }
 }
 
-extern "C" fn x_error_callback(
-    _dpy: *mut ffi::Display,
-    _err: *mut ffi::XErrorEvent,
-) -> i32 {
+extern "C" fn x_error_callback(_dpy: *mut ffi::Display, _err: *mut ffi::XErrorEvent) -> i32 {
     0
 }
 
@@ -499,11 +447,9 @@ fn create_context(
         let context = if check_ext(extensions, "GLX_ARB_create_context") {
             let mut attributes = Vec::with_capacity(9);
 
-            attributes
-                .push(ffi::glx_extra::CONTEXT_MAJOR_VERSION_ARB as raw::c_int);
+            attributes.push(ffi::glx_extra::CONTEXT_MAJOR_VERSION_ARB as raw::c_int);
             attributes.push(version.0 as raw::c_int);
-            attributes
-                .push(ffi::glx_extra::CONTEXT_MINOR_VERSION_ARB as raw::c_int);
+            attributes.push(ffi::glx_extra::CONTEXT_MINOR_VERSION_ARB as raw::c_int);
             attributes.push(version.1 as raw::c_int);
 
             if let Some(profile) = profile {
@@ -511,14 +457,10 @@ fn create_context(
                     GlProfile::Compatibility => {
                         ffi::glx_extra::CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB
                     }
-                    GlProfile::Core => {
-                        ffi::glx_extra::CONTEXT_CORE_PROFILE_BIT_ARB
-                    }
+                    GlProfile::Core => ffi::glx_extra::CONTEXT_CORE_PROFILE_BIT_ARB,
                 };
 
-                attributes.push(
-                    ffi::glx_extra::CONTEXT_PROFILE_MASK_ARB as raw::c_int,
-                );
+                attributes.push(ffi::glx_extra::CONTEXT_PROFILE_MASK_ARB as raw::c_int);
                 attributes.push(flag as raw::c_int);
             }
 
@@ -531,28 +473,24 @@ fn create_context(
                         Robustness::RobustNoResetNotification
                         | Robustness::TryRobustNoResetNotification => {
                             attributes.push(
-                                ffi::glx_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB as raw::c_int,
-                            );
-                            attributes.push(
-                                ffi::glx_extra::NO_RESET_NOTIFICATION_ARB
+                                ffi::glx_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB
                                     as raw::c_int,
                             );
-                            flags = flags
-                                | ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB
-                                    as raw::c_int;
+                            attributes
+                                .push(ffi::glx_extra::NO_RESET_NOTIFICATION_ARB as raw::c_int);
+                            flags =
+                                flags | ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as raw::c_int;
                         }
                         Robustness::RobustLoseContextOnReset
                         | Robustness::TryRobustLoseContextOnReset => {
                             attributes.push(
-                                ffi::glx_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB as raw::c_int,
-                            );
-                            attributes.push(
-                                ffi::glx_extra::LOSE_CONTEXT_ON_RESET_ARB
+                                ffi::glx_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB
                                     as raw::c_int,
                             );
-                            flags = flags
-                                | ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB
-                                    as raw::c_int;
+                            attributes
+                                .push(ffi::glx_extra::LOSE_CONTEXT_ON_RESET_ARB as raw::c_int);
+                            flags =
+                                flags | ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as raw::c_int;
                         }
                         Robustness::NotRobust => (),
                         Robustness::NoError => (),
@@ -568,8 +506,7 @@ fn create_context(
                 }
 
                 if debug {
-                    flags = flags
-                        | ffi::glx_extra::CONTEXT_DEBUG_BIT_ARB as raw::c_int;
+                    flags = flags | ffi::glx_extra::CONTEXT_DEBUG_BIT_ARB as raw::c_int;
                 }
 
                 flags
@@ -589,21 +526,14 @@ fn create_context(
             )
         } else {
             let visual_infos: *const ffi::XVisualInfo = visual_infos;
-            glx.CreateContext(
-                display as *mut _,
-                visual_infos as *mut _,
-                share,
-                1,
-            )
+            glx.CreateContext(display as *mut _, visual_infos as *mut _, share, 1)
         };
 
         (xlib.XSetErrorHandler)(old_callback);
 
         if context.is_null() {
             // TODO: check for errors and return `OpenGlVersionNotSupported`
-            return Err(CreationError::OsError(
-                "GL context creation failed".to_string(),
-            ));
+            return Err(CreationError::OsError("GL context creation failed".to_string()));
         }
 
         Ok(context)
@@ -618,10 +548,7 @@ unsafe fn choose_fbconfig(
     pf_reqs: &PixelFormatRequirements,
     surface_type: SurfaceType,
     transparent: Option<bool>,
-) -> Result<
-    (ffi::glx::types::GLXFBConfig, PixelFormat, ffi::XVisualInfo),
-    CreationError,
-> {
+) -> Result<(ffi::glx::types::GLXFBConfig, PixelFormat, ffi::XVisualInfo), CreationError> {
     let glx = GLX.as_ref().unwrap();
 
     let descriptor = {
@@ -632,9 +559,7 @@ unsafe fn choose_fbconfig(
 
         if let Some(xid) = pf_reqs.x11_visual_xid {
             // getting the visual infos
-            let fvi = crate::platform_impl::x11_utils::get_visual_info_from_xid(
-                &xconn, xid,
-            );
+            let fvi = crate::platform_impl::x11_utils::get_visual_info_from_xid(&xconn, xid);
 
             out.push(ffi::glx::X_VISUAL_TYPE as raw::c_int);
             out.push(fvi.class as raw::c_int);
@@ -671,13 +596,9 @@ unsafe fn choose_fbconfig(
             out.push(ffi::glx::RED_SIZE as raw::c_int);
             out.push((color / 3) as raw::c_int);
             out.push(ffi::glx::GREEN_SIZE as raw::c_int);
-            out.push(
-                (color / 3 + if color % 3 != 0 { 1 } else { 0 }) as raw::c_int,
-            );
+            out.push((color / 3 + if color % 3 != 0 { 1 } else { 0 }) as raw::c_int);
             out.push(ffi::glx::BLUE_SIZE as raw::c_int);
-            out.push(
-                (color / 3 + if color % 3 == 2 { 1 } else { 0 }) as raw::c_int,
-            );
+            out.push((color / 3 + if color % 3 == 2 { 1 } else { 0 }) as raw::c_int);
         }
 
         if let Some(alpha) = pf_reqs.alpha_bits {
@@ -715,14 +636,10 @@ unsafe fn choose_fbconfig(
 
         if pf_reqs.srgb {
             if check_ext(extensions, "GLX_ARB_framebuffer_sRGB") {
-                out.push(
-                    ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as raw::c_int,
-                );
+                out.push(ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as raw::c_int);
                 out.push(1);
             } else if check_ext(extensions, "GLX_EXT_framebuffer_sRGB") {
-                out.push(
-                    ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as raw::c_int,
-                );
+                out.push(ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as raw::c_int);
                 out.push(1);
             } else {
                 return Err(CreationError::NoAvailablePixelFormat);
@@ -733,14 +650,8 @@ unsafe fn choose_fbconfig(
             ReleaseBehavior::Flush => (),
             ReleaseBehavior::None => {
                 if check_ext(extensions, "GLX_ARB_context_flush_control") {
-                    out.push(
-                        ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_ARB
-                            as raw::c_int,
-                    );
-                    out.push(
-                        ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_NONE_ARB
-                            as raw::c_int,
-                    );
+                    out.push(ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_ARB as raw::c_int);
+                    out.push(ffi::glx_extra::CONTEXT_RELEASE_BEHAVIOR_NONE_ARB as raw::c_int);
                 }
             }
         }
@@ -753,10 +664,7 @@ unsafe fn choose_fbconfig(
     };
 
     // calling glXChooseFBConfig
-    let (fb_config, visual_infos): (
-        ffi::glx::types::GLXFBConfig,
-        ffi::XVisualInfo,
-    ) = {
+    let (fb_config, visual_infos): (ffi::glx::types::GLXFBConfig, ffi::XVisualInfo) = {
         let mut num_configs = 0;
         let configs = glx.ChooseFBConfig(
             xconn.display as *mut _,
@@ -786,8 +694,7 @@ unsafe fn choose_fbconfig(
                     return None;
                 }
 
-                let visual_infos: ffi::XVisualInfo =
-                    std::ptr::read(visual_infos_raw as *const _);
+                let visual_infos: ffi::XVisualInfo = std::ptr::read(visual_infos_raw as *const _);
                 (xconn.xlib.XFree)(visual_infos_raw as *mut _);
                 Some(visual_infos)
             },
@@ -808,12 +715,7 @@ unsafe fn choose_fbconfig(
 
     let get_attrib = |attrib: raw::c_int| -> i32 {
         let mut value = 0;
-        glx.GetFBConfigAttrib(
-            xconn.display as *mut _,
-            fb_config,
-            attrib,
-            &mut value,
-        );
+        glx.GetFBConfigAttrib(xconn.display as *mut _, fb_config, attrib, &mut value);
         // TODO: check return value
         value
     };
@@ -829,19 +731,13 @@ unsafe fn choose_fbconfig(
         stencil_bits: get_attrib(ffi::glx::STENCIL_SIZE as raw::c_int) as u8,
         stereoscopy: get_attrib(ffi::glx::STEREO as raw::c_int) != 0,
         double_buffer: get_attrib(ffi::glx::DOUBLEBUFFER as raw::c_int) != 0,
-        multisampling: if get_attrib(ffi::glx::SAMPLE_BUFFERS as raw::c_int)
-            != 0
-        {
+        multisampling: if get_attrib(ffi::glx::SAMPLE_BUFFERS as raw::c_int) != 0 {
             Some(get_attrib(ffi::glx::SAMPLES as raw::c_int) as u16)
         } else {
             None
         },
-        srgb: get_attrib(
-            ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as raw::c_int,
-        ) != 0
-            || get_attrib(
-                ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as raw::c_int,
-            ) != 0,
+        srgb: get_attrib(ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as raw::c_int) != 0
+            || get_attrib(ffi::glx_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as raw::c_int) != 0,
     };
 
     Ok((fb_config, pf_desc, visual_infos))
@@ -858,12 +754,10 @@ fn load_extensions(
 ) -> Result<String, CreationError> {
     unsafe {
         let glx = GLX.as_ref().unwrap();
-        let extensions =
-            glx.QueryExtensionsString(xconn.display as *mut _, screen_id);
+        let extensions = glx.QueryExtensionsString(xconn.display as *mut _, screen_id);
         if extensions.is_null() {
             return Err(CreationError::OsError(
-                "`glXQueryExtensionsString` found no glX extensions"
-                    .to_string(),
+                "`glXQueryExtensionsString` found no glX extensions".to_string(),
             ));
         }
         let extensions = CStr::from_ptr(extensions).to_bytes().to_vec();

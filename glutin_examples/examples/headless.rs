@@ -3,8 +3,7 @@ mod support;
 use glutin::dpi::PhysicalSize;
 use glutin::event_loop::EventLoop;
 use glutin::{
-    Context, ContextBuilder, ContextCurrentState, CreationError, GlProfile,
-    GlRequest, NotCurrent,
+    Context, ContextBuilder, ContextCurrentState, CreationError, GlProfile, GlRequest, NotCurrent,
 };
 use std::path::Path;
 use support::gl;
@@ -78,9 +77,7 @@ fn build_context<T1: ContextCurrentState>(
 }
 
 fn main() {
-    let cb = ContextBuilder::new()
-        .with_gl_profile(GlProfile::Core)
-        .with_gl(GlRequest::Latest);
+    let cb = ContextBuilder::new().with_gl_profile(GlProfile::Core).with_gl(GlRequest::Latest);
     let size = PhysicalSize::new(768., 480.);
 
     let (headless_context, _el) = build_context(cb).unwrap();
@@ -102,12 +99,7 @@ fn main() {
         // to have a different code path.
         gl.gl.GenRenderbuffers(1, &mut render_buf);
         gl.gl.BindRenderbuffer(gl::RENDERBUFFER, render_buf);
-        gl.gl.RenderbufferStorage(
-            gl::RENDERBUFFER,
-            gl::RGB8,
-            size.width as _,
-            size.height as _,
-        );
+        gl.gl.RenderbufferStorage(gl::RENDERBUFFER, gl::RGB8, size.width as _, size.height as _);
         gl.gl.GenFramebuffers(1, &mut fb);
         gl.gl.BindFramebuffer(gl::FRAMEBUFFER, fb);
         gl.gl.FramebufferRenderbuffer(

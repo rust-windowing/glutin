@@ -1,13 +1,11 @@
 #![cfg(target_os = "windows")]
 
 use crate::{
-    Api, ContextCurrentState, ContextError, CreationError, GlAttributes,
-    GlRequest, NotCurrent, PixelFormat, PixelFormatRequirements, Rect,
+    Api, ContextCurrentState, ContextError, CreationError, GlAttributes, GlRequest, NotCurrent,
+    PixelFormat, PixelFormatRequirements, Rect,
 };
 
-use crate::api::egl::{
-    Context as EglContext, NativeDisplay, SurfaceType as EglSurfaceType, EGL,
-};
+use crate::api::egl::{Context as EglContext, NativeDisplay, SurfaceType as EglSurfaceType, EGL};
 use crate::api::wgl::Context as WglContext;
 use crate::platform::windows::WindowExtWindows;
 
@@ -16,6 +14,7 @@ use winapi::shared::windef::{HGLRC, HWND};
 use winit;
 use winit::dpi;
 use winit::event_loop::EventLoopWindowTarget;
+use winit::platform::windows::WindowBuilderExtWindows;
 use winit::window::{Window, WindowBuilder};
 
 use std::marker::PhantomData;
@@ -72,26 +71,22 @@ impl Context {
                     (Some(&Context::HiddenWindowWgl(_, _)), _)
                     | (Some(&Context::Wgl(_)), _)
                     | (None, None) => {
-                        let gl_attr_wgl =
-                            gl_attr.clone().map_sharing(|ctx| match *ctx {
-                                Context::HiddenWindowWgl(_, ref c)
-                                | Context::Wgl(ref c) => c.get_hglrc(),
-                                _ => unreachable!(),
-                            });
-                        unsafe {
-                            WglContext::new(&pf_reqs, &gl_attr_wgl, hwnd)
-                                .map(Context::Wgl)
-                        }
+                        let gl_attr_wgl = gl_attr.clone().map_sharing(|ctx| match *ctx {
+                            Context::HiddenWindowWgl(_, ref c) | Context::Wgl(ref c) => {
+                                c.get_hglrc()
+                            }
+                            _ => unreachable!(),
+                        });
+                        unsafe { WglContext::new(&pf_reqs, &gl_attr_wgl, hwnd).map(Context::Wgl) }
                     }
                     // We must use EGL.
                     (Some(_), Some(_)) => {
-                        let gl_attr_egl =
-                            gl_attr.clone().map_sharing(|ctx| match *ctx {
-                                Context::Egl(ref c)
-                                | Context::EglPbuffer(ref c)
-                                | Context::HiddenWindowEgl(_, ref c) => c,
-                                _ => unreachable!(),
-                            });
+                        let gl_attr_egl = gl_attr.clone().map_sharing(|ctx| match *ctx {
+                            Context::Egl(ref c)
+                            | Context::EglPbuffer(ref c)
+                            | Context::HiddenWindowEgl(_, ref c) => c,
+                            _ => unreachable!(),
+                        });
 
                         EglContext::new(
                             &pf_reqs,
@@ -105,10 +100,8 @@ impl Context {
                     }
                     // Try EGL, fallback to WGL.
                     (None, Some(_)) => {
-                        let gl_attr_egl =
-                            gl_attr.clone().map_sharing(|_| unreachable!());
-                        let gl_attr_wgl =
-                            gl_attr.clone().map_sharing(|_| unreachable!());
+                        let gl_attr_egl = gl_attr.clone().map_sharing(|_| unreachable!());
+                        let gl_attr_wgl = gl_attr.clone().map_sharing(|_| unreachable!());
 
                         if let Ok(c) = EglContext::new(
                             &pf_reqs,
@@ -122,8 +115,7 @@ impl Context {
                             Ok(Context::Egl(c))
                         } else {
                             unsafe {
-                                WglContext::new(&pf_reqs, &gl_attr_wgl, hwnd)
-                                    .map(Context::Wgl)
+                                WglContext::new(&pf_reqs, &gl_attr_wgl, hwnd).map(Context::Wgl)
                             }
                         }
                     }
@@ -131,16 +123,11 @@ impl Context {
                 }
             }
             _ => {
-                let gl_attr_wgl =
-                    gl_attr.clone().map_sharing(|ctx| match *ctx {
-                        Context::HiddenWindowWgl(_, ref c)
-                        | Context::Wgl(ref c) => c.get_hglrc(),
-                        _ => panic!(),
-                    });
-                unsafe {
-                    WglContext::new(&pf_reqs, &gl_attr_wgl, hwnd)
-                        .map(Context::Wgl)
-                }
+                let gl_attr_wgl = gl_attr.clone().map_sharing(|ctx| match *ctx {
+                    Context::HiddenWindowWgl(_, ref c) | Context::Wgl(ref c) => c.get_hglrc(),
+                    _ => panic!(),
+                });
+                unsafe { WglContext::new(&pf_reqs, &gl_attr_wgl, hwnd).map(Context::Wgl) }
             }
         }
     }
@@ -159,13 +146,12 @@ impl Context {
             | (Some(&Context::Egl(_)), Some(_))
             | (Some(&Context::HiddenWindowEgl(_, _)), Some(_))
             | (Some(&Context::EglPbuffer(_)), Some(_)) => {
-                let gl_attr_egl =
-                    gl_attr.clone().map_sharing(|ctx| match *ctx {
-                        Context::Egl(ref c)
-                        | Context::EglPbuffer(ref c)
-                        | Context::HiddenWindowEgl(_, ref c) => c,
-                        _ => unreachable!(),
-                    });
+                let gl_attr_egl = gl_attr.clone().map_sharing(|ctx| match *ctx {
+                    Context::Egl(ref c)
+                    | Context::EglPbuffer(ref c)
+                    | Context::HiddenWindowEgl(_, ref c) => c,
+                    _ => unreachable!(),
+                });
 
                 let native_display = NativeDisplay::Other(None);
                 let context = EglContext::new(
@@ -187,13 +173,12 @@ impl Context {
 
         let wb = WindowBuilder::new()
             .with_visible(false)
-            .with_inner_size(size);
-        Self::new_windowed(wb, &el, pf_reqs, gl_attr).map(|(win, context)| {
-            match context {
-                Context::Egl(context) => Context::HiddenWindowEgl(win, context),
-                Context::Wgl(context) => Context::HiddenWindowWgl(win, context),
-                _ => unreachable!(),
-            }
+            .with_inner_size(size)
+            .with_drag_and_drop(false);
+        Self::new_windowed(wb, &el, pf_reqs, gl_attr).map(|(win, context)| match context {
+            Context::Egl(context) => Context::HiddenWindowEgl(win, context),
+            Context::Wgl(context) => Context::HiddenWindowWgl(win, context),
+            _ => unreachable!(),
         })
     }
 
@@ -205,9 +190,7 @@ impl Context {
     #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
         match *self {
-            Context::Wgl(ref c) | Context::HiddenWindowWgl(_, ref c) => {
-                c.make_current()
-            }
+            Context::Wgl(ref c) | Context::HiddenWindowWgl(_, ref c) => c.make_current(),
             Context::Egl(ref c)
             | Context::HiddenWindowEgl(_, ref c)
             | Context::EglPbuffer(ref c) => c.make_current(),
@@ -217,9 +200,7 @@ impl Context {
     #[inline]
     pub unsafe fn make_not_current(&self) -> Result<(), ContextError> {
         match *self {
-            Context::Wgl(ref c) | Context::HiddenWindowWgl(_, ref c) => {
-                c.make_not_current()
-            }
+            Context::Wgl(ref c) | Context::HiddenWindowWgl(_, ref c) => c.make_not_current(),
             Context::Egl(ref c)
             | Context::HiddenWindowEgl(_, ref c)
             | Context::EglPbuffer(ref c) => c.make_not_current(),
@@ -229,9 +210,7 @@ impl Context {
     #[inline]
     pub fn is_current(&self) -> bool {
         match *self {
-            Context::Wgl(ref c) | Context::HiddenWindowWgl(_, ref c) => {
-                c.is_current()
-            }
+            Context::Wgl(ref c) | Context::HiddenWindowWgl(_, ref c) => c.is_current(),
             Context::Egl(ref c)
             | Context::HiddenWindowEgl(_, ref c)
             | Context::EglPbuffer(ref c) => c.is_current(),
@@ -241,9 +220,7 @@ impl Context {
     #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
         match *self {
-            Context::Wgl(ref c) | Context::HiddenWindowWgl(_, ref c) => {
-                c.get_proc_address(addr)
-            }
+            Context::Wgl(ref c) | Context::HiddenWindowWgl(_, ref c) => c.get_proc_address(addr),
             Context::Egl(ref c)
             | Context::HiddenWindowEgl(_, ref c)
             | Context::EglPbuffer(ref c) => c.get_proc_address(addr),
@@ -260,13 +237,8 @@ impl Context {
     }
 
     #[inline]
-    pub fn swap_buffers_with_damage(
-        &self,
-        rects: &[Rect],
-    ) -> Result<(), ContextError> {
-        Err(ContextError::OsError(
-            "buffer damage not suported".to_string(),
-        ))
+    pub fn swap_buffers_with_damage(&self, _rects: &[Rect]) -> Result<(), ContextError> {
+        Err(ContextError::OsError("buffer damage not suported".to_string()))
     }
 
     #[inline]
@@ -277,9 +249,7 @@ impl Context {
     #[inline]
     pub fn get_api(&self) -> Api {
         match *self {
-            Context::Wgl(ref c) | Context::HiddenWindowWgl(_, ref c) => {
-                c.get_api()
-            }
+            Context::Wgl(ref c) | Context::HiddenWindowWgl(_, ref c) => c.get_api(),
             Context::Egl(ref c)
             | Context::HiddenWindowEgl(_, ref c)
             | Context::EglPbuffer(ref c) => c.get_api(),
@@ -332,9 +302,7 @@ pub trait RawContextExt {
         Self: Sized;
 }
 
-impl<'a, T: ContextCurrentState> RawContextExt
-    for crate::ContextBuilder<'a, T>
-{
+impl<'a, T: ContextCurrentState> RawContextExt for crate::ContextBuilder<'a, T> {
     #[inline]
     unsafe fn build_raw_context(
         self,
@@ -346,13 +314,7 @@ impl<'a, T: ContextCurrentState> RawContextExt
         let crate::ContextBuilder { pf_reqs, gl_attr } = self;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
         Context::new_raw_context(hwnd as *mut _, &pf_reqs, &gl_attr)
-            .map(|context| crate::Context {
-                context,
-                phantom: PhantomData,
-            })
-            .map(|context| crate::RawContext {
-                context,
-                window: (),
-            })
+            .map(|context| crate::Context { context, phantom: PhantomData })
+            .map(|context| crate::RawContext { context, window: () })
     }
 }

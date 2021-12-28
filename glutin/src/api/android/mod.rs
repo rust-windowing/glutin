@@ -1,12 +1,8 @@
 #![cfg(target_os = "android")]
 
-use crate::api::egl::{
-    Context as EglContext, NativeDisplay, SurfaceType as EglSurfaceType,
-};
+use crate::api::egl::{Context as EglContext, NativeDisplay, SurfaceType as EglSurfaceType};
 use crate::CreationError::{self, OsError};
-use crate::{
-    Api, ContextError, GlAttributes, PixelFormat, PixelFormatRequirements, Rect,
-};
+use crate::{Api, ContextError, GlAttributes, PixelFormat, PixelFormatRequirements, Rect};
 
 //use crate::platform::android::EventLoopExtAndroid;
 use glutin_egl_sys as ffi;
@@ -61,25 +57,17 @@ impl Context {
     ) -> Result<(winit::window::Window, Self), CreationError> {
         let win = wb.build(el)?;
         let gl_attr = gl_attr.clone().map_sharing(|c| &c.0.egl_context);
-        let nwin = unsafe { ndk_glue::native_window() };
+        let nwin = ndk_glue::native_window();
         if nwin.is_none() {
             return Err(OsError("Android's native window is null".to_string()));
         }
         let native_display = NativeDisplay::Android;
-        let egl_context = EglContext::new(
-            pf_reqs,
-            &gl_attr,
-            native_display,
-            EglSurfaceType::Window,
-            |c, _| Ok(c[0]),
-        )
-        .and_then(|p| {
-            p.finish(nwin.as_ref().unwrap().ptr().as_ptr() as *const _)
-        })?;
-        let ctx = Arc::new(AndroidContext {
-            egl_context,
-            stopped: Some(Mutex::new(false)),
-        });
+        let egl_context =
+            EglContext::new(pf_reqs, &gl_attr, native_display, EglSurfaceType::Window, |c, _| {
+                Ok(c[0])
+            })
+            .and_then(|p| p.finish(nwin.as_ref().unwrap().ptr().as_ptr() as *const _))?;
+        let ctx = Arc::new(AndroidContext { egl_context, stopped: Some(Mutex::new(false)) });
 
         // TODO: With `ndk-glue` we cannot directly register handlers in such manner, so we want work around it in different way.
 
@@ -125,10 +113,7 @@ impl Context {
             |c, _| Ok(c[0]),
         )?;
         let egl_context = context.finish_pbuffer(size)?;
-        let ctx = Arc::new(AndroidContext {
-            egl_context,
-            stopped: None,
-        });
+        let ctx = Arc::new(AndroidContext { egl_context, stopped: None });
         Ok(Context(ctx))
     }
 
@@ -181,10 +166,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn swap_buffers_with_damage(
-        &self,
-        rects: &[Rect],
-    ) -> Result<(), ContextError> {
+    pub fn swap_buffers_with_damage(&self, rects: &[Rect]) -> Result<(), ContextError> {
         if let Some(ref stopped) = self.0.stopped {
             let stopped = stopped.lock();
             if *stopped {

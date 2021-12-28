@@ -30,7 +30,7 @@
 //! You can also produce headless [`Context`]s via the
 //! [`ContextBuilder::build_headless`] function.
 //!
-//! [`Window`]: struct.Window.html
+//! [`Window`]: window/struct.Window.html
 //! [`Context`]: struct.Context.html
 //! [`WindowedContext<T>`]: type.WindowedContext.html
 //! [`RawContext<T>`]: type.RawContext.html
@@ -84,15 +84,6 @@ extern crate lazy_static;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 #[macro_use]
 extern crate objc;
-#[cfg(any(
-    target_os = "linux",
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-))]
-#[macro_use]
-extern crate log;
 
 pub mod platform;
 
@@ -194,10 +185,7 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
         self,
         other: &'a Context<T2>,
     ) -> ContextBuilder<'a, T2> {
-        ContextBuilder {
-            gl_attr: self.gl_attr.set_sharing(Some(other)),
-            pf_reqs: self.pf_reqs,
-        }
+        ContextBuilder { gl_attr: self.gl_attr.set_sharing(Some(other)), pf_reqs: self.pf_reqs }
     }
 
     /// Sets the multisampling level to request. A value of `0` indicates that
@@ -286,10 +274,7 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     ///   * Windows using EGL or WGL
     ///   * Android using EGL
     #[inline]
-    pub fn with_hardware_acceleration(
-        mut self,
-        acceleration: Option<bool>,
-    ) -> Self {
+    pub fn with_hardware_acceleration(mut self, acceleration: Option<bool>) -> Self {
         self.pf_reqs.hardware_accelerated = acceleration;
         self
     }
@@ -318,48 +303,40 @@ impl CreationError {
         target_os = "netbsd",
         target_os = "openbsd",
     ))]
+    #[cfg(feature = "x11")]
     pub(crate) fn append(self, err: CreationError) -> Self {
         match self {
             CreationError::CreationErrors(mut errs) => {
                 errs.push(Box::new(err));
                 CreationError::CreationErrors(errs)
             }
-            _ => CreationError::CreationErrors(vec![
-                Box::new(err),
-                Box::new(self),
-            ]),
+            _ => CreationError::CreationErrors(vec![Box::new(err), Box::new(self)]),
         }
     }
 
-    fn to_string(&self) -> &str {
-        match *self {
-            CreationError::OsError(ref text)
-            | CreationError::NotSupported(ref text) => &text,
-            CreationError::NoBackendAvailable(_) => "No backend is available",
+    fn to_string(&self) -> String {
+        match self {
+            CreationError::OsError(text) | CreationError::NotSupported(text) => text.clone(),
+            CreationError::NoBackendAvailable(_) => "No backend is available".to_string(),
             CreationError::RobustnessNotSupported => {
-                "You requested robustness, but it is not supported."
+                "You requested robustness, but it is not supported.".to_string()
             }
             CreationError::OpenGlVersionNotSupported => {
-                "The requested OpenGL version is not supported."
+                "The requested OpenGL version is not supported.".to_string()
             }
             CreationError::NoAvailablePixelFormat => {
-                "Couldn't find any pixel format that matches the criteria."
+                "Couldn't find any pixel format that matches the criteria.".to_string()
             }
-            CreationError::PlatformSpecific(ref text) => &text,
-            CreationError::Window(ref err) => {
-                std::error::Error::description(err)
-            }
-            CreationError::CreationErrors(_) => "Received multiple errors.",
+            CreationError::PlatformSpecific(text) => text.clone(),
+            CreationError::Window(err) => err.to_string(),
+            CreationError::CreationErrors(_) => "Received multiple errors.".to_string(),
         }
     }
 }
 
 impl std::fmt::Display for CreationError {
-    fn fmt(
-        &self,
-        formatter: &mut std::fmt::Formatter,
-    ) -> Result<(), std::fmt::Error> {
-        formatter.write_str(self.to_string())?;
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        formatter.write_str(&self.to_string())?;
 
         if let CreationError::CreationErrors(ref es) = *self {
             use std::fmt::Debug;
@@ -376,10 +353,6 @@ impl std::fmt::Display for CreationError {
 }
 
 impl std::error::Error for CreationError {
-    fn description(&self) -> &str {
-        self.to_string()
-    }
-
     fn cause(&self) -> Option<&dyn std::error::Error> {
         match *self {
             CreationError::NoBackendAvailable(ref err) => Some(&**err),
@@ -407,32 +380,18 @@ pub enum ContextError {
     FunctionUnavailable,
 }
 
-impl ContextError {
-    fn to_string(&self) -> &str {
-        use std::error::Error;
-        match *self {
-            ContextError::OsError(ref string) => string,
-            ContextError::IoError(ref err) => err.description(),
-            ContextError::ContextLost => "Context lost",
-            ContextError::FunctionUnavailable => "Function unavailable",
+impl std::fmt::Display for ContextError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        match self {
+            ContextError::OsError(string) => write!(formatter, "{}", string),
+            ContextError::IoError(err) => write!(formatter, "{}", err),
+            ContextError::ContextLost => write!(formatter, "Context lost"),
+            ContextError::FunctionUnavailable => write!(formatter, "Function unavailable"),
         }
     }
 }
 
-impl std::fmt::Display for ContextError {
-    fn fmt(
-        &self,
-        formatter: &mut std::fmt::Formatter,
-    ) -> Result<(), std::fmt::Error> {
-        formatter.write_str(self.to_string())
-    }
-}
-
-impl std::error::Error for ContextError {
-    fn description(&self) -> &str {
-        self.to_string()
-    }
-}
+impl std::error::Error for ContextError {}
 
 /// All APIs related to OpenGL that you can possibly get while using glutin.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -488,12 +447,8 @@ impl GlRequest {
     /// Extract the desktop GL version, if any.
     pub fn to_gl_version(&self) -> Option<(u8, u8)> {
         match self {
-            &GlRequest::Specific(Api::OpenGl, opengl_version) => {
-                Some(opengl_version)
-            }
-            &GlRequest::GlThenGles { opengl_version, .. } => {
-                Some(opengl_version)
-            }
+            &GlRequest::Specific(Api::OpenGl, opengl_version) => Some(opengl_version),
+            &GlRequest::GlThenGles { opengl_version, .. } => Some(opengl_version),
             _ => None,
         }
     }

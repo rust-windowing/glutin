@@ -41,21 +41,10 @@ impl<T: ContextCurrentState> Context<T> {
     ///
     /// [`ContextWrapper::make_current`]:
     /// struct.ContextWrapper.html#method.make_current
-    pub unsafe fn make_current(
-        self,
-    ) -> Result<Context<PossiblyCurrent>, (Self, ContextError)> {
+    pub unsafe fn make_current(self) -> Result<Context<PossiblyCurrent>, (Self, ContextError)> {
         match self.context.make_current() {
-            Ok(()) => Ok(Context {
-                context: self.context,
-                phantom: PhantomData,
-            }),
-            Err(err) => Err((
-                Context {
-                    context: self.context,
-                    phantom: PhantomData,
-                },
-                err,
-            )),
+            Ok(()) => Ok(Context { context: self.context, phantom: PhantomData }),
+            Err(err) => Err((Context { context: self.context, phantom: PhantomData }, err)),
         }
     }
 
@@ -63,21 +52,10 @@ impl<T: ContextCurrentState> Context<T> {
     ///
     /// [`ContextWrapper::make_not_current`]:
     /// struct.ContextWrapper.html#method.make_not_current
-    pub unsafe fn make_not_current(
-        self,
-    ) -> Result<Context<NotCurrent>, (Self, ContextError)> {
+    pub unsafe fn make_not_current(self) -> Result<Context<NotCurrent>, (Self, ContextError)> {
         match self.context.make_not_current() {
-            Ok(()) => Ok(Context {
-                context: self.context,
-                phantom: PhantomData,
-            }),
-            Err(err) => Err((
-                Context {
-                    context: self.context,
-                    phantom: PhantomData,
-                },
-                err,
-            )),
+            Ok(()) => Ok(Context { context: self.context, phantom: PhantomData }),
+            Err(err) => Err((Context { context: self.context, phantom: PhantomData }, err)),
         }
     }
 
@@ -86,10 +64,7 @@ impl<T: ContextCurrentState> Context<T> {
     /// [`ContextWrapper::treat_as_not_current`]:
     /// struct.ContextWrapper.html#method.treat_as_not_current
     pub unsafe fn treat_as_not_current(self) -> Context<NotCurrent> {
-        Context {
-            context: self.context,
-            phantom: PhantomData,
-        }
+        Context { context: self.context, phantom: PhantomData }
     }
 
     /// See [`ContextWrapper::treat_as_current`].
@@ -97,10 +72,7 @@ impl<T: ContextCurrentState> Context<T> {
     /// [`ContextWrapper::treat_as_current`]:
     /// struct.ContextWrapper.html#method.treat_as_current
     pub unsafe fn treat_as_current(self) -> Context<PossiblyCurrent> {
-        Context {
-            context: self.context,
-            phantom: PhantomData,
-        }
+        Context { context: self.context, phantom: PhantomData }
     }
 
     /// See [`ContextWrapper::is_current`].
@@ -155,8 +127,8 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
             target_os = "openbsd",
         )),
         doc = "\
-    [`build_surfaceless`]: os/index.html
-    [`build_osmesa`]: os/index.html
+    [`build_surfaceless`]: platform/index.html\n\
+    [`build_osmesa`]: platform/index.html\
     "
     )]
     #[cfg_attr(
@@ -168,8 +140,8 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
             target_os = "openbsd",
         ),
         doc = "\
-    [`build_surfaceless`]: os/unix/trait.HeadlessContextExt.html#tymethod.build_surfaceless
-    [`build_osmesa`]: os/unix/trait.HeadlessContextExt.html#tymethod.build_osmesa
+    [`build_surfaceless`]: platform/unix/trait.HeadlessContextExt.html#tymethod.build_surfaceless\n\
+    [`build_osmesa`]: platform/unix/trait.HeadlessContextExt.html#tymethod.build_osmesa\
     "
     )]
     pub fn build_headless<TE>(
@@ -179,12 +151,8 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     ) -> Result<Context<NotCurrent>, CreationError> {
         let ContextBuilder { pf_reqs, gl_attr } = self;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
-        platform_impl::Context::new_headless(el, &pf_reqs, &gl_attr, size).map(
-            |context| Context {
-                context,
-                phantom: PhantomData,
-            },
-        )
+        platform_impl::Context::new_headless(el, &pf_reqs, &gl_attr, size)
+            .map(|context| Context { context, phantom: PhantomData })
     }
 }
 

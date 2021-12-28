@@ -30,10 +30,8 @@ impl MakeCurrentGuard {
                 display,
                 old_display: egl.GetCurrentDisplay(),
                 possibly_invalid: Some(MakeCurrentGuardInner {
-                    old_draw_surface: egl
-                        .GetCurrentSurface(ffi::egl::DRAW as i32),
-                    old_read_surface: egl
-                        .GetCurrentSurface(ffi::egl::READ as i32),
+                    old_draw_surface: egl.GetCurrentSurface(ffi::egl::DRAW as i32),
+                    old_read_surface: egl.GetCurrentSurface(ffi::egl::READ as i32),
                     old_context: egl.GetCurrentContext(),
                 }),
             };
@@ -42,8 +40,7 @@ impl MakeCurrentGuard {
                 ret.invalidate();
             }
 
-            let res =
-                egl.MakeCurrent(display, draw_surface, read_surface, context);
+            let res = egl.MakeCurrent(display, draw_surface, read_surface, context);
 
             if res == 0 {
                 let err = egl.GetError();
@@ -62,10 +59,8 @@ impl MakeCurrentGuard {
     ) {
         if self.possibly_invalid.is_some() {
             let pi = self.possibly_invalid.as_ref().unwrap();
-            if pi.old_draw_surface == draw_surface
-                && draw_surface != ffi::egl::NO_SURFACE
-                || pi.old_read_surface == read_surface
-                    && read_surface != ffi::egl::NO_SURFACE
+            if pi.old_draw_surface == draw_surface && draw_surface != ffi::egl::NO_SURFACE
+                || pi.old_read_surface == read_surface && read_surface != ffi::egl::NO_SURFACE
                 || pi.old_context == context
             {
                 self.invalidate();
@@ -81,19 +76,10 @@ impl MakeCurrentGuard {
 impl Drop for MakeCurrentGuard {
     fn drop(&mut self) {
         let egl = super::EGL.as_ref().unwrap();
-        let (draw_surface, read_surface, context) =
-            match self.possibly_invalid.take() {
-                Some(inner) => (
-                    inner.old_draw_surface,
-                    inner.old_read_surface,
-                    inner.old_context,
-                ),
-                None => (
-                    ffi::egl::NO_SURFACE,
-                    ffi::egl::NO_SURFACE,
-                    ffi::egl::NO_CONTEXT,
-                ),
-            };
+        let (draw_surface, read_surface, context) = match self.possibly_invalid.take() {
+            Some(inner) => (inner.old_draw_surface, inner.old_read_surface, inner.old_context),
+            None => (ffi::egl::NO_SURFACE, ffi::egl::NO_SURFACE, ffi::egl::NO_CONTEXT),
+        };
 
         let display = match self.old_display {
             ffi::egl::NO_DISPLAY => self.display,
@@ -101,8 +87,7 @@ impl Drop for MakeCurrentGuard {
         };
 
         unsafe {
-            let res =
-                egl.MakeCurrent(display, draw_surface, read_surface, context);
+            let res = egl.MakeCurrent(display, draw_surface, read_surface, context);
 
             if res == 0 {
                 let err = egl.GetError();

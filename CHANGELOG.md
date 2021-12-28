@@ -1,5 +1,23 @@
-# Unreleased
+# Version 0.28.0 (2021-12-02)
 
+- On Windows, fixed a panic for headless contexts because of active drag-and-drop (OleInitialize failed! Result was: `RPC_E_CHANGED_MODE`)
+- Updated winit dependency to 0.26.0. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/releases/tag/v0.26.0) for more info.
+
+# Version 0.27.0 (2021-06-01)
+
+- Updated winit dependency to 0.25.0. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/releases/tag/v0.25.0) for more info.
+
+# Version 0.26.0 (2020-12-10)
+
+- Updated winit dependency to 0.24.0. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/releases/tag/v0.24.0) for more info.
+
+# Version 0.25.1 (2020-10-10)
+
+- X11 and Wayland are now optional features (enabled by default)
+
+# Version 0.25.0 (2020-10-02)
+
+- Updated winit dependency to 0.23.0. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/blob/master/CHANGELOG.md#0230-2020-10-02) for more info.
 - Avoid loading libEGL.dll from PATH on Windows.
 
 # Version 0.24.1 (2020-05-26)
@@ -52,7 +70,7 @@
 
 # Version 0.20.1 (2019-08-08)
 
- - **Backport:** We now load `libGL.so` instead of `libGLX.so`. 
+ - **Backport:** We now load `libGL.so` instead of `libGLX.so`.
 
 # Version 0.22.0-alpha1 (2019-06-21)
 
@@ -101,7 +119,7 @@
  - "Fixed" bug where we will close `EGLDisplay`s while they are still in use by
  others. Angry and/or salty rant can be found in `glutin/src/api/egl/mod.rs`,
  you can't miss it.
- - **Breaking**: `WindowedContext`s now deref to `Context`, not `Window`. 
+ - **Breaking**: `WindowedContext`s now deref to `Context`, not `Window`.
  Please use `.window()` to access the window.
 
 # Version 0.20.0 (2019-03-09)

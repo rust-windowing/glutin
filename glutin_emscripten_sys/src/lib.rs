@@ -54,8 +54,7 @@ extern "C" {
         context: EMSCRIPTEN_WEBGL_CONTEXT_HANDLE,
     ) -> EMSCRIPTEN_RESULT;
 
-    pub fn emscripten_webgl_get_current_context(
-    ) -> EMSCRIPTEN_WEBGL_CONTEXT_HANDLE;
+    pub fn emscripten_webgl_get_current_context() -> EMSCRIPTEN_WEBGL_CONTEXT_HANDLE;
 
     pub fn emscripten_webgl_destroy_context(
         context: EMSCRIPTEN_WEBGL_CONTEXT_HANDLE,
@@ -79,15 +78,11 @@ extern "C" {
         callback: em_webgl_context_callback,
     ) -> EMSCRIPTEN_RESULT;
 
-    pub fn emscripten_is_webgl_context_lost(
-        target: *const raw::c_char,
-    ) -> EM_BOOL;
+    pub fn emscripten_is_webgl_context_lost(target: *const raw::c_char) -> EM_BOOL;
 
     // note: this function is not documented but is used by the ports of glfw,
     // SDL and EGL
-    pub fn emscripten_GetProcAddress(
-        name: *const raw::c_char,
-    ) -> *const raw::c_void;
+    pub fn emscripten_GetProcAddress(name: *const raw::c_char) -> *const raw::c_void;
 
     pub fn emscripten_request_fullscreen(
         target: *const raw::c_char,

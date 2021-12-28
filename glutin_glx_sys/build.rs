@@ -20,8 +20,7 @@ fn main() {
             .write_bindings(gl_generator::StructGenerator, &mut file)
             .unwrap();
 
-        let mut file =
-            File::create(&dest.join("glx_extra_bindings.rs")).unwrap();
+        let mut file = File::create(&dest.join("glx_extra_bindings.rs")).unwrap();
         Registry::new(
             Api::Glx,
             (1, 4),
