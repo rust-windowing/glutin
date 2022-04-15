@@ -1,3 +1,7 @@
+# Unreleased
+
+- Ignore vsync safely on unsupported platforms (e.g: llvmpipe software render).
+
 # Version 0.28.0 (2021-12-02)
 
 - On Windows, fixed a panic for headless contexts because of active drag-and-drop (OleInitialize failed! Result was: `RPC_E_CHANGED_MODE`)
