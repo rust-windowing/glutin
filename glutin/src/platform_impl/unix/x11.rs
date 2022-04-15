@@ -41,10 +41,18 @@ pub enum X11Context {
     Egl(EglContext),
 }
 
-#[derive(Debug)]
 pub struct ContextInner {
     xconn: Arc<XConnection>,
     context: X11Context,
+}
+
+impl std::fmt::Debug for ContextInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ContextInner")
+            .field("xconn", &self.xconn)
+            .field("context", &self.context)
+            .finish()
+    }
 }
 
 enum Prototype<'a> {

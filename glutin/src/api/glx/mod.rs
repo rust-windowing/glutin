@@ -364,7 +364,13 @@ impl<'a> ContextPrototype<'a> {
     }
 
     pub fn finish(self, window: ffi::Window) -> Result<Context, CreationError> {
-        let glx = GLX.as_ref().unwrap();
+        let glx = match GLX.as_ref() {
+            Some(glx) => glx,
+            _ => {
+                return Err(CreationError::OsError("Can't get GLX as reference.".into()));
+            }
+        };
+
         let (extra_functions, context) = self.create_context()?;
 
         // vsync
@@ -410,9 +416,7 @@ impl<'a> ContextPrototype<'a> {
                 extra_functions.SwapIntervalSGI(swap_mode);
             }
         } else if self.opengl.vsync {
-            return Err(CreationError::OsError(
-                "Couldn't find any available vsync extension".to_string(),
-            ));
+            eprintln!("Couldn't find any available vsync extension on this platform.")
         }
 
         Ok(Context {

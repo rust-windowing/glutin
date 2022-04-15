@@ -364,7 +364,7 @@ fn get_native_display(native_display: &NativeDisplay) -> *const raw::c_void {
                 ffi::egl::DEFAULT_DISPLAY as *mut _,
                 std::ptr::null(),
             )
-        }
+        },
 
         NativeDisplay::Device(display)
             if has_dp_extension("EGL_EXT_platform_device")
@@ -375,7 +375,7 @@ fn get_native_display(native_display: &NativeDisplay) -> *const raw::c_void {
                 display as *mut _,
                 std::ptr::null(),
             )
-        }
+        },
 
         NativeDisplay::X11(Some(display))
         | NativeDisplay::Gbm(Some(display))
