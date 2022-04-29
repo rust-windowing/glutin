@@ -73,7 +73,7 @@ use winit::dpi;
 use winit::event_loop::EventLoopWindowTarget;
 use winit::window::WindowBuilder;
 
-use std::ffi::CString;
+use std::ffi::{CString, CStr};
 use std::os::raw;
 
 #[derive(Debug, PartialEq)]
