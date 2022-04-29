@@ -166,11 +166,9 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
+    pub fn get_proc_address(&self, addr: &CStr) -> *const core::ffi::c_void {
         let glx = GLX.as_ref().unwrap();
-        let addr = CString::new(addr.as_bytes()).unwrap();
-        let addr = addr.as_ptr();
-        unsafe { glx.GetProcAddress(addr as *const _) as *const _ }
+        unsafe { glx.GetProcAddress(addr.as_ptr() as *const _) as *const _ }
     }
 
     #[inline]
@@ -204,7 +202,8 @@ impl Drop for Context {
                 .map_err(|err| ContextError::OsError(err))
                 .unwrap();
 
-            let gl_finish_fn = self.get_proc_address("glFinish");
+            let gl_finish_fn =
+                self.get_proc_address(CStr::from_bytes_with_nul_unchecked(b"glFinish"));
             assert!(gl_finish_fn != std::ptr::null());
             let gl_finish_fn = std::mem::transmute::<_, extern "system" fn()>(gl_finish_fn);
             gl_finish_fn();

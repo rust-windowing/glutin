@@ -364,7 +364,7 @@ fn get_native_display(native_display: &NativeDisplay) -> *const raw::c_void {
                 ffi::egl::DEFAULT_DISPLAY as *mut _,
                 std::ptr::null(),
             )
-        }
+        },
 
         NativeDisplay::Device(display)
             if has_dp_extension("EGL_EXT_platform_device")
@@ -375,7 +375,7 @@ fn get_native_display(native_display: &NativeDisplay) -> *const raw::c_void {
                 display as *mut _,
                 std::ptr::null(),
             )
-        }
+        },
 
         NativeDisplay::X11(Some(display))
         | NativeDisplay::Gbm(Some(display))
@@ -584,11 +584,9 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
+    pub fn get_proc_address(&self, addr: &CStr) -> *const core::ffi::c_void {
         let egl = EGL.as_ref().unwrap();
-        let addr = CString::new(addr.as_bytes()).unwrap();
-        let addr = addr.as_ptr();
-        unsafe { egl.GetProcAddress(addr) as *const _ }
+        unsafe { egl.GetProcAddress(addr.as_ptr()) as *const _ }
     }
 
     #[inline]
@@ -688,7 +686,8 @@ impl Drop for Context {
 
             guard.if_any_same_then_invalidate(surface, surface, self.context);
 
-            let gl_finish_fn = self.get_proc_address("glFinish");
+            let gl_finish_fn =
+                self.get_proc_address(&CStr::from_bytes_with_nul_unchecked(b"glFinish"));
             assert!(gl_finish_fn != std::ptr::null());
             let gl_finish_fn = std::mem::transmute::<_, extern "system" fn()>(gl_finish_fn);
             gl_finish_fn();

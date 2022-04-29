@@ -376,13 +376,12 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, proc_name: &str) -> *const core::ffi::c_void {
-        let proc_name_c = CString::new(proc_name).expect("proc name contained interior nul byte");
+    pub fn get_proc_address(&self, proc_name: &CStr) -> *const core::ffi::c_void {
         let path = b"/System/Library/Frameworks/OpenGLES.framework/OpenGLES\0";
         let addr = unsafe {
             let lib =
                 ffi::dlopen(path.as_ptr() as *const raw::c_char, ffi::RTLD_LAZY | ffi::RTLD_GLOBAL);
-            ffi::dlsym(lib, proc_name_c.as_ptr()) as *const _
+            ffi::dlsym(lib, proc_name.as_ptr()) as *const _
         };
         // debug!("proc {} -> {:?}", proc_name, addr);
         addr

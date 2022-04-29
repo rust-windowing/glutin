@@ -179,8 +179,7 @@ impl Context {
         unsafe { gl::wgl::GetCurrentContext() == self.context.0 as *const raw::c_void }
     }
 
-    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
-        let addr = CString::new(addr.as_bytes()).unwrap();
+    pub fn get_proc_address(&self, addr: &CStr) -> *const core::ffi::c_void {
         let addr = addr.as_ptr();
 
         unsafe {

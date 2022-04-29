@@ -17,7 +17,7 @@ use crate::{
 
 use winit::dpi;
 
-use std::ffi::CString;
+use std::ffi::CStr;
 use std::os::raw;
 
 #[derive(Debug)]
@@ -205,11 +205,8 @@ impl OsMesaContext {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
-        unsafe {
-            let c_str = CString::new(addr.as_bytes().to_vec()).unwrap();
-            core::mem::transmute(osmesa_sys::OSMesaGetProcAddress(c_str.as_ptr() as *mut _))
-        }
+    pub fn get_proc_address(&self, addr: &CStr) -> *const core::ffi::c_void {
+        unsafe { core::mem::transmute(osmesa_sys::OSMesaGetProcAddress(addr.as_ptr() as *mut _)) }
     }
 }
 

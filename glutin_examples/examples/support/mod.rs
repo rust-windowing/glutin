@@ -1,6 +1,6 @@
 use glutin::{self, PossiblyCurrent};
 
-use std::ffi::CStr;
+use std::ffi::{CStr, CString};
 
 pub mod gl {
     pub use self::Gles2 as Gl;
@@ -12,7 +12,9 @@ pub struct Gl {
 }
 
 pub fn load(gl_context: &glutin::Context<PossiblyCurrent>) -> Gl {
-    let gl = gl::Gl::load_with(|ptr| gl_context.get_proc_address(ptr) as *const _);
+    let gl = gl::Gl::load_with(|ptr| {
+        gl_context.get_proc_address(&CString::new(ptr).unwrap()) as *const _
+    });
 
     let version = unsafe {
         let data = CStr::from_ptr(gl.GetString(gl::VERSION) as *const _).to_bytes().to_vec();

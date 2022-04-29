@@ -18,6 +18,7 @@ use winit::dpi;
 use winit::event_loop::EventLoopWindowTarget;
 use winit::window::{Window, WindowBuilder};
 
+use std::ffi::CStr;
 use std::ops::{Deref, DerefMut};
 use std::os::raw;
 use std::sync::Arc;
@@ -620,7 +621,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
+    pub fn get_proc_address(&self, addr: &CStr) -> *const core::ffi::c_void {
         match self.context {
             X11Context::Glx(ref ctx) => ctx.get_proc_address(addr),
             X11Context::Egl(ref ctx) => ctx.get_proc_address(addr),

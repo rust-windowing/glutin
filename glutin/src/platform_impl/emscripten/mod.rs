@@ -10,7 +10,7 @@ use winit::dpi;
 use winit::event_loop::EventLoopWindowTarget;
 use winit::window::WindowBuilder;
 
-use std::ffi::CString;
+use std::ffi::CStr;
 
 #[derive(Debug)]
 pub enum Context {
@@ -133,13 +133,11 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
-        let addr = CString::new(addr).unwrap();
-
+    pub fn get_proc_address(&self, addr: &CStr) -> *const core::ffi::c_void {
         unsafe {
             // FIXME: if `as_ptr()` is used, then wrong data is passed to
             // emscripten
-            ffi::emscripten_GetProcAddress(addr.into_raw() as *const _) as *const _
+            ffi::emscripten_GetProcAddress(addr.to_owned().into_raw() as *const _) as *const _
         }
     }
 

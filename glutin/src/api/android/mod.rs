@@ -148,7 +148,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
+    pub fn get_proc_address(&self, addr: &CStr) -> *const core::ffi::c_void {
         self.0.egl_context.get_proc_address(addr)
     }
 

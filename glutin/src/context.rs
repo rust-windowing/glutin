@@ -1,6 +1,6 @@
 use super::*;
 
-use std::marker::PhantomData;
+use std::{ffi::CStr, marker::PhantomData};
 use winit::event_loop::EventLoopWindowTarget;
 
 /// Represents an OpenGL [`Context`].
@@ -96,7 +96,7 @@ impl Context<PossiblyCurrent> {
     ///
     /// [`ContextWrapper::get_proc_address`]:
     /// struct.ContextWrapper.html#method.get_proc_address
-    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
+    pub fn get_proc_address(&self, addr: &CStr) -> *const core::ffi::c_void {
         self.context.get_proc_address(addr)
     }
 }

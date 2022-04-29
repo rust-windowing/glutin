@@ -29,6 +29,7 @@ use winit::dpi;
 use winit::event_loop::EventLoopWindowTarget;
 use winit::window::{Window, WindowBuilder};
 
+use std::ffi::CStr;
 use std::marker::PhantomData;
 use std::os::raw;
 #[cfg(feature = "x11")]
@@ -247,7 +248,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
+    pub fn get_proc_address(&self, addr: &CStr) -> *const core::ffi::c_void {
         match *self {
             #[cfg(feature = "x11")]
             Context::X11(ref ctx) => ctx.get_proc_address(addr),
