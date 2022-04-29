@@ -8,9 +8,9 @@ use cgl::{kCGLCECrashOnRemovedFunctions, kCGLCPSurfaceOpacity, CGLEnable, CGLSet
 use cocoa::appkit::{self, NSOpenGLContext, NSOpenGLPixelFormat};
 use cocoa::base::{id, nil};
 use cocoa::foundation::NSAutoreleasePool;
-use core_foundation::base::TCFType;
+use core_foundation::base::{kCFAllocatorDefault, TCFType};
 use core_foundation::bundle::{CFBundleGetBundleWithIdentifier, CFBundleGetFunctionPointerForName};
-use core_foundation::string::CFString;
+use core_foundation::string::{kCFStringEncodingUTF8, CFString};
 use objc::runtime::{BOOL, NO};
 
 use crate::platform::macos::WindowExtMacOS;
@@ -233,8 +233,11 @@ impl Context {
         }
     }
 
-    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
-        let symbol_name: CFString = FromStr::from_str(addr).unwrap();
+    pub fn get_proc_address(&self, addr: &CStr) -> *const core::ffi::c_void {
+        // let symbol_name: CFString = FromStr::from_str(addr).unwrap();
+        let symbol_name =
+            CFStringCreateWithCString(kCFAllocatorDefault, addr.as_ptr(), kCFStringEncodingUTF8);
+        let symbol_name = CFString::wrap_under_create_rule(string_ref);
         let framework_name: CFString = FromStr::from_str("com.apple.opengl").unwrap();
         let framework =
             unsafe { CFBundleGetBundleWithIdentifier(framework_name.as_concrete_TypeRef()) };
