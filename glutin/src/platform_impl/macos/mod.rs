@@ -10,7 +10,7 @@ use cocoa::base::{id, nil};
 use cocoa::foundation::NSAutoreleasePool;
 use core_foundation::base::{kCFAllocatorDefault, TCFType};
 use core_foundation::bundle::{CFBundleGetBundleWithIdentifier, CFBundleGetFunctionPointerForName};
-use core_foundation::string::{kCFStringEncodingUTF8, CFString};
+use core_foundation::string::{kCFStringEncodingUTF8, CFString, CFStringCreateWithCString};
 use objc::runtime::{BOOL, NO};
 
 use crate::platform::macos::WindowExtMacOS;
@@ -238,7 +238,7 @@ impl Context {
         // let symbol_name: CFString = FromStr::from_str(addr).unwrap();
         let symbol_name =
             CFStringCreateWithCString(kCFAllocatorDefault, addr.as_ptr(), kCFStringEncodingUTF8);
-        let symbol_name = CFString::wrap_under_create_rule(string_ref);
+        let symbol_name = CFString::wrap_under_create_rule(symbol_name);
         let framework_name: CFString = FromStr::from_str("com.apple.opengl").unwrap();
         let framework =
             unsafe { CFBundleGetBundleWithIdentifier(framework_name.as_concrete_TypeRef()) };
