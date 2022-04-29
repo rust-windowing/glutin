@@ -19,10 +19,10 @@ use winit::dpi;
 use winit::event_loop::EventLoopWindowTarget;
 use winit::window::{Window, WindowBuilder};
 
+use std::ffi::CStr;
 use std::ops::Deref;
 use std::os::raw;
 use std::str::FromStr;
-use std::ffi::CStr;
 
 mod helpers;
 
@@ -236,9 +236,15 @@ impl Context {
 
     pub fn get_proc_address(&self, addr: &CStr) -> *const core::ffi::c_void {
         // let symbol_name: CFString = FromStr::from_str(addr).unwrap();
-        let symbol_name =
-            CFStringCreateWithCString(kCFAllocatorDefault, addr.as_ptr(), kCFStringEncodingUTF8);
-        let symbol_name = CFString::wrap_under_create_rule(symbol_name);
+        let symbol_name = unsafe {
+            let symbol_name = CFStringCreateWithCString(
+                kCFAllocatorDefault,
+                addr.as_ptr(),
+                kCFStringEncodingUTF8,
+            );
+            CFString::wrap_under_create_rule(symbol_name)
+        };
+
         let framework_name: CFString = FromStr::from_str("com.apple.opengl").unwrap();
         let framework =
             unsafe { CFBundleGetBundleWithIdentifier(framework_name.as_concrete_TypeRef()) };
