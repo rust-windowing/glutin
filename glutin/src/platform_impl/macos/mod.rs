@@ -22,6 +22,7 @@ use winit::window::{Window, WindowBuilder};
 use std::ops::Deref;
 use std::os::raw;
 use std::str::FromStr;
+use std::ffi::CStr;
 
 mod helpers;
 
