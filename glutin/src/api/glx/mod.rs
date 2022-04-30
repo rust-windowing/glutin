@@ -203,7 +203,7 @@ impl Drop for Context {
                 .unwrap();
 
             let gl_finish_fn =
-                self.get_proc_address(CStr::from_bytes_with_nul_unchecked(b"glFinish"));
+                self.get_proc_address(CStr::from_bytes_with_nul_unchecked(b"glFinish\0"));
             assert!(gl_finish_fn != std::ptr::null());
             let gl_finish_fn = std::mem::transmute::<_, extern "system" fn()>(gl_finish_fn);
             gl_finish_fn();
