@@ -261,7 +261,7 @@ impl Context {
         let _: () = msg_send![layer, setDrawableProperties: draw_props];
 
         let gl = ffi::gles::Gles2::load_with(|symbol| {
-            self.get_proc_address(symbol) as *const raw::c_void
+            self.get_proc_address(&CString::new(symbol).unwrap()) as *const raw::c_void
         });
         let mut color_render_buf: ffi::gles::types::GLuint = 0;
         let mut frame_buf: ffi::gles::types::GLuint = 0;
