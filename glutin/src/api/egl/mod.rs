@@ -128,7 +128,7 @@ use parking_lot::Mutex;
 ))]
 use winit::dpi;
 
-use std::ffi::{CStr, CString};
+use std::ffi::CStr;
 use std::ops::{Deref, DerefMut};
 use std::os::raw;
 
