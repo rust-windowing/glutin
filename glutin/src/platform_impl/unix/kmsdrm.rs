@@ -62,7 +62,8 @@ impl Context {
         gl_attr: &GlAttributes<&Context>,
         _size: Option<winit::dpi::PhysicalSize<u32>>,
     ) -> Result<Self, CreationError> {
-        let gl_attr = gl_attr.clone().map_sharing(|c| &**c);
+        let mut gl_attr = gl_attr.clone().map_sharing(|c| &**c);
+        gl_attr.vsync = true;
         let display_ptr_mutex =
             el.gbm_device().ok_or(CreationError::NotSupported("GBM is not initialized".into()))?;
         let display_ptr = display_ptr_mutex.lock();
@@ -142,7 +143,8 @@ impl Context {
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<Self, CreationError> {
         let display_ptr = display_ptr_mtx.lock();
-        let gl_attr = gl_attr.clone().map_sharing(|c| &**c);
+        let mut gl_attr = gl_attr.clone().map_sharing(|c| &**c);
+        gl_attr.vsync = true;
         let format = pf_to_fmt!(pf_reqs);
 
         let context = EglContext::new(
