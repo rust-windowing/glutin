@@ -44,7 +44,7 @@ pub struct CtxLock {
 pub struct Context {
     display: EglContext,
     ctx_lock: parking_lot::Mutex<CtxLock>,
-    device: AssertSync<&'static gbm::Device<crate::platform::unix::Card>>,
+    device: AssertSync<gbm::Device<crate::platform::unix::Card>>,
     depth: u32,
     bpp: u32,
     connector: drm::control::connector::Handle,
@@ -70,11 +70,14 @@ impl Context {
     ) -> Result<Self, CreationError> {
         let mut gl_attr = gl_attr.clone().map_sharing(|c| &**c);
         gl_attr.vsync = true;
-        let display_ptr = el
-            .gbm_device()
+        let drm_ptr = el
+            .drm_device()
             .ok_or(CreationError::NotSupported("GBM is not initialized".into()))?
             .as_ref()
-            .map_err(|e| CreationError::OsError(e.to_string()))?;
+            .map_err(|e| CreationError::OsError(e.to_string()))?
+            .clone();
+        let display_ptr =
+            gbm::Device::new(drm_ptr).map_err(|e| CreationError::OsError(e.to_string()))?;
         let native_display = NativeDisplay::Gbm(Some(display_ptr.as_raw() as *const _));
         let context = EglContext::new(
             pf_reqs,
@@ -87,23 +90,18 @@ impl Context {
         let context = Context {
             display: context,
             ctx_lock: Mutex::new(CtxLock { surface: None, previous_fb: None, previous_bo: None }),
-            device: AssertSync(
-                el.gbm_device()
-                    .ok_or(CreationError::NotSupported("GBM is not initialized".into()))?
-                    .as_ref()
-                    .map_err(|e| CreationError::OsError(e.to_string()))?,
-            ),
+            device: AssertSync(display_ptr),
             depth: pf_reqs.depth_bits.unwrap_or(0) as u32,
             mode: el
-                .gbm_mode()
+                .drm_mode()
                 .ok_or(CreationError::NotSupported("GBM is not initialized".into()))?,
             bpp: pf_reqs.alpha_bits.unwrap_or(0) as u32 + pf_reqs.color_bits.unwrap_or(0) as u32,
             crtc: el
-                .gbm_crtc()
+                .drm_crtc()
                 .ok_or(CreationError::NotSupported("GBM is not initialized".into()))?
                 .clone(),
             connector: el
-                .gbm_connector()
+                .drm_connector()
                 .ok_or(CreationError::NotSupported("GBM is not initialized".into()))?
                 .handle(),
         };
@@ -121,12 +119,12 @@ impl Context {
         let size = window.inner_size();
         let (width, height): (u32, u32) = size.into();
         let ctx = Self::new_raw_context(
-            el.gbm_device().ok_or(CreationError::NotSupported("GBM is not initialized".into()))?,
+            el.drm_device().ok_or(CreationError::NotSupported("GBM is not initialized".into()))?,
             width,
             height,
-            el.gbm_crtc().ok_or(CreationError::OsError("No crtc found".to_string()))?,
-            el.gbm_connector().ok_or(CreationError::OsError("No connector found".to_string()))?,
-            el.gbm_mode().ok_or(CreationError::OsError("No mode found".to_string()))?,
+            el.drm_crtc().ok_or(CreationError::OsError("No crtc found".to_string()))?,
+            el.drm_connector().ok_or(CreationError::OsError("No connector found".to_string()))?,
+            el.drm_mode().ok_or(CreationError::OsError("No mode found".to_string()))?,
             pf_reqs,
             gl_attr,
         )?;
@@ -135,9 +133,7 @@ impl Context {
 
     #[inline]
     pub fn new_raw_context(
-        display_ptr: &'static AssertSync<
-            Result<gbm::Device<crate::platform::unix::Card>, std::io::Error>,
-        >,
+        display_ptr: &'static AssertSync<Result<crate::platform::unix::Card, std::io::Error>>,
         width: u32,
         height: u32,
         crt: &drm::control::crtc::Info,
@@ -148,8 +144,10 @@ impl Context {
     ) -> Result<Self, CreationError> {
         let mut gl_attr = gl_attr.clone().map_sharing(|c| &**c);
         gl_attr.vsync = true;
+        let drm_ptr =
+            display_ptr.as_ref().map_err(|e| CreationError::OsError(e.to_string()))?.clone();
         let display_ptr =
-            display_ptr.as_ref().map_err(|e| CreationError::OsError(e.to_string()))?;
+            gbm::Device::new(drm_ptr).map_err(|e| CreationError::OsError(e.to_string()))?;
         let format = pf_to_fmt!(pf_reqs);
 
         let context = EglContext::new(

@@ -473,8 +473,8 @@ pub trait RawContextExt {
     #[cfg(feature = "kmsdrm")]
     unsafe fn build_raw_drm_context(
         self,
-        gbm_device: &'static winit::platform::unix::AssertSync<
-            Result<gbm::Device<winit::platform::unix::Card>, std::io::Error>,
+        drm_device: &'static winit::platform::unix::AssertSync<
+            Result<winit::platform::unix::Card, std::io::Error>,
         >,
         width: u32,
         height: u32,
@@ -539,8 +539,8 @@ impl<'a, T: ContextCurrentState> RawContextExt for crate::ContextBuilder<'a, T> 
     #[cfg(feature = "kmsdrm")]
     unsafe fn build_raw_drm_context(
         self,
-        gbm_device: &'static winit::platform::unix::AssertSync<
-            Result<gbm::Device<winit::platform::unix::Card>, std::io::Error>,
+        drm_device: &'static winit::platform::unix::AssertSync<
+            Result<winit::platform::unix::Card, std::io::Error>,
         >,
         width: u32,
         height: u32,
@@ -559,7 +559,7 @@ impl<'a, T: ContextCurrentState> RawContextExt for crate::ContextBuilder<'a, T> 
             _ => unreachable!(),
         });
         kmsdrm::Context::new_raw_context(
-            gbm_device, width, height, crt, con, mode, &pf_reqs, &gl_attr,
+            drm_device, width, height, crt, con, mode, &pf_reqs, &gl_attr,
         )
         .map(|context| Context::Drm(context))
         .map(|context| crate::Context { context, phantom: PhantomData })
