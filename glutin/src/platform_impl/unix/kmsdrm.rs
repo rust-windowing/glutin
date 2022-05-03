@@ -1,7 +1,5 @@
 #![cfg(feature = "kmsdrm")]
 
-use std::sync::Arc;
-
 use drm::control::Device;
 use gbm::{AsRaw, BufferObjectFlags};
 use parking_lot::Mutex;
