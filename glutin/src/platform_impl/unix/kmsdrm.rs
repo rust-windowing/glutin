@@ -1,9 +1,11 @@
+#![cfg(feature = "kmsdrm")]
+
 use drm::control::Device;
 use gbm::{AsRaw, BufferObjectFlags};
 use parking_lot::Mutex;
 use winit::{
     event_loop::EventLoopWindowTarget,
-    platform::unix::{AssertSync, Card, EventLoopWindowTargetExtUnix},
+    platform::unix::{AssertSync, EventLoopWindowTargetExtUnix},
     window::{Window, WindowBuilder},
 };
 
