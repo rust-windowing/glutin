@@ -277,11 +277,7 @@ impl Context {
 
     #[inline]
     pub fn swap_buffers_with_damage_supported(&self) -> bool {
-        let ret = (**self).swap_buffers_with_damage_supported();
-        if let Err(_) = self.finish_swap_buffers() {
-            return false;
-        }
-        ret
+        (**self).swap_buffers_with_damage_supported()
     }
 
     #[inline]
