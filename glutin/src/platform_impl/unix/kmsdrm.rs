@@ -208,7 +208,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn resize(&self, width: u32, height: u32) {
+    pub fn resize(&self, _width: u32, _height: u32) {
         /*
         match self {
         Context::Windowed(_, surface) => surface.0.resize(width as i32, height as i32, 0, 0),
