@@ -364,7 +364,7 @@ fn get_native_display(native_display: &NativeDisplay) -> *const raw::c_void {
                 ffi::egl::DEFAULT_DISPLAY as *mut _,
                 std::ptr::null(),
             )
-        }
+        },
 
         NativeDisplay::Device(display)
             if has_dp_extension("EGL_EXT_platform_device")
@@ -375,7 +375,7 @@ fn get_native_display(native_display: &NativeDisplay) -> *const raw::c_void {
                 display as *mut _,
                 std::ptr::null(),
             )
-        }
+        },
 
         NativeDisplay::X11(Some(display))
         | NativeDisplay::Gbm(Some(display))
@@ -1038,6 +1038,7 @@ where
         match (api, version) {
             (Api::OpenGlEs, Some((3, _))) => {
                 if egl_version < &(1, 3) {
+                    println!("{}", line!());
                     return Err(CreationError::NoAvailablePixelFormat);
                 }
                 out.push(ffi::egl::RENDERABLE_TYPE as raw::c_int);
@@ -1047,6 +1048,7 @@ where
             }
             (Api::OpenGlEs, Some((2, _))) => {
                 if egl_version < &(1, 3) {
+                    println!("{}", line!());
                     return Err(CreationError::NoAvailablePixelFormat);
                 }
                 out.push(ffi::egl::RENDERABLE_TYPE as raw::c_int);
@@ -1065,6 +1067,7 @@ where
             (Api::OpenGlEs, _) => unimplemented!(),
             (Api::OpenGl, _) => {
                 if egl_version < &(1, 3) {
+                    println!("{}", line!());
                     return Err(CreationError::NoAvailablePixelFormat);
                 }
                 out.push(ffi::egl::RENDERABLE_TYPE as raw::c_int);
@@ -1109,6 +1112,7 @@ where
         }
 
         if let Some(true) = pf_reqs.double_buffer {
+            println!("{}", line!());
             return Err(CreationError::NoAvailablePixelFormat);
         }
 
@@ -1118,6 +1122,7 @@ where
         }
 
         if pf_reqs.stereoscopy {
+            println!("{}", line!());
             return Err(CreationError::NoAvailablePixelFormat);
         }
 
@@ -1149,6 +1154,7 @@ where
     }
 
     if num_configs == 0 {
+        println!("{}", line!());
         return Err(CreationError::NoAvailablePixelFormat);
     }
 
@@ -1200,11 +1206,14 @@ where
         .collect::<Vec<_>>();
 
     if config_ids.is_empty() {
+        println!("{}", line!());
         return Err(CreationError::NoAvailablePixelFormat);
     }
 
-    let config_id =
-        config_selector(config_ids, display).map_err(|_| CreationError::NoAvailablePixelFormat)?;
+    let config_id = config_selector(config_ids, display).map_err(|_| {
+        println!("{}", line!());
+        CreationError::NoAvailablePixelFormat
+    })?;
 
     // analyzing each config
     macro_rules! attrib {
