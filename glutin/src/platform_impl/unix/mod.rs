@@ -473,10 +473,8 @@ pub trait RawContextExt {
     #[cfg(feature = "kmsdrm")]
     unsafe fn build_raw_drm_context(
         self,
-        gbm_device: &'static parking_lot::Mutex<
-            winit::platform::unix::AssertSync<
-                Result<gbm::Device<winit::platform::unix::Card>, std::io::Error>,
-            >,
+        gbm_device: &'static winit::platform::unix::AssertSync<
+            Result<gbm::Device<winit::platform::unix::Card>, std::io::Error>,
         >,
         width: u32,
         height: u32,
@@ -541,10 +539,8 @@ impl<'a, T: ContextCurrentState> RawContextExt for crate::ContextBuilder<'a, T> 
     #[cfg(feature = "kmsdrm")]
     unsafe fn build_raw_drm_context(
         self,
-        gbm_device: &'static parking_lot::Mutex<
-            winit::platform::unix::AssertSync<
-                Result<gbm::Device<winit::platform::unix::Card>, std::io::Error>,
-            >,
+        gbm_device: &'static winit::platform::unix::AssertSync<
+            Result<gbm::Device<winit::platform::unix::Card>, std::io::Error>,
         >,
         width: u32,
         height: u32,

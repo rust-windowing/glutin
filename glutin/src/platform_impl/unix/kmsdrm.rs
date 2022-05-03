@@ -29,9 +29,6 @@ macro_rules! pf_to_fmt {
 
 #[derive(Debug)]
 pub struct CtxLock {
-    device: &'static parking_lot::Mutex<
-        AssertSync<Result<gbm::Device<crate::platform::unix::Card>, std::io::Error>>,
-    >,
     surface: Option<gbm::Surface<()>>,
     previous_bo: Option<gbm::BufferObject<()>>,
     previous_fb: Option<drm::control::framebuffer::Handle>,
@@ -41,6 +38,7 @@ pub struct CtxLock {
 pub struct Context {
     display: EglContext,
     ctx_lock: parking_lot::Mutex<CtxLock>,
+    device: &'static AssertSync<Result<gbm::Device<crate::platform::unix::Card>, std::io::Error>>,
     depth: u32,
     bpp: u32,
     connector: drm::control::connector::Handle,
@@ -66,9 +64,8 @@ impl Context {
     ) -> Result<Self, CreationError> {
         let mut gl_attr = gl_attr.clone().map_sharing(|c| &**c);
         gl_attr.vsync = true;
-        let display_ptr_mutex =
+        let display_ptr =
             el.gbm_device().ok_or(CreationError::NotSupported("GBM is not initialized".into()))?;
-        let display_ptr = display_ptr_mutex.lock();
         let native_display = NativeDisplay::Gbm(Some(
             display_ptr.as_ref().map_err(|e| CreationError::OsError(e.to_string()))?.as_raw()
                 as *const _,
@@ -83,14 +80,10 @@ impl Context {
         .and_then(|p| p.finish_surfaceless())?;
         let context = Context {
             display: context,
-            ctx_lock: Mutex::new(CtxLock {
-                device: el
-                    .gbm_device()
-                    .ok_or(CreationError::NotSupported("GBM is not initialized".into()))?,
-                surface: None,
-                previous_fb: None,
-                previous_bo: None,
-            }),
+            ctx_lock: Mutex::new(CtxLock { surface: None, previous_fb: None, previous_bo: None }),
+            device: el
+                .gbm_device()
+                .ok_or(CreationError::NotSupported("GBM is not initialized".into()))?,
             depth: pf_reqs.depth_bits.unwrap_or(0) as u32,
             mode: el
                 .gbm_mode()
@@ -133,8 +126,8 @@ impl Context {
 
     #[inline]
     pub fn new_raw_context(
-        display_ptr_mtx: &'static parking_lot::Mutex<
-            AssertSync<Result<gbm::Device<crate::platform::unix::Card>, std::io::Error>>,
+        display_ptr: &'static AssertSync<
+            Result<gbm::Device<crate::platform::unix::Card>, std::io::Error>,
         >,
         width: u32,
         height: u32,
@@ -144,7 +137,6 @@ impl Context {
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<Self, CreationError> {
-        let display_ptr = display_ptr_mtx.lock();
         let mut gl_attr = gl_attr.clone().map_sharing(|c| &**c);
         gl_attr.vsync = true;
         let format = pf_to_fmt!(pf_reqs);
@@ -177,11 +169,11 @@ impl Context {
             display,
             mode,
             ctx_lock: Mutex::new(CtxLock {
-                device: display_ptr_mtx,
                 surface: Some(surface),
                 previous_fb: None,
                 previous_bo: None,
             }),
+            device: display_ptr,
             depth: pf_reqs.depth_bits.unwrap_or(0) as u32,
             bpp: pf_reqs.alpha_bits.unwrap_or(0) as u32 + pf_reqs.color_bits.unwrap_or(0) as u32,
             crtc: crt.clone(),
@@ -242,19 +234,19 @@ impl Context {
                     Err(ContextError::OsError(format!("Error locking front buffer: {}", e)))
                 })?
         };
-        let d_lock = lock.device.lock();
-        let fb = d_lock
+        let fb = self
+            .device
             .as_ref()
             .or(Err(ContextError::OsError("GBM is uninitialized".to_string())))?
             .add_framebuffer(&front_buffer, self.depth, self.bpp)
             .or_else(|e| Err(ContextError::OsError(format!("Error adding framebuffer: {}", e))))?;
-        d_lock
+        self.device
             .as_ref()
             .or(Err(ContextError::OsError("GBM is uninitialized".to_string())))?
             .set_crtc(self.crtc.handle(), Some(fb), (0, 0), &[self.connector], Some(self.mode))
             .or_else(|e| Err(ContextError::OsError(format!("Error setting crtc: {}", e))))?;
         if let Some(prev_fb) = lock.previous_fb {
-            d_lock
+            self.device
                 .as_ref()
                 .or(Err(ContextError::OsError("GBM is uninitialized".to_string())))?
                 .destroy_framebuffer(prev_fb)
