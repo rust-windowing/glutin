@@ -19,9 +19,7 @@ use crate::api::egl::SurfaceType as EglSurfaceType;
 macro_rules! pf_to_fmt {
     ($pf:expr) => {
         match ($pf.color_bits, $pf.alpha_bits, $pf.srgb) {
-            (Some(24), Some(0) | None, _) => gbm::Format::Rgb888,
             (Some(24), Some(8), _) => gbm::Format::Xrgb8888,
-            (Some(12), Some(4), false) => gbm::Format::Xrgb4444,
             _ => gbm::Format::Xrgb8888,
         }
     };
