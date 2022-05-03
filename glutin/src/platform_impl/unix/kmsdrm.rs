@@ -227,8 +227,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn swap_buffers(&self) -> Result<(), ContextError> {
-        (**self).swap_buffers()?;
+    fn finish_swap_buffers(&self) -> Result<(), ContextError> {
         let mut lock = self.ctx_lock.lock();
         let front_buffer = unsafe {
             lock.surface
@@ -265,13 +264,24 @@ impl Context {
     }
 
     #[inline]
+    pub fn swap_buffers(&self) -> Result<(), ContextError> {
+        (**self).swap_buffers()?;
+        self.finish_swap_buffers()
+    }
+
+    #[inline]
     pub fn swap_buffers_with_damage(&self, rects: &[Rect]) -> Result<(), ContextError> {
-        (**self).swap_buffers_with_damage(rects)
+        (**self).swap_buffers_with_damage(rects)?;
+        self.finish_swap_buffers()
     }
 
     #[inline]
     pub fn swap_buffers_with_damage_supported(&self) -> bool {
-        (**self).swap_buffers_with_damage_supported()
+        let ret = (**self).swap_buffers_with_damage_supported();
+        if let Err(_) = self.finish_swap_buffers() {
+            return false;
+        }
+        ret
     }
 
     #[inline]
