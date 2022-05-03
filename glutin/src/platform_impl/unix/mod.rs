@@ -477,8 +477,7 @@ pub trait RawContextExt {
         width: u32,
         height: u32,
         crt: &drm::control::crtc::Info,
-        con: &drm::control::connector::Info,
-        mode: drm::control::Mode,
+        plane: drm::control::plane::Handle,
     ) -> Result<crate::RawContext<NotCurrent>, CreationError>
     where
         Self: Sized;
@@ -541,8 +540,7 @@ impl<'a, T: ContextCurrentState> RawContextExt for crate::ContextBuilder<'a, T> 
         width: u32,
         height: u32,
         crt: &drm::control::crtc::Info,
-        con: &drm::control::connector::Info,
-        mode: drm::control::Mode,
+        plane: drm::control::plane::Handle,
     ) -> Result<crate::RawContext<NotCurrent>, CreationError>
     where
         Self: Sized,
@@ -554,11 +552,9 @@ impl<'a, T: ContextCurrentState> RawContextExt for crate::ContextBuilder<'a, T> 
             Context::Drm(ref ctx) => ctx,
             _ => unreachable!(),
         });
-        kmsdrm::Context::new_raw_context(
-            drm_device, width, height, crt, con, mode, &pf_reqs, &gl_attr,
-        )
-        .map(|context| Context::Drm(context))
-        .map(|context| crate::Context { context, phantom: PhantomData })
-        .map(|context| crate::RawContext { context, window: () })
+        kmsdrm::Context::new_raw_context(drm_device, width, height, crt, plane, &pf_reqs, &gl_attr)
+            .map(|context| Context::Drm(context))
+            .map(|context| crate::Context { context, phantom: PhantomData })
+            .map(|context| crate::RawContext { context, window: () })
     }
 }

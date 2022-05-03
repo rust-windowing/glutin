@@ -1,11 +1,11 @@
 #![cfg(feature = "kmsdrm")]
 
-use drm::control::Device;
+use drm::control::{atomic::AtomicModeReq, property, AtomicCommitFlags, Device, ResourceHandle};
 use gbm::{AsRaw, BufferObjectFlags};
 use parking_lot::Mutex;
 use winit::{
     event_loop::EventLoopWindowTarget,
-    platform::unix::EventLoopWindowTargetExtUnix,
+    platform::unix::{Card, EventLoopWindowTargetExtUnix},
     window::{Window, WindowBuilder},
 };
 
@@ -47,9 +47,8 @@ pub struct Context {
     ctx_lock: parking_lot::Mutex<CtxLock>,
     depth: u32,
     bpp: u32,
-    connector: drm::control::connector::Handle,
+    plane: drm::control::plane::Handle,
     crtc: drm::control::crtc::Info,
-    mode: drm::control::Mode,
 }
 
 impl std::ops::Deref for Context {
@@ -58,6 +57,21 @@ impl std::ops::Deref for Context {
     fn deref(&self) -> &Self::Target {
         &self.display
     }
+}
+
+fn find_prop_id<T: ResourceHandle>(
+    card: &Card,
+    handle: T,
+    name: &'static str,
+) -> Option<property::Handle> {
+    let props = card.get_properties(handle).expect("Could not get props of connector");
+    let (ids, _vals) = props.as_props_and_values();
+    ids.iter()
+        .find(|&id| {
+            let info = card.get_property(*id).unwrap();
+            info.name().to_str().map(|x| x == name).unwrap_or(false)
+        })
+        .cloned()
 }
 
 impl Context {
@@ -80,6 +94,10 @@ impl Context {
         let display_ptr =
             gbm::Device::new(drm_ptr).map_err(|e| CreationError::OsError(e.to_string()))?;
         let native_display = NativeDisplay::Gbm(Some(display_ptr.as_raw() as *const _));
+        let crtc = el
+            .drm_crtc()
+            .ok_or(CreationError::NotSupported("GBM is not initialized".into()))?
+            .clone();
         let context = EglContext::new(
             pf_reqs,
             &gl_attr,
@@ -96,19 +114,12 @@ impl Context {
                 previous_bo: None,
                 device: display_ptr,
             }),
-            depth: pf_reqs.depth_bits.unwrap_or(0) as u32,
-            mode: el
-                .drm_mode()
+            plane: el
+                .drm_plane()
                 .ok_or(CreationError::NotSupported("GBM is not initialized".into()))?,
+            depth: pf_reqs.depth_bits.unwrap_or(0) as u32,
             bpp: pf_reqs.alpha_bits.unwrap_or(0) as u32 + pf_reqs.color_bits.unwrap_or(0) as u32,
-            crtc: el
-                .drm_crtc()
-                .ok_or(CreationError::NotSupported("GBM is not initialized".into()))?
-                .clone(),
-            connector: el
-                .drm_connector()
-                .ok_or(CreationError::NotSupported("GBM is not initialized".into()))?
-                .handle(),
+            crtc,
         };
         Ok(context)
     }
@@ -132,8 +143,7 @@ impl Context {
             width,
             height,
             el.drm_crtc().ok_or(CreationError::OsError("No crtc found".to_string()))?,
-            el.drm_connector().ok_or(CreationError::OsError("No connector found".to_string()))?,
-            el.drm_mode().ok_or(CreationError::OsError("No mode found".to_string()))?,
+            el.drm_plane().ok_or(CreationError::OsError("No plane found".to_string()))?,
             pf_reqs,
             gl_attr,
         )?;
@@ -146,8 +156,7 @@ impl Context {
         width: u32,
         height: u32,
         crt: &drm::control::crtc::Info,
-        con: &drm::control::connector::Info,
-        mode: drm::control::Mode,
+        plane: drm::control::plane::Handle,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<Self, CreationError> {
@@ -179,17 +188,16 @@ impl Context {
 
         let ctx = Context {
             display,
-            mode,
             ctx_lock: Mutex::new(CtxLock {
                 surface: Some(surface),
                 previous_fb: None,
                 previous_bo: None,
                 device: display_ptr,
             }),
+            plane,
             depth: pf_reqs.depth_bits.unwrap_or(0) as u32,
             bpp: pf_reqs.alpha_bits.unwrap_or(0) as u32 + pf_reqs.color_bits.unwrap_or(0) as u32,
             crtc: crt.clone(),
-            connector: con.handle(),
         };
         Ok(ctx)
     }
@@ -250,8 +258,20 @@ impl Context {
             .device
             .add_framebuffer(&front_buffer, self.depth, self.bpp)
             .or_else(|e| Err(ContextError::OsError(format!("Error adding framebuffer: {}", e))))?;
+        let mut atomic_req = AtomicModeReq::new();
+        atomic_req.add_property(
+            self.plane,
+            find_prop_id(&lock.device, self.plane, "FB_ID")
+                .ok_or(ContextError::OsError("Could not get FB_ID".to_string()))?,
+            property::Value::Framebuffer(Some(fb)),
+        );
+        atomic_req.add_property(
+            self.plane,
+            find_prop_id(&lock.device, self.plane, "CRTC_ID").expect("Could not get CRTC_ID"),
+            property::Value::CRTC(Some(self.crtc.handle())),
+        );
         lock.device
-            .set_crtc(self.crtc.handle(), Some(fb), (0, 0), &[self.connector], Some(self.mode))
+            .atomic_commit(AtomicCommitFlags::empty(), atomic_req)
             .or_else(|e| Err(ContextError::OsError(format!("Error setting crtc: {}", e))))?;
         if let Some(prev_fb) = lock.previous_fb {
             lock.device.destroy_framebuffer(prev_fb).or_else(|e| {
