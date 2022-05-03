@@ -1,11 +1,13 @@
 #![cfg(feature = "kmsdrm")]
 
+use std::sync::Arc;
+
 use drm::control::Device;
 use gbm::{AsRaw, BufferObjectFlags};
 use parking_lot::Mutex;
 use winit::{
     event_loop::EventLoopWindowTarget,
-    platform::unix::{AssertSync, EventLoopWindowTargetExtUnix},
+    platform::unix::EventLoopWindowTargetExtUnix,
     window::{Window, WindowBuilder},
 };
 
@@ -38,13 +40,13 @@ pub struct CtxLock {
     surface: Option<gbm::Surface<()>>,
     previous_bo: Option<gbm::BufferObject<()>>,
     previous_fb: Option<drm::control::framebuffer::Handle>,
+    device: gbm::Device<crate::platform::unix::Card>,
 }
 
 #[derive(Debug)]
 pub struct Context {
     display: EglContext,
     ctx_lock: parking_lot::Mutex<CtxLock>,
-    device: AssertSync<gbm::Device<crate::platform::unix::Card>>,
     depth: u32,
     bpp: u32,
     connector: drm::control::connector::Handle,
@@ -73,6 +75,7 @@ impl Context {
         let drm_ptr = el
             .drm_device()
             .ok_or(CreationError::NotSupported("GBM is not initialized".into()))?
+            .lock()
             .as_ref()
             .map_err(|e| CreationError::OsError(e.to_string()))?
             .clone();
@@ -89,8 +92,12 @@ impl Context {
         .and_then(|p| p.finish_surfaceless())?;
         let context = Context {
             display: context,
-            ctx_lock: Mutex::new(CtxLock { surface: None, previous_fb: None, previous_bo: None }),
-            device: AssertSync(display_ptr),
+            ctx_lock: Mutex::new(CtxLock {
+                surface: None,
+                previous_fb: None,
+                previous_bo: None,
+                device: display_ptr,
+            }),
             depth: pf_reqs.depth_bits.unwrap_or(0) as u32,
             mode: el
                 .drm_mode()
@@ -119,7 +126,11 @@ impl Context {
         let size = window.inner_size();
         let (width, height): (u32, u32) = size.into();
         let ctx = Self::new_raw_context(
-            el.drm_device().ok_or(CreationError::NotSupported("GBM is not initialized".into()))?,
+            el.drm_device()
+                .ok_or(CreationError::NotSupported("GBM is not initialized".into()))?
+                .lock()
+                .as_ref()
+                .map_err(|e| CreationError::OsError(e.to_string()))?,
             width,
             height,
             el.drm_crtc().ok_or(CreationError::OsError("No crtc found".to_string()))?,
@@ -133,7 +144,7 @@ impl Context {
 
     #[inline]
     pub fn new_raw_context(
-        display_ptr: &'static AssertSync<Result<crate::platform::unix::Card, std::io::Error>>,
+        display_ptr: &crate::platform::unix::Card,
         width: u32,
         height: u32,
         crt: &drm::control::crtc::Info,
@@ -144,8 +155,7 @@ impl Context {
     ) -> Result<Self, CreationError> {
         let mut gl_attr = gl_attr.clone().map_sharing(|c| &**c);
         gl_attr.vsync = true;
-        let drm_ptr =
-            display_ptr.as_ref().map_err(|e| CreationError::OsError(e.to_string()))?.clone();
+        let drm_ptr = display_ptr.clone();
         let display_ptr =
             gbm::Device::new(drm_ptr).map_err(|e| CreationError::OsError(e.to_string()))?;
         let format = pf_to_fmt!(pf_reqs);
@@ -176,8 +186,8 @@ impl Context {
                 surface: Some(surface),
                 previous_fb: None,
                 previous_bo: None,
+                device: display_ptr,
             }),
-            device: AssertSync(display_ptr),
             depth: pf_reqs.depth_bits.unwrap_or(0) as u32,
             bpp: pf_reqs.alpha_bits.unwrap_or(0) as u32 + pf_reqs.color_bits.unwrap_or(0) as u32,
             crtc: crt.clone(),
@@ -238,15 +248,15 @@ impl Context {
                     Err(ContextError::OsError(format!("Error locking front buffer: {}", e)))
                 })?
         };
-        let fb = self
+        let fb = lock
             .device
             .add_framebuffer(&front_buffer, self.depth, self.bpp)
             .or_else(|e| Err(ContextError::OsError(format!("Error adding framebuffer: {}", e))))?;
-        self.device
+        lock.device
             .set_crtc(self.crtc.handle(), Some(fb), (0, 0), &[self.connector], Some(self.mode))
             .or_else(|e| Err(ContextError::OsError(format!("Error setting crtc: {}", e))))?;
         if let Some(prev_fb) = lock.previous_fb {
-            self.device.destroy_framebuffer(prev_fb).or_else(|e| {
+            lock.device.destroy_framebuffer(prev_fb).or_else(|e| {
                 Err(ContextError::OsError(format!("Error destroying framebuffer: {}", e)))
             })?
         }

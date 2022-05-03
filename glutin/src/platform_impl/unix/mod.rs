@@ -473,9 +473,7 @@ pub trait RawContextExt {
     #[cfg(feature = "kmsdrm")]
     unsafe fn build_raw_drm_context(
         self,
-        drm_device: &'static winit::platform::unix::AssertSync<
-            Result<winit::platform::unix::Card, std::io::Error>,
-        >,
+        drm_device: &winit::platform::unix::Card,
         width: u32,
         height: u32,
         crt: &drm::control::crtc::Info,
@@ -539,9 +537,7 @@ impl<'a, T: ContextCurrentState> RawContextExt for crate::ContextBuilder<'a, T> 
     #[cfg(feature = "kmsdrm")]
     unsafe fn build_raw_drm_context(
         self,
-        drm_device: &'static winit::platform::unix::AssertSync<
-            Result<winit::platform::unix::Card, std::io::Error>,
-        >,
+        drm_device: &winit::platform::unix::Card,
         width: u32,
         height: u32,
         crt: &drm::control::crtc::Info,
