@@ -38,7 +38,7 @@ pub struct CtxLock {
 pub struct Context {
     display: EglContext,
     ctx_lock: parking_lot::Mutex<CtxLock>,
-    device: &'static AssertSync<Result<gbm::Device<crate::platform::unix::Card>, std::io::Error>>,
+    device: AssertSync<&'static gbm::Device<crate::platform::unix::Card>>,
     depth: u32,
     bpp: u32,
     connector: drm::control::connector::Handle,
@@ -64,12 +64,12 @@ impl Context {
     ) -> Result<Self, CreationError> {
         let mut gl_attr = gl_attr.clone().map_sharing(|c| &**c);
         gl_attr.vsync = true;
-        let display_ptr =
-            el.gbm_device().ok_or(CreationError::NotSupported("GBM is not initialized".into()))?;
-        let native_display = NativeDisplay::Gbm(Some(
-            display_ptr.as_ref().map_err(|e| CreationError::OsError(e.to_string()))?.as_raw()
-                as *const _,
-        ));
+        let display_ptr = el
+            .gbm_device()
+            .ok_or(CreationError::NotSupported("GBM is not initialized".into()))?
+            .as_ref()
+            .map_err(|e| CreationError::OsError(e.to_string()))?;
+        let native_display = NativeDisplay::Gbm(Some(display_ptr.as_raw() as *const _));
         let context = EglContext::new(
             pf_reqs,
             &gl_attr,
@@ -81,9 +81,12 @@ impl Context {
         let context = Context {
             display: context,
             ctx_lock: Mutex::new(CtxLock { surface: None, previous_fb: None, previous_bo: None }),
-            device: el
-                .gbm_device()
-                .ok_or(CreationError::NotSupported("GBM is not initialized".into()))?,
+            device: AssertSync(
+                el.gbm_device()
+                    .ok_or(CreationError::NotSupported("GBM is not initialized".into()))?
+                    .as_ref()
+                    .map_err(|e| CreationError::OsError(e.to_string()))?,
+            ),
             depth: pf_reqs.depth_bits.unwrap_or(0) as u32,
             mode: el
                 .gbm_mode()
@@ -139,22 +142,19 @@ impl Context {
     ) -> Result<Self, CreationError> {
         let mut gl_attr = gl_attr.clone().map_sharing(|c| &**c);
         gl_attr.vsync = true;
+        let display_ptr =
+            display_ptr.as_ref().map_err(|e| CreationError::OsError(e.to_string()))?;
         let format = pf_to_fmt!(pf_reqs);
 
         let context = EglContext::new(
             pf_reqs,
             &gl_attr,
-            NativeDisplay::Gbm(Some(
-                display_ptr.as_ref().map_err(|e| CreationError::OsError(e.to_string()))?.as_raw()
-                    as ffi::EGLNativeDisplayType,
-            )),
+            NativeDisplay::Gbm(Some(display_ptr.as_raw() as ffi::EGLNativeDisplayType)),
             EglSurfaceType::Window,
             |c, _| Ok(c[0]),
         )?;
 
         let surface: gbm::Surface<()> = display_ptr
-            .as_ref()
-            .map_err(|e| CreationError::OsError(e.to_string()))?
             .create_surface(
                 width,
                 height,
@@ -173,7 +173,7 @@ impl Context {
                 previous_fb: None,
                 previous_bo: None,
             }),
-            device: display_ptr,
+            device: AssertSync(display_ptr),
             depth: pf_reqs.depth_bits.unwrap_or(0) as u32,
             bpp: pf_reqs.alpha_bits.unwrap_or(0) as u32 + pf_reqs.color_bits.unwrap_or(0) as u32,
             crtc: crt.clone(),
@@ -236,23 +236,15 @@ impl Context {
         };
         let fb = self
             .device
-            .as_ref()
-            .or(Err(ContextError::OsError("GBM is uninitialized".to_string())))?
             .add_framebuffer(&front_buffer, self.depth, self.bpp)
             .or_else(|e| Err(ContextError::OsError(format!("Error adding framebuffer: {}", e))))?;
         self.device
-            .as_ref()
-            .or(Err(ContextError::OsError("GBM is uninitialized".to_string())))?
             .set_crtc(self.crtc.handle(), Some(fb), (0, 0), &[self.connector], Some(self.mode))
             .or_else(|e| Err(ContextError::OsError(format!("Error setting crtc: {}", e))))?;
         if let Some(prev_fb) = lock.previous_fb {
-            self.device
-                .as_ref()
-                .or(Err(ContextError::OsError("GBM is uninitialized".to_string())))?
-                .destroy_framebuffer(prev_fb)
-                .or_else(|e| {
-                    Err(ContextError::OsError(format!("Error destroying framebuffer: {}", e)))
-                })?
+            self.device.destroy_framebuffer(prev_fb).or_else(|e| {
+                Err(ContextError::OsError(format!("Error destroying framebuffer: {}", e)))
+            })?
         }
         lock.previous_fb = Some(fb);
         lock.previous_bo = Some(front_buffer);
