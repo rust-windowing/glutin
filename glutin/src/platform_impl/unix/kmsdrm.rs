@@ -112,16 +112,16 @@ impl Context {
             el.drm_plane().ok_or(CreationError::NotSupported("GBM is not initialized".into()))?;
         let context = Context {
             display: context,
+            crtc_id_property: find_prop_id(&display_ptr, plane, "CRTC_ID")
+                .ok_or(CreationError::NotSupported("Could not get CRTC_ID".into()))?,
+            fb_id_property: find_prop_id(&display_ptr, plane, "FB_ID")
+                .ok_or(CreationError::NotSupported("Could not get FB_ID".into()))?,
             ctx_lock: Mutex::new(CtxLock {
                 surface: None,
                 previous_fb: None,
                 previous_bo: None,
                 device: display_ptr,
             }),
-            crtc_id_property: find_prop_id(&display_ptr, plane, "CRTC_ID")
-                .ok_or(CreationError::NotSupported("Could not get CRTC_ID".into()))?,
-            fb_id_property: find_prop_id(&display_ptr, plane, "FB_ID")
-                .ok_or(CreationError::NotSupported("Could not get FB_ID".into()))?,
             plane,
             depth: pf_reqs.depth_bits.unwrap_or(0) as u32,
             bpp: pf_reqs.alpha_bits.unwrap_or(0) as u32 + pf_reqs.color_bits.unwrap_or(0) as u32,
@@ -194,16 +194,16 @@ impl Context {
 
         let ctx = Context {
             display,
+            crtc_id_property: find_prop_id(&display_ptr, plane, "CRTC_ID")
+                .ok_or(CreationError::NotSupported("Could not get CRTC_ID".into()))?,
+            fb_id_property: find_prop_id(&display_ptr, plane, "FB_ID")
+                .ok_or(CreationError::NotSupported("Could not get FB_ID".into()))?,
             ctx_lock: Mutex::new(CtxLock {
                 surface: Some(surface),
                 previous_fb: None,
                 previous_bo: None,
                 device: display_ptr,
             }),
-            crtc_id_property: find_prop_id(&display_ptr, plane, "CRTC_ID")
-                .ok_or(CreationError::NotSupported("Could not get CRTC_ID".into()))?,
-            fb_id_property: find_prop_id(&display_ptr, plane, "FB_ID")
-                .ok_or(CreationError::NotSupported("Could not get FB_ID".into()))?,
             plane,
             depth: pf_reqs.depth_bits.unwrap_or(0) as u32,
             bpp: pf_reqs.alpha_bits.unwrap_or(0) as u32 + pf_reqs.color_bits.unwrap_or(0) as u32,
