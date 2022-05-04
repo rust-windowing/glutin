@@ -1,5 +1,7 @@
 #![cfg(feature = "kmsdrm")]
 
+use std::{num::NonZeroU32, os::unix::prelude::FromRawFd};
+
 use drm::control::{atomic::AtomicModeReq, property, AtomicCommitFlags, Device, ResourceHandle};
 use gbm::{AsRaw, BufferObjectFlags};
 use parking_lot::Mutex;
@@ -10,8 +12,8 @@ use winit::{
 };
 
 use crate::{
-    api::egl::NativeDisplay, ContextError, CreationError, GlAttributes, PixelFormat,
-    PixelFormatRequirements, Rect,
+    api::egl::{Egl, NativeDisplay, EGL},
+    ContextError, CreationError, GlAttributes, PixelFormat, PixelFormatRequirements, Rect,
 };
 use glutin_egl_sys as ffi;
 
@@ -39,17 +41,26 @@ pub struct CtxLock {
     previous_bo: Option<gbm::BufferObject<()>>,
     previous_fb: Option<drm::control::framebuffer::Handle>,
     device: gbm::Device<crate::platform::unix::Card>,
-    mode_req: AtomicModeReq,
+    kms_fence: ffi::egl::types::EGLSyncKHR,
+    gpu_fence: ffi::egl::types::EGLSyncKHR,
+    kms_in_fence_fd: i32,
+    kms_out_fence_fd: i32,
 }
+
+unsafe impl Send for CtxLock {}
+unsafe impl Sync for CtxLock {}
 
 #[derive(Debug)]
 pub struct Context {
     display: EglContext,
     ctx_lock: parking_lot::Mutex<CtxLock>,
     fb_id_property: property::Handle,
+    out_fence_ptr_prop: property::Handle,
+    in_fence_fd_prop: property::Handle,
     depth: u32,
     bpp: u32,
     plane: drm::control::plane::Handle,
+    crtc: drm::control::crtc::Info,
 }
 
 impl std::ops::Deref for Context {
@@ -102,18 +113,27 @@ impl Context {
         .and_then(|p| p.finish_surfaceless())?;
         let plane =
             el.drm_plane().ok_or(CreationError::NotSupported("GBM is not initialized".into()))?;
+        let crtc = el.drm_crtc().ok_or(CreationError::OsError("No crtc found".to_string()))?;
         let context = Context {
             display: context,
             fb_id_property: find_prop_id(&display_ptr, plane, "FB_ID")
+                .ok_or(CreationError::NotSupported("Could not get FB_ID".into()))?,
+            out_fence_ptr_prop: find_prop_id(&display_ptr, crtc.handle(), "OUT_FENCE_PTR")
+                .ok_or(CreationError::NotSupported("Could not get FB_ID".into()))?,
+            in_fence_fd_prop: find_prop_id(&display_ptr, plane, "IN_FENCE_FD")
                 .ok_or(CreationError::NotSupported("Could not get FB_ID".into()))?,
             ctx_lock: Mutex::new(CtxLock {
                 surface: None,
                 previous_fb: None,
                 previous_bo: None,
                 device: display_ptr,
-                mode_req: AtomicModeReq::new(),
+                kms_fence: std::ptr::null(),
+                gpu_fence: std::ptr::null(),
+                kms_in_fence_fd: -1,
+                kms_out_fence_fd: -1,
             }),
             plane,
+            crtc: crtc.clone(),
             depth: pf_reqs.depth_bits.unwrap_or(0) as u32,
             bpp: pf_reqs.alpha_bits.unwrap_or(0) as u32 + pf_reqs.color_bits.unwrap_or(0) as u32,
         };
@@ -137,6 +157,7 @@ impl Context {
             width,
             height,
             el.drm_plane().ok_or(CreationError::OsError("No plane found".to_string()))?,
+            el.drm_crtc().ok_or(CreationError::OsError("No crtc found".to_string()))?.clone(),
             pf_reqs,
             gl_attr,
         )?;
@@ -149,6 +170,7 @@ impl Context {
         width: u32,
         height: u32,
         plane: drm::control::plane::Handle,
+        crtc: drm::control::crtc::Info,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<Self, CreationError> {
@@ -182,14 +204,22 @@ impl Context {
             display,
             fb_id_property: find_prop_id(&display_ptr, plane, "FB_ID")
                 .ok_or(CreationError::NotSupported("Could not get FB_ID".into()))?,
+            out_fence_ptr_prop: find_prop_id(&display_ptr, crtc.handle(), "OUT_FENCE_PTR")
+                .ok_or(CreationError::NotSupported("Could not get FB_ID".into()))?,
+            in_fence_fd_prop: find_prop_id(&display_ptr, plane, "IN_FENCE_FD")
+                .ok_or(CreationError::NotSupported("Could not get FB_ID".into()))?,
             ctx_lock: Mutex::new(CtxLock {
                 surface: Some(surface),
                 previous_fb: None,
                 previous_bo: None,
                 device: display_ptr,
-                mode_req: AtomicModeReq::new(),
+                kms_fence: std::ptr::null(),
+                gpu_fence: std::ptr::null(),
+                kms_in_fence_fd: -1,
+                kms_out_fence_fd: -1,
             }),
             plane,
+            crtc: crtc.clone(),
             depth: pf_reqs.depth_bits.unwrap_or(0) as u32,
             bpp: pf_reqs.alpha_bits.unwrap_or(0) as u32 + pf_reqs.color_bits.unwrap_or(0) as u32,
         };
@@ -237,8 +267,22 @@ impl Context {
     }
 
     #[inline]
-    fn finish_swap_buffers(&self) -> Result<(), ContextError> {
+    fn finish_swap_buffers(
+        &self,
+        egl: &Egl,
+        gpu_fence: *const std::os::raw::c_void,
+    ) -> Result<(), ContextError> {
         let mut lock = self.ctx_lock.lock();
+        lock.gpu_fence = gpu_fence;
+
+        lock.kms_in_fence_fd =
+            unsafe { egl.DupNativeFenceFDANDROID(self.display.get_egl_display(), lock.gpu_fence) };
+
+        unsafe {
+            egl.DestroySyncKHR(self.display.get_egl_display(), gpu_fence);
+        }
+        assert!(lock.kms_in_fence_fd != -1);
+
         let front_buffer = unsafe {
             lock.surface
                 .as_ref()
@@ -252,34 +296,126 @@ impl Context {
             .device
             .add_framebuffer(&front_buffer, self.depth, self.bpp)
             .or_else(|e| Err(ContextError::OsError(format!("Error adding framebuffer: {}", e))))?;
-        lock.mode_req.add_property(
+
+        if !lock.kms_fence.is_null() {
+            unsafe {
+                let mut status: i32 = 0;
+                while status != ffi::egl::CONDITION_SATISFIED as i32 {
+                    status = egl.ClientWaitSyncKHR(
+                        self.display.get_egl_display(),
+                        lock.kms_fence,
+                        0,
+                        ffi::egl::FOREVER,
+                    );
+                }
+                egl.DestroySyncKHR(self.display.get_egl_display(), lock.kms_fence);
+            }
+        }
+        let mut atomic_req = AtomicModeReq::new();
+        atomic_req.add_property(
             self.plane,
             self.fb_id_property,
             property::Value::Framebuffer(Some(fb)),
         );
+        if lock.kms_in_fence_fd != -1 {
+            let fence_ptr: *mut i32 = &mut lock.kms_out_fence_fd;
+            atomic_req.add_property(
+                self.crtc.handle(),
+                self.out_fence_ptr_prop,
+                property::Value::Unknown(fence_ptr as u64),
+            );
+            atomic_req.add_property(
+                self.plane,
+                self.in_fence_fd_prop,
+                property::Value::Object(Some(
+                    NonZeroU32::new(lock.kms_in_fence_fd as u32).unwrap(),
+                )),
+            );
+        }
         lock.device
-            .atomic_commit(AtomicCommitFlags::empty(), lock.mode_req.clone())
+            .atomic_commit(AtomicCommitFlags::NONBLOCK, atomic_req)
             .or_else(|e| Err(ContextError::OsError(format!("Error setting crtc: {}", e))))?;
         if let Some(prev_fb) = lock.previous_fb {
             lock.device.destroy_framebuffer(prev_fb).or_else(|e| {
                 Err(ContextError::OsError(format!("Error destroying framebuffer: {}", e)))
             })?
         }
+        if lock.kms_in_fence_fd != -1 {
+            unsafe {
+                drop(std::fs::File::from_raw_fd(lock.kms_in_fence_fd));
+            }
+            lock.kms_in_fence_fd = -1;
+        }
         lock.previous_fb = Some(fb);
         lock.previous_bo = Some(front_buffer);
+        lock.gpu_fence = std::ptr::null();
+        lock.kms_fence = std::ptr::null();
+        if lock.kms_out_fence_fd != -1 {
+            let attrib_list = [
+                ffi::egl::SYNC_NATIVE_FENCE_FD_ANDROID as i32,
+                lock.kms_out_fence_fd,
+                ffi::egl::NONE as i32,
+            ];
+
+            lock.kms_fence = unsafe {
+                egl.CreateSyncKHR(
+                    self.display.get_egl_display(),
+                    ffi::egl::SYNC_NATIVE_FENCE_ANDROID,
+                    attrib_list.as_ptr(),
+                )
+            };
+
+            assert!(!lock.kms_fence.is_null());
+            lock.kms_out_fence_fd = -1;
+            unsafe { egl.WaitSyncKHR(self.display.get_egl_display(), lock.kms_fence, 0) };
+        }
         Ok(())
     }
 
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
+        let egl = EGL.as_ref().unwrap();
+        let attrib_list = [
+            ffi::egl::SYNC_NATIVE_FENCE_FD_ANDROID as i32,
+            ffi::egl::NO_NATIVE_FENCE_FD_ANDROID,
+            ffi::egl::NONE as i32,
+        ];
+
+        let gpu_fence = unsafe {
+            egl.CreateSyncKHR(
+                self.display.get_egl_display(),
+                ffi::egl::SYNC_NATIVE_FENCE_ANDROID,
+                attrib_list.as_ptr(),
+            )
+        };
+
+        assert!(!gpu_fence.is_null());
+
         (**self).swap_buffers()?;
-        self.finish_swap_buffers()
+        self.finish_swap_buffers(egl, gpu_fence)
     }
 
     #[inline]
     pub fn swap_buffers_with_damage(&self, rects: &[Rect]) -> Result<(), ContextError> {
+        let egl = EGL.as_ref().unwrap();
+        let attrib_list = [
+            ffi::egl::SYNC_NATIVE_FENCE_FD_ANDROID as i32,
+            ffi::egl::NO_NATIVE_FENCE_FD_ANDROID,
+            ffi::egl::NONE as i32,
+        ];
+
+        let gpu_fence = unsafe {
+            egl.CreateSyncKHR(
+                self.display.get_egl_display(),
+                ffi::egl::SYNC_NATIVE_FENCE_ANDROID,
+                attrib_list.as_ptr(),
+            )
+        };
+
+        assert!(!gpu_fence.is_null());
+
         (**self).swap_buffers_with_damage(rects)?;
-        self.finish_swap_buffers()
+        self.finish_swap_buffers(egl, gpu_fence)
     }
 
     #[inline]

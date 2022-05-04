@@ -35,8 +35,11 @@ fn main() {
                 "EGL_EXT_platform_base",
                 "EGL_EXT_platform_x11",
                 "EGL_MESA_platform_gbm",
+                "EGL_ANDROID_native_fence_sync",
                 "EGL_EXT_platform_wayland",
                 "EGL_EXT_platform_device",
+                "EGL_KHR_fence_sync",
+                "EGL_KHR_wait_sync",
                 "EGL_KHR_swap_buffers_with_damage",
             ],
         );
