@@ -46,11 +46,9 @@ pub struct Context {
     display: EglContext,
     ctx_lock: parking_lot::Mutex<CtxLock>,
     fb_id_property: property::Handle,
-    crtc_id_property: property::Handle,
     depth: u32,
     bpp: u32,
     plane: drm::control::plane::Handle,
-    crtc: drm::control::crtc::Info,
 }
 
 impl std::ops::Deref for Context {
@@ -93,10 +91,6 @@ impl Context {
         let display_ptr =
             gbm::Device::new(drm_ptr).map_err(|e| CreationError::OsError(e.to_string()))?;
         let native_display = NativeDisplay::Gbm(Some(display_ptr.as_raw() as *const _));
-        let crtc = el
-            .drm_crtc()
-            .ok_or(CreationError::NotSupported("GBM is not initialized".into()))?
-            .clone();
         let context = EglContext::new(
             pf_reqs,
             &gl_attr,
@@ -109,8 +103,6 @@ impl Context {
             el.drm_plane().ok_or(CreationError::NotSupported("GBM is not initialized".into()))?;
         let context = Context {
             display: context,
-            crtc_id_property: find_prop_id(&display_ptr, plane, "CRTC_ID")
-                .ok_or(CreationError::NotSupported("Could not get CRTC_ID".into()))?,
             fb_id_property: find_prop_id(&display_ptr, plane, "FB_ID")
                 .ok_or(CreationError::NotSupported("Could not get FB_ID".into()))?,
             ctx_lock: Mutex::new(CtxLock {
@@ -122,7 +114,6 @@ impl Context {
             plane,
             depth: pf_reqs.depth_bits.unwrap_or(0) as u32,
             bpp: pf_reqs.alpha_bits.unwrap_or(0) as u32 + pf_reqs.color_bits.unwrap_or(0) as u32,
-            crtc,
         };
         Ok(context)
     }
@@ -143,7 +134,6 @@ impl Context {
                 .ok_or(CreationError::NotSupported("GBM is not initialized".into()))?,
             width,
             height,
-            el.drm_crtc().ok_or(CreationError::OsError("No crtc found".to_string()))?,
             el.drm_plane().ok_or(CreationError::OsError("No plane found".to_string()))?,
             pf_reqs,
             gl_attr,
@@ -156,7 +146,6 @@ impl Context {
         display_ptr: &crate::platform::unix::Card,
         width: u32,
         height: u32,
-        crt: &drm::control::crtc::Info,
         plane: drm::control::plane::Handle,
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
@@ -189,8 +178,6 @@ impl Context {
 
         let ctx = Context {
             display,
-            crtc_id_property: find_prop_id(&display_ptr, plane, "CRTC_ID")
-                .ok_or(CreationError::NotSupported("Could not get CRTC_ID".into()))?,
             fb_id_property: find_prop_id(&display_ptr, plane, "FB_ID")
                 .ok_or(CreationError::NotSupported("Could not get FB_ID".into()))?,
             ctx_lock: Mutex::new(CtxLock {
@@ -202,7 +189,6 @@ impl Context {
             plane,
             depth: pf_reqs.depth_bits.unwrap_or(0) as u32,
             bpp: pf_reqs.alpha_bits.unwrap_or(0) as u32 + pf_reqs.color_bits.unwrap_or(0) as u32,
-            crtc: crt.clone(),
         };
         Ok(ctx)
     }
@@ -268,11 +254,6 @@ impl Context {
             self.plane,
             self.fb_id_property,
             property::Value::Framebuffer(Some(fb)),
-        );
-        atomic_req.add_property(
-            self.plane,
-            self.crtc_id_property,
-            property::Value::CRTC(Some(self.crtc.handle())),
         );
         lock.device
             .atomic_commit(AtomicCommitFlags::empty(), atomic_req)

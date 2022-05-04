@@ -476,7 +476,6 @@ pub trait RawContextExt {
         drm_device: &winit::platform::unix::Card,
         width: u32,
         height: u32,
-        crt: &drm::control::crtc::Info,
         plane: drm::control::plane::Handle,
     ) -> Result<crate::RawContext<NotCurrent>, CreationError>
     where
@@ -539,7 +538,6 @@ impl<'a, T: ContextCurrentState> RawContextExt for crate::ContextBuilder<'a, T> 
         drm_device: &winit::platform::unix::Card,
         width: u32,
         height: u32,
-        crt: &drm::control::crtc::Info,
         plane: drm::control::plane::Handle,
     ) -> Result<crate::RawContext<NotCurrent>, CreationError>
     where
@@ -552,7 +550,7 @@ impl<'a, T: ContextCurrentState> RawContextExt for crate::ContextBuilder<'a, T> 
             Context::Drm(ref ctx) => ctx,
             _ => unreachable!(),
         });
-        kmsdrm::Context::new_raw_context(drm_device, width, height, crt, plane, &pf_reqs, &gl_attr)
+        kmsdrm::Context::new_raw_context(drm_device, width, height, plane, &pf_reqs, &gl_attr)
             .map(|context| Context::Drm(context))
             .map(|context| crate::Context { context, phantom: PhantomData })
             .map(|context| crate::RawContext { context, window: () })
