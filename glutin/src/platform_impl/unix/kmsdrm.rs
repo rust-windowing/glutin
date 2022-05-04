@@ -102,7 +102,8 @@ impl Context {
             .clone();
         let display_ptr =
             gbm::Device::new(drm_ptr).map_err(|e| CreationError::OsError(e.to_string()))?;
-        let native_display = NativeDisplay::Gbm(Some(display_ptr.as_raw() as *const _));
+        let native_display =
+            NativeDisplay::Gbm(Some(display_ptr.as_raw() as ffi::EGLNativeDisplayType));
         let context = EglContext::new(
             pf_reqs,
             &gl_attr,
