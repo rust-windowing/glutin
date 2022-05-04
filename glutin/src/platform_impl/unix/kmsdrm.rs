@@ -258,7 +258,7 @@ impl Context {
             property::Value::Framebuffer(Some(fb)),
         );
         lock.device
-            .atomic_commit(AtomicCommitFlags::empty(), lock.mode_req)
+            .atomic_commit(AtomicCommitFlags::empty(), lock.mode_req.clone())
             .or_else(|e| Err(ContextError::OsError(format!("Error setting crtc: {}", e))))?;
         if let Some(prev_fb) = lock.previous_fb {
             lock.device.destroy_framebuffer(prev_fb).or_else(|e| {
