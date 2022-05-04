@@ -39,6 +39,7 @@ pub struct CtxLock {
     previous_bo: Option<gbm::BufferObject<()>>,
     previous_fb: Option<drm::control::framebuffer::Handle>,
     device: gbm::Device<crate::platform::unix::Card>,
+    mode_req: AtomicModeReq,
 }
 
 #[derive(Debug)]
@@ -110,6 +111,7 @@ impl Context {
                 previous_fb: None,
                 previous_bo: None,
                 device: display_ptr,
+                mode_req: AtomicModeReq::new(),
             }),
             plane,
             depth: pf_reqs.depth_bits.unwrap_or(0) as u32,
@@ -185,6 +187,7 @@ impl Context {
                 previous_fb: None,
                 previous_bo: None,
                 device: display_ptr,
+                mode_req: AtomicModeReq::new(),
             }),
             plane,
             depth: pf_reqs.depth_bits.unwrap_or(0) as u32,
@@ -249,14 +252,13 @@ impl Context {
             .device
             .add_framebuffer(&front_buffer, self.depth, self.bpp)
             .or_else(|e| Err(ContextError::OsError(format!("Error adding framebuffer: {}", e))))?;
-        let mut atomic_req = AtomicModeReq::new();
-        atomic_req.add_property(
+        lock.mode_req.add_property(
             self.plane,
             self.fb_id_property,
             property::Value::Framebuffer(Some(fb)),
         );
         lock.device
-            .atomic_commit(AtomicCommitFlags::empty(), atomic_req)
+            .atomic_commit(AtomicCommitFlags::empty(), lock.mode_req)
             .or_else(|e| Err(ContextError::OsError(format!("Error setting crtc: {}", e))))?;
         if let Some(prev_fb) = lock.previous_fb {
             lock.device.destroy_framebuffer(prev_fb).or_else(|e| {
