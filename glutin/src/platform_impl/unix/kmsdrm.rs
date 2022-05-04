@@ -45,6 +45,8 @@ pub struct CtxLock {
 pub struct Context {
     display: EglContext,
     ctx_lock: parking_lot::Mutex<CtxLock>,
+    fb_id_property: property::Handle,
+    crtc_id_property: property::Handle,
     depth: u32,
     bpp: u32,
     plane: drm::control::plane::Handle,
@@ -106,6 +108,8 @@ impl Context {
             |c, _| Ok(c[0]),
         )
         .and_then(|p| p.finish_surfaceless())?;
+        let plane =
+            el.drm_plane().ok_or(CreationError::NotSupported("GBM is not initialized".into()))?;
         let context = Context {
             display: context,
             ctx_lock: Mutex::new(CtxLock {
@@ -114,9 +118,11 @@ impl Context {
                 previous_bo: None,
                 device: display_ptr,
             }),
-            plane: el
-                .drm_plane()
-                .ok_or(CreationError::NotSupported("GBM is not initialized".into()))?,
+            crtc_id_property: find_prop_id(&display_ptr, plane, "CRTC_ID")
+                .ok_or(CreationError::NotSupported("Could not get CRTC_ID".into()))?,
+            fb_id_property: find_prop_id(&display_ptr, plane, "FB_ID")
+                .ok_or(CreationError::NotSupported("Could not get FB_ID".into()))?,
+            plane,
             depth: pf_reqs.depth_bits.unwrap_or(0) as u32,
             bpp: pf_reqs.alpha_bits.unwrap_or(0) as u32 + pf_reqs.color_bits.unwrap_or(0) as u32,
             crtc,
@@ -194,6 +200,10 @@ impl Context {
                 previous_bo: None,
                 device: display_ptr,
             }),
+            crtc_id_property: find_prop_id(&display_ptr, plane, "CRTC_ID")
+                .ok_or(CreationError::NotSupported("Could not get CRTC_ID".into()))?,
+            fb_id_property: find_prop_id(&display_ptr, plane, "FB_ID")
+                .ok_or(CreationError::NotSupported("Could not get FB_ID".into()))?,
             plane,
             depth: pf_reqs.depth_bits.unwrap_or(0) as u32,
             bpp: pf_reqs.alpha_bits.unwrap_or(0) as u32 + pf_reqs.color_bits.unwrap_or(0) as u32,
@@ -261,13 +271,12 @@ impl Context {
         let mut atomic_req = AtomicModeReq::new();
         atomic_req.add_property(
             self.plane,
-            find_prop_id(&lock.device, self.plane, "FB_ID")
-                .ok_or(ContextError::OsError("Could not get FB_ID".to_string()))?,
+            self.fb_id_property,
             property::Value::Framebuffer(Some(fb)),
         );
         atomic_req.add_property(
             self.plane,
-            find_prop_id(&lock.device, self.plane, "CRTC_ID").expect("Could not get CRTC_ID"),
+            self.crtc_id_property,
             property::Value::CRTC(Some(self.crtc.handle())),
         );
         lock.device
