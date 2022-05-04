@@ -89,9 +89,6 @@ impl Context {
         let drm_ptr = el
             .drm_device()
             .ok_or(CreationError::NotSupported("GBM is not initialized".into()))?
-            .lock()
-            .as_ref()
-            .map_err(|e| CreationError::OsError(e.to_string()))?
             .clone();
         let display_ptr =
             gbm::Device::new(drm_ptr).map_err(|e| CreationError::OsError(e.to_string()))?;
@@ -142,10 +139,8 @@ impl Context {
         let (width, height): (u32, u32) = size.into();
         let ctx = Self::new_raw_context(
             el.drm_device()
-                .ok_or(CreationError::NotSupported("GBM is not initialized".into()))?
-                .lock()
                 .as_ref()
-                .map_err(|e| CreationError::OsError(e.to_string()))?,
+                .ok_or(CreationError::NotSupported("GBM is not initialized".into()))?,
             width,
             height,
             el.drm_crtc().ok_or(CreationError::OsError("No crtc found".to_string()))?,
