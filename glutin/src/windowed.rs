@@ -171,6 +171,14 @@ impl<W> ContextWrapper<PossiblyCurrent, W> {
         let (width, height) = size.into();
         self.context.context.resize(width, height);
     }
+
+    /// Query the underlying surface back's buffer age.
+    ///
+    /// Return `n` is the number of frames elapsed since it was most recently
+    /// drawn.
+    pub fn buffer_age(&self) -> u32 {
+        self.context.context.buffer_age()
+    }
 }
 
 impl<T: ContextCurrentState, W> ContextWrapper<T, W> {

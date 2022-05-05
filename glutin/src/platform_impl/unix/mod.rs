@@ -281,6 +281,17 @@ impl Context {
     }
 
     #[inline]
+    pub fn buffer_age(&self) -> u32 {
+        match *self {
+            #[cfg(feature = "x11")]
+            Context::X11(ref ctx) => ctx.buffer_age(),
+            #[cfg(feature = "wayland")]
+            Context::Wayland(ref ctx) => ctx.buffer_age(),
+            _ => unreachable!(),
+        }
+    }
+
+    #[inline]
     pub fn swap_buffers_with_damage_supported(&self) -> bool {
         match *self {
             #[cfg(feature = "x11")]

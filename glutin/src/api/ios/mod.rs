@@ -306,6 +306,11 @@ impl Context {
     }
 
     #[inline]
+    pub fn buffer_age(&self) -> u32 {
+        0
+    }
+
+    #[inline]
     pub fn swap_buffers_with_damage(&self, _rects: &[Rect]) -> Result<(), ContextError> {
         Err(ContextError::OsError("buffer damage not suported".to_string()))
     }

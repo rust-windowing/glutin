@@ -44,7 +44,6 @@ pub enum X11Context {
 
 #[derive(Debug)]
 pub struct ContextInner {
-    xconn: Arc<XConnection>,
     context: X11Context,
 }
 
@@ -225,7 +224,7 @@ impl Context {
                 Prototype::Egl(ctx) => X11Context::Egl(ctx.finish_pbuffer(size)?),
             };
 
-            let context = Context::PBuffer(ContextInner { xconn: Arc::clone(&xconn), context });
+            let context = Context::PBuffer(ContextInner { context });
 
             Ok(context)
         } else {
@@ -269,7 +268,7 @@ impl Context {
                 _ => unimplemented!(),
             };
 
-            let context = Context::Surfaceless(ContextInner { xconn: Arc::clone(&xconn), context });
+            let context = Context::Surfaceless(ContextInner { context });
 
             Ok(context)
         }
@@ -496,7 +495,7 @@ impl Context {
             Prototype::Egl(ctx) => X11Context::Egl(ctx.finish(xwin as _)?),
         };
 
-        let context = Context::Windowed(ContextInner { xconn: Arc::clone(&xconn), context });
+        let context = Context::Windowed(ContextInner { context });
 
         Ok((win, context))
     }
@@ -570,7 +569,7 @@ impl Context {
             Prototype::Egl(ctx) => X11Context::Egl(ctx.finish(xwin as _)?),
         };
 
-        let context = Context::Windowed(ContextInner { xconn: Arc::clone(&xconn), context });
+        let context = Context::Windowed(ContextInner { context });
 
         Ok(context)
     }
@@ -625,6 +624,14 @@ impl Context {
         match self.context {
             X11Context::Glx(ref ctx) => ctx.get_proc_address(addr),
             X11Context::Egl(ref ctx) => ctx.get_proc_address(addr),
+        }
+    }
+
+    #[inline]
+    pub fn buffer_age(&self) -> u32 {
+        match self.context {
+            X11Context::Glx(ref ctx) => ctx.buffer_age(),
+            X11Context::Egl(ref ctx) => ctx.buffer_age(),
         }
     }
 

@@ -1,5 +1,7 @@
 # Unreleased
 
+- Fix crash when creating OpenGLES context without explicit version
+- Add `buffer_age` method on `WindowedContext`
 - Changed `get_proc_address` to take a &CStr instead of a &str.
 
 # Version 0.28.0 (2021-12-02)

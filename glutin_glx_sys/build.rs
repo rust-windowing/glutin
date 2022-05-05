@@ -27,17 +27,18 @@ fn main() {
             Profile::Core,
             Fallbacks::All,
             [
+                "GLX_ARB_context_flush_control",
                 "GLX_ARB_create_context",
                 "GLX_ARB_create_context_profile",
                 "GLX_ARB_create_context_robustness",
-                "GLX_ARB_context_flush_control",
                 "GLX_ARB_fbconfig_float",
                 "GLX_ARB_framebuffer_sRGB",
-                "GLX_EXT_framebuffer_sRGB",
                 "GLX_ARB_multisample",
+                "GLX_EXT_buffer_age",
+                "GLX_EXT_framebuffer_sRGB",
                 "GLX_EXT_swap_control",
-                "GLX_SGI_swap_control",
                 "GLX_MESA_swap_control",
+                "GLX_SGI_swap_control",
             ],
         )
         .write_bindings(gl_generator::StructGenerator, &mut file)

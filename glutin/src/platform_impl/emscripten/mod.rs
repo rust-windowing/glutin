@@ -142,6 +142,11 @@ impl Context {
     }
 
     #[inline]
+    pub fn buffer_age(&self) -> u32 {
+        0
+    }
+
+    #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
         Ok(())
     }
