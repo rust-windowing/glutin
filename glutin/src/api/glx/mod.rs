@@ -187,6 +187,24 @@ impl Context {
     }
 
     #[inline]
+    pub fn buffer_age(&self) -> u32 {
+        let glx = GLX.as_ref().unwrap();
+
+        let mut buffer_age = 0;
+
+        unsafe {
+            glx.QueryDrawable(
+                self.xconn.display as *mut _,
+                self.drawable,
+                ffi::glx_extra::BACK_BUFFER_AGE_EXT as i32,
+                &mut buffer_age,
+            );
+        }
+
+        buffer_age
+    }
+
+    #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
         self.pixel_format.clone()
     }

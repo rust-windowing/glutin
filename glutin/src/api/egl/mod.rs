@@ -668,6 +668,28 @@ impl Context {
     pub fn get_pixel_format(&self) -> PixelFormat {
         self.pixel_format.clone()
     }
+
+    #[inline]
+    pub fn buffer_age(&self) -> u32 {
+        let egl = EGL.as_ref().unwrap();
+        let surface = self.surface.as_ref().unwrap().lock();
+
+        let mut buffer_age = 0;
+        let result = unsafe {
+            egl.QuerySurface(
+                self.display,
+                *surface as *const _,
+                ffi::egl::BUFFER_AGE_EXT as i32,
+                &mut buffer_age,
+            )
+        };
+
+        if result == ffi::egl::FALSE {
+            0
+        } else {
+            buffer_age as u32
+        }
+    }
 }
 
 unsafe impl Send for Context {}
