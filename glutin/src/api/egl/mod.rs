@@ -364,7 +364,7 @@ fn get_native_display(native_display: &NativeDisplay) -> *const raw::c_void {
                 ffi::egl::DEFAULT_DISPLAY as *mut _,
                 std::ptr::null(),
             )
-        }
+        },
 
         NativeDisplay::Device(display)
             if has_dp_extension("EGL_EXT_platform_device")
@@ -375,7 +375,7 @@ fn get_native_display(native_display: &NativeDisplay) -> *const raw::c_void {
                 display as *mut _,
                 std::ptr::null(),
             )
-        }
+        },
 
         NativeDisplay::X11(Some(display))
         | NativeDisplay::Gbm(Some(display))
@@ -1054,7 +1054,7 @@ where
                 out.push(ffi::egl::CONFORMANT as raw::c_int);
                 out.push(ffi::egl::OPENGL_ES2_BIT as raw::c_int);
             }
-            (Api::OpenGlEs, Some((1, _))) => {
+            (Api::OpenGlEs, _) => {
                 if egl_version >= &(1, 3) {
                     out.push(ffi::egl::RENDERABLE_TYPE as raw::c_int);
                     out.push(ffi::egl::OPENGL_ES_BIT as raw::c_int);
@@ -1062,7 +1062,6 @@ where
                     out.push(ffi::egl::OPENGL_ES_BIT as raw::c_int);
                 }
             }
-            (Api::OpenGlEs, _) => unimplemented!(),
             (Api::OpenGl, _) => {
                 if egl_version < &(1, 3) {
                     return Err(CreationError::NoAvailablePixelFormat);

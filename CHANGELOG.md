@@ -1,3 +1,7 @@
+# Unreleased
+
+- Fix crash when creating OpenGLES context without explicit version
+
 # Version 0.28.0 (2021-12-02)
 
 - On Windows, fixed a panic for headless contexts because of active drag-and-drop (OleInitialize failed! Result was: `RPC_E_CHANGED_MODE`)
