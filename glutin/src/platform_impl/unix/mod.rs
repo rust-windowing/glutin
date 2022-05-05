@@ -6,8 +6,8 @@
     target_os = "openbsd",
 ))]
 
-#[cfg(not(any(feature = "x11", feature = "wayland")))]
-compile_error!("at least one of the 'x11' or 'wayland' features must be enabled");
+#[cfg(not(any(feature = "x11", feature = "wayland", feature = "kmsdrm")))]
+compile_error!("at least one of the 'x11' or 'wayland' or `kmsdrm` features must be enabled");
 
 mod kmsdrm;
 mod wayland;
