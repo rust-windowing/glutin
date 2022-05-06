@@ -1,3 +1,8 @@
+# Unreleased
+
+- Fix crash when creating OpenGLES context without explicit version
+- Add `buffer_age` method on `WindowedContext`
+
 # Version 0.28.0 (2021-12-02)
 
 - On Linux, add KMS/DRM support
