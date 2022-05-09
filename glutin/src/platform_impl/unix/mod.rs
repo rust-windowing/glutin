@@ -20,6 +20,7 @@ use crate::{
     Api, ContextCurrentState, ContextError, CreationError, GlAttributes, NotCurrent, PixelFormat,
     PixelFormatRequirements, Rect,
 };
+use winit::platform::unix::Backend;
 #[cfg(feature = "x11")]
 pub use x11::utils as x11_utils;
 
@@ -115,39 +116,41 @@ impl Context {
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<(Window, Self), CreationError> {
-        #[cfg(feature = "wayland")]
-        if el.is_wayland() {
-            Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
+        match el.unix_backend() {
+            #[cfg(feature = "wayland")]
+            Backend::Wayland => {
+                Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
 
-            let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
-                Context::Wayland(ref ctx) => ctx,
-                _ => unreachable!(),
-            });
-            return wayland::Context::new(wb, el, pf_reqs, &gl_attr)
-                .map(|(win, context)| (win, Context::Wayland(context)));
-        }
-        #[cfg(feature = "x11")]
-        if el.is_x11() {
-            Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
-            let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
-                Context::X11(ref ctx) => ctx,
-                _ => unreachable!(),
-            });
-            return x11::Context::new(wb, el, pf_reqs, &gl_attr)
-                .map(|(win, context)| (win, Context::X11(context)));
-        }
-        #[cfg(feature = "kms")]
-        if el.is_drm() {
-            Context::is_compatible(&gl_attr.sharing, ContextType::Drm)?;
+                let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
+                    Context::Wayland(ref ctx) => ctx,
+                    _ => unreachable!(),
+                });
+                return wayland::Context::new(wb, el, pf_reqs, &gl_attr)
+                    .map(|(win, context)| (win, Context::Wayland(context)));
+            }
+            #[cfg(feature = "x11")]
+            Backend::X => {
+                Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
+                let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
+                    Context::X11(ref ctx) => ctx,
+                    _ => unreachable!(),
+                });
+                return x11::Context::new(wb, el, pf_reqs, &gl_attr)
+                    .map(|(win, context)| (win, Context::X11(context)));
+            }
+            #[cfg(feature = "kms")]
+            Backend::Kms => {
+                Context::is_compatible(&gl_attr.sharing, ContextType::Drm)?;
 
-            let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
-                Context::Drm(ref ctx) => ctx,
-                _ => unreachable!(),
-            });
-            return kms::Context::new(wb, el, pf_reqs, &gl_attr)
-                .map(|(win, context)| (win, Context::Drm(context)));
+                let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
+                    Context::Drm(ref ctx) => ctx,
+                    _ => unreachable!(),
+                });
+                return kms::Context::new(wb, el, pf_reqs, &gl_attr)
+                    .map(|(win, context)| (win, Context::Drm(context)));
+            }
+            _ => panic!("glutin was not compiled with support for this display server"),
         }
-        panic!("glutin was not compiled with support for this display server")
     }
 
     #[inline]

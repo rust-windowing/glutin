@@ -27,6 +27,7 @@ wayland = [
 ]
 wayland-dlopen = ["winit/wayland-dlopen"]
 kms = ["drm", "gbm", "winit/kms"]
+kms-ext = ["winit/kms-ext"]
 default = ["x11", "wayland", "wayland-dlopen", "kms"]
 
 [dependencies]
