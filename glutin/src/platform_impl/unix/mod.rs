@@ -6,10 +6,10 @@
     target_os = "openbsd",
 ))]
 
-#[cfg(not(any(feature = "x11", feature = "wayland", feature = "kmsdrm")))]
-compile_error!("at least one of the 'x11' or 'wayland' or `kmsdrm` features must be enabled");
+#[cfg(not(any(feature = "x11", feature = "wayland", feature = "kms")))]
+compile_error!("at least one of the 'x11' or 'wayland' or `kms` features must be enabled");
 
-mod kmsdrm;
+mod kms;
 mod wayland;
 mod x11;
 
@@ -51,7 +51,7 @@ pub enum ContextType {
     X11,
     #[cfg(feature = "wayland")]
     Wayland,
-    #[cfg(feature = "kmsdrm")]
+    #[cfg(feature = "kms")]
     Drm,
     OsMesa,
 }
@@ -62,8 +62,8 @@ pub enum Context {
     X11(x11::Context),
     #[cfg(feature = "wayland")]
     Wayland(wayland::Context),
-    #[cfg(feature = "kmsdrm")]
-    Drm(kmsdrm::Context),
+    #[cfg(feature = "kms")]
+    Drm(kms::Context),
     OsMesa(osmesa::OsMesaContext),
 }
 
@@ -94,7 +94,7 @@ impl Context {
                         return Err(CreationError::PlatformSpecific(msg.into()));
                     }
                 },
-                #[cfg(feature = "kmsdrm")]
+                #[cfg(feature = "kms")]
                 ContextType::Drm => match *c {
                     Context::Drm(_) => Ok(()),
                     _ => {
@@ -136,7 +136,7 @@ impl Context {
             return x11::Context::new(wb, el, pf_reqs, &gl_attr)
                 .map(|(win, context)| (win, Context::X11(context)));
         }
-        #[cfg(feature = "kmsdrm")]
+        #[cfg(feature = "kms")]
         if el.is_drm() {
             Context::is_compatible(&gl_attr.sharing, ContextType::Drm)?;
 
@@ -144,7 +144,7 @@ impl Context {
                 Context::Drm(ref ctx) => ctx,
                 _ => unreachable!(),
             });
-            return kmsdrm::Context::new(wb, el, pf_reqs, &gl_attr)
+            return kms::Context::new(wb, el, pf_reqs, &gl_attr)
                 .map(|(win, context)| (win, Context::Drm(context)));
         }
         panic!("glutin was not compiled with support for this display server")
@@ -186,14 +186,14 @@ impl Context {
             return x11::Context::new_headless(&el, pf_reqs, &gl_attr, size)
                 .map(|ctx| Context::X11(ctx));
         }
-        #[cfg(feature = "kmsdrm")]
+        #[cfg(feature = "kms")]
         if el.is_drm() {
             Context::is_compatible(&gl_attr.sharing, ContextType::Drm)?;
             let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
                 Context::Drm(ref ctx) => ctx,
                 _ => unreachable!(),
             });
-            return kmsdrm::Context::new_headless(&el, pf_reqs, &gl_attr, size)
+            return kms::Context::new_headless(&el, pf_reqs, &gl_attr, size)
                 .map(|ctx| Context::Drm(ctx));
         }
         panic!("glutin was not compiled with support for this display server")
@@ -206,7 +206,7 @@ impl Context {
             Context::X11(ref ctx) => ctx.make_current(),
             #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.make_current(),
-            #[cfg(feature = "kmsdrm")]
+            #[cfg(feature = "kms")]
             Context::Drm(ref ctx) => ctx.make_current(),
             Context::OsMesa(ref ctx) => ctx.make_current(),
         }
@@ -219,7 +219,7 @@ impl Context {
             Context::X11(ref ctx) => ctx.make_not_current(),
             #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.make_not_current(),
-            #[cfg(feature = "kmsdrm")]
+            #[cfg(feature = "kms")]
             Context::Drm(ref ctx) => ctx.make_not_current(),
             Context::OsMesa(ref ctx) => ctx.make_not_current(),
         }
@@ -232,7 +232,7 @@ impl Context {
             Context::X11(ref ctx) => ctx.is_current(),
             #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.is_current(),
-            #[cfg(feature = "kmsdrm")]
+            #[cfg(feature = "kms")]
             Context::Drm(ref ctx) => ctx.is_current(),
             Context::OsMesa(ref ctx) => ctx.is_current(),
         }
@@ -245,7 +245,7 @@ impl Context {
             Context::X11(ref ctx) => ctx.get_api(),
             #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.get_api(),
-            #[cfg(feature = "kmsdrm")]
+            #[cfg(feature = "kms")]
             Context::Drm(ref ctx) => ctx.get_api(),
             Context::OsMesa(ref ctx) => ctx.get_api(),
         }
@@ -261,7 +261,7 @@ impl Context {
             },
             #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => RawHandle::Egl(ctx.raw_handle()),
-            #[cfg(feature = "kmsdrm")]
+            #[cfg(feature = "kms")]
             Context::Drm(ref ctx) => RawHandle::Egl(ctx.raw_handle()),
             Context::OsMesa(ref ctx) => RawHandle::Egl(ctx.raw_handle()),
         }
@@ -274,7 +274,7 @@ impl Context {
             Context::X11(ref ctx) => ctx.get_egl_display(),
             #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.get_egl_display(),
-            #[cfg(feature = "kmsdrm")]
+            #[cfg(feature = "kms")]
             Context::Drm(ref ctx) => ctx.get_egl_display(),
             _ => None,
         }
@@ -288,7 +288,7 @@ impl Context {
             Context::X11(_) => (),
             #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.resize(width, height),
-            #[cfg(feature = "kmsdrm")]
+            #[cfg(feature = "kms")]
             Context::Drm(ref ctx) => ctx.resize(width, height),
             _ => unreachable!(),
         }
@@ -301,7 +301,7 @@ impl Context {
             Context::X11(ref ctx) => ctx.get_proc_address(addr),
             #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.get_proc_address(addr),
-            #[cfg(feature = "kmsdrm")]
+            #[cfg(feature = "kms")]
             Context::Drm(ref ctx) => ctx.get_proc_address(addr),
             Context::OsMesa(ref ctx) => ctx.get_proc_address(addr),
         }
@@ -314,7 +314,7 @@ impl Context {
             Context::X11(ref ctx) => ctx.swap_buffers(),
             #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.swap_buffers(),
-            #[cfg(feature = "kmsdrm")]
+            #[cfg(feature = "kms")]
             Context::Drm(ref ctx) => ctx.swap_buffers(),
             _ => unreachable!(),
         }
@@ -327,7 +327,7 @@ impl Context {
             Context::X11(ref ctx) => ctx.swap_buffers_with_damage(rects),
             #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.swap_buffers_with_damage(rects),
-            #[cfg(feature = "kmsdrm")]
+            #[cfg(feature = "kms")]
             Context::Drm(ref ctx) => ctx.swap_buffers_with_damage(rects),
             _ => unreachable!(),
         }
@@ -351,7 +351,7 @@ impl Context {
             Context::X11(ref ctx) => ctx.swap_buffers_with_damage_supported(),
             #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.swap_buffers_with_damage_supported(),
-            #[cfg(feature = "kmsdrm")]
+            #[cfg(feature = "kms")]
             Context::Drm(ref ctx) => ctx.swap_buffers_with_damage_supported(),
             _ => unreachable!(),
         }
@@ -364,7 +364,7 @@ impl Context {
             Context::X11(ref ctx) => ctx.get_pixel_format(),
             #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.get_pixel_format(),
-            #[cfg(feature = "kmsdrm")]
+            #[cfg(feature = "kms")]
             Context::Drm(ref ctx) => ctx.get_pixel_format(),
             _ => unreachable!(),
         }
@@ -481,7 +481,7 @@ pub trait RawContextExt {
     ///
     /// Unsafe behaviour might happen if you:
     ///   - Provide us with invalid parameters.
-    #[cfg(feature = "kmsdrm")]
+    #[cfg(feature = "kms")]
     unsafe fn build_raw_drm_context(
         self,
         drm_device: &winit::platform::unix::Card,
@@ -544,7 +544,7 @@ impl<'a, T: ContextCurrentState> RawContextExt for crate::ContextBuilder<'a, T> 
     }
 
     #[inline]
-    #[cfg(feature = "kmsdrm")]
+    #[cfg(feature = "kms")]
     unsafe fn build_raw_drm_context(
         self,
         drm_device: &winit::platform::unix::Card,
@@ -563,7 +563,7 @@ impl<'a, T: ContextCurrentState> RawContextExt for crate::ContextBuilder<'a, T> 
             Context::Drm(ref ctx) => ctx,
             _ => unreachable!(),
         });
-        kmsdrm::Context::new_raw_context(drm_device, width, height, plane, crtc, &pf_reqs, &gl_attr)
+        kms::Context::new_raw_context(drm_device, width, height, plane, crtc, &pf_reqs, &gl_attr)
             .map(|context| Context::Drm(context))
             .map(|context| crate::Context { context, phantom: PhantomData })
             .map(|context| crate::RawContext { context, window: () })

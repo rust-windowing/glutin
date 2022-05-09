@@ -1,4 +1,4 @@
-#![cfg(feature = "kmsdrm")]
+#![cfg(feature = "kms")]
 
 use std::{num::NonZeroU32, os::unix::prelude::FromRawFd};
 

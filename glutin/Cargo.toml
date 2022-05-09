@@ -26,8 +26,8 @@ wayland = [
   "wayland-egl",
 ]
 wayland-dlopen = ["winit/wayland-dlopen"]
-kmsdrm = ["drm", "gbm", "winit/kmsdrm"]
-default = ["x11", "wayland", "wayland-dlopen", "kmsdrm"]
+kms = ["drm", "gbm", "winit/kms"]
+default = ["x11", "wayland", "wayland-dlopen", "kms"]
 
 [dependencies]
 lazy_static = "1.4.0"
