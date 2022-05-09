@@ -149,6 +149,7 @@ impl Context {
                 return kms::Context::new(wb, el, pf_reqs, &gl_attr)
                     .map(|(win, context)| (win, Context::Drm(context)));
             }
+            #[cfg(not(all(feature = "x11", feature = "wayland", feature = "kms")))]
             _ => panic!("glutin was not compiled with support for this display server"),
         }
     }
@@ -169,37 +170,40 @@ impl Context {
         gl_attr: &GlAttributes<&Context>,
         size: Option<dpi::PhysicalSize<u32>>,
     ) -> Result<Self, CreationError> {
-        #[cfg(feature = "wayland")]
-        if el.is_wayland() {
-            Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
-            let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
-                Context::Wayland(ref ctx) => ctx,
-                _ => unreachable!(),
-            });
-            return wayland::Context::new_headless(&el, pf_reqs, &gl_attr, size)
-                .map(|ctx| Context::Wayland(ctx));
+        match el.unix_backend() {
+            #[cfg(feature = "wayland")]
+            Backend::Wayland => {
+                Context::is_compatible(&gl_attr.sharing, ContextType::Wayland)?;
+                let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
+                    Context::Wayland(ref ctx) => ctx,
+                    _ => unreachable!(),
+                });
+                return wayland::Context::new_headless(&el, pf_reqs, &gl_attr, size)
+                    .map(|ctx| Context::Wayland(ctx));
+            }
+            #[cfg(feature = "x11")]
+            Backend::X => {
+                Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
+                let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
+                    Context::X11(ref ctx) => ctx,
+                    _ => unreachable!(),
+                });
+                return x11::Context::new_headless(&el, pf_reqs, &gl_attr, size)
+                    .map(|ctx| Context::X11(ctx));
+            }
+            #[cfg(feature = "kms")]
+            Backend::Kms => {
+                Context::is_compatible(&gl_attr.sharing, ContextType::Drm)?;
+                let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
+                    Context::Drm(ref ctx) => ctx,
+                    _ => unreachable!(),
+                });
+                return kms::Context::new_headless(&el, pf_reqs, &gl_attr, size)
+                    .map(|ctx| Context::Drm(ctx));
+            }
+            #[cfg(not(all(feature = "x11", feature = "wayland", feature = "kms")))]
+            _ => panic!("glutin was not compiled with support for this display server"),
         }
-        #[cfg(feature = "x11")]
-        if el.is_x11() {
-            Context::is_compatible(&gl_attr.sharing, ContextType::X11)?;
-            let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
-                Context::X11(ref ctx) => ctx,
-                _ => unreachable!(),
-            });
-            return x11::Context::new_headless(&el, pf_reqs, &gl_attr, size)
-                .map(|ctx| Context::X11(ctx));
-        }
-        #[cfg(feature = "kms")]
-        if el.is_drm() {
-            Context::is_compatible(&gl_attr.sharing, ContextType::Drm)?;
-            let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
-                Context::Drm(ref ctx) => ctx,
-                _ => unreachable!(),
-            });
-            return kms::Context::new_headless(&el, pf_reqs, &gl_attr, size)
-                .map(|ctx| Context::Drm(ctx));
-        }
-        panic!("glutin was not compiled with support for this display server")
     }
 
     #[inline]
