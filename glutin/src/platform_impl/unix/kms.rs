@@ -253,14 +253,7 @@ impl Context {
     }
 
     #[inline]
-    pub fn resize(&self, _width: u32, _height: u32) {
-        /*
-        match self {
-        Context::Windowed(_, surface) => surface.0.resize(width as i32, height as i32, 0, 0),
-        _ => unreachable!(),
-        }
-        */
-    }
+    pub fn resize(&self, _width: u32, _height: u32) {}
 
     #[inline]
     pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
