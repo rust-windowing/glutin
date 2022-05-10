@@ -2,6 +2,7 @@
 
 - Fix crash when creating OpenGLES context without explicit version
 - Add `buffer_age` method on `WindowedContext`
+- Return an `Err` instead of panicking when surfaceless GLX context creation fails on Linux
 
 # Version 0.28.0 (2021-12-02)
 
