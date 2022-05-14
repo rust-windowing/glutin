@@ -201,8 +201,6 @@ impl Context {
                 return kms::Context::new_headless(&el, pf_reqs, &gl_attr, size)
                     .map(|ctx| Context::Drm(ctx));
             }
-            #[cfg(not(all(feature = "x11", feature = "wayland", feature = "kms")))]
-            _ => panic!("glutin was not compiled with support for this display server"),
         }
     }
 
