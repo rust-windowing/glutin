@@ -143,6 +143,11 @@ impl Context {
     pub fn resize(&self, _: u32, _: u32) {}
 
     #[inline]
+    pub fn buffer_age(&self) -> u32 {
+        self.0.egl_context.buffer_age()
+    }
+
+    #[inline]
     pub fn is_current(&self) -> bool {
         self.0.egl_context.is_current()
     }
