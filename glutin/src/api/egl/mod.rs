@@ -617,7 +617,11 @@ impl Context {
     #[cfg(not(target_os = "windows"))]
     pub fn swap_buffers_with_damage(&self, rects: &[Rect]) -> Result<(), ContextError> {
         let egl = EGL.as_ref().unwrap();
-        
+
+        if !self.swap_buffers_with_damage_supported() {
+            return Err(ContextError::FunctionUnavailable);
+        }
+
         let surface = self.surface.as_ref().unwrap().lock();
         if *surface == ffi::egl::NO_SURFACE {
             return Err(ContextError::ContextLost);
@@ -654,7 +658,7 @@ impl Context {
     }
 
     #[inline]
-    #[cfg(all(not(target_os = "windows"), not(target_os = "android")))]
+    #[cfg(not(any(target_os = "windows", target_os = "android")))]
     pub fn swap_buffers_with_damage_supported(&self) -> bool {
         let egl = EGL.as_ref().unwrap();
         egl.SwapBuffersWithDamageKHR.is_loaded()
