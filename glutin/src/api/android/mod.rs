@@ -4,7 +4,7 @@ use crate::api::egl::{Context as EglContext, NativeDisplay, SurfaceType as EglSu
 use crate::CreationError::{self, OsError};
 use crate::{Api, ContextError, GlAttributes, PixelFormat, PixelFormatRequirements, Rect};
 
-use crate::platform::android::EventLoopExtAndroid;
+use crate::platform::android::EventLoopWindowTargetExtAndroid;
 use glutin_egl_sys as ffi;
 use parking_lot::Mutex;
 use winit;
