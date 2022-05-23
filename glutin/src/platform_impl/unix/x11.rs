@@ -472,7 +472,7 @@ impl Context {
             EglSurfaceType::Window,
             fallback,
             fallback,
-            Some(wb.window.transparent),
+            Some(wb.transparent()),
         )?;
 
         // getting the `visual_infos` (a struct that contains information about
