@@ -9,7 +9,6 @@
 ))]
 #![allow(unused_variables)]
 
-#[cfg(not(target_os = "android"))]
 mod egl {
     use super::ffi;
     use crate::api::dlloader::{SymTrait, SymWrapper};
@@ -90,20 +89,6 @@ mod egl {
     }
 }
 
-#[cfg(target_os = "android")]
-mod egl {
-    use super::ffi;
-
-    #[derive(Clone)]
-    pub struct Egl(pub ffi::egl::Egl);
-
-    impl Egl {
-        pub fn new() -> Result<Self, ()> {
-            Ok(Egl(ffi::egl::Egl))
-        }
-    }
-}
-
 mod make_current_guard;
 
 pub use self::egl::Egl;
@@ -180,13 +165,6 @@ pub struct Context {
     config_id: ffi::egl::types::EGLConfig,
 }
 
-#[cfg(target_os = "android")]
-#[inline]
-fn get_native_display(native_display: &NativeDisplay) -> *const raw::c_void {
-    let egl = EGL.as_ref().unwrap();
-    unsafe { egl.GetDisplay(ffi::egl::DEFAULT_DISPLAY as *mut _) }
-}
-
 fn get_egl_version(
     display: ffi::egl::types::EGLDisplay,
 ) -> Result<(ffi::egl::types::EGLint, ffi::egl::types::EGLint), CreationError> {
@@ -256,7 +234,6 @@ unsafe fn bind_and_get_api<'a>(
     }
 }
 
-#[cfg(not(target_os = "android"))]
 fn get_native_display(native_display: &NativeDisplay) -> *const raw::c_void {
     let egl = EGL.as_ref().unwrap();
     // the first step is to query the list of extensions without any display, if
@@ -352,9 +329,6 @@ fn get_native_display(native_display: &NativeDisplay) -> *const raw::c_void {
             }
         }
 
-        // TODO: This will never be reached right now, as the android egl
-        // bindings use the static generator, so can't rely on
-        // GetPlatformDisplay(EXT).
         NativeDisplay::Android
             if has_dp_extension("EGL_KHR_platform_android")
                 && egl.GetPlatformDisplay.is_loaded() =>
