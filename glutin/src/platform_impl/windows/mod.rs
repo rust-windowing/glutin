@@ -228,6 +228,14 @@ impl Context {
     }
 
     #[inline]
+    pub fn buffer_age(&self) -> u32 {
+        match *self {
+            Context::Egl(ref c) => c.buffer_age(),
+            _ => 0,
+        }
+    }
+
+    #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
         match *self {
             Context::Wgl(ref c) => c.swap_buffers(),
