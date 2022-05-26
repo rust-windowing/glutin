@@ -28,11 +28,16 @@ pub fn main() {
 
     let raw_display = event_loop.raw_display_handle();
 
-    // We create a window before the display to accomodate for WGL, since it
-    // requires creating HDC for properly loading the WGL and it should be taken
-    // from the window you'll be rendering into.
-    let window = WindowBuilder::new().with_transparent(true).build(&event_loop).unwrap();
-    let raw_window_handle = window.raw_window_handle();
+    let mut window = cfg!(any(wgl_backend, glx_backend)).then(|| {
+        // We create a window before the display to accommodate for WGL, since it
+        // requires creating HDC for properly loading the WGL and it should be taken
+        // from the window you'll be rendering into.
+
+        // On GLX the window should be available for config_template() + find_configs()
+        // to propagate its Xlib visual ID.
+        WindowBuilder::new().with_transparent(true).build(&event_loop).unwrap()
+    });
+    let raw_window_handle = window.as_ref().map(|w| w.raw_window_handle());
 
     // Create the GL display. This will create display automatically for the
     // underlying GL platform. See support module on how it's being done.
@@ -41,73 +46,101 @@ pub fn main() {
     // Create the config we'll be used for window. We'll use the native window
     // raw-window-handle for it to get the right visual and use proper hdc. Note
     // that you can likely use it for other windows using the same config.
-    let template = config_template(window.raw_window_handle());
-    let config = unsafe {
-        gl_display
-            .find_configs(template)
-            .unwrap()
-            .reduce(|accum, config| {
-                // Find the config with the maximum number of samples.
-                //
-                // In general if you're not sure what you want in template you can request or
-                // don't want to require multisampling for example, you can search for a
-                // specific option you want afterwards.
-                //
-                // XXX however on macOS you can request only one config, so you should do
-                // a search with the help of `find_configs` and adjusting your template.
-                if config.num_samples() > accum.num_samples() {
-                    config
-                } else {
-                    accum
-                }
-            })
-            .unwrap()
-    };
+    let template = config_template(raw_window_handle);
+    let config = unsafe { gl_display.find_configs(template) }
+        .unwrap()
+        .reduce(|accum, config| {
+            // Find the config with the maximum number of samples.
+            //
+            // In general if you're not sure what you want in template you can request or
+            // don't want to require multisampling for example, you can search for a
+            // specific option you want afterwards.
+            //
+            // XXX however on macOS you can request only one config, so you should do
+            // a search with the help of `find_configs` and adjusting your template.
+            if config.num_samples() > accum.num_samples() {
+                config
+            } else {
+                accum
+            }
+        })
+        .unwrap();
 
     println!("Picked a config with {} samples", config.num_samples());
-
-    // Create a wrapper for GL window and surface.
-    let gl_window = GlWindow::from_existing(&gl_display, window, &config);
 
     // The context creation part. It can be created before surface and that's how
     // it's expected in multithreaded + multiwindow operation mode, since you
     // can send NotCurrentContext, but not Surface.
-    let context_attributes = ContextAttributesBuilder::new().build(Some(raw_window_handle));
+    let context_attributes = ContextAttributesBuilder::new().build(raw_window_handle);
 
     // Since glutin by default tries to create OpenGL core context, which may not be
     // present we should try gles.
     let fallback_context_attributes = ContextAttributesBuilder::new()
         .with_context_api(ContextApi::Gles(None))
-        .build(Some(raw_window_handle));
-    let gl_context = unsafe {
+        .build(raw_window_handle);
+    let mut not_current_gl_context = Some(unsafe {
         gl_display.create_context(&config, &context_attributes).unwrap_or_else(|_| {
             gl_display
                 .create_context(&config, &fallback_context_attributes)
                 .expect("failed to create context")
         })
-    };
+    });
 
-    // Make it current and load symbols.
-    let gl_context = gl_context.make_current(&gl_window.surface).unwrap();
+    let mut state = None;
+    let mut renderer = None;
 
-    // WGL requires current context on the calling thread to load symbols properly,
-    // so the call here is for portability reasons. In case you don't target WGL
-    // you can call it right after display creation.
-    //
-    // The symbol loading is done by the renderer.
-    let renderer = Renderer::new(&gl_display);
-
-    // Try setting vsync.
-    if let Err(res) = gl_window
-        .surface
-        .set_swap_interval(&gl_context, SwapInterval::Wait(NonZeroU32::new(1).unwrap()))
-    {
-        eprintln!("Error setting vsync: {:?}", res);
-    }
-
-    event_loop.run(move |event, _, control_flow| {
+    event_loop.run(move |event, event_loop_window_target, control_flow| {
         *control_flow = ControlFlow::Wait;
         match event {
+            Event::Resumed => {
+                // While this event is only relevant for Android, it is raised on all platforms
+                // to provide a consistent place to create windows
+
+                #[cfg(target_os = "android")]
+                println!("Android window available");
+
+                // Take a possibly early created window, or create a new one
+                let window = window.take().unwrap_or_else(|| {
+                    WindowBuilder::new().build(event_loop_window_target).unwrap()
+                });
+
+                // Create a wrapper for GL window and surface.
+                let gl_window = GlWindow::from_existing(&gl_display, window, &config);
+
+                // Make it current.
+                let gl_context = not_current_gl_context
+                    .take()
+                    .unwrap()
+                    .make_current(&gl_window.surface)
+                    .unwrap();
+
+                // The context needs to be current for the Renderer to set up shaders and
+                // buffers. It also performs function loading, which needs a current context on
+                // WGL.
+                renderer.get_or_insert_with(|| Renderer::new(&gl_display));
+
+                // Try setting vsync.
+                if let Err(res) = gl_window
+                    .surface
+                    .set_swap_interval(&gl_context, SwapInterval::Wait(NonZeroU32::new(1).unwrap()))
+                {
+                    eprintln!("Error setting vsync: {:?}", res);
+                }
+
+                assert!(state.replace((gl_context, gl_window)).is_none());
+            },
+            Event::Suspended => {
+                // This event is only raised on Android, where the backing NativeWindow for a GL
+                // Surface can appear and disappear at any moment.
+                println!("Android window removed");
+                // Destroy the GL Surface and un-current the GL Context before ndk-glue releases
+                // the window back to the system.
+                let (gl_context, _) = state.take().unwrap();
+                assert!(not_current_gl_context
+                    .replace(gl_context.make_not_current().unwrap())
+                    .is_none());
+            },
+
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::Resized(size) => {
                     if size.width != 0 && size.height != 0 {
@@ -115,12 +148,15 @@ pub fn main() {
                         // Notable platforms here are Wayland and macOS, other don't require it
                         // and the function is no-op, but it's wise to resize it for portability
                         // reasons.
-                        gl_window.surface.resize(
-                            &gl_context,
-                            NonZeroU32::new(size.width).unwrap(),
-                            NonZeroU32::new(size.height).unwrap(),
-                        );
-                        renderer.resize(size.width as i32, size.height as i32);
+                        if let Some((gl_context, gl_window)) = &state {
+                            gl_window.surface.resize(
+                                gl_context,
+                                NonZeroU32::new(size.width).unwrap(),
+                                NonZeroU32::new(size.height).unwrap(),
+                            );
+                            let renderer = renderer.as_ref().unwrap();
+                            renderer.resize(size.width as i32, size.height as i32);
+                        }
                     }
                 },
                 WindowEvent::CloseRequested => {
@@ -129,10 +165,13 @@ pub fn main() {
                 _ => (),
             },
             Event::RedrawEventsCleared => {
-                renderer.draw();
-                gl_window.window.request_redraw();
+                if let Some((gl_context, gl_window)) = &state {
+                    let renderer = renderer.as_ref().unwrap();
+                    renderer.draw();
+                    gl_window.window.request_redraw();
 
-                gl_window.surface.swap_buffers(&gl_context).unwrap();
+                    gl_window.surface.swap_buffers(gl_context).unwrap();
+                }
             },
             _ => (),
         }
@@ -168,11 +207,14 @@ impl GlWindow {
 }
 
 /// Create template to find OpenGL config.
-pub fn config_template(raw_window_handle: RawWindowHandle) -> ConfigTemplate {
-    let builder = ConfigTemplateBuilder::new()
-        .with_alpha_size(8)
-        .compatible_with_native_window(raw_window_handle)
-        .with_surface_type(ConfigSurfaceTypes::WINDOW);
+pub fn config_template(raw_window_handle: Option<RawWindowHandle>) -> ConfigTemplate {
+    let mut builder = ConfigTemplateBuilder::new().with_alpha_size(8);
+
+    if let Some(raw_window_handle) = raw_window_handle {
+        builder = builder
+            .compatible_with_native_window(raw_window_handle)
+            .with_surface_type(ConfigSurfaceTypes::WINDOW);
+    }
 
     #[cfg(cgl_backend)]
     let builder = builder.with_transparency(true).with_multisampling(8);
@@ -194,7 +236,7 @@ pub fn surface_attributes(window: &Window) -> SurfaceAttributes<WindowSurface> {
 /// Create the display.
 pub fn create_display(
     raw_display: RawDisplayHandle,
-    raw_window_handle: RawWindowHandle,
+    raw_window_handle: Option<RawWindowHandle>,
 ) -> Display {
     #[cfg(egl_backend)]
     let preference = DisplayApiPreference::Egl;
@@ -206,10 +248,10 @@ pub fn create_display(
     let preference = DisplayApiPreference::Cgl;
 
     #[cfg(wgl_backend)]
-    let preference = DisplayApiPreference::Wgl(Some(raw_window_handle));
+    let preference = DisplayApiPreference::Wgl(Some(raw_window_handle.unwrap()));
 
     #[cfg(all(egl_backend, wgl_backend))]
-    let preference = DisplayApiPreference::WglThenEgl(Some(raw_window_handle));
+    let preference = DisplayApiPreference::WglThenEgl(Some(raw_window_handle.unwrap()));
 
     #[cfg(all(egl_backend, glx_backend))]
     let preference = DisplayApiPreference::GlxThenEgl(Box::new(unix::register_xlib_error_hook));
