@@ -153,6 +153,11 @@ impl Context {
     }
 
     #[inline]
+    pub fn buffer_age(&self) -> u32 {
+        self.0.egl_context.buffer_age()
+    }
+
+    #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
         if let Some(ref stopped) = self.0.stopped {
             let stopped = stopped.lock();
