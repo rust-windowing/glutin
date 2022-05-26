@@ -5,6 +5,7 @@
     target_os = "freebsd",
     target_os = "netbsd",
     target_os = "openbsd",
+    target_os = "android",
 ))]
 
 use libloading::Library;

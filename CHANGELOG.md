@@ -2,6 +2,7 @@
 
 - Fix crash when creating OpenGLES context without explicit version
 - Add `buffer_age` method on `WindowedContext`
+- On Android, switched from `StaticStructGenerator` to `StructGenerator`, fixing some compilation errors.
 
 # Version 0.28.0 (2021-12-02)
 
