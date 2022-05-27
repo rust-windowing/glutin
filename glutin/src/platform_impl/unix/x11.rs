@@ -264,7 +264,11 @@ impl Context {
                 // Prototype::Glx(ctx) =>
                 // X11Context::Glx(ctx.finish_surfaceless(xwin)?),
                 Prototype::Egl(ctx) => X11Context::Egl(ctx.finish_surfaceless()?),
-                _ => unimplemented!(),
+                _ => {
+                    return Err(CreationError::NotSupported(
+                        "Surfaceless GLX context not implemented".to_string(),
+                    ))
+                }
             };
 
             let context = Context::Surfaceless(ContextInner { context });
