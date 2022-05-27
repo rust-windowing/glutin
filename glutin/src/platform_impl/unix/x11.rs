@@ -134,10 +134,10 @@ where
 
             // Stick with the earlier.
             (Some(Err(Lacks::Transparency)), Err(Lacks::Transparency)) => (),
-            (Some(Err(_)), Err(Lacks::XID)) => (),
+            (Some(Err(_)), Err(Lacks::Xid)) => (),
 
             // Lacking transparency is better than lacking the xid.
-            (Some(Err(Lacks::XID)), Err(Lacks::Transparency)) => {
+            (Some(Err(Lacks::Xid)), Err(Lacks::Transparency)) => {
                 chosen_config_id = Some((config_id, visual_infos));
                 lacks_what = Some(this_lacks_what);
             }
@@ -149,7 +149,7 @@ where
         Some(Err(Lacks::Transparency)) => log::warn!(
             "Glutin could not a find fb config with an alpha mask. Transparency may be broken."
         ),
-        Some(Err(Lacks::XID)) => panic!(),
+        Some(Err(Lacks::Xid)) => panic!(),
         None => unreachable!(),
     }
 
@@ -375,14 +375,14 @@ impl Context {
                     // If the preferred choice works, don't spend time testing
                     // if the other works.
                     if prefer_egl {
-                        if let Some(_) = &*EGL {
+                        if EGL.is_some() {
                             return egl(builder_egl_u);
-                        } else if let Some(_) = &*GLX {
+                        } else if GLX.is_some() {
                             return glx(builder_glx_u);
                         }
-                    } else if let Some(_) = &*GLX {
+                    } else if GLX.is_some() {
                         return glx(builder_glx_u);
-                    } else if let Some(_) = &*EGL {
+                    } else if EGL.is_some() {
                         return egl(builder_egl_u);
                     }
 
@@ -391,10 +391,10 @@ impl Context {
                     ));
                 } else {
                     if prefer_egl {
-                        if let Some(_) = &*EGL {
+                        if EGL.is_some() {
                             return egl(builder_egl_u);
                         }
-                    } else if let Some(_) = &*GLX {
+                    } else if GLX.is_some() {
                         return glx(builder_glx_u);
                     }
 
@@ -404,7 +404,7 @@ impl Context {
                 }
             }
             GlRequest::Specific(Api::OpenGlEs, _) => {
-                if let Some(_) = *EGL {
+                if EGL.is_some() {
                     let builder = gl_attr.clone();
                     *builder_egl_u = Some(builder.map_sharing(|c| match c.context {
                         X11Context::Egl(ref c) => c,

@@ -8,65 +8,61 @@
 #![cfg(feature = "x11")]
 
 mod make_current_guard;
-mod glx {
-    use crate::api::dlloader::{SymTrait, SymWrapper};
-    use glutin_glx_sys as ffi;
-    use std::ops::{Deref, DerefMut};
 
-    #[derive(Clone)]
-    pub struct Glx(SymWrapper<ffi::glx::Glx>);
+use std::ffi::{CStr, CString};
+use std::ops::{Deref, DerefMut};
+use std::os::raw;
+use std::sync::Arc;
 
-    /// Because `*const raw::c_void` doesn't implement `Sync`.
-    unsafe impl Sync for Glx {}
+use glutin_glx_sys as ffi;
+use winit::dpi;
 
-    impl SymTrait for ffi::glx::Glx {
-        fn load_with(lib: &libloading::Library) -> Self {
-            Self::load_with(|sym| unsafe {
-                lib.get(std::ffi::CString::new(sym.as_bytes()).unwrap().as_bytes_with_nul())
-                    .map(|sym| *sym)
-                    .unwrap_or(std::ptr::null_mut())
-            })
-        }
-    }
-
-    impl Glx {
-        pub fn new() -> Result<Self, ()> {
-            let paths = vec!["libGL.so.1", "libGL.so"];
-
-            SymWrapper::new(paths).map(Glx)
-        }
-    }
-
-    impl Deref for Glx {
-        type Target = ffi::glx::Glx;
-
-        fn deref(&self) -> &ffi::glx::Glx {
-            &self.0
-        }
-    }
-
-    impl DerefMut for Glx {
-        fn deref_mut(&mut self) -> &mut ffi::glx::Glx {
-            &mut self.0
-        }
-    }
-}
-
-pub use self::glx::Glx;
 use self::make_current_guard::MakeCurrentGuard;
+use crate::api::dlloader::{SymTrait, SymWrapper};
+use crate::platform::unix::x11::XConnection;
+use crate::platform_impl::x11_utils::SurfaceType;
 use crate::{
     Api, ContextError, CreationError, GlAttributes, GlProfile, GlRequest, PixelFormat,
     PixelFormatRequirements, ReleaseBehavior, Robustness,
 };
 
-use crate::platform::unix::x11::XConnection;
-use crate::platform_impl::x11_utils::SurfaceType;
-use glutin_glx_sys as ffi;
-use winit::dpi;
+#[derive(Clone)]
+pub struct Glx(SymWrapper<ffi::glx::Glx>);
 
-use std::ffi::{CStr, CString};
-use std::os::raw;
-use std::sync::Arc;
+/// Because `*const raw::c_void` doesn't implement `Sync`.
+unsafe impl Sync for Glx {}
+
+impl SymTrait for ffi::glx::Glx {
+    fn load_with(lib: &libloading::Library) -> Self {
+        Self::load_with(|sym| unsafe {
+            lib.get(std::ffi::CString::new(sym.as_bytes()).unwrap().as_bytes_with_nul())
+                .map(|sym| *sym)
+                .unwrap_or(std::ptr::null_mut())
+        })
+    }
+}
+
+impl Glx {
+    pub fn new() -> Result<Self, ()> {
+        let paths = vec!["libGL.so.1", "libGL.so"];
+
+        SymWrapper::new(paths).map(Glx)
+    }
+}
+
+impl Deref for Glx {
+    type Target = ffi::glx::Glx;
+
+    fn deref(&self) -> &ffi::glx::Glx {
+        &self.0
+    }
+}
+
+impl DerefMut for Glx {
+    fn deref_mut(&mut self) -> &mut ffi::glx::Glx {
+        &mut self.0
+    }
+}
 
 lazy_static! {
     pub static ref GLX: Option<Glx> = Glx::new().ok();
@@ -81,7 +77,8 @@ pub struct Context {
 }
 
 impl Context {
-    // transparent is `None` if window is raw.
+    // transparent is [`None`] if window is raw.
+    #[allow(clippy::new_ret_no_self)]
     pub fn new<'a>(
         xconn: Arc<XConnection>,
         pf_reqs: &PixelFormatRequirements,
@@ -223,7 +220,7 @@ impl Drop for Context {
                 .unwrap();
 
             let gl_finish_fn = self.get_proc_address("glFinish");
-            assert!(gl_finish_fn != std::ptr::null());
+            assert!(!gl_finish_fn.is_null());
             let gl_finish_fn = std::mem::transmute::<_, extern "system" fn()>(gl_finish_fn);
             gl_finish_fn();
 

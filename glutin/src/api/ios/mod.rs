@@ -385,7 +385,6 @@ impl Context {
         let proc_name_c = CString::new(proc_name).expect("proc name contained interior nul byte");
         let path = b"/System/Library/Frameworks/OpenGLES.framework/OpenGLES\0";
 
-        // debug!("proc {} -> {:?}", proc_name, addr);
         unsafe {
             let lib =
                 ffi::dlopen(path.as_ptr() as *const raw::c_char, ffi::RTLD_LAZY | ffi::RTLD_GLOBAL);

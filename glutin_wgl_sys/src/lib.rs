@@ -1,4 +1,5 @@
 #![cfg(any(target_os = "windows"))]
+#![allow(clippy::manual_non_exhaustive, clippy::missing_safety_doc, clippy::too_many_arguments)]
 
 /// WGL bindings
 pub mod wgl {

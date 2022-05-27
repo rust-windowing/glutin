@@ -1,5 +1,12 @@
 #![cfg(target_os = "ios")]
-#![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
+#![allow(
+    clippy::missing_safety_doc,
+    clippy::too_many_arguments,
+    clippy::unused_unit,
+    non_camel_case_types,
+    non_snake_case,
+    non_upper_case_globals
+)]
 
 pub mod gles {
     include!(concat!(env!("OUT_DIR"), "/gles2_bindings.rs"));

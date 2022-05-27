@@ -65,10 +65,8 @@
 [`RawContextExt`]: os/unix/trait.RawContextExt.html
 "
 )]
-#![deny(
-    missing_debug_implementations,
-    //missing_docs,
-)]
+#![deny(missing_debug_implementations)]
+#![allow(clippy::missing_safety_doc, clippy::too_many_arguments)]
 
 #[cfg(any(
     target_os = "windows",
@@ -117,13 +115,16 @@ pub struct ContextBuilder<'a, T: ContextCurrentState> {
     pub pf_reqs: PixelFormatRequirements,
 }
 
+impl Default for ContextBuilder<'_, NotCurrent> {
+    fn default() -> Self {
+        Self { gl_attr: Default::default(), pf_reqs: Default::default() }
+    }
+}
+
 impl<'a> ContextBuilder<'a, NotCurrent> {
     /// Initializes a new `ContextBuilder` with default values.
     pub fn new() -> Self {
-        ContextBuilder {
-            pf_reqs: std::default::Default::default(),
-            gl_attr: std::default::Default::default(),
-        }
+        Default::default()
     }
 }
 
@@ -440,10 +441,10 @@ pub enum GlRequest {
 
 impl GlRequest {
     /// Extract the desktop GL version, if any.
-    pub fn to_gl_version(&self) -> Option<(u8, u8)> {
+    pub fn to_gl_version(self) -> Option<(u8, u8)> {
         match self {
-            &GlRequest::Specific(Api::OpenGl, opengl_version) => Some(opengl_version),
-            &GlRequest::GlThenGles { opengl_version, .. } => Some(opengl_version),
+            GlRequest::Specific(Api::OpenGl, opengl_version) => Some(opengl_version),
+            GlRequest::GlThenGles { opengl_version, .. } => Some(opengl_version),
             _ => None,
         }
     }
@@ -584,8 +585,9 @@ pub struct PixelFormatRequirements {
     /// The behavior when changing the current context. Default is `Flush`.
     pub release_behavior: ReleaseBehavior,
 
-    /// X11 only: set internally to insure a certain visual xid is used when
+    /// X11 only: set internally to ensure a certain visual xid is used when
     /// choosing the fbconfig.
+    #[allow(dead_code)]
     pub(crate) x11_visual_xid: Option<std::os::raw::c_ulong>,
 }
 

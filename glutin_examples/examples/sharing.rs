@@ -61,7 +61,6 @@ fn main() {
         glw.gl.BindFramebuffer(gl::DRAW_FRAMEBUFFER, 0);
         glw.gl.Viewport(0, 0, size.width as _, size.height as _);
     }
-    std::mem::drop(windowed_context);
 
     let headless_context = ct.get_current(headless_id).unwrap();
     let glc = support::load(headless_context.headless());
@@ -81,7 +80,6 @@ fn main() {
         );
         glc.gl.Viewport(0, 0, size.width as _, size.height as _);
     }
-    std::mem::drop(headless_context);
 
     el.run(move |event, _, control_flow| {
         println!("{:?}", event);
@@ -89,10 +87,9 @@ fn main() {
 
         match event {
             Event::LoopDestroyed => unsafe {
-                let windowed_context = ct.get_current(windowed_id).unwrap();
+                let _ = ct.get_current(windowed_id).unwrap();
                 glw.gl.DeleteFramebuffers(1, &window_fb);
                 glw.gl.DeleteRenderbuffers(1, &render_buf);
-                std::mem::drop(windowed_context);
                 let _ = ct.get_current(headless_id).unwrap();
                 glc.gl.DeleteFramebuffers(1, &context_fb);
             },
@@ -110,7 +107,6 @@ fn main() {
                             size.height as _,
                         );
                         glw.gl.Viewport(0, 0, size.width as _, size.height as _);
-                        std::mem::drop(windowed_context);
 
                         let _ = ct.get_current(headless_id).unwrap();
                         glc.gl.Viewport(0, 0, size.width as _, size.height as _);
@@ -120,9 +116,8 @@ fn main() {
                 _ => (),
             },
             Event::RedrawRequested(_) => {
-                let headless_context = ct.get_current(headless_id).unwrap();
+                let _ = ct.get_current(headless_id).unwrap();
                 glc.draw_frame([1.0, 0.5, 0.7, 1.0]);
-                std::mem::drop(headless_context);
 
                 let windowed_context = ct.get_current(windowed_id).unwrap();
                 unsafe {

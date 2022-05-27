@@ -66,10 +66,7 @@ impl Drop for MakeCurrentGuard {
             None => (0, std::ptr::null()),
         };
 
-        let display = match self.old_display {
-            old_display if old_display == std::ptr::null_mut() => self.display,
-            old_display => old_display,
-        };
+        let display = if self.old_display.is_null() { self.display } else { self.old_display };
 
         let res = unsafe { glx.MakeCurrent(display as *mut _, drawable, context) };
 

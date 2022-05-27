@@ -126,11 +126,11 @@ impl Context {
             );
 
             if transparent {
-                let mut opacity = 0;
+                let opacity = 0;
                 CGLSetParameter(
                     gl_context.CGLContextObj() as *mut _,
                     kCGLCPSurfaceOpacity,
-                    &mut opacity,
+                    &opacity,
                 );
             }
 
@@ -339,7 +339,7 @@ impl Drop for IdRef {
 
 impl Deref for IdRef {
     type Target = id;
-    fn deref<'a>(&'a self) -> &'a id {
+    fn deref(&self) -> &id {
         &self.0
     }
 }
