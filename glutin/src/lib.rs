@@ -67,6 +67,7 @@
 )]
 #![deny(missing_debug_implementations)]
 #![allow(clippy::missing_safety_doc, clippy::too_many_arguments)]
+#![cfg_attr(feature = "cargo-clippy", deny(warnings))]
 
 #[cfg(any(
     target_os = "windows",

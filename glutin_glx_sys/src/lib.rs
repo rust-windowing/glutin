@@ -11,6 +11,7 @@
     clippy::redundant_static_lifetimes,
     clippy::unused_unit
 )]
+#![cfg_attr(feature = "cargo-clippy", deny(warnings))]
 
 pub use self::glx::types::GLXContext;
 pub use x11_dl::xlib::*;

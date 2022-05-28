@@ -1,3 +1,5 @@
+#![cfg_attr(feature = "cargo-clippy", deny(warnings))]
+
 use glutin::event::{Event, WindowEvent};
 use glutin::event_loop::{ControlFlow, EventLoop};
 use glutin::window::WindowBuilder;
