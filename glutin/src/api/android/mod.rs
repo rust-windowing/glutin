@@ -6,6 +6,7 @@ use crate::{Api, ContextError, GlAttributes, PixelFormat, PixelFormatRequirement
 
 use glutin_egl_sys as ffi;
 use parking_lot::Mutex;
+use raw_window_handle::{AndroidNdkHandle, HasRawWindowHandle, RawWindowHandle};
 use winit;
 use winit::dpi;
 use winit::event_loop::EventLoopWindowTarget;
@@ -32,15 +33,20 @@ impl Context {
     ) -> Result<(winit::window::Window, Self), CreationError> {
         let win = wb.build(el)?;
         let gl_attr = gl_attr.clone().map_sharing(|c| &c.0.egl_context);
-        let nwin = ndk_glue::native_window();
         let nwin =
-            nwin.as_ref().ok_or_else(|| OsError("Android's native window is null".to_string()))?;
+            if let RawWindowHandle::AndroidNdk(AndroidNdkHandle { a_native_window, .. }) =
+                win.raw_window_handle()
+            {
+                a_native_window
+            } else {
+                return Err(OsError("raw_window_handle() is not for Android".to_string()));
+            };
         let native_display = NativeDisplay::Android;
         let egl_context =
             EglContext::new(pf_reqs, &gl_attr, native_display, EglSurfaceType::Window, |c, _| {
                 Ok(c[0])
             })
-            .and_then(|p| p.finish(nwin.ptr().as_ptr() as *const _))?;
+            .and_then(|p| p.finish(nwin))?;
         let ctx = Arc::new(AndroidContext { egl_context, stopped: Some(Mutex::new(false)) });
 
         let context = Context(ctx.clone());
