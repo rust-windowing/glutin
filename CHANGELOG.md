@@ -2,8 +2,11 @@
 
 - Fix crash when creating OpenGLES context without explicit version.
 - Add `buffer_age` method on `WindowedContext`.
-- On Android, switched from `StaticStructGenerator` to `StructGenerator`, fixing some compilation errors.
 - Return an `Err` instead of panicking when surfaceless GLX context creation fails on Linux.
+- Fix compilation on Android:
+  - Switch from `StaticStructGenerator` to `StructGenerator` to dynamically load symbols.
+  - Replace `android_glue` dependency with `ndk-glue`, and remove broken lifecycle event handling.
+  - Glutin can now be used on Android, however, the application must ensure it only creates the `Context` following a winit `Event::Resumed` event, and destroys the `Context` in response to a `Event::Suspended` event.
 
 # Version 0.28.0 (2021-12-02)
 
