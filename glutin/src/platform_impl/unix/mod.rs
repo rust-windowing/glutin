@@ -9,6 +9,8 @@
 #[cfg(not(any(feature = "x11", feature = "wayland")))]
 compile_error!("at least one of the 'x11' or 'wayland' features must be enabled");
 
+#[cfg(all(feature = "gbm", target_os = "linux"))]
+mod gbm;
 mod wayland;
 mod x11;
 
@@ -31,6 +33,8 @@ use winit::window::{Window, WindowBuilder};
 
 use std::marker::PhantomData;
 use std::os::raw;
+#[cfg(all(feature = "gbm", target_os = "linux"))]
+use std::path::Path;
 #[cfg(feature = "x11")]
 use std::sync::Arc;
 
@@ -51,6 +55,8 @@ pub enum ContextType {
     #[cfg(feature = "wayland")]
     Wayland,
     OsMesa,
+    #[cfg(all(feature = "gbm", target_os = "linux"))]
+    Gbm,
 }
 
 #[derive(Debug)]
@@ -60,6 +66,8 @@ pub enum Context {
     #[cfg(feature = "wayland")]
     Wayland(wayland::Context),
     OsMesa(osmesa::OsMesaContext),
+    #[cfg(all(feature = "gbm", target_os = "linux"))]
+    Gbm(gbm::Context),
 }
 
 impl Context {
@@ -86,6 +94,14 @@ impl Context {
                     Context::Wayland(_) => Ok(()),
                     _ => {
                         let msg = "Cannot share a Wayland context with a non-Wayland context";
+                        return Err(CreationError::PlatformSpecific(msg.into()));
+                    }
+                },
+                #[cfg(all(feature = "gbm", target_os = "linux"))]
+                ContextType::Gbm => match *c {
+                    Context::Gbm(_) => Ok(()),
+                    _ => {
+                        let msg = "Cannot share a GBM context with a non-GBM context";
                         return Err(CreationError::PlatformSpecific(msg.into()));
                     }
                 },
@@ -173,6 +189,8 @@ impl Context {
             #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.make_current(),
             Context::OsMesa(ref ctx) => ctx.make_current(),
+            #[cfg(all(feature = "gbm", target_os = "linux"))]
+            Context::Gbm(ref ctx) => ctx.make_current(),
         }
     }
 
@@ -184,6 +202,8 @@ impl Context {
             #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.make_not_current(),
             Context::OsMesa(ref ctx) => ctx.make_not_current(),
+            #[cfg(all(feature = "gbm", target_os = "linux"))]
+            Context::Gbm(ref ctx) => ctx.make_not_current(),
         }
     }
 
@@ -195,6 +215,8 @@ impl Context {
             #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.is_current(),
             Context::OsMesa(ref ctx) => ctx.is_current(),
+            #[cfg(all(feature = "gbm", target_os = "linux"))]
+            Context::Gbm(ref ctx) => ctx.is_current(),
         }
     }
 
@@ -206,6 +228,8 @@ impl Context {
             #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.get_api(),
             Context::OsMesa(ref ctx) => ctx.get_api(),
+            #[cfg(all(feature = "gbm", target_os = "linux"))]
+            Context::Gbm(ref ctx) => ctx.get_api(),
         }
     }
 
@@ -220,6 +244,8 @@ impl Context {
             #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => RawHandle::Egl(ctx.raw_handle()),
             Context::OsMesa(ref ctx) => RawHandle::Egl(ctx.raw_handle()),
+            #[cfg(all(feature = "gbm", target_os = "linux"))]
+            Context::Gbm(ref ctx) => RawHandle::Egl(ctx.raw_handle()),
         }
     }
 
@@ -254,6 +280,8 @@ impl Context {
             #[cfg(feature = "wayland")]
             Context::Wayland(ref ctx) => ctx.get_proc_address(addr),
             Context::OsMesa(ref ctx) => ctx.get_proc_address(addr),
+            #[cfg(all(feature = "gbm", target_os = "linux"))]
+            Context::Gbm(ref ctx) => ctx.get_proc_address(addr),
         }
     }
 
@@ -345,6 +373,24 @@ pub trait HeadlessContextExt {
     ) -> Result<crate::Context<NotCurrent>, CreationError>
     where
         Self: Sized;
+
+    /// Builds an GBM-surfaceless context.
+    ///
+    /// `dri_device_path` is the path to the DRI device, for example
+    /// `/dev/dri/renderD128`.
+    ///
+    /// Errors can occur if the OpenGL [`Context`] could not be created. This
+    /// generally happens because the underlying platform doesn't support a
+    /// requested feature.
+    ///
+    /// [`Context`]: struct.Context.html
+    #[cfg(all(feature = "gbm", target_os = "linux"))]
+    fn build_gbm_surfaceless(
+        self,
+        dri_device_path: impl AsRef<Path>,
+    ) -> Result<crate::Context<NotCurrent>, CreationError>
+    where
+        Self: Sized;
 }
 
 impl<'a, T: ContextCurrentState> HeadlessContextExt for crate::ContextBuilder<'a, T> {
@@ -379,6 +425,27 @@ impl<'a, T: ContextCurrentState> HeadlessContextExt for crate::ContextBuilder<'a
         let crate::ContextBuilder { pf_reqs, gl_attr } = self;
         let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
         Context::new_headless_impl(el, &pf_reqs, &gl_attr, None)
+            .map(|context| crate::Context { context, phantom: PhantomData })
+    }
+
+    #[cfg(all(feature = "gbm", target_os = "linux"))]
+    #[inline]
+    fn build_gbm_surfaceless(
+        self,
+        dri_device_path: impl AsRef<Path>,
+    ) -> Result<crate::Context<NotCurrent>, CreationError>
+    where
+        Self: Sized,
+    {
+        let crate::ContextBuilder { pf_reqs, gl_attr } = self;
+        let gl_attr = gl_attr.map_sharing(|ctx| &ctx.context);
+        Context::is_compatible(&gl_attr.sharing, ContextType::Gbm)?;
+        let gl_attr = gl_attr.clone().map_sharing(|ctx| match *ctx {
+            Context::Gbm(ref ctx) => ctx,
+            _ => unreachable!(),
+        });
+        gbm::Context::new_surfaceless(&pf_reqs, &gl_attr, dri_device_path.as_ref())
+            .map(|context| Context::Gbm(context))
             .map(|context| crate::Context { context, phantom: PhantomData })
     }
 }
