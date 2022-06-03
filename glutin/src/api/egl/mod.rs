@@ -1110,39 +1110,41 @@ where
         return Err(CreationError::OsError("eglChooseConfig failed".to_string()));
     }
 
-    // We're interested in those configs which allow our desired VSync.
-    let desired_swap_interval = if opengl.vsync { 1 } else { 0 };
+    if surface_type != SurfaceType::Surfaceless {
+        // We're interested in those configs which allow our desired VSync.
+        let desired_swap_interval = if opengl.vsync { 1 } else { 0 };
 
-    let config_ids = config_ids
-        .into_iter()
-        .filter(|&config| {
-            let mut min_swap_interval = 0;
-            let res = egl.GetConfigAttrib(
-                display,
-                config,
-                ffi::egl::MIN_SWAP_INTERVAL as ffi::egl::types::EGLint,
-                &mut min_swap_interval,
-            );
+        config_ids = config_ids
+            .into_iter()
+            .filter(|&config| {
+                let mut min_swap_interval = 0;
+                let res = egl.GetConfigAttrib(
+                    display,
+                    config,
+                    ffi::egl::MIN_SWAP_INTERVAL as ffi::egl::types::EGLint,
+                    &mut min_swap_interval,
+                );
 
-            if desired_swap_interval < min_swap_interval {
-                return false;
-            }
+                if desired_swap_interval < min_swap_interval {
+                    return false;
+                }
 
-            let mut max_swap_interval = 0;
-            let res = egl.GetConfigAttrib(
-                display,
-                config,
-                ffi::egl::MAX_SWAP_INTERVAL as ffi::egl::types::EGLint,
-                &mut max_swap_interval,
-            );
+                let mut max_swap_interval = 0;
+                let res = egl.GetConfigAttrib(
+                    display,
+                    config,
+                    ffi::egl::MAX_SWAP_INTERVAL as ffi::egl::types::EGLint,
+                    &mut max_swap_interval,
+                );
 
-            if desired_swap_interval > max_swap_interval {
-                return false;
-            }
+                if desired_swap_interval > max_swap_interval {
+                    return false;
+                }
 
-            true
-        })
-        .collect::<Vec<_>>();
+                true
+            })
+            .collect::<Vec<_>>();
+    }
 
     if config_ids.is_empty() {
         return Err(CreationError::NoAvailablePixelFormat);
