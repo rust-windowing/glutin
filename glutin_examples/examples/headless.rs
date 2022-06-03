@@ -25,6 +25,15 @@ fn build_context_headless<T1: ContextCurrentState>(
     cb.build_headless(&el, size_one)
 }
 
+#[cfg(all(target_os = "linux", feature = "gbm"))]
+fn build_context_gbm_surfaceless<T1: ContextCurrentState>(
+    cb: ContextBuilder<T1>,
+    dri_device_path: impl AsRef<Path>,
+) -> Result<Context<NotCurrent>, CreationError> {
+    use glutin::platform::unix::HeadlessContextExt;
+    cb.build_gbm_surfaceless(dri_device_path)
+}
+
 #[cfg(target_os = "linux")]
 fn build_context_osmesa<T1: ContextCurrentState>(
     cb: ContextBuilder<T1>,
@@ -37,7 +46,7 @@ fn build_context_osmesa<T1: ContextCurrentState>(
 #[cfg(target_os = "linux")]
 fn build_context<T1: ContextCurrentState>(
     cb: ContextBuilder<T1>,
-) -> Result<(Context<NotCurrent>, EventLoop<()>), [CreationError; 3]> {
+) -> Result<(Context<NotCurrent>, Option<EventLoop<()>>), [CreationError; 4]> {
     // On unix operating systems, you should always try for surfaceless first,
     // and if that does not work, headless (pbuffers), and if that too fails,
     // finally osmesa.
@@ -45,27 +54,55 @@ fn build_context<T1: ContextCurrentState>(
     // If willing, you could attempt to use hidden windows instead of os mesa,
     // but note that you must handle events for the window that come on the
     // events loop.
-    let el = EventLoop::new();
 
-    println!("Trying surfaceless");
-    let err1 = match build_context_surfaceless(cb.clone(), &el) {
-        Ok(ctx) => return Ok((ctx, el)),
-        Err(err) => err,
-    };
+    let err1;
+    let err2;
 
-    println!("Trying headless");
-    let err2 = match build_context_headless(cb.clone(), &el) {
-        Ok(ctx) => return Ok((ctx, el)),
-        Err(err) => err,
-    };
+    // Event loop creation will panic if it fails; thus our only choice is to
+    // catch the unwind and then try contexts that require not event loop.
+    println!("Trying event loop creation");
+    match std::panic::catch_unwind(|| EventLoop::new()) {
+        Ok(el) => {
+            println!("Trying surfaceless");
+            err1 = match build_context_surfaceless(cb.clone(), &el) {
+                Ok(ctx) => return Ok((ctx, Some(el))),
+                Err(err) => err,
+            };
+
+            println!("Trying headless");
+            err2 = match build_context_headless(cb.clone(), &el) {
+                Ok(ctx) => return Ok((ctx, Some(el))),
+                Err(err) => err,
+            };
+        }
+        Err(_) => {
+            let msg = "event loop creation failed";
+            err1 = CreationError::PlatformSpecific(msg.to_string());
+            err2 = CreationError::PlatformSpecific(msg.to_string());
+        }
+    }
+
+    let err3;
+    #[cfg(all(target_os = "linux", feature = "gbm"))]
+    {
+        println!("Trying gbm surfaceless");
+        err3 = match build_context_gbm_surfaceless(cb.clone(), "/dev/dri/renderD128") {
+            Ok(ctx) => return Ok((ctx, None)),
+            Err(err) => err,
+        };
+    }
+    #[cfg(not(all(target_os = "linux", feature = "gbm")))]
+    {
+        err3 = CreationError::NotSupported("gbm feature disabled".to_string());
+    }
 
     println!("Trying osmesa");
-    let err3 = match build_context_osmesa(cb) {
-        Ok(ctx) => return Ok((ctx, el)),
+    let err4 = match build_context_osmesa(cb) {
+        Ok(ctx) => return Ok((ctx, None)),
         Err(err) => err,
     };
 
-    Err([err1, err2, err3])
+    Err([err1, err2, err3, err4])
 }
 
 #[cfg(not(target_os = "linux"))]

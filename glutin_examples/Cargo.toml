@@ -10,6 +10,9 @@ build = "build.rs"
 edition = "2018"
 publish = false
 
+[features]
+gbm = ["glutin/gbm"]
+
 [dependencies]
 glutin = { path = "../glutin" }
 takeable-option = "0.4"
