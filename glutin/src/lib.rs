@@ -337,7 +337,11 @@ impl std::fmt::Display for CreationError {
                 return write!(f, "{}", err);
             }
             CreationError::CreationErrors(ref es) => {
-                return write!(f, "Received multiple errors: `{:?}`", es);
+                writeln!(f, "Received multiple errors:")?;
+                for e in es {
+                    writeln!(f, "\t{}", e)?;
+                }
+                return Ok(());
             }
         })
     }
