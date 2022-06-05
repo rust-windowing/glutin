@@ -281,13 +281,13 @@ impl<'a> ContextPrototype<'a> {
                     (3, 2),
                     (3, 1),
                 ];
-                let ctx;
-                'outer: loop {
-                    // Try all OpenGL versions in descending order because some
-                    // non-compliant drivers don't return
-                    // the latest supported version but the one requested
-                    for opengl_version in opengl_versions.iter() {
-                        match create_context(
+                // Try all OpenGL versions in descending order because some
+                // non-compliant drivers don't return
+                // the latest supported version but the one requested
+                opengl_versions
+                    .iter()
+                    .find_map(|opengl_version| {
+                        create_context(
                             &extra_functions,
                             &self.extensions,
                             &self.xconn.xlib,
@@ -299,30 +299,27 @@ impl<'a> ContextPrototype<'a> {
                             self.xconn.display,
                             self.fb_config,
                             &self.visual_infos,
-                        ) {
-                            Ok(x) => {
-                                ctx = x;
-                                break 'outer;
-                            }
-                            Err(_) => continue,
-                        }
-                    }
-                    ctx = create_context(
-                        &extra_functions,
-                        &self.extensions,
-                        &self.xconn.xlib,
-                        (1, 0),
-                        self.opengl.profile,
-                        self.opengl.debug,
-                        self.opengl.robustness,
-                        share,
-                        self.xconn.display,
-                        self.fb_config,
-                        &self.visual_infos,
-                    )?;
-                    break;
-                }
-                ctx
+                        )
+                        .ok()
+                    })
+                    .map_or_else(
+                        || {
+                            create_context(
+                                &extra_functions,
+                                &self.extensions,
+                                &self.xconn.xlib,
+                                (1, 0),
+                                self.opengl.profile,
+                                self.opengl.debug,
+                                self.opengl.robustness,
+                                share,
+                                self.xconn.display,
+                                self.fb_config,
+                                &self.visual_infos,
+                            )
+                        },
+                        Ok,
+                    )?
             }
             GlRequest::Specific(Api::OpenGl, (major, minor)) => create_context(
                 &extra_functions,
