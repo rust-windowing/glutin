@@ -313,42 +313,37 @@ impl CreationError {
             _ => CreationError::CreationErrors(vec![Box::new(err), Box::new(self)]),
         }
     }
-
-    fn to_string(&self) -> String {
-        match self {
-            CreationError::OsError(text) | CreationError::NotSupported(text) => text.clone(),
-            CreationError::NoBackendAvailable(_) => "No backend is available".to_string(),
-            CreationError::RobustnessNotSupported => {
-                "You requested robustness, but it is not supported.".to_string()
-            }
-            CreationError::OpenGlVersionNotSupported => {
-                "The requested OpenGL version is not supported.".to_string()
-            }
-            CreationError::NoAvailablePixelFormat => {
-                "Couldn't find any pixel format that matches the criteria.".to_string()
-            }
-            CreationError::PlatformSpecific(text) => text.clone(),
-            CreationError::Window(err) => err.to_string(),
-            CreationError::CreationErrors(_) => "Received multiple errors.".to_string(),
-        }
-    }
 }
 
 impl std::fmt::Display for CreationError {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        formatter.write_str(&self.to_string())?;
-
-        if let CreationError::CreationErrors(ref es) = *self {
-            use std::fmt::Debug;
-            write!(formatter, " Errors: `")?;
-            es.fmt(formatter)?;
-            write!(formatter, "`")?;
-        }
-
-        if let Some(err) = std::error::Error::source(self) {
-            write!(formatter, ": {}", err)?;
-        }
-        Ok(())
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        f.write_str(match self {
+            CreationError::OsError(text)
+            | CreationError::NotSupported(text)
+            | CreationError::PlatformSpecific(text) => text,
+            CreationError::NoBackendAvailable(err) => {
+                return write!(f, "No backend is available: {}", err);
+            }
+            CreationError::RobustnessNotSupported => {
+                "You requested robustness, but it is not supported."
+            }
+            CreationError::OpenGlVersionNotSupported => {
+                "The requested OpenGL version is not supported."
+            }
+            CreationError::NoAvailablePixelFormat => {
+                "Couldn't find any pixel format that matches the criteria."
+            }
+            CreationError::Window(err) => {
+                return write!(f, "{}", err);
+            }
+            CreationError::CreationErrors(ref es) => {
+                writeln!(f, "Received multiple errors:")?;
+                for e in es {
+                    writeln!(f, "\t{}", e)?;
+                }
+                return Ok(());
+            }
+        })
     }
 }
 
