@@ -30,9 +30,6 @@ libloading = "0.7"
 parking_lot = "0.11"
 raw-window-handle = "0.4"
 
-[target.'cfg(target_os = "emscripten")'.dependencies]
-glutin_emscripten_sys = { version = "0.1.1", path = "../glutin_emscripten_sys" }
-
 [target.'cfg(any(target_os = "ios", target_os = "macos"))'.dependencies]
 objc = "0.2.6"
 glutin_gles2_sys = { version = "0.1.5", path = "../glutin_gles2_sys" }

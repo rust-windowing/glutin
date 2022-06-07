@@ -21,6 +21,3 @@ mod platform_impl;
 #[cfg(target_os = "ios")]
 #[path = "ios/mod.rs"]
 mod platform_impl;
-#[cfg(target_os = "emscripten")]
-#[path = "emscripten/mod.rs"]
-mod platform_impl;
