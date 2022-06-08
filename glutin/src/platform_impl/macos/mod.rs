@@ -12,7 +12,8 @@ use cocoa::foundation::NSAutoreleasePool;
 use core_foundation::base::TCFType;
 use core_foundation::bundle::{CFBundleGetBundleWithIdentifier, CFBundleGetFunctionPointerForName};
 use core_foundation::string::CFString;
-use objc::runtime::{BOOL, NO};
+use objc2::msg_send;
+use objc2::runtime::{BOOL, NO};
 
 use crate::platform::macos::WindowExtMacOS;
 

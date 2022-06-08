@@ -13,8 +13,8 @@ pub mod gles {
     include!(concat!(env!("OUT_DIR"), "/gles2_bindings.rs"));
 }
 
-use objc::runtime::Object;
-use objc::{Encode, Encoding};
+use objc2::runtime::Object;
+use objc2::{Encode, Encoding};
 
 use std::os::raw;
 

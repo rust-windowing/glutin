@@ -66,10 +66,6 @@
 #![allow(clippy::missing_safety_doc, clippy::too_many_arguments)]
 #![cfg_attr(feature = "cargo-clippy", deny(warnings))]
 
-#[cfg(any(target_os = "macos", target_os = "ios"))]
-#[macro_use]
-extern crate objc;
-
 pub mod platform;
 
 mod api;

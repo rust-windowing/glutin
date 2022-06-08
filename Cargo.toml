@@ -8,3 +8,19 @@ members = [
     "glutin_wgl_sys",
     "glutin_gles2_sys",
 ]
+
+[patch.crates-io]
+objc2 = { path = "../objc2/objc2" }
+objc2-encode = { path = "../objc2/objc2-encode" }
+block2 = { path = "../objc2/block2" }
+objc-sys = { path = "../objc2/objc-sys" }
+block-sys = { path = "../objc2/block-sys" }
+
+cocoa-foundation = { path = "../core-foundation-rs/cocoa-foundation" }
+cocoa = { path = "../core-foundation-rs/cocoa" }
+core-foundation-sys = { path = "../core-foundation-rs/core-foundation-sys" }
+core-foundation = { path = "../core-foundation-rs/core-foundation" }
+core-graphics-types = { path = "../core-foundation-rs/core-graphics-types" }
+core-graphics = { path = "../core-foundation-rs/core-graphics" }
+
+winit = { path = "../winit" }

@@ -6,6 +6,7 @@ use crate::{
 
 use cocoa::appkit::*;
 use cocoa::base::nil;
+use objc2::msg_send;
 
 pub fn get_gl_profile<T>(
     opengl: &GlAttributes<&T>,

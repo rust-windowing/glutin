@@ -67,8 +67,9 @@ use crate::{
 };
 
 use glutin_gles2_sys as ffi;
-use objc::declare::ClassDecl;
-use objc::runtime::{Class, Object, Sel, BOOL, NO, YES};
+use objc2::declare::ClassDecl;
+use objc2::runtime::{Class, Object, Sel, BOOL, NO, YES};
+use objc2::{class, msg_send};
 use winit::dpi;
 use winit::event_loop::EventLoopWindowTarget;
 use winit::window::WindowBuilder;
@@ -421,7 +422,7 @@ fn create_view_class() {
 
     extern "C" fn layer_class(_: &Class, _: Sel) -> *const Class {
         Class::get("CAEAGLLayer").expect("Failed to get class `CAEAGLLayer`")
-            as *const objc::runtime::Class
+            as *const objc2::runtime::Class
     }
 
     let superclass = Class::get("GLKView").expect("Failed to get class `GLKView`");
