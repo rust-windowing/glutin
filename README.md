@@ -52,10 +52,6 @@ To compile the examples for android, you have to use the `cargo apk` utility.
 
 See [`cargo-apk` in the `android-ndk-rs` repository](https://github.com/rust-windowing/android-ndk-rs/cargo-apk) for instructions.
 
-### Emscripten with asmjs
-
-Emscripten support has been deprecated in favor of platforms like stdweb. To get an OpenGL context on these platforms, please use crates like [glow](https://crates.io/crates/glow) instead.
-
 ### X11
 
 The plan is that glutin tries to dynamically link-to and use Wayland w/EGL if possible. If it doesn't work, it will try Xlib w/GLX follow by Xlib w/EGL instead. This is work-in-progress.

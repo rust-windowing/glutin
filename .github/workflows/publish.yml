@@ -21,10 +21,6 @@ jobs:
       continue-on-error: true
       run: cd glutin_egl_sys && cargo publish --token ${{ secrets.cratesio_token }}
       
-    - name: Publish glutin_emscripten_sys to crates.io
-      continue-on-error: true
-      run: cd glutin_emscripten_sys && cargo publish --token ${{ secrets.cratesio_token }}
-      
     - name: Publish glutin_gles2_sys to crates.io
       continue-on-error: true
       run: cd glutin_gles2_sys && cargo publish --token ${{ secrets.cratesio_token }}
