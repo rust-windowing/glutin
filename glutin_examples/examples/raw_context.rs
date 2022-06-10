@@ -25,7 +25,7 @@ mod this_example {
         let mut transparency = String::new();
         std::io::stdin().read_line(&mut transparency).unwrap();
         let transparency = transparency.trim().parse().unwrap_or_else(|_| {
-            println!("Unknown input, assumming true.");
+            println!("Unknown input, assuming true.");
             true
         });
 

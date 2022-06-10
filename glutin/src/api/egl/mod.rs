@@ -235,7 +235,7 @@ fn get_native_display(native_display: &NativeDisplay) -> *const raw::c_void {
             vec![]
         } else {
             let p = CStr::from_ptr(p);
-            let list = String::from_utf8(p.to_bytes().to_vec()).unwrap_or_else(|_| String::new());
+            let list = String::from_utf8(p.to_bytes().to_vec()).unwrap_or_default();
             list.split(' ').map(|e| e.to_string()).collect::<Vec<_>>()
         }
     };
@@ -397,7 +397,7 @@ impl Context {
         let extensions = if egl_version >= (1, 2) {
             let p =
                 unsafe { CStr::from_ptr(egl.QueryString(display, ffi::egl::EXTENSIONS as i32)) };
-            let list = String::from_utf8(p.to_bytes().to_vec()).unwrap_or_else(|_| String::new());
+            let list = String::from_utf8(p.to_bytes().to_vec()).unwrap_or_default();
             list.split(' ').map(|e| e.to_string()).collect::<Vec<_>>()
         } else {
             vec![]
