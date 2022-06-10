@@ -112,7 +112,6 @@ File a PR if you are interested in implementing the latter.
             match event {
                 Event::LoopDestroyed => {
                     Takeable::take(&mut raw_context); // Make sure it drops first
-                    return;
                 }
                 Event::WindowEvent { event, .. } => match event {
                     WindowEvent::Resized(physical_size) => raw_context.resize(physical_size),

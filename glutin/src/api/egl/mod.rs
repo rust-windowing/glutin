@@ -84,7 +84,7 @@ mod egl {
             #[cfg(not(target_os = "windows"))]
             let paths = vec!["libEGL.so.1", "libEGL.so"];
 
-            SymWrapper::new(paths).map(|i| Egl(i))
+            SymWrapper::new(paths).map(Egl)
         }
     }
 }
@@ -199,10 +199,8 @@ unsafe fn bind_and_get_api<'a>(
             }
         }
         GlRequest::Specific(Api::OpenGlEs, version) => {
-            if egl_version >= (1, 2) {
-                if egl.BindAPI(ffi::egl::OPENGL_ES_API) == 0 {
-                    return Err(CreationError::OpenGlVersionNotSupported);
-                }
+            if egl_version >= (1, 2) && egl.BindAPI(ffi::egl::OPENGL_ES_API) == 0 {
+                return Err(CreationError::OpenGlVersionNotSupported);
             }
             Ok((Some(version), Api::OpenGlEs))
         }
@@ -246,12 +244,12 @@ fn get_native_display(native_display: &NativeDisplay) -> *const raw::c_void {
             vec![]
         } else {
             let p = CStr::from_ptr(p);
-            let list = String::from_utf8(p.to_bytes().to_vec()).unwrap_or_else(|_| format!(""));
+            let list = String::from_utf8(p.to_bytes().to_vec()).unwrap_or_else(|_| String::new());
             list.split(' ').map(|e| e.to_string()).collect::<Vec<_>>()
         }
     };
 
-    let has_dp_extension = |e: &str| dp_extensions.iter().find(|s| s == &e).is_some();
+    let has_dp_extension = |e: &str| dp_extensions.iter().any(|s| &s == &e);
 
     match *native_display {
         // Note: Some EGL implementations are missing the
@@ -408,14 +406,14 @@ impl Context {
         let extensions = if egl_version >= (1, 2) {
             let p =
                 unsafe { CStr::from_ptr(egl.QueryString(display, ffi::egl::EXTENSIONS as i32)) };
-            let list = String::from_utf8(p.to_bytes().to_vec()).unwrap_or_else(|_| format!(""));
+            let list = String::from_utf8(p.to_bytes().to_vec()).unwrap_or_else(|_| String::new());
             list.split(' ').map(|e| e.to_string()).collect::<Vec<_>>()
         } else {
             vec![]
         };
 
         // binding the right API and choosing the version
-        let (version, api) = unsafe { bind_and_get_api(&opengl, egl_version)? };
+        let (version, api) = unsafe { bind_and_get_api(opengl, egl_version)? };
 
         let (config_id, pixel_format) = unsafe {
             choose_fbconfig(
@@ -529,7 +527,7 @@ impl Context {
 
         if ret == 0 {
             match unsafe { egl.GetError() } as u32 {
-                ffi::egl::CONTEXT_LOST => return Err(ContextError::ContextLost),
+                ffi::egl::CONTEXT_LOST => Err(ContextError::ContextLost),
                 err => {
                     panic!("swap_buffers: eglSwapBuffers failed (eglGetError returned 0x{:x})", err)
                 }
@@ -573,7 +571,7 @@ impl Context {
 
         if ret == ffi::egl::FALSE {
             match unsafe { egl.GetError() } as u32 {
-                ffi::egl::CONTEXT_LOST => return Err(ContextError::ContextLost),
+                ffi::egl::CONTEXT_LOST => Err(ContextError::ContextLost),
                 err => {
                     panic!("swap_buffers: eglSwapBuffers failed (eglGetError returned 0x{:x})", err)
                 }
@@ -631,7 +629,7 @@ impl Drop for Context {
             // to ensure it actually gets destroyed. This requires making the
             // this context current.
             let mut guard = MakeCurrentGuard::new(self.display, surface, surface, self.context)
-                .map_err(|err| ContextError::OsError(err))
+                .map_err(ContextError::OsError)
                 .unwrap();
 
             guard.if_any_same_then_invalidate(surface, surface, self.context);
@@ -785,7 +783,7 @@ impl<'a> ContextPrototype<'a> {
     pub fn finish_surfaceless(self) -> Result<Context, CreationError> {
         // FIXME: Also check for the GL_OES_surfaceless_context *CONTEXT*
         // extension
-        if self.extensions.iter().find(|s| s == &"EGL_KHR_surfaceless_context").is_none() {
+        if !self.extensions.iter().any(|s| &s == &"EGL_KHR_surfaceless_context") {
             Err(CreationError::NotSupported("EGL surfaceless not supported".to_string()))
         } else {
             self.finish_impl(None)
@@ -879,46 +877,44 @@ impl<'a> ContextPrototype<'a> {
                 } else {
                     return Err(CreationError::OpenGlVersionNotSupported);
                 }
+            } else if let Ok(ctx) = create_context(
+                self.display,
+                &self.egl_version,
+                &self.extensions,
+                self.api,
+                (3, 2),
+                self.config_id,
+                self.opengl.debug,
+                self.opengl.robustness,
+                share,
+            ) {
+                ctx
+            } else if let Ok(ctx) = create_context(
+                self.display,
+                &self.egl_version,
+                &self.extensions,
+                self.api,
+                (3, 1),
+                self.config_id,
+                self.opengl.debug,
+                self.opengl.robustness,
+                share,
+            ) {
+                ctx
+            } else if let Ok(ctx) = create_context(
+                self.display,
+                &self.egl_version,
+                &self.extensions,
+                self.api,
+                (1, 0),
+                self.config_id,
+                self.opengl.debug,
+                self.opengl.robustness,
+                share,
+            ) {
+                ctx
             } else {
-                if let Ok(ctx) = create_context(
-                    self.display,
-                    &self.egl_version,
-                    &self.extensions,
-                    self.api,
-                    (3, 2),
-                    self.config_id,
-                    self.opengl.debug,
-                    self.opengl.robustness,
-                    share,
-                ) {
-                    ctx
-                } else if let Ok(ctx) = create_context(
-                    self.display,
-                    &self.egl_version,
-                    &self.extensions,
-                    self.api,
-                    (3, 1),
-                    self.config_id,
-                    self.opengl.debug,
-                    self.opengl.robustness,
-                    share,
-                ) {
-                    ctx
-                } else if let Ok(ctx) = create_context(
-                    self.display,
-                    &self.egl_version,
-                    &self.extensions,
-                    self.api,
-                    (1, 0),
-                    self.config_id,
-                    self.opengl.debug,
-                    self.opengl.robustness,
-                    share,
-                ) {
-                    ctx
-                } else {
-                    return Err(CreationError::OpenGlVersionNotSupported);
-                }
+                return Err(CreationError::OpenGlVersionNotSupported);
             }
         };
 
@@ -926,7 +922,7 @@ impl<'a> ContextPrototype<'a> {
             // VSync defaults to enabled; disable it if it was not requested.
             if !self.opengl.vsync {
                 let _guard = MakeCurrentGuard::new(self.display, surface, surface, context)
-                    .map_err(|err| CreationError::OsError(err))?;
+                    .map_err(CreationError::OsError)?;
 
                 let egl = EGL.as_ref().unwrap();
                 unsafe {
@@ -940,7 +936,7 @@ impl<'a> ContextPrototype<'a> {
         Ok(Context {
             display: self.display,
             context,
-            surface: surface.map(|s| Mutex::new(s)),
+            surface: surface.map(Mutex::new),
             api: self.api,
             pixel_format: self.pixel_format,
         })
@@ -1205,9 +1201,7 @@ unsafe fn create_context(
     let mut context_attributes = Vec::with_capacity(10);
     let mut flags = 0;
 
-    if egl_version >= &(1, 5)
-        || extensions.iter().find(|s| s == &"EGL_KHR_create_context").is_some()
-    {
+    if egl_version >= &(1, 5) || extensions.iter().any(|s| &s == &"EGL_KHR_create_context") {
         context_attributes.push(ffi::egl::CONTEXT_MAJOR_VERSION as i32);
         context_attributes.push(version.0 as i32);
         context_attributes.push(ffi::egl::CONTEXT_MINOR_VERSION as i32);
@@ -1215,13 +1209,13 @@ unsafe fn create_context(
 
         // handling robustness
         let supports_robustness = egl_version >= &(1, 5)
-            || extensions.iter().find(|s| s == &"EGL_EXT_create_context_robustness").is_some();
+            || extensions.iter().any(|s| &s == &"EGL_EXT_create_context_robustness");
 
         match gl_robustness {
             Robustness::NotRobust => (),
 
             Robustness::NoError => {
-                if extensions.iter().find(|s| s == &"EGL_KHR_create_context_no_error").is_some() {
+                if extensions.iter().any(|s| &s == &"EGL_KHR_create_context_no_error") {
                     context_attributes.push(ffi::egl::CONTEXT_OPENGL_NO_ERROR_KHR as raw::c_int);
                     context_attributes.push(1);
                 }
@@ -1232,7 +1226,7 @@ unsafe fn create_context(
                     context_attributes
                         .push(ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY as raw::c_int);
                     context_attributes.push(ffi::egl::NO_RESET_NOTIFICATION as raw::c_int);
-                    flags = flags | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
+                    flags |= ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
                 } else {
                     return Err(CreationError::RobustnessNotSupported);
                 }
@@ -1243,7 +1237,7 @@ unsafe fn create_context(
                     context_attributes
                         .push(ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY as raw::c_int);
                     context_attributes.push(ffi::egl::NO_RESET_NOTIFICATION as raw::c_int);
-                    flags = flags | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
+                    flags |= ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
                 }
             }
 
@@ -1252,7 +1246,7 @@ unsafe fn create_context(
                     context_attributes
                         .push(ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY as raw::c_int);
                     context_attributes.push(ffi::egl::LOSE_CONTEXT_ON_RESET as raw::c_int);
-                    flags = flags | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
+                    flags |= ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
                 } else {
                     return Err(CreationError::RobustnessNotSupported);
                 }
@@ -1263,23 +1257,14 @@ unsafe fn create_context(
                     context_attributes
                         .push(ffi::egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY as raw::c_int);
                     context_attributes.push(ffi::egl::LOSE_CONTEXT_ON_RESET as raw::c_int);
-                    flags = flags | ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
+                    flags |= ffi::egl::CONTEXT_OPENGL_ROBUST_ACCESS as raw::c_int;
                 }
             }
         }
 
-        if gl_debug {
-            if egl_version >= &(1, 5) {
-                context_attributes.push(ffi::egl::CONTEXT_OPENGL_DEBUG as i32);
-                context_attributes.push(ffi::egl::TRUE as i32);
-            }
-
-            // TODO: using this flag sometimes generates an error
-            //       there was a change in the specs that added this flag, so it
-            // may not be       supported everywhere ; however it is
-            // not possible to know whether it is       supported or
-            // not flags = flags |
-            // ffi::egl::CONTEXT_OPENGL_DEBUG_BIT_KHR as i32;
+        if gl_debug && egl_version >= &(1, 5) {
+            context_attributes.push(ffi::egl::CONTEXT_OPENGL_DEBUG as i32);
+            context_attributes.push(ffi::egl::TRUE as i32);
         }
 
         // In at least some configurations, the Android emulator’s GL

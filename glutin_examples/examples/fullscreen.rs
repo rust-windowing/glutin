@@ -32,7 +32,7 @@ fn main() {
 
     let windowed_context = unsafe { windowed_context.make_current().unwrap() };
 
-    let gl = support::load(&windowed_context.context());
+    let gl = support::load(windowed_context.context());
 
     el.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;

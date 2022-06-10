@@ -80,7 +80,7 @@ impl OsMesaContext {
 
         match opengl.robustness {
             Robustness::RobustNoResetNotification | Robustness::RobustLoseContextOnReset => {
-                return Err(CreationError::RobustnessNotSupported.into());
+                return Err(CreationError::RobustnessNotSupported);
             }
             _ => (),
         }

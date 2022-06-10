@@ -102,11 +102,10 @@ impl Context {
             let data = CStr::from_ptr(data).to_bytes().to_vec();
             String::from_utf8(data).unwrap()
         } else {
-            format!("")
+            String::new()
         };
 
-        let use_arb_for_pixel_format =
-            extensions.split(' ').find(|&i| i == "WGL_ARB_pixel_format").is_some();
+        let use_arb_for_pixel_format = extensions.split(' ').any(|i| i == "WGL_ARB_pixel_format");
 
         // calling SetPixelFormat, if not already done
         let mut pixel_format_id = GetPixelFormat(hdc);
@@ -139,7 +138,7 @@ impl Context {
         let gl_library = load_opengl32_dll()?;
 
         // handling vsync
-        if extensions.split(' ').find(|&i| i == "WGL_EXT_swap_control").is_some() {
+        if extensions.split(' ').any(|i| i == "WGL_EXT_swap_control") {
             let _guard = CurrentContextGuard::make_current(hdc, context.0)?;
 
             if extra_functions.SwapIntervalEXT(if opengl.vsync { 1 } else { 0 }) == 0 {
@@ -236,7 +235,7 @@ unsafe fn create_context(
     if let Some((extra_functions, _pf_reqs, opengl, extensions)) = extra {
         share = opengl.sharing.unwrap_or(std::ptr::null_mut());
 
-        if extensions.split(' ').find(|&i| i == "WGL_ARB_create_context").is_some() {
+        if extensions.split(' ').any(|i| i == "WGL_ARB_create_context") {
             let mut attributes = Vec::new();
 
             match opengl.version {
@@ -248,11 +247,7 @@ unsafe fn create_context(
                     attributes.push(minor as raw::c_int);
                 }
                 GlRequest::Specific(Api::OpenGlEs, (major, minor)) => {
-                    if extensions
-                        .split(' ')
-                        .find(|&i| i == "WGL_EXT_create_context_es2_profile")
-                        .is_some()
-                    {
+                    if extensions.split(' ').any(|i| i == "WGL_EXT_create_context_es2_profile") {
                         attributes.push(gl::wgl_extra::CONTEXT_PROFILE_MASK_ARB as raw::c_int);
                         attributes.push(gl::wgl_extra::CONTEXT_ES2_PROFILE_BIT_EXT as raw::c_int);
                     } else {
@@ -276,8 +271,7 @@ unsafe fn create_context(
             }
 
             if let Some(profile) = opengl.profile {
-                if extensions.split(' ').find(|&i| i == "WGL_ARB_create_context_profile").is_some()
-                {
+                if extensions.split(' ').any(|i| i == "WGL_ARB_create_context_profile") {
                     let flag = match profile {
                         GlProfile::Compatibility => {
                             gl::wgl_extra::CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB
@@ -298,11 +292,7 @@ unsafe fn create_context(
                 let mut flags = 0;
 
                 // robustness
-                if extensions
-                    .split(' ')
-                    .find(|&i| i == "WGL_ARB_create_context_robustness")
-                    .is_some()
-                {
+                if extensions.split(' ').any(|i| i == "WGL_ARB_create_context_robustness") {
                     match opengl.robustness {
                         Robustness::RobustNoResetNotification
                         | Robustness::TryRobustNoResetNotification => {
@@ -311,8 +301,7 @@ unsafe fn create_context(
                                     as raw::c_int,
                             );
                             attributes.push(gl::wgl_extra::NO_RESET_NOTIFICATION_ARB as raw::c_int);
-                            flags =
-                                flags | gl::wgl_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as raw::c_int;
+                            flags |= gl::wgl_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as raw::c_int;
                         }
                         Robustness::RobustLoseContextOnReset
                         | Robustness::TryRobustLoseContextOnReset => {
@@ -321,8 +310,7 @@ unsafe fn create_context(
                                     as raw::c_int,
                             );
                             attributes.push(gl::wgl_extra::LOSE_CONTEXT_ON_RESET_ARB as raw::c_int);
-                            flags =
-                                flags | gl::wgl_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as raw::c_int;
+                            flags |= gl::wgl_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as raw::c_int;
                         }
                         Robustness::NotRobust => (),
                         Robustness::NoError => (),
@@ -338,7 +326,7 @@ unsafe fn create_context(
                 }
 
                 if opengl.debug {
-                    flags = flags | gl::wgl_extra::CONTEXT_DEBUG_BIT_ARB as raw::c_int;
+                    flags |= gl::wgl_extra::CONTEXT_DEBUG_BIT_ARB as raw::c_int;
                 }
 
                 flags
@@ -376,13 +364,11 @@ unsafe fn create_context(
         )));
     }
 
-    if !share.is_null() {
-        if gl::wgl::ShareLists(share as *const raw::c_void, ctx) == 0 {
-            return Err(CreationError::OsError(format!(
-                "wglShareLists failed: {}",
-                std::io::Error::last_os_error()
-            )));
-        }
+    if !share.is_null() && gl::wgl::ShareLists(share as *const raw::c_void, ctx) == 0 {
+        return Err(CreationError::OsError(format!(
+            "wglShareLists failed: {}",
+            std::io::Error::last_os_error()
+        )));
     };
 
     Ok(ContextWrapper(ctx as HGLRC))
@@ -556,7 +542,7 @@ unsafe fn choose_arb_pixel_format_id(
 
         out.push(gl::wgl_extra::PIXEL_TYPE_ARB as raw::c_int);
         if pf_reqs.float_color_buffer {
-            if extensions.split(' ').find(|&i| i == "WGL_ARB_pixel_format_float").is_some() {
+            if extensions.split(' ').any(|i| i == "WGL_ARB_pixel_format_float") {
                 out.push(gl::wgl_extra::TYPE_RGBA_FLOAT_ARB as raw::c_int);
             } else {
                 return Err(());
@@ -601,7 +587,7 @@ unsafe fn choose_arb_pixel_format_id(
         out.push(if double_buffer { 1 } else { 0 });
 
         if let Some(multisampling) = pf_reqs.multisampling {
-            if extensions.split(' ').find(|&i| i == "WGL_ARB_multisample").is_some() {
+            if extensions.split(' ').any(|i| i == "WGL_ARB_multisample") {
                 out.push(gl::wgl_extra::SAMPLE_BUFFERS_ARB as raw::c_int);
                 out.push(if multisampling == 0 { 0 } else { 1 });
                 out.push(gl::wgl_extra::SAMPLES_ARB as raw::c_int);
@@ -616,10 +602,10 @@ unsafe fn choose_arb_pixel_format_id(
 
         // WGL_*_FRAMEBUFFER_SRGB might be assumed to be true if not listed;
         // so it's best to list it out and set its value as necessary.
-        if extensions.split(' ').find(|&i| i == "WGL_ARB_framebuffer_sRGB").is_some() {
+        if extensions.split(' ').any(|i| i == "WGL_ARB_framebuffer_sRGB") {
             out.push(gl::wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as raw::c_int);
             out.push(pf_reqs.srgb as raw::c_int);
-        } else if extensions.split(' ').find(|&i| i == "WGL_EXT_framebuffer_sRGB").is_some() {
+        } else if extensions.split(' ').any(|i| i == "WGL_EXT_framebuffer_sRGB") {
             out.push(gl::wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as raw::c_int);
             out.push(pf_reqs.srgb as raw::c_int);
         } else if pf_reqs.srgb {
@@ -629,7 +615,7 @@ unsafe fn choose_arb_pixel_format_id(
         match pf_reqs.release_behavior {
             ReleaseBehavior::Flush => (),
             ReleaseBehavior::None => {
-                if extensions.split(' ').find(|&i| i == "WGL_ARB_context_flush_control").is_some() {
+                if extensions.split(' ').any(|i| i == "WGL_ARB_context_flush_control") {
                     out.push(gl::wgl_extra::CONTEXT_RELEASE_BEHAVIOR_ARB as raw::c_int);
                     out.push(gl::wgl_extra::CONTEXT_RELEASE_BEHAVIOR_NONE_ARB as raw::c_int);
                 }
@@ -692,7 +678,7 @@ unsafe fn choose_arb_pixel_format(
         stereoscopy: get_info(gl::wgl_extra::STEREO_ARB) != 0,
         double_buffer: get_info(gl::wgl_extra::DOUBLE_BUFFER_ARB) != 0,
         multisampling: {
-            if extensions.split(' ').find(|&i| i == "WGL_ARB_multisample").is_some() {
+            if extensions.split(' ').any(|i| i == "WGL_ARB_multisample") {
                 match get_info(gl::wgl_extra::SAMPLES_ARB) {
                     0 => None,
                     a => Some(a as u16),
@@ -701,9 +687,9 @@ unsafe fn choose_arb_pixel_format(
                 None
             }
         },
-        srgb: if extensions.split(' ').find(|&i| i == "WGL_ARB_framebuffer_sRGB").is_some() {
+        srgb: if extensions.split(' ').any(|i| i == "WGL_ARB_framebuffer_sRGB") {
             get_info(gl::wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB) != 0
-        } else if extensions.split(' ').find(|&i| i == "WGL_EXT_framebuffer_sRGB").is_some() {
+        } else if extensions.split(' ').any(|i| i == "WGL_EXT_framebuffer_sRGB") {
             get_info(gl::wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT) != 0
         } else {
             false

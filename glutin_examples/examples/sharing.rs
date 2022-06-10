@@ -41,7 +41,7 @@ fn main() {
         "Pixel format of the window's GL context: {:?}",
         windowed_context.windowed().get_pixel_format()
     );
-    let glw = support::load(&windowed_context.windowed().context());
+    let glw = support::load(windowed_context.windowed().context());
 
     let render_buf = make_renderbuf(&glw, size);
 
@@ -64,7 +64,7 @@ fn main() {
     std::mem::drop(windowed_context);
 
     let headless_context = ct.get_current(headless_id).unwrap();
-    let glc = support::load(&headless_context.headless());
+    let glc = support::load(headless_context.headless());
 
     let mut context_fb = 0;
     unsafe {
@@ -88,17 +88,14 @@ fn main() {
         *control_flow = ControlFlow::Wait;
 
         match event {
-            Event::LoopDestroyed => {
-                unsafe {
-                    let windowed_context = ct.get_current(windowed_id).unwrap();
-                    glw.gl.DeleteFramebuffers(1, &window_fb);
-                    glw.gl.DeleteRenderbuffers(1, &render_buf);
-                    std::mem::drop(windowed_context);
-                    let _ = ct.get_current(headless_id).unwrap();
-                    glc.gl.DeleteFramebuffers(1, &context_fb);
-                }
-                return;
-            }
+            Event::LoopDestroyed => unsafe {
+                let windowed_context = ct.get_current(windowed_id).unwrap();
+                glw.gl.DeleteFramebuffers(1, &window_fb);
+                glw.gl.DeleteRenderbuffers(1, &render_buf);
+                std::mem::drop(windowed_context);
+                let _ = ct.get_current(headless_id).unwrap();
+                glc.gl.DeleteFramebuffers(1, &context_fb);
+            },
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::Resized(physical_size) => {
                     let windowed_context = ct.get_current(windowed_id).unwrap();

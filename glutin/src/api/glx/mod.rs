@@ -33,7 +33,7 @@ mod glx {
         pub fn new() -> Result<Self, ()> {
             let paths = vec!["libGL.so.1", "libGL.so"];
 
-            SymWrapper::new(paths).map(|i| Glx(i))
+            SymWrapper::new(paths).map(Glx)
         }
     }
 
@@ -219,7 +219,7 @@ impl Drop for Context {
         unsafe {
             // See `drop` for `crate::api::egl::Context` for rationale.
             let mut guard = MakeCurrentGuard::new(&self.xconn, self.drawable, self.context)
-                .map_err(|err| ContextError::OsError(err))
+                .map_err(ContextError::OsError)
                 .unwrap();
 
             let gl_finish_fn = self.get_proc_address("glFinish");
@@ -385,8 +385,8 @@ impl<'a> ContextPrototype<'a> {
         // vsync
         let swap_mode = if self.opengl.vsync { 1 } else { 0 };
 
-        let _guard = MakeCurrentGuard::new(&self.xconn, window, context)
-            .map_err(|err| CreationError::OsError(err))?;
+        let _guard =
+            MakeCurrentGuard::new(&self.xconn, window, context).map_err(CreationError::OsError)?;
 
         if check_ext(&self.extensions, "GLX_EXT_swap_control")
             && extra_functions.SwapIntervalEXT.is_loaded()
@@ -493,8 +493,7 @@ fn create_context(
                             );
                             attributes
                                 .push(ffi::glx_extra::NO_RESET_NOTIFICATION_ARB as raw::c_int);
-                            flags =
-                                flags | ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as raw::c_int;
+                            flags |= ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as raw::c_int;
                         }
                         Robustness::RobustLoseContextOnReset
                         | Robustness::TryRobustLoseContextOnReset => {
@@ -504,8 +503,7 @@ fn create_context(
                             );
                             attributes
                                 .push(ffi::glx_extra::LOSE_CONTEXT_ON_RESET_ARB as raw::c_int);
-                            flags =
-                                flags | ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as raw::c_int;
+                            flags |= ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as raw::c_int;
                         }
                         Robustness::NotRobust => (),
                         Robustness::NoError => (),
@@ -521,7 +519,7 @@ fn create_context(
                 }
 
                 if debug {
-                    flags = flags | ffi::glx_extra::CONTEXT_DEBUG_BIT_ARB as raw::c_int;
+                    flags |= ffi::glx_extra::CONTEXT_DEBUG_BIT_ARB as raw::c_int;
                 }
 
                 flags
@@ -574,7 +572,7 @@ unsafe fn choose_fbconfig(
 
         if let Some(xid) = pf_reqs.x11_visual_xid {
             // getting the visual infos
-            let fvi = crate::platform_impl::x11_utils::get_visual_info_from_xid(&xconn, xid);
+            let fvi = crate::platform_impl::x11_utils::get_visual_info_from_xid(xconn, xid);
 
             out.push(ffi::glx::X_VISUAL_TYPE as raw::c_int);
             out.push(fvi.class as raw::c_int);
@@ -716,7 +714,7 @@ unsafe fn choose_fbconfig(
         ) {
             Ok((config_id, visual_infos)) => {
                 let config = *configs.offset(config_id as isize);
-                let config = config.clone();
+                let config = config;
 
                 (xconn.xlib.XFree)(configs as *mut _);
                 (config, visual_infos)
@@ -760,7 +758,7 @@ unsafe fn choose_fbconfig(
 
 /// Checks if `ext` is available.
 fn check_ext(extensions: &str, ext: &str) -> bool {
-    extensions.split(' ').find(|&s| s == ext).is_some()
+    extensions.split(' ').any(|s| s == ext)
 }
 
 fn load_extensions(

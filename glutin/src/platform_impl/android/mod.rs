@@ -48,7 +48,7 @@ impl Context {
             .and_then(|p| p.finish(nwin))?;
         let ctx = Arc::new(AndroidContext { egl_context, stopped: Some(Mutex::new(false)) });
 
-        let context = Context(ctx.clone());
+        let context = Context(ctx);
 
         Ok((win, context))
     }

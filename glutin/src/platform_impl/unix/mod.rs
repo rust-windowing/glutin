@@ -70,7 +70,7 @@ impl Context {
                     Context::OsMesa(_) => Ok(()),
                     _ => {
                         let msg = "Cannot share an OSMesa context with a non-OSMesa context";
-                        return Err(CreationError::PlatformSpecific(msg.into()));
+                        Err(CreationError::PlatformSpecific(msg.into()))
                     }
                 },
                 #[cfg(feature = "x11")]
@@ -78,7 +78,7 @@ impl Context {
                     Context::X11(_) => Ok(()),
                     _ => {
                         let msg = "Cannot share an X11 context with a non-X11 context";
-                        return Err(CreationError::PlatformSpecific(msg.into()));
+                        Err(CreationError::PlatformSpecific(msg.into()))
                     }
                 },
                 #[cfg(feature = "wayland")]
@@ -86,7 +86,7 @@ impl Context {
                     Context::Wayland(_) => Ok(()),
                     _ => {
                         let msg = "Cannot share a Wayland context with a non-Wayland context";
-                        return Err(CreationError::PlatformSpecific(msg.into()));
+                        Err(CreationError::PlatformSpecific(msg.into()))
                     }
                 },
             }
@@ -149,8 +149,8 @@ impl Context {
                 Context::Wayland(ref ctx) => ctx,
                 _ => unreachable!(),
             });
-            return wayland::Context::new_headless(&el, pf_reqs, &gl_attr, size)
-                .map(|ctx| Context::Wayland(ctx));
+            return wayland::Context::new_headless(el, pf_reqs, &gl_attr, size)
+                .map(Context::Wayland);
         }
         #[cfg(feature = "x11")]
         if el.is_x11() {
@@ -159,8 +159,7 @@ impl Context {
                 Context::X11(ref ctx) => ctx,
                 _ => unreachable!(),
             });
-            return x11::Context::new_headless(&el, pf_reqs, &gl_attr, size)
-                .map(|ctx| Context::X11(ctx));
+            return x11::Context::new_headless(el, pf_reqs, &gl_attr, size).map(Context::X11);
         }
         panic!("glutin was not compiled with support for this display server")
     }
@@ -364,7 +363,7 @@ impl<'a, T: ContextCurrentState> HeadlessContextExt for crate::ContextBuilder<'a
             _ => unreachable!(),
         });
         osmesa::OsMesaContext::new(&pf_reqs, &gl_attr, size)
-            .map(|context| Context::OsMesa(context))
+            .map(Context::OsMesa)
             .map(|context| crate::Context { context, phantom: PhantomData })
     }
 
@@ -441,7 +440,7 @@ impl<'a, T: ContextCurrentState> RawContextExt for crate::ContextBuilder<'a, T> 
             _ => unreachable!(),
         });
         wayland::Context::new_raw_context(display_ptr, surface, width, height, &pf_reqs, &gl_attr)
-            .map(|context| Context::Wayland(context))
+            .map(Context::Wayland)
             .map(|context| crate::Context { context, phantom: PhantomData })
             .map(|context| crate::RawContext { context, window: () })
     }
@@ -464,7 +463,7 @@ impl<'a, T: ContextCurrentState> RawContextExt for crate::ContextBuilder<'a, T> 
             _ => unreachable!(),
         });
         x11::Context::new_raw_context(xconn, xwin, &pf_reqs, &gl_attr)
-            .map(|context| Context::X11(context))
+            .map(Context::X11)
             .map(|context| crate::Context { context, phantom: PhantomData })
             .map(|context| crate::RawContext { context, window: () })
     }

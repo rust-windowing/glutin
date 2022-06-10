@@ -63,7 +63,7 @@ pub fn examine_visual_info(
         }
     }
 
-    return Ok(());
+    Ok(())
 }
 
 pub use super::select_config;

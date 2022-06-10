@@ -14,7 +14,7 @@ use core_foundation::string::CFString;
 use objc::runtime::{BOOL, NO};
 
 use crate::platform::macos::WindowExtMacOS;
-use winit;
+
 use winit::dpi;
 use winit::event_loop::EventLoopWindowTarget;
 use winit::window::{Window, WindowBuilder};
