@@ -13,7 +13,7 @@ publish = false
 [dependencies]
 glutin = { path = "../glutin" }
 takeable-option = "0.4"
-image = "0.21"
+image = "0.24"
 
 [build-dependencies]
 gl_generator = "0.14"
