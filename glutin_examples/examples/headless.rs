@@ -140,7 +140,7 @@ fn main() {
         &pixels_flipped,
         size.width as u32,
         size.height as u32,
-        image::RGB(8),
+        image::ColorType::Rgb8,
     )
     .unwrap();
 
