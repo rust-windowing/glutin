@@ -14,7 +14,8 @@ on:
       - '.github/workflows/ci.yml'
 
 jobs:
-  Check_Formatting:
+  check-formatting:
+    name: Check formatting
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
@@ -25,7 +26,8 @@ jobs:
     - name: Check Formatting
       run: cargo +stable fmt --all -- --check
 
-  Tests:
+  tests:
+    name: Tests
     strategy:
       fail-fast: false
       matrix:
@@ -70,6 +72,7 @@ jobs:
       with:
         rust-version: ${{ matrix.rust_version }}${{ matrix.platform.host }}
         targets: ${{ matrix.platform.target }}
+        components: clippy
 
     - name: Install GCC Multilib
       if: (matrix.platform.os == 'ubuntu-latest') && contains(matrix.platform.target, 'i686')
@@ -83,6 +86,11 @@ jobs:
       shell: bash
       if: matrix.platform.target != 'wasm32-unknown-unknown'
       run: cd glutin && cargo doc --no-deps --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES --document-private-items
+
+    - name: Lint with clippy
+      shell: bash
+      if: matrix.rust_version != 'nightly'
+      run: cargo clippy --workspace --all-targets --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES -- -Dwarnings
 
     - name: Build glutin
       shell: bash
@@ -103,7 +111,6 @@ jobs:
       shell: bash
       if: (!contains(matrix.platform.target, 'ios') && !contains(matrix.platform.target, 'wasm32'))
       run: cd glutin && cargo $WEB test --verbose --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES
-
 
     - name: Build with serde enabled
       shell: bash

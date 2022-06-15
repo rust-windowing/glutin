@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use crate::{
     CreationError, GlAttributes, GlProfile, GlRequest, PixelFormatRequirements, ReleaseBehavior,
 };
@@ -21,16 +23,16 @@ pub fn get_gl_profile<T>(
         }
     } else if let Some(v) = version {
         // second, process exact requested version, if any
-        if v < (3, 2) {
-            if opengl.profile.is_none() && v <= (2, 1) {
-                Ok(NSOpenGLProfileVersionLegacy)
-            } else {
-                Err(CreationError::OpenGlVersionNotSupported)
+        match v.cmp(&(3, 2)) {
+            Ordering::Less => {
+                if opengl.profile.is_none() && v <= (2, 1) {
+                    Ok(NSOpenGLProfileVersionLegacy)
+                } else {
+                    Err(CreationError::OpenGlVersionNotSupported)
+                }
             }
-        } else if v == (3, 2) {
-            Ok(NSOpenGLProfileVersion3_2Core)
-        } else {
-            Ok(NSOpenGLProfileVersion4_1Core)
+            Ordering::Equal => Ok(NSOpenGLProfileVersion3_2Core),
+            Ordering::Greater => Ok(NSOpenGLProfileVersion4_1Core),
         }
     } else if let GlRequest::Latest = opengl.version {
         // now, find the latest supported version automatically;

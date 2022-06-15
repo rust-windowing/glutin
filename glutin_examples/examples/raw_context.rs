@@ -25,7 +25,7 @@ mod this_example {
         let mut transparency = String::new();
         std::io::stdin().read_line(&mut transparency).unwrap();
         let transparency = transparency.trim().parse().unwrap_or_else(|_| {
-            println!("Unknown input, assumming true.");
+            println!("Unknown input, assuming true.");
             true
         });
 
@@ -112,7 +112,6 @@ File a PR if you are interested in implementing the latter.
             match event {
                 Event::LoopDestroyed => {
                     Takeable::take(&mut raw_context); // Make sure it drops first
-                    return;
                 }
                 Event::WindowEvent { event, .. } => match event {
                     WindowEvent::Resized(physical_size) => raw_context.resize(physical_size),

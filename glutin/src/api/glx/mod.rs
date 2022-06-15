@@ -8,65 +8,61 @@
 #![cfg(feature = "x11")]
 
 mod make_current_guard;
-mod glx {
-    use crate::api::dlloader::{SymTrait, SymWrapper};
-    use glutin_glx_sys as ffi;
-    use std::ops::{Deref, DerefMut};
 
-    #[derive(Clone)]
-    pub struct Glx(SymWrapper<ffi::glx::Glx>);
+use std::ffi::{CStr, CString};
+use std::ops::{Deref, DerefMut};
+use std::os::raw;
+use std::sync::Arc;
 
-    /// Because `*const raw::c_void` doesn't implement `Sync`.
-    unsafe impl Sync for Glx {}
+use glutin_glx_sys as ffi;
+use winit::dpi;
 
-    impl SymTrait for ffi::glx::Glx {
-        fn load_with(lib: &libloading::Library) -> Self {
-            Self::load_with(|sym| unsafe {
-                lib.get(std::ffi::CString::new(sym.as_bytes()).unwrap().as_bytes_with_nul())
-                    .map(|sym| *sym)
-                    .unwrap_or(std::ptr::null_mut())
-            })
-        }
-    }
-
-    impl Glx {
-        pub fn new() -> Result<Self, ()> {
-            let paths = vec!["libGL.so.1", "libGL.so"];
-
-            SymWrapper::new(paths).map(|i| Glx(i))
-        }
-    }
-
-    impl Deref for Glx {
-        type Target = ffi::glx::Glx;
-
-        fn deref(&self) -> &ffi::glx::Glx {
-            &self.0
-        }
-    }
-
-    impl DerefMut for Glx {
-        fn deref_mut(&mut self) -> &mut ffi::glx::Glx {
-            &mut self.0
-        }
-    }
-}
-
-pub use self::glx::Glx;
 use self::make_current_guard::MakeCurrentGuard;
+use crate::api::dlloader::{SymTrait, SymWrapper};
+use crate::platform::unix::x11::XConnection;
+use crate::platform_impl::x11_utils::SurfaceType;
 use crate::{
     Api, ContextError, CreationError, GlAttributes, GlProfile, GlRequest, PixelFormat,
     PixelFormatRequirements, ReleaseBehavior, Robustness,
 };
 
-use crate::platform::unix::x11::XConnection;
-use crate::platform_impl::x11_utils::SurfaceType;
-use glutin_glx_sys as ffi;
-use winit::dpi;
+#[derive(Clone)]
+pub struct Glx(SymWrapper<ffi::glx::Glx>);
 
-use std::ffi::{CStr, CString};
-use std::os::raw;
-use std::sync::Arc;
+/// Because `*const raw::c_void` doesn't implement `Sync`.
+unsafe impl Sync for Glx {}
+
+impl SymTrait for ffi::glx::Glx {
+    fn load_with(lib: &libloading::Library) -> Self {
+        Self::load_with(|sym| unsafe {
+            lib.get(std::ffi::CString::new(sym.as_bytes()).unwrap().as_bytes_with_nul())
+                .map(|sym| *sym)
+                .unwrap_or(std::ptr::null_mut())
+        })
+    }
+}
+
+impl Glx {
+    pub fn new() -> Result<Self, ()> {
+        let paths = vec!["libGL.so.1", "libGL.so"];
+
+        SymWrapper::new(paths).map(Glx)
+    }
+}
+
+impl Deref for Glx {
+    type Target = ffi::glx::Glx;
+
+    fn deref(&self) -> &ffi::glx::Glx {
+        &self.0
+    }
+}
+
+impl DerefMut for Glx {
+    fn deref_mut(&mut self) -> &mut ffi::glx::Glx {
+        &mut self.0
+    }
+}
 
 lazy_static! {
     pub static ref GLX: Option<Glx> = Glx::new().ok();
@@ -81,7 +77,8 @@ pub struct Context {
 }
 
 impl Context {
-    // transparent is `None` if window is raw.
+    // transparent is [`None`] if window is raw.
+    #[allow(clippy::new_ret_no_self)]
     pub fn new<'a>(
         xconn: Arc<XConnection>,
         pf_reqs: &PixelFormatRequirements,
@@ -219,11 +216,11 @@ impl Drop for Context {
         unsafe {
             // See `drop` for `crate::api::egl::Context` for rationale.
             let mut guard = MakeCurrentGuard::new(&self.xconn, self.drawable, self.context)
-                .map_err(|err| ContextError::OsError(err))
+                .map_err(ContextError::OsError)
                 .unwrap();
 
             let gl_finish_fn = self.get_proc_address("glFinish");
-            assert!(gl_finish_fn != std::ptr::null());
+            assert!(!gl_finish_fn.is_null());
             let gl_finish_fn = std::mem::transmute::<_, extern "system" fn()>(gl_finish_fn);
             gl_finish_fn();
 
@@ -385,8 +382,8 @@ impl<'a> ContextPrototype<'a> {
         // vsync
         let swap_mode = if self.opengl.vsync { 1 } else { 0 };
 
-        let _guard = MakeCurrentGuard::new(&self.xconn, window, context)
-            .map_err(|err| CreationError::OsError(err))?;
+        let _guard =
+            MakeCurrentGuard::new(&self.xconn, window, context).map_err(CreationError::OsError)?;
 
         if check_ext(&self.extensions, "GLX_EXT_swap_control")
             && extra_functions.SwapIntervalEXT.is_loaded()
@@ -493,8 +490,7 @@ fn create_context(
                             );
                             attributes
                                 .push(ffi::glx_extra::NO_RESET_NOTIFICATION_ARB as raw::c_int);
-                            flags =
-                                flags | ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as raw::c_int;
+                            flags |= ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as raw::c_int;
                         }
                         Robustness::RobustLoseContextOnReset
                         | Robustness::TryRobustLoseContextOnReset => {
@@ -504,8 +500,7 @@ fn create_context(
                             );
                             attributes
                                 .push(ffi::glx_extra::LOSE_CONTEXT_ON_RESET_ARB as raw::c_int);
-                            flags =
-                                flags | ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as raw::c_int;
+                            flags |= ffi::glx_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as raw::c_int;
                         }
                         Robustness::NotRobust => (),
                         Robustness::NoError => (),
@@ -521,7 +516,7 @@ fn create_context(
                 }
 
                 if debug {
-                    flags = flags | ffi::glx_extra::CONTEXT_DEBUG_BIT_ARB as raw::c_int;
+                    flags |= ffi::glx_extra::CONTEXT_DEBUG_BIT_ARB as raw::c_int;
                 }
 
                 flags
@@ -574,7 +569,7 @@ unsafe fn choose_fbconfig(
 
         if let Some(xid) = pf_reqs.x11_visual_xid {
             // getting the visual infos
-            let fvi = crate::platform_impl::x11_utils::get_visual_info_from_xid(&xconn, xid);
+            let fvi = crate::platform_impl::x11_utils::get_visual_info_from_xid(xconn, xid);
 
             out.push(ffi::glx::X_VISUAL_TYPE as raw::c_int);
             out.push(fvi.class as raw::c_int);
@@ -716,7 +711,7 @@ unsafe fn choose_fbconfig(
         ) {
             Ok((config_id, visual_infos)) => {
                 let config = *configs.offset(config_id as isize);
-                let config = config.clone();
+                let config = config;
 
                 (xconn.xlib.XFree)(configs as *mut _);
                 (config, visual_infos)
@@ -760,7 +755,7 @@ unsafe fn choose_fbconfig(
 
 /// Checks if `ext` is available.
 fn check_ext(extensions: &str, ext: &str) -> bool {
-    extensions.split(' ').find(|&s| s == ext).is_some()
+    extensions.split(' ').any(|s| s == ext)
 }
 
 fn load_extensions(

@@ -14,7 +14,7 @@ fn build_context_surfaceless<T1: ContextCurrentState>(
     el: &EventLoop<()>,
 ) -> Result<Context<NotCurrent>, CreationError> {
     use glutin::platform::unix::HeadlessContextExt;
-    cb.build_surfaceless(&el)
+    cb.build_surfaceless(el)
 }
 
 fn build_context_headless<T1: ContextCurrentState>(
@@ -22,7 +22,7 @@ fn build_context_headless<T1: ContextCurrentState>(
     el: &EventLoop<()>,
 ) -> Result<Context<NotCurrent>, CreationError> {
     let size_one = PhysicalSize::new(1, 1);
-    cb.build_headless(&el, size_one)
+    cb.build_headless(el, size_one)
 }
 
 #[cfg(target_os = "linux")]

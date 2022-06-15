@@ -11,7 +11,7 @@ use crate::platform::windows::WindowExtWindows;
 
 use glutin_egl_sys as ffi;
 use winapi::shared::windef::{HGLRC, HWND};
-use winit;
+
 use winit::dpi;
 use winit::event_loop::EventLoopWindowTarget;
 use winit::platform::windows::WindowBuilderExtWindows;
@@ -77,7 +77,7 @@ impl Context {
                             }
                             _ => unreachable!(),
                         });
-                        unsafe { WglContext::new(&pf_reqs, &gl_attr_wgl, hwnd).map(Context::Wgl) }
+                        unsafe { WglContext::new(pf_reqs, &gl_attr_wgl, hwnd).map(Context::Wgl) }
                     }
                     // We must use EGL.
                     (Some(_), Some(_)) => {
@@ -89,14 +89,14 @@ impl Context {
                         });
 
                         EglContext::new(
-                            &pf_reqs,
+                            pf_reqs,
                             &gl_attr_egl,
                             NativeDisplay::Other(Some(std::ptr::null())),
                             EglSurfaceType::Window,
                             |c, _| Ok(c[0]),
                         )
                         .and_then(|p| p.finish(hwnd))
-                        .map(|c| Context::Egl(c))
+                        .map(Context::Egl)
                     }
                     // Try EGL, fallback to WGL.
                     (None, Some(_)) => {
@@ -104,7 +104,7 @@ impl Context {
                         let gl_attr_wgl = gl_attr.clone().map_sharing(|_| unreachable!());
 
                         if let Ok(c) = EglContext::new(
-                            &pf_reqs,
+                            pf_reqs,
                             &gl_attr_egl,
                             NativeDisplay::Other(Some(std::ptr::null())),
                             EglSurfaceType::Window,
@@ -115,7 +115,7 @@ impl Context {
                             Ok(Context::Egl(c))
                         } else {
                             unsafe {
-                                WglContext::new(&pf_reqs, &gl_attr_wgl, hwnd).map(Context::Wgl)
+                                WglContext::new(pf_reqs, &gl_attr_wgl, hwnd).map(Context::Wgl)
                             }
                         }
                     }
@@ -127,7 +127,7 @@ impl Context {
                     Context::HiddenWindowWgl(_, ref c) | Context::Wgl(ref c) => c.get_hglrc(),
                     _ => panic!(),
                 });
-                unsafe { WglContext::new(&pf_reqs, &gl_attr_wgl, hwnd).map(Context::Wgl) }
+                unsafe { WglContext::new(pf_reqs, &gl_attr_wgl, hwnd).map(Context::Wgl) }
             }
         }
     }
@@ -162,7 +162,7 @@ impl Context {
                     |c, _| Ok(c[0]),
                 )
                 .and_then(|prototype| prototype.finish_pbuffer(size))
-                .map(|ctx| Context::EglPbuffer(ctx));
+                .map(Context::EglPbuffer);
 
                 if let Ok(context) = context {
                     return Ok(context);
@@ -175,7 +175,7 @@ impl Context {
             .with_visible(false)
             .with_inner_size(size)
             .with_drag_and_drop(false);
-        Self::new_windowed(wb, &el, pf_reqs, gl_attr).map(|(win, context)| match context {
+        Self::new_windowed(wb, el, pf_reqs, gl_attr).map(|(win, context)| match context {
             Context::Egl(context) => Context::HiddenWindowEgl(win, context),
             Context::Wgl(context) => Context::HiddenWindowWgl(win, context),
             _ => unreachable!(),

@@ -9,7 +9,7 @@ pub struct MakeCurrentGuard {
     possibly_invalid: Option<MakeCurrentGuardInner>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 struct MakeCurrentGuardInner {
     old_draw_surface: ffi::egl::types::EGLSurface,
     old_read_surface: ffi::egl::types::EGLSurface,

@@ -155,7 +155,7 @@ pub struct Context {
 
 fn validate_version(version: u8) -> Result<ffi::NSUInteger, CreationError> {
     let version = version as ffi::NSUInteger;
-    if version >= ffi::kEAGLRenderingAPIOpenGLES1 && version <= ffi::kEAGLRenderingAPIOpenGLES3 {
+    if (ffi::kEAGLRenderingAPIOpenGLES1..=ffi::kEAGLRenderingAPIOpenGLES3).contains(&version) {
         Ok(version)
     } else {
         Err(CreationError::OsError(format!(
@@ -384,13 +384,12 @@ impl Context {
     pub fn get_proc_address(&self, proc_name: &str) -> *const core::ffi::c_void {
         let proc_name_c = CString::new(proc_name).expect("proc name contained interior nul byte");
         let path = b"/System/Library/Frameworks/OpenGLES.framework/OpenGLES\0";
-        let addr = unsafe {
+
+        unsafe {
             let lib =
                 ffi::dlopen(path.as_ptr() as *const raw::c_char, ffi::RTLD_LAZY | ffi::RTLD_GLOBAL);
             ffi::dlsym(lib, proc_name_c.as_ptr()) as *const _
-        };
-        // debug!("proc {} -> {:?}", proc_name, addr);
-        addr
+        }
     }
 
     #[inline]

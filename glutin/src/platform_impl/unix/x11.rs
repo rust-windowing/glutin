@@ -13,7 +13,7 @@ use crate::{
 };
 
 use glutin_glx_sys as ffi;
-use winit;
+
 use winit::dpi;
 use winit::event_loop::EventLoopWindowTarget;
 use winit::window::{Window, WindowBuilder};
@@ -110,7 +110,7 @@ where
         };
 
         let this_lacks_what = x11_utils::examine_visual_info(
-            &xconn,
+            xconn,
             visual_infos,
             transparent == Some(true),
             pf_reqs.x11_visual_xid,
@@ -134,10 +134,10 @@ where
 
             // Stick with the earlier.
             (Some(Err(Lacks::Transparency)), Err(Lacks::Transparency)) => (),
-            (Some(Err(_)), Err(Lacks::XID)) => (),
+            (Some(Err(_)), Err(Lacks::Xid)) => (),
 
             // Lacking transparency is better than lacking the xid.
-            (Some(Err(Lacks::XID)), Err(Lacks::Transparency)) => {
+            (Some(Err(Lacks::Xid)), Err(Lacks::Transparency)) => {
                 chosen_config_id = Some((config_id, visual_infos));
                 lacks_what = Some(this_lacks_what);
             }
@@ -149,7 +149,7 @@ where
         Some(Err(Lacks::Transparency)) => log::warn!(
             "Glutin could not a find fb config with an alpha mask. Transparency may be broken."
         ),
-        Some(Err(Lacks::XID)) => panic!(),
+        Some(Err(Lacks::Xid)) => panic!(),
         None => unreachable!(),
     }
 
@@ -178,7 +178,7 @@ impl Context {
         size: Option<dpi::PhysicalSize<u32>>,
     ) -> Result<Self, CreationError> {
         Self::try_then_fallback(|fallback| {
-            Self::new_headless_impl(el, pf_reqs, gl_attr, size.clone(), fallback)
+            Self::new_headless_impl(el, pf_reqs, gl_attr, size, fallback)
         })
     }
 
@@ -291,7 +291,7 @@ impl Context {
         transparent: Option<bool>,
     ) -> Result<Prototype<'a>, CreationError> {
         let select_config = |cs, display| {
-            select_config(&xconn, transparent, pf_reqs, cs, |config_id| {
+            select_config(xconn, transparent, pf_reqs, cs, |config_id| {
                 let xid = egl::get_native_visual_id(display, *config_id) as ffi::VisualID;
                 if xid == 0 {
                     return None;
@@ -316,7 +316,7 @@ impl Context {
                         _ => panic!("context already exists but is wrong type"),
                     }));
                     Ok(Prototype::Glx(GlxContext::new(
-                        Arc::clone(&xconn),
+                        Arc::clone(xconn),
                         pf_reqs,
                         builder_u.as_ref().unwrap(),
                         screen_id,
@@ -375,17 +375,15 @@ impl Context {
                     // If the preferred choice works, don't spend time testing
                     // if the other works.
                     if prefer_egl {
-                        if let Some(_) = &*EGL {
+                        if EGL.is_some() {
                             return egl(builder_egl_u);
-                        } else if let Some(_) = &*GLX {
+                        } else if GLX.is_some() {
                             return glx(builder_glx_u);
                         }
-                    } else {
-                        if let Some(_) = &*GLX {
-                            return glx(builder_glx_u);
-                        } else if let Some(_) = &*EGL {
-                            return egl(builder_egl_u);
-                        }
+                    } else if GLX.is_some() {
+                        return glx(builder_glx_u);
+                    } else if EGL.is_some() {
+                        return egl(builder_egl_u);
                     }
 
                     return Err(CreationError::NotSupported(
@@ -393,13 +391,11 @@ impl Context {
                     ));
                 } else {
                     if prefer_egl {
-                        if let Some(_) = &*EGL {
+                        if EGL.is_some() {
                             return egl(builder_egl_u);
                         }
-                    } else {
-                        if let Some(_) = &*GLX {
-                            return glx(builder_glx_u);
-                        }
+                    } else if GLX.is_some() {
+                        return glx(builder_glx_u);
                     }
 
                     return Err(CreationError::NotSupported(
@@ -408,7 +404,7 @@ impl Context {
                 }
             }
             GlRequest::Specific(Api::OpenGlEs, _) => {
-                if let Some(_) = *EGL {
+                if EGL.is_some() {
                     let builder = gl_attr.clone();
                     *builder_egl_u = Some(builder.map_sharing(|c| match c.context {
                         X11Context::Egl(ref c) => c,
@@ -482,7 +478,7 @@ impl Context {
         // getting the `visual_infos` (a struct that contains information about
         // the visual to use)
         let visual_infos = match context {
-            Prototype::Glx(ref p) => p.get_visual_infos().clone(),
+            Prototype::Glx(ref p) => *p.get_visual_infos(),
             Prototype::Egl(ref p) => {
                 utils::get_visual_info_from_xid(&xconn, p.get_native_visual_id() as ffi::VisualID)
             }
@@ -554,7 +550,7 @@ impl Context {
 
         // start the context building process
         let context = Self::new_first_stage(
-            &xconn,
+            xconn,
             &pf_reqs,
             gl_attr,
             screen_id,
