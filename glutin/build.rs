@@ -1,13 +1,6 @@
-use std::env;
-use std::fs::File;
-use std::path::PathBuf;
-
 use cfg_aliases::cfg_aliases;
-use gl_generator::{Api, Fallbacks, GlobalGenerator, Profile, Registry};
 
 fn main() {
-    // XXX this is taken from glutin/build.rs.
-
     // Setup alias to reduce `cfg` boilerplate.
     cfg_aliases! {
         // Systems.
@@ -28,13 +21,4 @@ fn main() {
         wgl_backend: { all(feature = "wgl", windows, not(wasm)) },
         cgl_backend: { all(macos, not(wasm)) },
     }
-
-    let dest = PathBuf::from(&env::var("OUT_DIR").unwrap());
-
-    println!("cargo:rerun-if-changed=build.rs");
-
-    let mut file = File::create(&dest.join("gl_bindings.rs")).unwrap();
-    Registry::new(Api::Gl, (3, 3), Profile::Core, Fallbacks::All, [])
-        .write_bindings(GlobalGenerator, &mut file)
-        .unwrap();
 }

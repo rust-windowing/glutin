@@ -1,37 +1,97 @@
+use std::ffi::CString;
+use std::num::NonZeroU32;
+
+use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle};
+
+use winit::event::{Event, WindowEvent};
+use winit::event_loop::{ControlFlow, EventLoop};
+use winit::window::WindowBuilder;
+
+use glutin::context::ContextAttributesBuilder;
+use glutin::prelude::*;
+use glutin::surface::SwapInterval;
+
 mod support;
 
-use glutin::event::{Event, WindowEvent};
-use glutin::event_loop::{ControlFlow, EventLoop};
-use glutin::window::WindowBuilder;
-use glutin::ContextBuilder;
+use support::*;
 
 fn main() {
-    let el = EventLoop::new();
-    let wb = WindowBuilder::new().with_title("A fantastic window!");
+    let event_loop = EventLoop::new();
 
-    let windowed_context = ContextBuilder::new().build_windowed(wb, &el).unwrap();
+    let raw_display = event_loop.raw_display_handle();
 
-    let windowed_context = unsafe { windowed_context.make_current().unwrap() };
+    // We create a window before the display to accomodate for WGL, since it
+    // requires creating HDC for properly loading the WGL and it should be taken
+    // from the window you'll be rendering into.
+    let window = WindowBuilder::new().with_transparent(true).build(&event_loop).unwrap();
+    let raw_window_handle = window.raw_window_handle();
 
-    println!("Pixel format of the window's GL context: {:?}", windowed_context.get_pixel_format());
+    // Create the GL display. This will create display automatically for the
+    // underlying GL platform. See support module on how it's being done.
+    let gl_display = create_display(raw_display, raw_window_handle);
 
-    let gl = support::load(windowed_context.context());
+    // Create the config we'll be used for window. We'll use the native window
+    // raw-window-handle for it to get the rigth visual and use proper hdc. Note
+    // that you can likely use it for other windows using the same config.
+    let template = config_template(window.raw_window_handle());
+    let config = unsafe { gl_display.find_configs(template).unwrap().next().unwrap() };
 
-    el.run(move |event, _, control_flow| {
-        println!("{:?}", event);
+    // Create a wrapper for GL window and surface.
+    let gl_window = GlWindow::from_existing(&gl_display, window, &config);
+
+    // The context creation part. It can be created before surface and that's how
+    // it's expected in multithreaded + multiwindow operation mode, since you
+    // can send NotCurrentContext, but not Surface.
+    let context_attributes = ContextAttributesBuilder::new().build(Some(raw_window_handle));
+    let gl_context = unsafe { gl_display.create_context(&config, &context_attributes).unwrap() };
+
+    // Make it current and load symbols.
+    let gl_context = gl_context.make_current(&gl_window.surface).unwrap();
+
+    gl::load_with(|symbol| {
+        let symbol = CString::new(symbol).unwrap();
+        gl_context.get_proc_address(symbol.as_c_str()) as *const _
+    });
+
+    // Try setting vsync.
+    if let Err(res) = gl_window
+        .surface
+        .set_swap_interval(&gl_context, SwapInterval::Wait(NonZeroU32::new(1).unwrap()))
+    {
+        eprintln!("Error setting vsync: {:?}", res);
+    }
+
+    event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
-
         match event {
-            Event::LoopDestroyed => (),
             Event::WindowEvent { event, .. } => match event {
-                WindowEvent::Resized(physical_size) => windowed_context.resize(physical_size),
-                WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+                WindowEvent::Resized(size) => {
+                    if size.width != 0 && size.height != 0 {
+                        // Some platforms like EGL require resizing GL surface to update the size
+                        // Notable platforms here are Wayland and macOS, other don't require it
+                        // and the function is no-op, but it's wise to resize it for portability
+                        // reasons.
+                        gl_window.surface.resize(
+                            &gl_context,
+                            NonZeroU32::new(size.width).unwrap(),
+                            NonZeroU32::new(size.height).unwrap(),
+                        );
+                    }
+                },
+                WindowEvent::CloseRequested => {
+                    *control_flow = ControlFlow::Exit;
+                },
                 _ => (),
             },
-            Event::RedrawRequested(_) => {
-                gl.draw_frame([1.0, 0.5, 0.7, 1.0]);
-                windowed_context.swap_buffers().unwrap();
-            }
+            Event::RedrawEventsCleared => {
+                unsafe {
+                    gl::ClearColor(0., 0.3, 0.3, 0.8);
+                    gl::Clear(gl::COLOR_BUFFER_BIT);
+                    gl_window.window.request_redraw();
+                }
+
+                gl_window.surface.swap_buffers(&gl_context).unwrap();
+            },
             _ => (),
         }
     });
