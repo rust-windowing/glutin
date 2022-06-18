@@ -28,16 +28,13 @@
 //! [`RawContextExt`] available on unix operating systems and Windows.
 //!
 //! You can also produce headless [`Context`]s via the
-//! [`ContextBuilder::build_headless`] function.
+//! [`ContextBuilder::build_headless()`] function.
 //!
-//! [`Window`]: window/struct.Window.html
-//! [`Context`]: struct.Context.html
-//! [`WindowedContext<T>`]: type.WindowedContext.html
-//! [`RawContext<T>`]: type.RawContext.html
+//! [`Window`]: crate::window::Window
 #![cfg_attr(
     target_os = "windows",
     doc = "\
-[`RawContextExt`]: os/windows/trait.RawContextExt.html
+[`RawContextExt`]: crate::platform::windows::RawContextExt
 "
 )]
 #![cfg_attr(
@@ -50,7 +47,7 @@
         target_os = "openbsd",
     )),
     doc = "\
-[`RawContextExt`]: os/index.html
+[`RawContextExt`]: crate::platform
 "
 )]
 #![cfg_attr(
@@ -62,7 +59,7 @@
         target_os = "openbsd",
     ),
     doc = "\
-[`RawContextExt`]: os/unix/trait.RawContextExt.html
+[`RawContextExt`]: crate::platform::unix::RawContextExt
 "
 )]
 #![deny(missing_debug_implementations)]
@@ -104,10 +101,6 @@ use std::io;
 ///
 /// One notable limitation of the Wayland backend when it comes to shared
 /// [`Context`]s is that both contexts must use the same events loop.
-///
-/// [`Context`]: struct.Context.html
-/// [`WindowedContext<T>`]: type.WindowedContext.html
-/// [`RawContext<T>`]: type.RawContext.html
 #[derive(Debug, Clone)]
 pub struct ContextBuilder<'a, T: ContextCurrentState> {
     /// The attributes to use to create the context.
@@ -138,8 +131,6 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     }
 
     /// Sets the desired OpenGL [`Context`] profile.
-    ///
-    /// [`Context`]: struct.Context.html
     #[inline]
     pub fn with_gl_profile(mut self, profile: GlProfile) -> Self {
         self.gl_attr.profile = Some(profile);
@@ -151,8 +142,6 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     /// The default value for this flag is `cfg!(debug_assertions)`, which means
     /// that it's enabled when you run `cargo build` and disabled when you run
     /// `cargo build --release`.
-    ///
-    /// [`Context`]: struct.Context.html
     #[inline]
     pub fn with_gl_debug_flag(mut self, flag: bool) -> Self {
         self.gl_attr.debug = flag;
@@ -161,9 +150,6 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
 
     /// Sets the robustness of the OpenGL [`Context`]. See the docs of
     /// [`Robustness`].
-    ///
-    /// [`Context`]: struct.Context.html
-    /// [`Robustness`]: enum.Robustness.html
     #[inline]
     pub fn with_gl_robustness(mut self, robustness: Robustness) -> Self {
         self.gl_attr.robustness = robustness;
@@ -180,8 +166,6 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     }
 
     /// Share the display lists with the given [`Context`].
-    ///
-    /// [`Context`]: struct.Context.html
     #[inline]
     pub fn with_shared_lists<T2: ContextCurrentState>(
         self,
@@ -239,7 +223,7 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
 
     /// Sets whether sRGB should be enabled on the window.
     ///
-    /// The default value is `true`.
+    /// The default value is [`true`].
     #[inline]
     pub fn with_srgb(mut self, srgb_enabled: bool) -> Self {
         self.pf_reqs.srgb = srgb_enabled;
@@ -248,7 +232,7 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
 
     /// Sets whether double buffering should be enabled.
     ///
-    /// The default value is `None`.
+    /// The default value is [`None`].
     ///
     /// ## Platform-specific
     ///
@@ -366,8 +350,6 @@ impl From<OsError> for CreationError {
 }
 
 /// Error that can happen when manipulating an OpenGL [`Context`].
-///
-/// [`Context`]: struct.Context.html
 #[derive(Debug)]
 pub enum ContextError {
     /// General platform error.
@@ -403,8 +385,6 @@ pub enum Api {
 }
 
 /// Describes the requested OpenGL [`Context`] profiles.
-///
-/// [`Context`]: struct.Context.html
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GlProfile {
     /// Include all the immediate more functions and definitions.
@@ -430,8 +410,6 @@ pub enum GlRequest {
     /// If OpenGL is available, create an OpenGL [`Context`] with the specified
     /// `opengl_version`. Else if OpenGL ES or WebGL is available, create a
     /// context with the specified `opengles_version`.
-    ///
-    /// [`Context`]: struct.Context.html
     GlThenGles {
         /// The version to use for OpenGL.
         opengl_version: (u8, u8),
@@ -459,8 +437,6 @@ pub static GL_CORE: GlRequest = GlRequest::Specific(Api::OpenGl, (3, 2));
 /// Specifies the tolerance of the OpenGL [`Context`] to faults. If you accept
 /// raw OpenGL commands and/or raw shader code from an untrusted source, you
 /// should definitely care about this.
-///
-/// [`Context`]: struct.Context.html
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Robustness {
     /// Not everything is checked. Your application can crash if you do
@@ -473,9 +449,7 @@ pub enum Robustness {
     ///
     /// Since this option is purely an optimization, no error will be returned
     /// if the backend doesn't support it. Instead it will automatically
-    /// fall back to [`NotRobust`].
-    ///
-    /// [`NotRobust`]: enum.Robustness.html#variant.NotRobust
+    /// fall back to [`NotRobust`][Self::NotRobust].
     NoError,
 
     /// Everything is checked to avoid any crash. The driver will attempt to
@@ -483,11 +457,8 @@ pub enum Robustness {
     /// implementation-defined. You are just guaranteed not to get a crash.
     RobustNoResetNotification,
 
-    /// Same as [`RobustNoResetNotification`] but the context creation doesn't
-    /// fail if it's not supported.
-    ///
-    /// [`RobustNoResetNotification`]:
-    /// enum.Robustness.html#variant.RobustNoResetNotification
+    /// Same as [`RobustNoResetNotification`][Self::RobustNoResetNotification]
+    /// but the context creation doesn't fail if it's not supported.
     TryRobustNoResetNotification,
 
     /// Everything is checked to avoid any crash. If a problem occurs, the
@@ -496,11 +467,8 @@ pub enum Robustness {
     /// a context with the same window :-/
     RobustLoseContextOnReset,
 
-    /// Same as [`RobustLoseContextOnReset`] but the context creation doesn't
-    /// fail if it's not supported.
-    ///
-    /// [`RobustLoseContextOnReset`]:
-    /// enum.Robustness.html#variant.RobustLoseContextOnReset
+    /// Same as [`RobustLoseContextOnReset`][Self::RobustLoseContextOnReset]
+    /// but the context creation doesn't fail if it's not supported.
     TryRobustLoseContextOnReset,
 }
 
@@ -527,7 +495,7 @@ pub struct PixelFormat {
     pub stencil_bits: u8,
     pub stereoscopy: bool,
     pub double_buffer: bool,
-    /// `None` if multisampling is disabled, otherwise `Some(N)` where `N` is
+    /// [`None`] if multisampling is disabled, otherwise `Some(N)` where `N` is
     /// the multisampling level.
     pub multisampling: Option<u16>,
     pub srgb: bool,
@@ -538,49 +506,49 @@ pub struct PixelFormat {
 #[derive(Clone, Debug)]
 pub struct PixelFormatRequirements {
     /// If true, only hardware-accelerated formats will be considered. If
-    /// false, only software renderers. `None` means "don't care". Default
+    /// false, only software renderers. [`None`] means "don't care". Default
     /// is `Some(true)`.
     pub hardware_accelerated: Option<bool>,
 
-    /// Minimum number of bits for the color buffer, excluding alpha. `None`
+    /// Minimum number of bits for the color buffer, excluding alpha. [`None`]
     /// means "don't care". The default is `Some(24)`.
     pub color_bits: Option<u8>,
 
     /// If true, the color buffer must be in a floating point format. Default
-    /// is `false`.
+    /// is [`false`].
     ///
     /// Using floating points allows you to write values outside of the `[0.0,
     /// 1.0]` range.
     pub float_color_buffer: bool,
 
-    /// Minimum number of bits for the alpha in the color buffer. `None` means
+    /// Minimum number of bits for the alpha in the color buffer. [`None`] means
     /// "don't care". The default is `Some(8)`.
     pub alpha_bits: Option<u8>,
 
-    /// Minimum number of bits for the depth buffer. `None` means "don't care".
+    /// Minimum number of bits for the depth buffer. [`None`] means "don't care".
     /// The default value is `Some(24)`.
     pub depth_bits: Option<u8>,
 
-    /// Minimum number of stencil bits. `None` means "don't care".
+    /// Minimum number of stencil bits. [`None`] means "don't care".
     /// The default value is `Some(8)`.
     pub stencil_bits: Option<u8>,
 
     /// If true, only double-buffered formats will be considered. If false,
-    /// only single-buffer formats. `None` means "don't care". The default
+    /// only single-buffer formats. [`None`] means "don't care". The default
     /// is `Some(true)`.
     pub double_buffer: Option<bool>,
 
     /// Contains the minimum number of samples per pixel in the color, depth
-    /// and stencil buffers. `None` means "don't care". Default is `None`.
+    /// and stencil buffers. [`None`] means "don't care". Default is [`None`].
     /// A value of `Some(0)` indicates that multisampling must not be enabled.
     pub multisampling: Option<u16>,
 
     /// If true, only stereoscopic formats will be considered. If false, only
-    /// non-stereoscopic formats. The default is `false`.
+    /// non-stereoscopic formats. The default is [`false`].
     pub stereoscopy: bool,
 
     /// If true, only sRGB-capable formats will be considered. If false, don't
-    /// care. The default is `true`.
+    /// care. The default is [`true`].
     pub srgb: bool,
 
     /// The behavior when changing the current context. Default is `Flush`.
@@ -613,51 +581,42 @@ impl Default for PixelFormatRequirements {
 }
 
 /// Attributes to use when creating an OpenGL [`Context`].
-///
-/// [`Context`]: struct.Context.html
 #[derive(Clone, Debug)]
 pub struct GlAttributes<S> {
     /// An existing context with which some OpenGL objects get shared.
     ///
-    /// The default is `None`.
+    /// The default is [`None`].
     pub sharing: Option<S>,
 
     /// Version to try create. See [`GlRequest`] for more infos.
     ///
-    /// The default is [`Latest`].
-    ///
-    /// [`Latest`]: enum.GlRequest.html#variant.Latest
-    /// [`GlRequest`]: enum.GlRequest.html
+    /// The default is [`GlRequest::Latest`].
     pub version: GlRequest,
 
     /// OpenGL profile to use.
     ///
-    /// The default is `None`.
+    /// The default is [`None`].
     pub profile: Option<GlProfile>,
 
     /// Whether to enable the `debug` flag of the context.
     ///
     /// Debug contexts are usually slower but give better error reporting.
     ///
-    /// The default is `true` in debug mode and `false` in release mode.
+    /// The default is [`true`] in debug mode and [`false`] in release mode.
     pub debug: bool,
 
     /// How the OpenGL [`Context`] should detect errors.
     ///
     /// The default is `NotRobust` because this is what is typically expected
     /// when you create an OpenGL [`Context`]. However for safety you should
-    /// consider [`TryRobustLoseContextOnReset`].
-    ///
-    /// [`Context`]: struct.Context.html
-    /// [`TryRobustLoseContextOnReset`]:
-    /// enum.Robustness.html#variant.TryRobustLoseContextOnReset
+    /// consider [`Robustness::TryRobustLoseContextOnReset`].
     pub robustness: Robustness,
 
-    /// Whether to use vsync. If vsync is enabled, calling `swap_buffers` will
-    /// block until the screen refreshes. This is typically used to prevent
-    /// screen tearing.
+    /// Whether to use vsync. If vsync is enabled, calling
+    /// [`ContextWrapper::swap_buffers()`] will block until the screen refreshes.
+    /// This is typically used to prevent screen tearing.
     ///
-    /// The default is `false`.
+    /// The default is [`false`].
     pub vsync: bool,
 }
 

@@ -26,10 +26,6 @@ use winit::event_loop::EventLoopWindowTarget;
 ///     .with_shared_lists(some_context.context());
 /// # }
 /// ```
-///
-/// [`WindowedContext<T>`]: type.WindowedContext.html
-/// [`RawContext<T>`]: type.RawContext.html
-/// [`Context`]: struct.Context.html
 #[derive(Debug)]
 pub struct Context<T: ContextCurrentState> {
     pub(crate) context: platform_impl::Context,
@@ -37,10 +33,7 @@ pub struct Context<T: ContextCurrentState> {
 }
 
 impl<T: ContextCurrentState> Context<T> {
-    /// See [`ContextWrapper::make_current`].
-    ///
-    /// [`ContextWrapper::make_current`]:
-    /// struct.ContextWrapper.html#method.make_current
+    /// See [`ContextWrapper::make_current()`].
     pub unsafe fn make_current(self) -> Result<Context<PossiblyCurrent>, (Self, ContextError)> {
         match self.context.make_current() {
             Ok(()) => Ok(Context { context: self.context, phantom: PhantomData }),
@@ -48,10 +41,7 @@ impl<T: ContextCurrentState> Context<T> {
         }
     }
 
-    /// See [`ContextWrapper::make_not_current`].
-    ///
-    /// [`ContextWrapper::make_not_current`]:
-    /// struct.ContextWrapper.html#method.make_not_current
+    /// See [`ContextWrapper::make_not_current()`].
     pub unsafe fn make_not_current(self) -> Result<Context<NotCurrent>, (Self, ContextError)> {
         match self.context.make_not_current() {
             Ok(()) => Ok(Context { context: self.context, phantom: PhantomData }),
@@ -59,43 +49,29 @@ impl<T: ContextCurrentState> Context<T> {
         }
     }
 
-    /// See [`ContextWrapper::treat_as_not_current`].
-    ///
-    /// [`ContextWrapper::treat_as_not_current`]:
-    /// struct.ContextWrapper.html#method.treat_as_not_current
+    /// See [`ContextWrapper::treat_as_not_current()`].
     pub unsafe fn treat_as_not_current(self) -> Context<NotCurrent> {
         Context { context: self.context, phantom: PhantomData }
     }
 
-    /// See [`ContextWrapper::treat_as_current`].
-    ///
-    /// [`ContextWrapper::treat_as_current`]:
-    /// struct.ContextWrapper.html#method.treat_as_current
+    /// See [`ContextWrapper::treat_as_current()`].
     pub unsafe fn treat_as_current(self) -> Context<PossiblyCurrent> {
         Context { context: self.context, phantom: PhantomData }
     }
 
-    /// See [`ContextWrapper::is_current`].
-    ///
-    /// [`ContextWrapper::is_current`]:
-    /// struct.ContextWrapper.html#method.is_current
+    /// See [`ContextWrapper::is_current()`].
     pub fn is_current(&self) -> bool {
         self.context.is_current()
     }
 
-    /// See [`ContextWrapper::get_api`].
-    ///
-    /// [`ContextWrapper::get_api`]: struct.ContextWrapper.html#method.get_api
+    /// See [`ContextWrapper::get_api()`].
     pub fn get_api(&self) -> Api {
         self.context.get_api()
     }
 }
 
 impl Context<PossiblyCurrent> {
-    /// See [`ContextWrapper::get_proc_address`].
-    ///
-    /// [`ContextWrapper::get_proc_address`]:
-    /// struct.ContextWrapper.html#method.get_proc_address
+    /// See [`ContextWrapper::get_proc_address()`].
     pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
         self.context.get_proc_address(addr)
     }
@@ -104,11 +80,11 @@ impl Context<PossiblyCurrent> {
 impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     /// Builds the given GL context.
     ///
-    /// When on a unix operating system, prefer [`build_surfaceless`]. If both
-    /// [`build_surfaceless`] and `build_headless` fail, try using a hidden
-    /// window, or [`build_osmesa`]. Please note that if you choose to use a
-    /// hidden window, you must still handle the events it generates on the
-    /// events loop.
+    /// When on a unix operating system, prefer [`build_surfaceless()`]. If both
+    /// [`build_surfaceless()`] and [`build_headless()`][Self::build_headless()]
+    /// fail, try using a hidden window, or [`build_osmesa()`]. Please note that
+    /// if you choose to use a hidden window, you must still handle the events
+    /// it generates on the events loop.
     ///
     /// Errors can occur in two scenarios:
     ///  - If the window could not be created (via permission denied,
@@ -116,8 +92,6 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     ///  - If the OpenGL [`Context`] could not be created. This generally
     ///    happens
     ///  because the underlying platform doesn't support a requested feature.
-    ///
-    /// [`Context`]: struct.Context.html
     #[cfg_attr(
         not(any(
             target_os = "linux",
@@ -126,9 +100,9 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
             target_os = "netbsd",
             target_os = "openbsd",
         )),
-        doc = "\
-    [`build_surfaceless`]: platform/index.html\n\
-    [`build_osmesa`]: platform/index.html\
+        doc = "\n
+    [`build_surfaceless()`]: crate::platform\n
+    [`build_osmesa()`]: crate::platform
     "
     )]
     #[cfg_attr(
@@ -139,9 +113,9 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
             target_os = "netbsd",
             target_os = "openbsd",
         ),
-        doc = "\
-    [`build_surfaceless`]: platform/unix/trait.HeadlessContextExt.html#tymethod.build_surfaceless\n\
-    [`build_osmesa`]: platform/unix/trait.HeadlessContextExt.html#tymethod.build_osmesa\
+        doc = "\n
+    [`build_surfaceless()`]: platform::unix::HeadlessContextExt::build_surfaceless()\n
+    [`build_osmesa()`]: platform::unix::HeadlessContextExt::build_osmesa()
     "
     )]
     pub fn build_headless<TE>(
@@ -165,11 +139,7 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
 /// A type that [`Context`]s which might possibly be currently current on some
 /// thread take as a generic.
 ///
-/// See [`ContextWrapper::make_current`] for more details.
-///
-/// [`ContextWrapper::make_current`]:
-/// struct.ContextWrapper.html#method.make_current
-/// [`Context`]: struct.Context.html
+/// See [`ContextWrapper::make_current()`] for more details.
 #[derive(Debug, Clone, Copy)]
 pub struct PossiblyCurrent {
     phantom: PhantomData<*mut ()>,
@@ -178,19 +148,12 @@ pub struct PossiblyCurrent {
 /// A type that [`Context`]s which are not currently current on any thread take
 /// as a generic.
 ///
-/// See [`ContextWrapper::make_current`] for more details.
-///
-/// [`ContextWrapper::make_current`]:
-/// struct.ContextWrapper.html#method.make_current
-/// [`Context`]: struct.Context.html
+/// See [`ContextWrapper::make_current()`] for more details.
 #[derive(Debug, Clone, Copy)]
 pub enum NotCurrent {}
 
 /// A trait implemented on both [`NotCurrent`] and
 /// [`PossiblyCurrent`].
-///
-/// [`NotCurrent`]: enum.NotCurrent.html
-/// [`PossiblyCurrent`]: struct.PossiblyCurrent.html
 pub trait ContextCurrentState: std::fmt::Debug + Clone {}
 
 impl ContextCurrentState for PossiblyCurrent {}

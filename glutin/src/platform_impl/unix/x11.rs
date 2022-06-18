@@ -357,12 +357,12 @@ impl Context {
                 }
 
                 // force_prefer_unless_only does what it says on the tin, it
-                // forces only the prefered method to happen unless it's the
+                // forces only the preferred method to happen unless it's the
                 // only method available.
                 //
                 // Users of this function should first call with `prefer_egl`
                 // as `<status of their choice>`, with
-                // `force_prefer_unless_only` as `false`.
+                // `force_prefer_unless_only` as [`false`].
                 //
                 // Then, if those users want to fallback and try the other
                 // method, they should call us with `prefer_egl` equal to
