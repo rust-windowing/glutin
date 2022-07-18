@@ -22,7 +22,7 @@ Join us in any of these:
 
 Warning: these are examples for master. For the [latest released version](https://github.com/rust-windowing/glutin/releases/tag/v0.27.0)
 
-The examples use [gl_generator](https://crates.io/crates/gl_generator) to generate OpenGL bindings. Try reading the documentation for this if the examples do not make sense.
+The examples use [gl_generator](https://crates.io/crates/gl_generator) to generate OpenGL bindings.
 
 ### Try it!
 
