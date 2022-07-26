@@ -12,6 +12,8 @@ pub mod gl {
     )]
 
     pub use self::Gles2 as Gl;
+
+    // gl_bindings.rs is generated in build.rs using https://crates.io/crates/gl_generator
     include!(concat!(env!("OUT_DIR"), "/gl_bindings.rs"));
 }
 
