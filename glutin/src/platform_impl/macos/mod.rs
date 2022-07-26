@@ -1,4 +1,5 @@
 #![cfg(target_os = "macos")]
+#![allow(clippy::let_unit_value)]
 use crate::{
     ContextError, CreationError, GlAttributes, PixelFormat, PixelFormatRequirements, Rect,
     Robustness,
