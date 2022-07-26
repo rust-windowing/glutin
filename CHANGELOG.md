@@ -7,6 +7,8 @@
   - Switch from `StaticStructGenerator` to `StructGenerator` to dynamically load symbols.
   - Replace `android_glue` dependency with `raw-window-handle`, and remove broken lifecycle event handling.
   - Glutin can now be used on Android, however, the application must ensure it only creates the `Context` following a winit `Event::Resumed` event, and destroys the `Context` in response to a `Event::Suspended` event.
+- Updated winit dependency to 0.27.0. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/releases/tag/v0.27.0) for more info.
+- On Windows, `build_raw_context` now uses `isize` for `hwnd` to follow winit change.
 
 # Version 0.28.0 (2021-12-02)
 

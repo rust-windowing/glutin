@@ -6,7 +6,7 @@ use crate::{Api, ContextError, GlAttributes, PixelFormat, PixelFormatRequirement
 
 use glutin_egl_sys as ffi;
 use parking_lot::Mutex;
-use raw_window_handle::{AndroidNdkHandle, HasRawWindowHandle, RawWindowHandle};
+use raw_window_handle::{AndroidNdkWindowHandle, HasRawWindowHandle, RawWindowHandle};
 use winit::dpi;
 use winit::event_loop::EventLoopWindowTarget;
 use winit::window::WindowBuilder;
@@ -33,7 +33,7 @@ impl Context {
         let win = wb.build(el)?;
         let gl_attr = gl_attr.clone().map_sharing(|c| &c.0.egl_context);
         let nwin =
-            if let RawWindowHandle::AndroidNdk(AndroidNdkHandle { a_native_window, .. }) =
+            if let RawWindowHandle::AndroidNdk(AndroidNdkWindowHandle { a_native_window, .. }) =
                 win.raw_window_handle()
             {
                 a_native_window

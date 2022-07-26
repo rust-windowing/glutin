@@ -304,7 +304,7 @@ pub trait RawContextExt {
     ///   - The window is destroyed before the context
     unsafe fn build_raw_context(
         self,
-        hwnd: *mut raw::c_void,
+        hwnd: isize,
     ) -> Result<crate::RawContext<NotCurrent>, CreationError>
     where
         Self: Sized;
@@ -314,7 +314,7 @@ impl<'a, T: ContextCurrentState> RawContextExt for crate::ContextBuilder<'a, T> 
     #[inline]
     unsafe fn build_raw_context(
         self,
-        hwnd: *mut raw::c_void,
+        hwnd: isize,
     ) -> Result<crate::RawContext<NotCurrent>, CreationError>
     where
         Self: Sized,
