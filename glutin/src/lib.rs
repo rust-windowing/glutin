@@ -334,10 +334,10 @@ impl std::fmt::Display for CreationError {
 }
 
 impl std::error::Error for CreationError {
-    fn cause(&self) -> Option<&dyn std::error::Error> {
-        match *self {
-            CreationError::NoBackendAvailable(ref err) => Some(&**err),
-            CreationError::Window(ref err) => Some(err),
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            CreationError::NoBackendAvailable(err) => Some(&**err),
+            CreationError::Window(err) => Some(err),
             _ => None,
         }
     }
