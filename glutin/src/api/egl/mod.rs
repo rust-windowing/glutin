@@ -130,17 +130,17 @@ lazy_static! {
 #[derive(Debug)]
 #[allow(dead_code)]
 pub enum NativeDisplay {
-    /// `None` means `EGL_DEFAULT_DISPLAY`.
+    /// [`None`] means `EGL_DEFAULT_DISPLAY`.
     X11(Option<ffi::EGLNativeDisplayType>),
-    /// `None` means `EGL_DEFAULT_DISPLAY`.
+    /// [`None`] means `EGL_DEFAULT_DISPLAY`.
     Gbm(Option<ffi::EGLNativeDisplayType>),
-    /// `None` means `EGL_DEFAULT_DISPLAY`.
+    /// [`None`] means `EGL_DEFAULT_DISPLAY`.
     Wayland(Option<ffi::EGLNativeDisplayType>),
     /// `EGL_DEFAULT_DISPLAY` is mandatory for Android.
     Android,
     // TODO: should be `EGLDeviceEXT`
     Device(ffi::EGLNativeDisplayType),
-    /// Don't specify any display type. Useful on windows. `None` means
+    /// Don't specify any display type. Useful on windows. [`None`] means
     /// `EGL_DEFAULT_DISPLAY`.
     Other(Option<ffi::EGLNativeDisplayType>),
 }

@@ -312,18 +312,14 @@ impl Context {
     }
 }
 
-/// A unix-specific extension to the [`ContextBuilder`] which allows building
-/// unix-specific headless contexts.
-///
-/// [`ContextBuilder`]: ../../struct.ContextBuilder.html
+/// A unix-specific extension to the [`ContextBuilder`][crate::ContextBuilder]
+/// which allows building unix-specific headless contexts.
 pub trait HeadlessContextExt {
     /// Builds an OsMesa context.
     ///
-    /// Errors can occur if the OpenGL [`Context`] could not be created. This
-    /// generally happens because the underlying platform doesn't support a
+    /// Errors can occur if the OpenGL [`Context`][crate::Context] could not be created.
+    /// This generally happens because the underlying platform doesn't support a
     /// requested feature.
-    ///
-    /// [`Context`]: struct.Context.html
     fn build_osmesa(
         self,
         size: dpi::PhysicalSize<u32>,
@@ -333,11 +329,9 @@ pub trait HeadlessContextExt {
 
     /// Builds an EGL-surfaceless context.
     ///
-    /// Errors can occur if the OpenGL [`Context`] could not be created. This
-    /// generally happens because the underlying platform doesn't support a
+    /// Errors can occur if the OpenGL [`Context`][crate::Context] could not be created.
+    /// This generally happens because the underlying platform doesn't support a
     /// requested feature.
-    ///
-    /// [`Context`]: struct.Context.html
     fn build_surfaceless<TE>(
         self,
         el: &EventLoopWindowTarget<TE>,
@@ -382,11 +376,8 @@ impl<'a, T: ContextCurrentState> HeadlessContextExt for crate::ContextBuilder<'a
     }
 }
 
-/// A unix-specific extension for the [`ContextBuilder`] which allows
-/// assembling [`RawContext<T>`]s.
-///
-/// [`RawContext<T>`]: ../../type.RawContext.html
-/// [`ContextBuilder`]: ../../struct.ContextBuilder.html
+/// A unix-specific extension for the [`ContextBuilder`][crate::ContextBuilder]
+/// which allows assembling [`RawContext<T>`][crate::RawContext]s.
 pub trait RawContextExt {
     /// Creates a raw context on the provided surface.
     ///

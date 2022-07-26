@@ -72,7 +72,7 @@ impl Context {
     ///
     /// # Unsafety
     ///
-    /// The `window` must continue to exist as long as the resulting `Context`
+    /// The `window` must continue to exist as long as the resulting [`Context`]
     /// exists.
     #[inline]
     pub unsafe fn new(
@@ -220,7 +220,7 @@ unsafe impl Sync for Context {}
 
 /// Creates an OpenGL context.
 ///
-/// If `extra` is `Some`, this function will attempt to use the latest WGL
+/// If `extra` is [`Some`], this function will attempt to use the latest WGL
 /// functions to create the context.
 ///
 /// Otherwise, only the basic API will be used and the chances of
