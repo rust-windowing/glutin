@@ -1,5 +1,5 @@
 #![cfg(target_os = "ios")]
-
+#![allow(clippy::let_unit_value)]
 //! iOS support
 //!
 //! # Building app
@@ -420,11 +420,8 @@ fn create_view_class() {
     }
 
     extern "C" fn layer_class(_: &Class, _: Sel) -> *const Class {
-        unsafe {
-            std::mem::transmute(
-                Class::get("CAEAGLLayer").expect("Failed to get class `CAEAGLLayer`"),
-            )
-        }
+        Class::get("CAEAGLLayer").expect("Failed to get class `CAEAGLLayer`")
+            as *const objc::runtime::Class
     }
 
     let superclass = Class::get("GLKView").expect("Failed to get class `GLKView`");
