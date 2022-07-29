@@ -15,6 +15,7 @@ use std::os::raw;
 use std::sync::Arc;
 
 use glutin_glx_sys as ffi;
+use once_cell::sync::Lazy;
 use winit::dpi;
 
 use self::make_current_guard::MakeCurrentGuard;
@@ -64,9 +65,7 @@ impl DerefMut for Glx {
     }
 }
 
-lazy_static! {
-    pub static ref GLX: Option<Glx> = Glx::new().ok();
-}
+pub static GLX: Lazy<Option<Glx>> = Lazy::new(|| Glx::new().ok());
 
 #[derive(Debug)]
 pub struct Context {
