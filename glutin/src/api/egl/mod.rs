@@ -11,7 +11,6 @@
 use std::ffi::{CStr, CString};
 use std::ops::{Deref, DerefMut};
 use std::os::raw;
-use std::sync::{Arc, Mutex};
 
 use glutin_egl_sys as ffi;
 use libloading;
@@ -19,6 +18,7 @@ use libloading;
 use libloading::os::unix as libloading_os;
 #[cfg(windows)]
 use libloading::os::windows as libloading_os;
+use once_cell::sync::{Lazy, OnceCell};
 #[cfg(any(
     target_os = "android",
     target_os = "windows",
@@ -49,45 +49,34 @@ type EglGetProcAddressType = libloading_os::Symbol<
     unsafe extern "C" fn(*const std::os::raw::c_void) -> *const std::os::raw::c_void,
 >;
 
-lazy_static! {
-    static ref EGL_GET_PROC_ADDRESS: Arc<Mutex<Option<EglGetProcAddressType>>> =
-        Arc::new(Mutex::new(None));
-}
+static EGL_GET_PROC_ADDRESS: OnceCell<EglGetProcAddressType> = OnceCell::new();
 
 impl SymTrait for ffi::egl::Egl {
     fn load_with(lib: &libloading::Library) -> Self {
         let f = move |s: &'static str| -> *const std::os::raw::c_void {
+            let s = std::ffi::CString::new(s.as_bytes()).unwrap();
+            let s = s.as_bytes_with_nul();
+
             // Check if the symbol is available in the library directly. If
             // it is, just return it.
-            if let Ok(sym) = unsafe {
-                lib.get(std::ffi::CString::new(s.as_bytes()).unwrap().as_bytes_with_nul())
-            } {
+            if let Ok(sym) = unsafe { lib.get(s) } {
                 return *sym;
             }
 
-            let mut egl_get_proc_address = (*EGL_GET_PROC_ADDRESS).lock().unwrap();
-            if egl_get_proc_address.is_none() {
-                unsafe {
-                    let sym: libloading::Symbol<
-                        unsafe extern "C" fn(
-                            *const std::os::raw::c_void,
-                        )
-                            -> *const std::os::raw::c_void,
-                    > = lib.get(b"eglGetProcAddress").unwrap();
-                    *egl_get_proc_address = Some(sym.into_raw());
-                }
-            }
+            let egl_get_proc_address = EGL_GET_PROC_ADDRESS.get_or_init(|| unsafe {
+                let sym: libloading::Symbol<
+                    unsafe extern "C" fn(
+                        *const std::os::raw::c_void,
+                    ) -> *const std::os::raw::c_void,
+                > = lib.get(b"eglGetProcAddress\0").unwrap();
+                sym.into_raw()
+            });
 
             // The symbol was not available in the library, so ask
             // eglGetProcAddress for it. Note that eglGetProcAddress was
             // only able to look up extension functions prior to EGL 1.5,
             // hence this two-part dance.
-            unsafe {
-                (egl_get_proc_address.as_ref().unwrap())(
-                    std::ffi::CString::new(s.as_bytes()).unwrap().as_bytes_with_nul().as_ptr()
-                        as *const std::os::raw::c_void,
-                )
-            }
+            unsafe { (egl_get_proc_address)(s.as_ptr().cast()) }
         };
 
         Self::load_with(f)
@@ -122,9 +111,7 @@ impl DerefMut for Egl {
     }
 }
 
-lazy_static! {
-    pub static ref EGL: Option<Egl> = Egl::new().ok();
-}
+pub static EGL: Lazy<Option<Egl>> = Lazy::new(|| Egl::new().ok());
 
 /// Specifies the type of display passed as `native_display`.
 #[derive(Debug)]
