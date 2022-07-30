@@ -31,7 +31,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust_version: [stable, nightly]
+        rust_version: [1.57.0, stable, nightly]
         platform:
           - { target: x86_64-pc-windows-msvc,   os: windows-latest,  }
           - { target: i686-pc-windows-msvc,     os: windows-latest,  }
@@ -100,7 +100,7 @@ jobs:
 
     - name: Lint with clippy
       shell: bash
-      if: matrix.rust_version != 'nightly'
+      if: matrix.rust_version == '1.57.0'
       run: cargo clippy --workspace --all-targets --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES -- -Dwarnings
 
     - name: Build glutin

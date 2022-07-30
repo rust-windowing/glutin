@@ -77,6 +77,7 @@ impl Context<PossiblyCurrent> {
     }
 }
 
+#[allow(rustdoc::broken_intra_doc_links)]
 impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     /// Builds the given GL context.
     ///
