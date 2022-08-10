@@ -6,7 +6,7 @@ A low-level library for OpenGL context creation, written in pure Rust.
 
 ```toml
 [dependencies]
-glutin = "0.29.0"
+glutin = "0.29.1"
 ```
 
 ## [Documentation](https://docs.rs/glutin)
@@ -20,7 +20,8 @@ Join us in any of these:
 
 ## Usage Examples
 
-Warning: these are examples for master. For the [latest released version](https://github.com/rust-windowing/glutin/releases/tag/v0.29.0)
+Warning: these are examples for master. For the latest released version you can
+find them [here](https://github.com/rust-windowing/glutin/releases/tag/v0.29.1).
 
 The examples use [gl_generator](https://crates.io/crates/gl_generator) to generate OpenGL bindings.
 
