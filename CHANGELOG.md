@@ -1,5 +1,7 @@
 # Unreleased
 
+# Version 0.29.1 (2022-08-10)
+
 - Fix build failures when building from crates.io
 
 # Version 0.29.0 (2022-07-30)
