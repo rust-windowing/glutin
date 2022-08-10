@@ -1,5 +1,7 @@
 # Unreleased
 
+- Fix build failures when building from crates.io
+
 # Version 0.29.0 (2022-07-30)
 
 - Fix crash when creating OpenGLES context without explicit version.
