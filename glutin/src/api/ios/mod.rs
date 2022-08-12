@@ -67,15 +67,17 @@ use crate::{
 };
 
 use glutin_gles2_sys as ffi;
-use objc2::declare::ClassDecl;
-use objc2::runtime::{Class, Object, Sel, BOOL, NO, YES};
-use objc2::{class, msg_send};
+use objc2::declare::ClassBuilder;
+use objc2::foundation::{CGFloat, NSRect, NSUInteger};
+use objc2::runtime::{Bool, Class, Object, Sel};
+use objc2::{class, msg_send, msg_send_bool, sel};
 use winit::dpi;
 use winit::event_loop::EventLoopWindowTarget;
 use winit::window::WindowBuilder;
 
 use std::ffi::CString;
 use std::os::raw;
+use std::ptr;
 
 #[derive(Debug, PartialEq)]
 enum ColorFormat {
@@ -86,8 +88,8 @@ enum ColorFormat {
 
 impl ColorFormat {
     #[allow(non_upper_case_globals)]
-    pub fn for_view(view: ffi::id) -> Self {
-        let color_format: ffi::NSUInteger = unsafe { msg_send![view, drawableColorFormat] };
+    pub fn for_view(view: *mut Object) -> Self {
+        let color_format: ffi::gles::types::GLint = unsafe { msg_send![view, drawableColorFormat] };
         match color_format {
             ffi::GLKViewDrawableColorFormatRGBA8888 => ColorFormat::Rgba8888,
             ffi::GLKViewDrawableColorFormatRGB565 => ColorFormat::Rgb565,
@@ -118,8 +120,8 @@ impl ColorFormat {
 }
 
 #[allow(non_upper_case_globals)]
-fn depth_for_view(view: ffi::id) -> u8 {
-    let depth_format: ffi::NSUInteger = unsafe { msg_send![view, drawableDepthFormat] };
+fn depth_for_view(view: *mut Object) -> u8 {
+    let depth_format: ffi::gles::types::GLint = unsafe { msg_send![view, drawableDepthFormat] };
     match depth_format {
         ffi::GLKViewDrawableDepthFormatNone => 0,
         ffi::GLKViewDrawableDepthFormat16 => 16,
@@ -129,8 +131,8 @@ fn depth_for_view(view: ffi::id) -> u8 {
 }
 
 #[allow(non_upper_case_globals)]
-fn stencil_for_view(view: ffi::id) -> u8 {
-    let stencil_format: ffi::NSUInteger = unsafe { msg_send![view, drawableStencilFormat] };
+fn stencil_for_view(view: *mut Object) -> u8 {
+    let stencil_format: ffi::gles::types::GLint = unsafe { msg_send![view, drawableStencilFormat] };
     match stencil_format {
         ffi::GLKViewDrawableStencilFormatNone => 0,
         ffi::GLKViewDrawableStencilFormat8 => 8,
@@ -139,8 +141,8 @@ fn stencil_for_view(view: ffi::id) -> u8 {
 }
 
 #[allow(non_upper_case_globals)]
-fn multisampling_for_view(view: ffi::id) -> Option<u16> {
-    let ms_format: ffi::NSUInteger = unsafe { msg_send![view, drawableMultisample] };
+fn multisampling_for_view(view: *mut Object) -> Option<u16> {
+    let ms_format: ffi::gles::types::GLint = unsafe { msg_send![view, drawableMultisample] };
     match ms_format {
         ffi::GLKViewDrawableMultisampleNone => None,
         ffi::GLKViewDrawableMultisample4X => Some(4),
@@ -150,12 +152,12 @@ fn multisampling_for_view(view: ffi::id) -> Option<u16> {
 
 #[derive(Debug)]
 pub struct Context {
-    eagl_context: ffi::id,
-    view: ffi::id, // this will be invalid after the `EventLoop` is dropped
+    eagl_context: *mut Object,
+    view: *mut Object, // this will be invalid after the `EventLoop` is dropped
 }
 
-fn validate_version(version: u8) -> Result<ffi::NSUInteger, CreationError> {
-    let version = version as ffi::NSUInteger;
+fn validate_version(version: u8) -> Result<NSUInteger, CreationError> {
+    let version = version as NSUInteger;
     if (ffi::kEAGLRenderingAPIOpenGLES1..=ffi::kEAGLRenderingAPIOpenGLES3).contains(&version) {
         Ok(version)
     } else {
@@ -199,7 +201,7 @@ impl Context {
         let win = builder.build(el)?;
         let context = unsafe {
             let eagl_context = Context::create_context(version)?;
-            let view = win.ui_view() as ffi::id;
+            let view = win.ui_view() as *mut Object;
             let mut context = Context { eagl_context, view };
             context.init_context(&win);
             context
@@ -218,15 +220,15 @@ impl Context {
         Self::new_windowed(wb, el, pf_reqs, gl_attr).map(|(_window, context)| context)
     }
 
-    unsafe fn create_context(mut version: ffi::NSUInteger) -> Result<ffi::id, CreationError> {
+    unsafe fn create_context(mut version: NSUInteger) -> Result<*mut Object, CreationError> {
         let context_class = Class::get("EAGLContext").expect("Failed to get class `EAGLContext`");
-        let eagl_context: ffi::id = msg_send![context_class, alloc];
-        let mut valid_context = ffi::nil;
-        while valid_context == ffi::nil && version > 0 {
+        let eagl_context: *mut Object = msg_send![context_class, alloc];
+        let mut valid_context: *mut Object = ptr::null_mut();
+        while valid_context.is_null() && version > 0 {
             valid_context = msg_send![eagl_context, initWithAPI: version];
             version -= 1;
         }
-        if valid_context == ffi::nil {
+        if valid_context.is_null() {
             Err(CreationError::OsError(
                 "Failed to create an OpenGL ES context with any version".to_string(),
             ))
@@ -238,26 +240,26 @@ impl Context {
     unsafe fn init_context(&mut self, win: &winit::window::Window) {
         let dict_class = Class::get("NSDictionary").expect("Failed to get class `NSDictionary`");
         let number_class = Class::get("NSNumber").expect("Failed to get class `NSNumber`");
-        let draw_props: ffi::id = msg_send![dict_class, alloc];
-        let draw_props: ffi::id = msg_send![draw_props,
-            initWithObjects:
-                vec![
-                    msg_send![number_class, numberWithBool:NO],
-                    ffi::kEAGLColorFormatRGB565,
-                ].as_ptr()
-            forKeys:
-                vec![
-                    ffi::kEAGLDrawablePropertyRetainedBacking,
-                    ffi::kEAGLDrawablePropertyColorFormat,
-                ].as_ptr()
-            count: 2
+        let draw_props: *mut Object = msg_send![dict_class, alloc];
+        let objects: Vec<*const Object> = vec![
+            msg_send![number_class, numberWithBool: Bool::NO],
+            ffi::kEAGLColorFormatRGB565.cast(),
+        ];
+        let keys: Vec<*const Object> = vec![
+            ffi::kEAGLDrawablePropertyRetainedBacking.cast(),
+            ffi::kEAGLDrawablePropertyColorFormat.cast(),
+        ];
+        let draw_props: *mut Object = msg_send![draw_props,
+            initWithObjects: objects.as_ptr(),
+            forKeys: keys.as_ptr(),
+            count: 2usize,
         ];
         self.make_current().unwrap();
 
         let view = self.view;
-        let scale_factor = win.scale_factor() as ffi::CGFloat;
+        let scale_factor = win.scale_factor() as CGFloat;
         let _: () = msg_send![view, setContentScaleFactor: scale_factor];
-        let layer: ffi::id = msg_send![view, layer];
+        let layer: *mut Object = msg_send![view, layer];
         let _: () = msg_send![layer, setContentsScale: scale_factor];
         let _: () = msg_send![layer, setDrawableProperties: draw_props];
 
@@ -269,8 +271,8 @@ impl Context {
         gl.GenRenderbuffers(1, &mut color_render_buf);
         gl.BindRenderbuffer(ffi::gles::RENDERBUFFER, color_render_buf);
 
-        let ok: BOOL = msg_send![self.eagl_context, renderbufferStorage:ffi::gles::RENDERBUFFER fromDrawable:layer];
-        if ok != YES {
+        let ok = msg_send_bool![self.eagl_context, renderbufferStorage:ffi::gles::RENDERBUFFER fromDrawable:layer];
+        if ok {
             panic!("EAGL: could not set renderbufferStorage");
         }
 
@@ -293,9 +295,9 @@ impl Context {
     #[inline]
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
         unsafe {
-            let res: BOOL =
-                msg_send![self.eagl_context, presentRenderbuffer: ffi::gles::RENDERBUFFER];
-            if res == YES {
+            let res =
+                msg_send_bool![self.eagl_context, presentRenderbuffer: ffi::gles::RENDERBUFFER];
+            if res {
                 Ok(())
             } else {
                 Err(ContextError::IoError(std::io::Error::new(
@@ -345,8 +347,8 @@ impl Context {
     #[inline]
     pub unsafe fn make_current(&self) -> Result<(), ContextError> {
         let context_class = Class::get("EAGLContext").expect("Failed to get class `EAGLContext`");
-        let res: BOOL = msg_send![context_class, setCurrentContext: self.eagl_context];
-        if res == YES {
+        let res = msg_send_bool![context_class, setCurrentContext: self.eagl_context];
+        if res {
             Ok(())
         } else {
             Err(ContextError::IoError(std::io::Error::new(
@@ -363,8 +365,9 @@ impl Context {
         }
 
         let context_class = Class::get("EAGLContext").expect("Failed to get class `EAGLContext`");
-        let res: BOOL = msg_send![context_class, setCurrentContext: ffi::nil];
-        if res == YES {
+        let context: *mut Object = ptr::null_mut();
+        let res = msg_send_bool![context_class, setCurrentContext: context];
+        if res {
             Ok(())
         } else {
             Err(ContextError::IoError(std::io::Error::new(
@@ -405,16 +408,16 @@ impl Context {
 }
 
 fn create_view_class() {
-    extern "C" fn init_with_frame(this: &Object, _: Sel, frame: ffi::CGRect) -> ffi::id {
+    extern "C" fn init_with_frame(this: &Object, _: Sel, frame: NSRect) -> *mut Object {
         unsafe {
-            let view: ffi::id = msg_send![super(this, class!(GLKView)), initWithFrame: frame];
+            let view: *mut Object = msg_send![super(this, class!(GLKView)), initWithFrame: frame];
 
             let mask = ffi::UIViewAutoresizingFlexibleWidth | ffi::UIViewAutoresizingFlexibleHeight;
             let _: () = msg_send![view, setAutoresizingMask: mask];
-            let _: () = msg_send![view, setAutoresizesSubviews: YES];
+            let _: () = msg_send![view, setAutoresizesSubviews: Bool::YES];
 
-            let layer: ffi::id = msg_send![view, layer];
-            let _: () = msg_send![layer, setOpaque: YES];
+            let layer: *mut Object = msg_send![view, layer];
+            let _: () = msg_send![layer, setOpaque: Bool::YES];
 
             view
         }
@@ -427,16 +430,10 @@ fn create_view_class() {
 
     let superclass = Class::get("GLKView").expect("Failed to get class `GLKView`");
     let mut decl =
-        ClassDecl::new("MainGLView", superclass).expect("Failed to declare class `MainGLView`");
+        ClassBuilder::new("MainGLView", superclass).expect("Failed to declare class `MainGLView`");
     unsafe {
-        decl.add_method(
-            sel!(initWithFrame:),
-            init_with_frame as extern "C" fn(&Object, Sel, ffi::CGRect) -> ffi::id,
-        );
-        decl.add_class_method(
-            sel!(layerClass),
-            layer_class as extern "C" fn(&Class, Sel) -> *const Class,
-        );
+        decl.add_method(sel!(initWithFrame:), init_with_frame as extern "C" fn(_, _, _) -> _);
+        decl.add_class_method(sel!(layerClass), layer_class as extern "C" fn(_, _) -> _);
         decl.register();
     }
 }

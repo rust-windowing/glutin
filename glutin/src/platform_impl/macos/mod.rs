@@ -12,8 +12,7 @@ use cocoa::foundation::NSAutoreleasePool;
 use core_foundation::base::TCFType;
 use core_foundation::bundle::{CFBundleGetBundleWithIdentifier, CFBundleGetFunctionPointerForName};
 use core_foundation::string::CFString;
-use objc2::msg_send;
-use objc2::runtime::{BOOL, NO};
+use objc2::{msg_send, msg_send_bool};
 
 use crate::platform::macos::WindowExtMacOS;
 
@@ -224,12 +223,8 @@ impl Context {
 
             let pool = NSAutoreleasePool::new(nil);
             let current = NSOpenGLContext::currentContext(nil);
-            let res = if current != nil {
-                let is_equal: BOOL = msg_send![current, isEqual: context];
-                is_equal != NO
-            } else {
-                false
-            };
+            let res =
+                if current != nil { msg_send_bool![current, isEqual: context] } else { false };
             let _: () = msg_send![pool, release];
             res
         }
