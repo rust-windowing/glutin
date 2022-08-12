@@ -222,13 +222,13 @@ impl Context {
 
     unsafe fn create_context(mut version: NSUInteger) -> Result<*mut Object, CreationError> {
         let context_class = Class::get("EAGLContext").expect("Failed to get class `EAGLContext`");
-        let eagl_context: *mut Object = msg_send![context_class, alloc];
-        let mut valid_context: *mut Object = ptr::null_mut();
-        while valid_context.is_null() && version > 0 {
-            valid_context = msg_send![eagl_context, initWithAPI: version];
+        let mut eagl_context: *mut Object = ptr::null_mut();
+        while eagl_context.is_null() && version > 0 {
+            eagl_context = msg_send![context_class, alloc];
+            eagl_context = msg_send![eagl_context, initWithAPI: version];
             version -= 1;
         }
-        if valid_context.is_null() {
+        if eagl_context.is_null() {
             Err(CreationError::OsError(
                 "Failed to create an OpenGL ES context with any version".to_string(),
             ))
