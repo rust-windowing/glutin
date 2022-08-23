@@ -16,6 +16,7 @@ use winapi::shared::ntdef::LPCWSTR;
 use winapi::shared::windef::{HDC, HGLRC, HWND};
 use winapi::um::libloaderapi::*;
 use winapi::um::wingdi::*;
+use winapi::um::winnt::IMAGE_DOS_HEADER;
 use winapi::um::winuser::*;
 
 use std::ffi::{CStr, CString, OsStr};
@@ -772,7 +773,7 @@ unsafe fn load_extra_functions(win: HWND) -> Result<gl::wgl_extra::Wgl, Creation
         }
 
         // access to class information of the real window
-        let instance = GetModuleHandleW(std::ptr::null());
+        let instance = get_instance_handle();
         let mut class: WNDCLASSEXW = std::mem::zeroed();
 
         if GetClassInfoExW(instance, class_name.as_ptr(), &mut class) == 0 {
@@ -814,7 +815,7 @@ unsafe fn load_extra_functions(win: HWND) -> Result<gl::wgl_extra::Wgl, Creation
             rect.bottom - rect.top,
             std::ptr::null_mut(),
             std::ptr::null_mut(),
-            GetModuleHandleW(std::ptr::null()),
+            get_instance_handle(),
             std::ptr::null_mut(),
         );
 
@@ -895,4 +896,19 @@ fn choose_dummy_pixel_format(hdc: HDC) -> Result<raw::c_int, CreationError> {
     }
 
     Ok(pf_id)
+}
+
+fn get_instance_handle() -> HINSTANCE {
+    // Gets the instance handle by taking the address of the
+    // pseudo-variable created by the Microsoft linker:
+    // https://devblogs.microsoft.com/oldnewthing/20041025-00/?p=37483
+
+    // This is preferred over GetModuleHandle(NULL) because it also works in DLLs:
+    // https://stackoverflow.com/questions/21718027/getmodulehandlenull-vs-hinstance
+
+    extern "C" {
+        static __ImageBase: IMAGE_DOS_HEADER;
+    }
+
+    unsafe { &__ImageBase as *const _ as _ }
 }
