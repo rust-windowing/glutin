@@ -15,7 +15,7 @@ use objc::rc::autoreleasepool;
 use objc::runtime::{BOOL, NO};
 
 use crate::config::GetGlConfig;
-use crate::context::{AsRawContext, ContextAttributes, RawContext, Robustness};
+use crate::context::{AsRawContext, ContextApi, ContextAttributes, RawContext, Robustness};
 use crate::display::GetGlDisplay;
 use crate::error::{ErrorKind, Result};
 use crate::prelude::*;
@@ -36,6 +36,10 @@ impl Display {
             Some(RawContext::Cgl(share_context)) => share_context.cast(),
             _ => nil,
         };
+
+        if matches!(context_attributes.api, ContextApi::Gles(_)) {
+            return Err(ErrorKind::NotSupported("gles is not supported with CGL").into());
+        }
 
         if context_attributes.robustness != Robustness::NotRobust {
             return Err(ErrorKind::NotSupported("robustness is not supported with CGL").into());

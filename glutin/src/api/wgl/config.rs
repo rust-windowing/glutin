@@ -342,7 +342,9 @@ impl GlConfig for Config {
     }
 
     fn srgb_capable(&self) -> bool {
-        if self.inner.display.inner.client_extensions.contains(SRGB_EXT) {
+        if self.inner.display.inner.client_extensions.contains(SRGB_EXT)
+            || self.inner.display.inner.client_extensions.contains("WGL_EXT_colorspace")
+        {
             self.raw_attribute(wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as c_int) != 0
         } else if self.inner.display.inner.client_extensions.contains(SRGB_ARB) {
             self.raw_attribute(wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as c_int) != 0
@@ -400,7 +402,13 @@ impl GlConfig for Config {
     }
 
     fn api(&self) -> Api {
-        Api::OPENGL
+        let mut api = Api::OPENGL;
+        if self.inner.display.inner.client_extensions.contains("WGL_EXT_create_context_es2_profile")
+        {
+            api |= Api::GLES2;
+        }
+
+        api
     }
 }
 

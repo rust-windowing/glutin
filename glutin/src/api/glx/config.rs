@@ -268,7 +268,13 @@ impl GlConfig for Config {
     }
 
     fn api(&self) -> Api {
-        Api::OPENGL
+        let mut api = Api::OPENGL;
+        if self.inner.display.inner.client_extensions.contains("GLX_EXT_create_context_es2_profile")
+        {
+            api |= Api::GLES2;
+        }
+
+        api
     }
 }
 
