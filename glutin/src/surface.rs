@@ -58,10 +58,10 @@ pub trait GlSurface<T: SurfaceTypeTrait>: Sealed {
 
     /// Set swap interval for the surface.
     ///
-    /// See the docs for [`crate::surface::SwapInterval`] on the details.
+    /// See [`crate::surface::SwapInterval`] for details.
     fn set_swap_interval(&self, context: &Self::Context, interval: SwapInterval) -> Result<()>;
 
-    /// Resize the surface to the new size.
+    /// Resize the surface to a new size.
     ///
     /// This call is for compatibility reasons, on most platforms it's a no-op.
     ///
@@ -107,7 +107,7 @@ impl<T: SurfaceTypeTrait + Default> SurfaceAttributesBuilder<T> {
     ///
     /// # Api-specific.
     ///
-    /// This only controls EGL surfaces, since the rest are using context for
+    /// This only controls EGL surfaces, other platforms use the context for
     /// that.
     pub fn with_srgb(mut self, srgb: Option<bool>) -> Self {
         self.attributes.srgb = srgb;
@@ -125,7 +125,7 @@ impl SurfaceAttributesBuilder<WindowSurface> {
     ///
     /// # Api-specific.
     ///
-    /// This is EGL specific, since the rest are using it on the context.
+    /// This is EGL specific, other platforms use the context for that.
     pub fn with_single_buffer(mut self, single_buffer: bool) -> Self {
         self.attributes.single_buffer = single_buffer;
         self

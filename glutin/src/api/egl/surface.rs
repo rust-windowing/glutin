@@ -58,11 +58,13 @@ impl Display {
         attrs.push(egl::NONE as EGLint);
 
         let config = config.clone();
-        let surface = Self::check_surface_error(self.inner.egl.CreatePbufferSurface(
-            *self.inner.raw,
-            *config.inner.raw,
-            attrs.as_ptr(),
-        ))?;
+        let surface = unsafe {
+            Self::check_surface_error(self.inner.egl.CreatePbufferSurface(
+                *self.inner.raw,
+                *config.inner.raw,
+                attrs.as_ptr(),
+            ))?
+        };
 
         Ok(Surface {
             display: self.clone(),
@@ -97,31 +99,33 @@ impl Display {
         attrs.push(egl::NONE as EGLAttrib);
 
         let config = config.clone();
-        let surface = if self.inner.version >= Version::new(1, 5)
-            && self.inner.egl.CreatePlatformWindowSurface.is_loaded()
-        {
-            self.inner.egl.CreatePlatformPixmapSurface(
-                *self.inner.raw,
-                *config.inner.raw,
-                native_pixmap.raw(),
-                attrs.as_ptr(),
-            )
-        } else if self.inner.client_extensions.contains("EGL_EXT_platform_base") {
-            let attrs: Vec<EGLint> = attrs.into_iter().map(|attr| attr as EGLint).collect();
-            self.inner.egl.CreatePlatformPixmapSurfaceEXT(
-                *self.inner.raw,
-                *config.inner.raw,
-                native_pixmap.raw(),
-                attrs.as_ptr(),
-            )
-        } else {
-            let attrs: Vec<EGLint> = attrs.into_iter().map(|attr| attr as EGLint).collect();
-            self.inner.egl.CreatePixmapSurface(
-                *self.inner.raw,
-                *config.inner.raw,
-                native_pixmap.raw(),
-                attrs.as_ptr(),
-            )
+        let surface = unsafe {
+            if self.inner.version >= Version::new(1, 5)
+                && self.inner.egl.CreatePlatformWindowSurface.is_loaded()
+            {
+                self.inner.egl.CreatePlatformPixmapSurface(
+                    *self.inner.raw,
+                    *config.inner.raw,
+                    native_pixmap.raw(),
+                    attrs.as_ptr(),
+                )
+            } else if self.inner.client_extensions.contains("EGL_EXT_platform_base") {
+                let attrs: Vec<EGLint> = attrs.into_iter().map(|attr| attr as EGLint).collect();
+                self.inner.egl.CreatePlatformPixmapSurfaceEXT(
+                    *self.inner.raw,
+                    *config.inner.raw,
+                    native_pixmap.raw(),
+                    attrs.as_ptr(),
+                )
+            } else {
+                let attrs: Vec<EGLint> = attrs.into_iter().map(|attr| attr as EGLint).collect();
+                self.inner.egl.CreatePixmapSurface(
+                    *self.inner.raw,
+                    *config.inner.raw,
+                    native_pixmap.raw(),
+                    attrs.as_ptr(),
+                )
+            }
         };
 
         let surface = Self::check_surface_error(surface)?;
@@ -174,31 +178,33 @@ impl Display {
 
         let config = config.clone();
 
-        let surface = if self.inner.version >= Version::new(1, 5)
-            && self.inner.egl.CreatePlatformWindowSurface.is_loaded()
-        {
-            self.inner.egl.CreatePlatformWindowSurface(
-                *self.inner.raw,
-                *config.inner.raw,
-                native_window.raw() as _,
-                attrs.as_ptr(),
-            )
-        } else if self.inner.client_extensions.contains("EGL_EXT_platform_base") {
-            let attrs: Vec<EGLint> = attrs.into_iter().map(|attr| attr as EGLint).collect();
-            self.inner.egl.CreatePlatformWindowSurfaceEXT(
-                *self.inner.raw,
-                *config.inner.raw,
-                native_window.raw() as _,
-                attrs.as_ptr(),
-            )
-        } else {
-            let attrs: Vec<EGLint> = attrs.into_iter().map(|attr| attr as EGLint).collect();
-            self.inner.egl.CreateWindowSurface(
-                *self.inner.raw,
-                *config.inner.raw,
-                native_window.raw() as _,
-                attrs.as_ptr(),
-            )
+        let surface = unsafe {
+            if self.inner.version >= Version::new(1, 5)
+                && self.inner.egl.CreatePlatformWindowSurface.is_loaded()
+            {
+                self.inner.egl.CreatePlatformWindowSurface(
+                    *self.inner.raw,
+                    *config.inner.raw,
+                    native_window.raw() as _,
+                    attrs.as_ptr(),
+                )
+            } else if self.inner.client_extensions.contains("EGL_EXT_platform_base") {
+                let attrs: Vec<EGLint> = attrs.into_iter().map(|attr| attr as EGLint).collect();
+                self.inner.egl.CreatePlatformWindowSurfaceEXT(
+                    *self.inner.raw,
+                    *config.inner.raw,
+                    native_window.raw() as _,
+                    attrs.as_ptr(),
+                )
+            } else {
+                let attrs: Vec<EGLint> = attrs.into_iter().map(|attr| attr as EGLint).collect();
+                self.inner.egl.CreateWindowSurface(
+                    *self.inner.raw,
+                    *config.inner.raw,
+                    native_window.raw() as _,
+                    attrs.as_ptr(),
+                )
+            }
         };
 
         let surface = Self::check_surface_error(surface)?;
@@ -233,11 +239,10 @@ pub struct Surface<T: SurfaceTypeTrait> {
 impl<T: SurfaceTypeTrait> Surface<T> {
     /// Swaps the underlying back buffers when the surface is not single
     /// buffered and pass the [`DamageRect`] information to the system
-    /// compositor. Providing empty slice will result in damaging the entire
-    /// surface.
+    /// compositor. Providing empty slice will damage the entire surface.
     ///
-    /// This Api doesn't do any partial rendering, it just sends the  provides
-    /// the hints for the system compositor.
+    /// This Api doesn't do any partial rendering, it just provides hints for
+    /// the system compositor.
     pub fn swap_buffers_with_damage(
         &self,
         _context: &PossiblyCurrentContext,

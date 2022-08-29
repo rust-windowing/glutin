@@ -58,13 +58,15 @@ impl Display {
         };
 
         // Set the base for errors coming from GLX.
-        let mut error_base = 0;
-        let mut event_base = 0;
-        if glx.QueryExtension(display.0, &mut error_base, &mut event_base) == 0 {
-            // The glx extension isn't present.
-            return Err(ErrorKind::InitializationFailed.into());
+        unsafe {
+            let mut error_base = 0;
+            let mut event_base = 0;
+            if glx.QueryExtension(display.0, &mut error_base, &mut event_base) == 0 {
+                // The glx extension isn't present.
+                return Err(ErrorKind::InitializationFailed.into());
+            }
+            GLX_BASE_ERROR.store(error_base, Ordering::Relaxed);
         }
-        GLX_BASE_ERROR.store(error_base, Ordering::Relaxed);
 
         // This is completely ridiculous, but VirtualBox's OpenGL driver needs
         // some call handled by *it* (i.e. not Mesa) to occur before
@@ -74,12 +76,13 @@ impl Display {
         //
         // The easiest way to do this is to just call `glXQueryVersion()` before
         // doing anything else. See: https://www.virtualbox.org/ticket/8293
-        let (mut major, mut minor) = (0, 0);
-        if glx.QueryVersion(display.0, &mut major, &mut minor) == 0 {
-            return Err(ErrorKind::InitializationFailed.into());
-        }
-
-        let version = Version::new(major as u8, minor as u8);
+        let version = unsafe {
+            let (mut major, mut minor) = (0, 0);
+            if glx.QueryVersion(display.0, &mut major, &mut minor) == 0 {
+                return Err(ErrorKind::InitializationFailed.into());
+            }
+            Version::new(major as u8, minor as u8)
+        };
 
         if version < Version::new(1, 3) {
             return Err(ErrorKind::NotSupported("the glx below 1.3 isn't supported").into());
@@ -114,7 +117,7 @@ impl GlDisplay for Display {
         &self,
         template: ConfigTemplate,
     ) -> Result<Box<dyn Iterator<Item = Self::Config> + '_>> {
-        Self::find_configs(self, template)
+        unsafe { Self::find_configs(self, template) }
     }
 
     unsafe fn create_window_surface(
@@ -122,7 +125,7 @@ impl GlDisplay for Display {
         config: &Self::Config,
         surface_attributes: &SurfaceAttributes<WindowSurface>,
     ) -> Result<Self::WindowSurface> {
-        Self::create_window_surface(self, config, surface_attributes)
+        unsafe { Self::create_window_surface(self, config, surface_attributes) }
     }
 
     unsafe fn create_pbuffer_surface(
@@ -130,7 +133,7 @@ impl GlDisplay for Display {
         config: &Self::Config,
         surface_attributes: &SurfaceAttributes<PbufferSurface>,
     ) -> Result<Self::PbufferSurface> {
-        Self::create_pbuffer_surface(self, config, surface_attributes)
+        unsafe { Self::create_pbuffer_surface(self, config, surface_attributes) }
     }
 
     unsafe fn create_context(
@@ -138,7 +141,7 @@ impl GlDisplay for Display {
         config: &Self::Config,
         context_attributes: &crate::context::ContextAttributes,
     ) -> Result<Self::NotCurrentContext> {
-        Self::create_context(self, config, context_attributes)
+        unsafe { Self::create_context(self, config, context_attributes) }
     }
 
     unsafe fn create_pixmap_surface(
@@ -146,7 +149,7 @@ impl GlDisplay for Display {
         config: &Self::Config,
         surface_attributes: &SurfaceAttributes<PixmapSurface>,
     ) -> Result<Self::PixmapSurface> {
-        Self::create_pixmap_surface(self, config, surface_attributes)
+        unsafe { Self::create_pixmap_surface(self, config, surface_attributes) }
     }
 }
 

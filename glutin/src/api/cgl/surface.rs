@@ -29,7 +29,7 @@ impl Display {
         Err(ErrorKind::NotSupported("pixmaps are not supported with CGL").into())
     }
 
-    pub(crate) fn create_pbuffer_surface(
+    pub(crate) unsafe fn create_pbuffer_surface(
         &self,
         _config: &Config,
         _surface_attributes: &SurfaceAttributes<PbufferSurface>,

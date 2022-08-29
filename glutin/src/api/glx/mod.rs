@@ -41,7 +41,7 @@ static LAST_GLX_ERROR: Lazy<Mutex<Option<Error>>> = Lazy::new(|| Mutex::new(None
 static GLX: Lazy<Option<Glx>> = Lazy::new(|| {
     let paths = ["libGL.so.1", "libGL.so"];
 
-    SymWrapper::new(&paths).map(Glx).ok()
+    unsafe { SymWrapper::new(&paths).map(Glx).ok() }
 });
 
 static GLX_EXTRA: Lazy<Option<GlxExtra>> = Lazy::new(|| {
@@ -56,7 +56,7 @@ unsafe impl Send for Glx {}
 
 impl SymLoading for glx::Glx {
     unsafe fn load_with(lib: &Library) -> Self {
-        Self::load_with(|sym| {
+        Self::load_with(|sym| unsafe {
             lib.get(CString::new(sym.as_bytes()).unwrap().as_bytes_with_nul())
                 .map(|sym| *sym)
                 .unwrap_or(std::ptr::null_mut())

@@ -40,7 +40,7 @@ impl Error {
         self.kind
     }
 
-    /// The underlying raw code if it's present.
+    /// The underlying raw code in case it's present.
     #[inline]
     pub fn raw_code(&self) -> Option<i64> {
         self.raw_code
@@ -92,7 +92,7 @@ pub enum ErrorKind {
     /// enough memory.
     OutOfMemory,
 
-    /// Anrecognized attribute value was passed.
+    /// An recognized attribute value was passed.
     BadAttribute,
 
     /// The context is no longer valid.
@@ -119,7 +119,7 @@ pub enum ErrorKind {
     /// The pixmap is invalid.
     BadPixmap,
 
-    /// Arguments are inconsistent. For example when sharad context are not
+    /// Arguments are inconsistent. For example when shared contexts are not
     /// compatible.
     BadMatch,
 
@@ -138,7 +138,7 @@ pub enum ErrorKind {
     /// The operation is not supported by the platform.
     NotSupported(&'static str),
 
-    /// The misc error that can't be classyfied occured.
+    /// The misc error that can't be classified occurred.
     Misc,
 }
 

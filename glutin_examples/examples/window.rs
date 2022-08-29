@@ -31,7 +31,7 @@ fn main() {
     let gl_display = create_display(raw_display, raw_window_handle);
 
     // Create the config we'll be used for window. We'll use the native window
-    // raw-window-handle for it to get the rigth visual and use proper hdc. Note
+    // raw-window-handle for it to get the right visual and use proper hdc. Note
     // that you can likely use it for other windows using the same config.
     let template = config_template(window.raw_window_handle());
     let config = unsafe { gl_display.find_configs(template).unwrap().next().unwrap() };

@@ -43,7 +43,7 @@ impl GlDisplay for Display {
         &self,
         template: ConfigTemplate,
     ) -> Result<Box<dyn Iterator<Item = Self::Config> + '_>> {
-        Self::find_configs(self, template)
+        unsafe { Self::find_configs(self, template) }
     }
 
     unsafe fn create_window_surface(
@@ -51,7 +51,7 @@ impl GlDisplay for Display {
         config: &Self::Config,
         surface_attributes: &SurfaceAttributes<WindowSurface>,
     ) -> Result<Self::WindowSurface> {
-        Self::create_window_surface(self, config, surface_attributes)
+        unsafe { Self::create_window_surface(self, config, surface_attributes) }
     }
 
     unsafe fn create_pbuffer_surface(
@@ -59,7 +59,7 @@ impl GlDisplay for Display {
         config: &Self::Config,
         surface_attributes: &SurfaceAttributes<PbufferSurface>,
     ) -> Result<Self::PbufferSurface> {
-        Self::create_pbuffer_surface(self, config, surface_attributes)
+        unsafe { Self::create_pbuffer_surface(self, config, surface_attributes) }
     }
 
     unsafe fn create_context(
@@ -67,7 +67,7 @@ impl GlDisplay for Display {
         config: &Self::Config,
         context_attributes: &crate::context::ContextAttributes,
     ) -> Result<Self::NotCurrentContext> {
-        Self::create_context(self, config, context_attributes)
+        unsafe { Self::create_context(self, config, context_attributes) }
     }
 
     unsafe fn create_pixmap_surface(
@@ -75,7 +75,7 @@ impl GlDisplay for Display {
         config: &Self::Config,
         surface_attributes: &SurfaceAttributes<PixmapSurface>,
     ) -> Result<Self::PixmapSurface> {
-        Self::create_pixmap_surface(self, config, surface_attributes)
+        unsafe { Self::create_pixmap_surface(self, config, surface_attributes) }
     }
 }
 

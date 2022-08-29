@@ -50,7 +50,7 @@ impl Display {
 
         let name =
             OsStr::new("opengl32.dll").encode_wide().chain(Some(0).into_iter()).collect::<Vec<_>>();
-        let lib_opengl32 = dll_loader::LoadLibraryW(name.as_ptr());
+        let lib_opengl32 = unsafe { dll_loader::LoadLibraryW(name.as_ptr()) };
         if lib_opengl32 == 0 {
             return Err(ErrorKind::NotFound.into());
         }
@@ -58,8 +58,11 @@ impl Display {
         // In case native window was provided init extra functions.
         let (wgl_extra, client_extensions) =
             if let Some(RawWindowHandle::Win32(window)) = native_window {
-                let (wgl_extra, client_extensions) = super::load_extra_functions(window.hwnd as _)?;
-                (Some(wgl_extra), client_extensions)
+                unsafe {
+                    let (wgl_extra, client_extensions) =
+                        super::load_extra_functions(window.hinstance as _, window.hwnd as _)?;
+                    (Some(wgl_extra), client_extensions)
+                }
             } else {
                 (None, HashSet::new())
             };
@@ -80,7 +83,7 @@ impl GlDisplay for Display {
         &self,
         template: ConfigTemplate,
     ) -> Result<Box<dyn Iterator<Item = Self::Config> + '_>> {
-        Self::find_configs(self, template)
+        unsafe { Self::find_configs(self, template) }
     }
 
     unsafe fn create_window_surface(
@@ -88,7 +91,7 @@ impl GlDisplay for Display {
         config: &Self::Config,
         surface_attributes: &SurfaceAttributes<WindowSurface>,
     ) -> Result<Self::WindowSurface> {
-        Self::create_window_surface(self, config, surface_attributes)
+        unsafe { Self::create_window_surface(self, config, surface_attributes) }
     }
 
     unsafe fn create_pbuffer_surface(
@@ -96,7 +99,7 @@ impl GlDisplay for Display {
         config: &Self::Config,
         surface_attributes: &SurfaceAttributes<PbufferSurface>,
     ) -> Result<Self::PbufferSurface> {
-        Self::create_pbuffer_surface(self, config, surface_attributes)
+        unsafe { Self::create_pbuffer_surface(self, config, surface_attributes) }
     }
 
     unsafe fn create_context(
@@ -104,7 +107,7 @@ impl GlDisplay for Display {
         config: &Self::Config,
         context_attributes: &crate::context::ContextAttributes,
     ) -> Result<Self::NotCurrentContext> {
-        Self::create_context(self, config, context_attributes)
+        unsafe { Self::create_context(self, config, context_attributes) }
     }
 
     unsafe fn create_pixmap_surface(
@@ -112,7 +115,7 @@ impl GlDisplay for Display {
         config: &Self::Config,
         surface_attributes: &SurfaceAttributes<PixmapSurface>,
     ) -> Result<Self::PixmapSurface> {
-        Self::create_pixmap_surface(self, config, surface_attributes)
+        unsafe { Self::create_pixmap_surface(self, config, surface_attributes) }
     }
 }
 

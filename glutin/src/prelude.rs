@@ -1,7 +1,8 @@
 //! The glutin prelude.
 //!
-//! The purpose of this module is to bring common imports, given that all
-//! graphics api are on the traits for the documetation sharing purposes.
+//! The purpose of this module is to make accessing common imports more
+//! convenient. The prelude also imports traits shared by the implementations of
+//! graphics apis.
 //!
 //! ```no_run
 //! # #![allow(unused_imports)]

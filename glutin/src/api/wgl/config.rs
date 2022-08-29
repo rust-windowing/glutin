@@ -31,7 +31,7 @@ const SRGB_ARB: &str = "WGL_ARB_framebuffer_sRGB";
 const SRGB_EXT: &str = "WGL_ARB_framebuffer_sRGB";
 
 impl Display {
-    pub(crate) fn find_configs(
+    pub(crate) unsafe fn find_configs(
         &self,
         template: ConfigTemplate,
     ) -> Result<Box<dyn Iterator<Item = Config> + '_>> {
@@ -274,16 +274,19 @@ impl Config {
     /// The `raw_window_handle` should point to a valid value.
     pub unsafe fn apply_on_native_window(&self, raw_window_handle: &RawWindowHandle) -> Result<()> {
         let hdc = match raw_window_handle {
-            RawWindowHandle::Win32(window) => gdi::GetDC(window.hwnd as _),
+            RawWindowHandle::Win32(window) => unsafe { gdi::GetDC(window.hwnd as _) },
             _ => return Err(ErrorKind::BadNativeWindow.into()),
         };
 
         let descriptor =
             self.inner.descriptor.as_ref().map(|desc| desc as _).unwrap_or(std::ptr::null());
-        if gl::SetPixelFormat(hdc, self.inner.pixel_format_index, descriptor) == 0 {
-            Err(IoError::last_os_error().into())
-        } else {
-            Ok(())
+
+        unsafe {
+            if gl::SetPixelFormat(hdc, self.inner.pixel_format_index, descriptor) == 0 {
+                Err(IoError::last_os_error().into())
+            } else {
+                Ok(())
+            }
         }
     }
 

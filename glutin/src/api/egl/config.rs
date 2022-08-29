@@ -24,7 +24,7 @@ const FLOAT_PIXELS_EXT: &str = "EGL_EXT_pixel_format_float";
 const SRGB_SURFACE: &str = "EGL_KHR_gl_colorspace";
 
 impl Display {
-    pub(crate) fn find_configs(
+    pub(crate) unsafe fn find_configs(
         &self,
         template: ConfigTemplate,
     ) -> Result<Box<dyn Iterator<Item = Config> + '_>> {

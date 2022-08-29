@@ -47,12 +47,14 @@ impl Display {
         attrs.push(glx::NONE as c_int);
 
         let config = config.clone();
-        let surface = self.inner.glx.CreatePixmap(
-            self.inner.raw.cast(),
-            *config.inner.raw,
-            xid,
-            attrs.as_ptr(),
-        );
+        let surface = unsafe {
+            self.inner.glx.CreatePixmap(
+                self.inner.raw.cast(),
+                *config.inner.raw,
+                xid,
+                attrs.as_ptr(),
+            )
+        };
 
         super::last_glx_error(self.inner.raw)?;
 
@@ -86,8 +88,9 @@ impl Display {
         attrs.push(glx::NONE as c_int);
 
         let config = config.clone();
-        let surface =
-            self.inner.glx.CreatePbuffer(self.inner.raw.cast(), *config.inner.raw, attrs.as_ptr());
+        let surface = unsafe {
+            self.inner.glx.CreatePbuffer(self.inner.raw.cast(), *config.inner.raw, attrs.as_ptr())
+        };
 
         super::last_glx_error(self.inner.raw)?;
 
@@ -120,12 +123,14 @@ impl Display {
         attrs.push(glx::NONE as c_int);
 
         let config = config.clone();
-        let surface = self.inner.glx.CreateWindow(
-            self.inner.raw.cast(),
-            *config.inner.raw,
-            window,
-            attrs.as_ptr() as *const _,
-        );
+        let surface = unsafe {
+            self.inner.glx.CreateWindow(
+                self.inner.raw.cast(),
+                *config.inner.raw,
+                window,
+                attrs.as_ptr() as *const _,
+            )
+        };
 
         super::last_glx_error(self.inner.raw)?;
 

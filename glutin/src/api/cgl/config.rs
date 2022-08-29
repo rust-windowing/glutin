@@ -78,10 +78,13 @@ impl Display {
         // Terminate attrs with zero.
         attrs.push(0);
 
-        let raw = NSOpenGLPixelFormat::alloc(nil).initWithAttributes_(&attrs);
-        if raw.is_null() {
-            return Err(ErrorKind::BadConfig.into());
-        }
+        let raw = unsafe {
+            let raw = NSOpenGLPixelFormat::alloc(nil).initWithAttributes_(&attrs);
+            if raw.is_null() {
+                return Err(ErrorKind::BadConfig.into());
+            }
+            raw
+        };
 
         let inner = Arc::new(ConfigInner {
             display: self.clone(),

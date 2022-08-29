@@ -41,23 +41,25 @@ impl Display {
             return Err(ErrorKind::NotSupported("robustness is not supported with CGL").into());
         }
 
-        let config = config.clone();
-        let raw = NSOpenGLContext::alloc(nil)
-            .initWithFormat_shareContext_(*config.inner.raw, share_context as *mut _);
+        unsafe {
+            let config = config.clone();
+            let raw = NSOpenGLContext::alloc(nil)
+                .initWithFormat_shareContext_(*config.inner.raw, share_context as *mut _);
 
-        if config.inner.transrarency {
-            let opacity = 0;
-            super::check_error(CGLSetParameter(
-                raw.CGLContextObj().cast(),
-                cgl::kCGLCPSurfaceOpacity,
-                &opacity,
-            ))?;
+            if config.inner.transrarency {
+                let opacity = 0;
+                super::check_error(CGLSetParameter(
+                    raw.CGLContextObj().cast(),
+                    cgl::kCGLCPSurfaceOpacity,
+                    &opacity,
+                ))?;
+            }
+
+            let inner = ContextInner { display: self.clone(), config, raw: NSOpenGLContextId(raw) };
+            let context = NotCurrentContext { inner };
+
+            Ok(context)
         }
-
-        let inner = ContextInner { display: self.clone(), config, raw: NSOpenGLContextId(raw) };
-        let context = NotCurrentContext { inner };
-
-        Ok(context)
     }
 }
 

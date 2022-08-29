@@ -57,7 +57,7 @@ pub trait NotCurrentGlContextSurfaceAccessor<T: SurfaceTypeTrait>: Sealed {
     ///
     /// # Api-specific:
     ///
-    /// **WGL/CGL: ** - Not supported.
+    /// **WGL/CGL:** - not supported.
     fn make_current_draw_read(
         self,
         surface_draw: &Self::Surface,
@@ -96,7 +96,7 @@ pub trait PossiblyCurrentContextGlSurfaceAccessor<T: SurfaceTypeTrait>: Sealed {
     ///
     /// # Api-specific:
     ///
-    /// This is not supported with WGL and CGL.
+    /// **CGL/WGL:** - not supported.
     fn make_current_draw_read(
         &self,
         surface_draw: &Self::Surface,
@@ -139,7 +139,7 @@ impl ContextAttributesBuilder {
     ///
     /// # Platform-specific
     ///
-    /// On Wayland both context must use the same Wayland connection.
+    /// On Wayland both contexts must use the same Wayland connection.
     ///
     /// [`Config`]: crate::config::Config
     pub fn with_sharing(mut self, context: &impl AsRawContext) -> Self {
@@ -323,7 +323,7 @@ pub enum ReleaseBehaviour {
     ///
     /// # Api-specific
     ///
-    /// **macOS:** no supported, [`Self::Flush`] is always used.
+    /// **macOS:** - not supported, [`Self::Flush`] is always used.
     None,
 
     /// Flushes the context that was previously current as if `glFlush` was
@@ -454,16 +454,14 @@ impl Sealed for NotCurrentContext {}
 /// The context that could be current on the current thread can neither be
 /// [`Send`] nor [`Sync`]. In case you need to use it on a different thread
 /// [`make it not current`].
-/// ```no_run
+/// ```compile_fail
 /// fn test_send<T: Send>() {}
-/// test_send::<glutin::context::NotCurrentContext>();
+/// test_send::<glutin::context::PossiblyCurrentContext>();
 /// ```
-///
-/// However it's not `Sync`.
 ///
 /// ```compile_fail
 /// fn test_sync<T: Sync>() {}
-/// test_sync::<glutin::context::NotCurrentContext>();
+/// test_sync::<glutin::context::PossiblyCurrentContext>();
 /// ```
 /// [`make it not current`]: crate::context::PossiblyCurrentGlContext::make_not_current
 #[derive(Debug)]

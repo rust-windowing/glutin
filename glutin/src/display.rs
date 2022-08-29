@@ -37,11 +37,11 @@ pub trait GlDisplay: Sealed {
     /// A context that is being used by the display.
     type NotCurrentContext: NotCurrentGlContext;
 
-    /// Find configuration matching the given `template`.
+    /// Find configurations matching the given `template`.
     ///
     /// # Safety
     ///
-    /// Some platforms use [`RawWindowHandle`] to perform config picking, so it
+    /// Some platforms use [`RawWindowHandle`] to pick configs, so it
     /// must point to a valid object if it was passed on
     /// [`crate::config::ConfigTemplate`].
     ///
@@ -82,7 +82,7 @@ pub trait GlDisplay: Sealed {
     ///
     /// # Safety
     ///
-    /// The function is safe in general, but mark as not for compatibility
+    /// The function is safe in general, but marked as not for compatibility
     /// reasons.
     unsafe fn create_pbuffer_surface(
         &self,
@@ -122,7 +122,7 @@ pub trait AsRawDisplay {
 /// The graphics display to handle underlying graphics platform in a
 /// cross-platform way.
 ///
-/// The display could be accessed from any thread.
+/// The display can be accessed from any thread.
 ///
 /// ```no_run
 /// fn test_send<T: Send>() {}
@@ -152,9 +152,17 @@ pub enum Display {
 impl Display {
     /// Create a graphics platform display from the given raw display handle.
     ///
+    /// The display mixing isn't supported, so if you created EGL display you
+    /// can't use it with the GLX display objects. Interaction between those
+    /// will result in a runtime panic.
+    ///
     /// # Safety
     ///
-    /// The `display` must point to the valid platform display.
+    /// The `display` must point to the valid platform display and be valid for
+    /// the entire lifetime of all Objects created with that display.
+    ///
+    /// The `picker` must contain pointers to the valid values if GLX or WGL
+    /// specific options were used.
     pub unsafe fn from_raw(display: RawDisplayHandle, picker: DisplayPicker) -> Result<Self> {
         #[cfg(glx_backend)]
         let registrar = picker
@@ -163,18 +171,20 @@ impl Display {
 
         match picker.api_preference {
             #[cfg(egl_backend)]
-            DisplayApiPreference::Egl => Ok(Self::Egl(EglDisplay::from_raw(display)?)),
+            DisplayApiPreference::Egl => unsafe { Ok(Self::Egl(EglDisplay::from_raw(display)?)) },
             #[cfg(glx_backend)]
-            DisplayApiPreference::Glx => Ok(Self::Glx(GlxDisplay::from_raw(display, registrar)?)),
+            DisplayApiPreference::Glx => unsafe {
+                Ok(Self::Glx(GlxDisplay::from_raw(display, registrar)?))
+            },
             #[cfg(wgl_backend)]
-            DisplayApiPreference::Wgl => {
+            DisplayApiPreference::Wgl => unsafe {
                 Ok(Self::Wgl(WglDisplay::from_raw(display, picker.window_handle)?))
             },
             #[cfg(cgl_backend)]
             DisplayApiPreference::Cgl => Ok(Self::Cgl(CglDisplay::from_raw(display)?)),
 
             #[cfg(all(egl_backend, glx_backend))]
-            DisplayApiPreference::EglThenGlx => {
+            DisplayApiPreference::EglThenGlx => unsafe {
                 if let Ok(display) = EglDisplay::from_raw(display) {
                     Ok(Self::Egl(display))
                 } else {
@@ -182,7 +192,7 @@ impl Display {
                 }
             },
             #[cfg(all(egl_backend, glx_backend))]
-            DisplayApiPreference::GlxThenEgl => {
+            DisplayApiPreference::GlxThenEgl => unsafe {
                 if let Ok(display) = GlxDisplay::from_raw(display, registrar) {
                     Ok(Self::Glx(display))
                 } else {
@@ -191,7 +201,7 @@ impl Display {
             },
 
             #[cfg(all(egl_backend, wgl_backend))]
-            DisplayApiPreference::EglThenWgl => {
+            DisplayApiPreference::EglThenWgl => unsafe {
                 if let Ok(display) = EglDisplay::from_raw(display) {
                     Ok(Self::Egl(display))
                 } else {
@@ -199,7 +209,7 @@ impl Display {
                 }
             },
             #[cfg(all(egl_backend, wgl_backend))]
-            DisplayApiPreference::WglThenEgl => {
+            DisplayApiPreference::WglThenEgl => unsafe {
                 if let Ok(display) = WglDisplay::from_raw(display, picker.window_handle) {
                     Ok(Self::Wgl(display))
                 } else {
@@ -223,19 +233,19 @@ impl GlDisplay for Display {
     ) -> Result<Box<dyn Iterator<Item = Self::Config> + '_>> {
         match self {
             #[cfg(egl_backend)]
-            Self::Egl(display) => {
+            Self::Egl(display) => unsafe {
                 Ok(Box::new(display.find_configs(template)?.into_iter().map(Config::Egl)))
             },
             #[cfg(glx_backend)]
-            Self::Glx(display) => {
+            Self::Glx(display) => unsafe {
                 Ok(Box::new(display.find_configs(template)?.into_iter().map(Config::Glx)))
             },
             #[cfg(wgl_backend)]
-            Self::Wgl(display) => {
+            Self::Wgl(display) => unsafe {
                 Ok(Box::new(display.find_configs(template)?.into_iter().map(Config::Wgl)))
             },
             #[cfg(cgl_backend)]
-            Self::Cgl(display) => {
+            Self::Cgl(display) => unsafe {
                 Ok(Box::new(display.find_configs(template)?.into_iter().map(Config::Cgl)))
             },
         }
@@ -248,19 +258,19 @@ impl GlDisplay for Display {
     ) -> Result<Self::NotCurrentContext> {
         match (self, config) {
             #[cfg(egl_backend)]
-            (Self::Egl(display), Config::Egl(config)) => {
+            (Self::Egl(display), Config::Egl(config)) => unsafe {
                 Ok(NotCurrentContext::Egl(display.create_context(config, context_attributes)?))
             },
             #[cfg(glx_backend)]
-            (Self::Glx(display), Config::Glx(config)) => {
+            (Self::Glx(display), Config::Glx(config)) => unsafe {
                 Ok(NotCurrentContext::Glx(display.create_context(config, context_attributes)?))
             },
             #[cfg(wgl_backend)]
-            (Self::Wgl(display), Config::Wgl(config)) => {
+            (Self::Wgl(display), Config::Wgl(config)) => unsafe {
                 Ok(NotCurrentContext::Wgl(display.create_context(config, context_attributes)?))
             },
             #[cfg(cgl_backend)]
-            (Self::Cgl(display), Config::Cgl(config)) => {
+            (Self::Cgl(display), Config::Cgl(config)) => unsafe {
                 Ok(NotCurrentContext::Cgl(display.create_context(config, context_attributes)?))
             },
             _ => unreachable!(),
@@ -274,19 +284,19 @@ impl GlDisplay for Display {
     ) -> Result<Self::WindowSurface> {
         match (self, config) {
             #[cfg(egl_backend)]
-            (Self::Egl(display), Config::Egl(config)) => {
+            (Self::Egl(display), Config::Egl(config)) => unsafe {
                 Ok(Surface::Egl(display.create_window_surface(config, surface_attributes)?))
             },
             #[cfg(glx_backend)]
-            (Self::Glx(display), Config::Glx(config)) => {
+            (Self::Glx(display), Config::Glx(config)) => unsafe {
                 Ok(Surface::Glx(display.create_window_surface(config, surface_attributes)?))
             },
             #[cfg(wgl_backend)]
-            (Self::Wgl(display), Config::Wgl(config)) => {
+            (Self::Wgl(display), Config::Wgl(config)) => unsafe {
                 Ok(Surface::Wgl(display.create_window_surface(config, surface_attributes)?))
             },
             #[cfg(cgl_backend)]
-            (Self::Cgl(display), Config::Cgl(config)) => {
+            (Self::Cgl(display), Config::Cgl(config)) => unsafe {
                 Ok(Surface::Cgl(display.create_window_surface(config, surface_attributes)?))
             },
             _ => unreachable!(),
@@ -300,19 +310,19 @@ impl GlDisplay for Display {
     ) -> Result<Self::PbufferSurface> {
         match (self, config) {
             #[cfg(egl_backend)]
-            (Self::Egl(display), Config::Egl(config)) => {
+            (Self::Egl(display), Config::Egl(config)) => unsafe {
                 Ok(Surface::Egl(display.create_pbuffer_surface(config, surface_attributes)?))
             },
             #[cfg(glx_backend)]
-            (Self::Glx(display), Config::Glx(config)) => {
+            (Self::Glx(display), Config::Glx(config)) => unsafe {
                 Ok(Surface::Glx(display.create_pbuffer_surface(config, surface_attributes)?))
             },
             #[cfg(wgl_backend)]
-            (Self::Wgl(display), Config::Wgl(config)) => {
+            (Self::Wgl(display), Config::Wgl(config)) => unsafe {
                 Ok(Surface::Wgl(display.create_pbuffer_surface(config, surface_attributes)?))
             },
             #[cfg(cgl_backend)]
-            (Self::Cgl(display), Config::Cgl(config)) => {
+            (Self::Cgl(display), Config::Cgl(config)) => unsafe {
                 Ok(Surface::Cgl(display.create_pbuffer_surface(config, surface_attributes)?))
             },
             _ => unreachable!(),
@@ -326,19 +336,19 @@ impl GlDisplay for Display {
     ) -> Result<Self::PixmapSurface> {
         match (self, config) {
             #[cfg(egl_backend)]
-            (Self::Egl(display), Config::Egl(config)) => {
+            (Self::Egl(display), Config::Egl(config)) => unsafe {
                 Ok(Surface::Egl(display.create_pixmap_surface(config, surface_attributes)?))
             },
             #[cfg(glx_backend)]
-            (Self::Glx(display), Config::Glx(config)) => {
+            (Self::Glx(display), Config::Glx(config)) => unsafe {
                 Ok(Surface::Glx(display.create_pixmap_surface(config, surface_attributes)?))
             },
             #[cfg(wgl_backend)]
-            (Self::Wgl(display), Config::Wgl(config)) => {
+            (Self::Wgl(display), Config::Wgl(config)) => unsafe {
                 Ok(Surface::Wgl(display.create_pixmap_surface(config, surface_attributes)?))
             },
             #[cfg(cgl_backend)]
-            (Self::Cgl(display), Config::Cgl(config)) => {
+            (Self::Cgl(display), Config::Cgl(config)) => unsafe {
                 Ok(Surface::Cgl(display.create_pixmap_surface(config, surface_attributes)?))
             },
             _ => unreachable!(),
@@ -354,7 +364,7 @@ impl AsRawDisplay for Display {
 
 impl Sealed for Display {}
 
-/// A settings to control automatic display picking.
+/// Settings to control automatic display picking.
 pub struct DisplayPicker {
     pub(crate) api_preference: DisplayApiPreference,
     #[cfg(glx_backend)]

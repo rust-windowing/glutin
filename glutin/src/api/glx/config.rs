@@ -23,7 +23,7 @@ use super::display::Display;
 const FLOAT_PIXEL_EXT: &str = "GLX_ARB_fbconfig_float";
 
 impl Display {
-    pub(crate) fn find_configs(
+    pub(crate) unsafe fn find_configs(
         &self,
         template: ConfigTemplate,
     ) -> Result<Box<dyn Iterator<Item = Config> + '_>> {

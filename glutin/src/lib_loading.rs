@@ -9,6 +9,7 @@ use libloading::Library;
 use libloading::os::windows::{Library as WinLibrary, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS};
 
 pub trait SymLoading {
+    /// # Safety
     /// The library must be unsured to live long enough.
     unsafe fn load_with(lib: &Library) -> Self;
 }
@@ -20,7 +21,7 @@ pub struct SymWrapper<T> {
 }
 
 impl<T: SymLoading> SymWrapper<T> {
-    pub fn new(lib_paths: &[&str]) -> Result<Self, ()> {
+    pub unsafe fn new(lib_paths: &[&str]) -> Result<Self, ()> {
         unsafe {
             for path in lib_paths {
                 #[cfg(windows)]

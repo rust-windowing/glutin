@@ -25,7 +25,7 @@ use super::display::Display;
 use super::surface::Surface;
 
 impl Display {
-    pub(crate) fn create_context(
+    pub(crate) unsafe fn create_context(
         &self,
         config: &Config,
         context_attributes: &ContextAttributes,

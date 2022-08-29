@@ -1,15 +1,15 @@
 //! The purpose of this library is to provide OpenGL `[context]` on as many
-//! platforms as possible abstracting away the underlying platforms shenanigans,
-//! while keeping direct access to them to make the use of platform specific
-//! extensions easier.
+//! platforms as possible abstracting away the platform inconsistencies,
+//! while providing direct access to them to make the use of platform specific
+//! extensions when needed.
 //!
-//! However the library doesn't force into using a cross platform abstraction,
+//! Glutin does not force to use the cross platform abstraction,
 //! for example, when only `[EGL]` is desired, it can be used directly.
 //!
 //! The initialization starts by loading and connecting to the underlying
-//! graphics platform Api when creating a `[display]`. This object is used to
-//! create all the OpenGL objects, such as `[config]`, `[context]`, and
-//! `[surface]`.
+//! graphics platform Api when creating a `[display]`. A display is used to
+//! create all the common platform Api objects, such as `[config]`, `[context]`,
+//! and `[surface]`.
 //!
 //! [display]: crate::display
 //! [context]: crate::context
@@ -19,6 +19,8 @@
 
 #![deny(rust_2018_idioms)]
 #![deny(rustdoc::broken_intra_doc_links)]
+#![deny(unsafe_op_in_unsafe_fn)]
+#![deny(improper_ctypes, improper_ctypes_definitions)]
 #![deny(clippy::all)]
 #![deny(missing_debug_implementations)]
 #![deny(missing_docs)]
@@ -46,7 +48,7 @@ extern crate objc;
 pub(crate) mod private {
     /// Prevent traits from being implemented downstream, since those are used
     /// purely for documentation organization and simplify platform api
-    /// implementation maintaining.
+    /// implementation maintenance.
     pub trait Sealed {}
 
     /// `gl_api_dispatch!(match expr; Enum(foo) => foo.something())`

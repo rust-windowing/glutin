@@ -32,7 +32,7 @@ impl Display {
         Err(ErrorKind::NotSupported("pixmaps are not implemented with WGL").into())
     }
 
-    pub(crate) fn create_pbuffer_surface(
+    pub(crate) unsafe fn create_pbuffer_surface(
         &self,
         _config: &Config,
         _surface_attributes: &SurfaceAttributes<PbufferSurface>,
@@ -47,7 +47,7 @@ impl Display {
     ) -> Result<Surface<WindowSurface>> {
         let hwnd = match surface_attributes.raw_window_handle.as_ref().unwrap() {
             handle @ RawWindowHandle::Win32(window_handle) => {
-                let _ = config.apply_on_native_window(handle);
+                let _ = unsafe { config.apply_on_native_window(handle) };
                 window_handle.hwnd as HWND
             },
             _ => {

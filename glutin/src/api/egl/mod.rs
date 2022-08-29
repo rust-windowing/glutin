@@ -28,7 +28,7 @@ pub(crate) static EGL: Lazy<Option<Egl>> = Lazy::new(|| {
     #[cfg(not(windows))]
     let paths = ["libEGL.so.1", "libEGL.so"];
 
-    SymWrapper::new(&paths).map(Egl).ok()
+    unsafe { SymWrapper::new(&paths).map(Egl).ok() }
 });
 
 type EglGetProcAddress = unsafe extern "C" fn(*const ffi::c_void) -> *const ffi::c_void;
@@ -42,21 +42,23 @@ unsafe impl Send for Egl {}
 impl SymLoading for egl::Egl {
     unsafe fn load_with(lib: &Library) -> Self {
         let loader = move |sym_name: &'static str| -> *const ffi::c_void {
-            let sym_name = CString::new(sym_name.as_bytes()).unwrap();
-            if let Ok(sym) = lib.get(sym_name.as_bytes_with_nul()) {
-                return *sym;
+            unsafe {
+                let sym_name = CString::new(sym_name.as_bytes()).unwrap();
+                if let Ok(sym) = lib.get(sym_name.as_bytes_with_nul()) {
+                    return *sym;
+                }
+
+                let egl_proc_address = EGL_GET_PROC_ADDRESS.get_or_init(|| {
+                    let sym: libloading::Symbol<'_, EglGetProcAddress> =
+                        lib.get(b"eglGetProcAddress\0").unwrap();
+                    sym.into_raw()
+                });
+
+                // The symbol was not available in the library, so ask eglGetProcAddress for it.
+                // Note that eglGetProcAddress was only able to look up extension
+                // functions prior to EGL 1.5, hence this two-part dance.
+                (egl_proc_address)(sym_name.as_bytes_with_nul().as_ptr() as *const ffi::c_void)
             }
-
-            let egl_proc_address = EGL_GET_PROC_ADDRESS.get_or_init(|| {
-                let sym: libloading::Symbol<'_, EglGetProcAddress> =
-                    lib.get(b"eglGetProcAddress\0").unwrap();
-                sym.into_raw()
-            });
-
-            // The symbol was not available in the library, so ask eglGetProcAddress for it.
-            // Note that eglGetProcAddress was only able to look up extension
-            // functions prior to EGL 1.5, hence this two-part dance.
-            (egl_proc_address)(sym_name.as_bytes_with_nul().as_ptr() as *const ffi::c_void)
         };
 
         Self::load_with(loader)

@@ -1,4 +1,4 @@
-//! Dedicated utils to work with X11 shenanigans.
+//! Utilities to access X11 specific config properties.
 
 use std::mem;
 
@@ -14,7 +14,7 @@ pub(crate) static XLIB: Lazy<Option<Xlib>> = Lazy::new(|| Xlib::open().ok());
 /// The XRENDER handle.
 static XRENDER: Lazy<Option<Xrender>> = Lazy::new(|| Xrender::open().ok());
 
-/// The GlConfig extension trait to get X11 options out of the config.
+/// The GlConfig extension trait to get X11 specific properties from a config.
 pub trait X11GlConfigExt {
     /// The `X11VisualInfo` that must be used to inititalize the Xlib window.
     fn x11_visual(&self) -> Option<X11VisualInfo>;
@@ -39,11 +39,13 @@ impl X11VisualInfo {
             return None;
         }
 
-        let mut raw: XVisualInfo = std::mem::zeroed();
-        raw.visualid = xid;
+        let raw = unsafe {
+            let mut raw: XVisualInfo = std::mem::zeroed();
+            raw.visualid = xid;
 
-        let mut num_visuals = 0;
-        let raw = (xlib.XGetVisualInfo)(display, VisualIDMask, &mut raw, &mut num_visuals);
+            let mut num_visuals = 0;
+            (xlib.XGetVisualInfo)(display, VisualIDMask, &mut raw, &mut num_visuals)
+        };
 
         if raw.is_null() {
             return None;
