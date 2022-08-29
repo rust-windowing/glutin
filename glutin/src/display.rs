@@ -1,4 +1,4 @@
-//! The GL platform display creation and picking.
+//! The OpenGL platform display selection and creation.
 #![allow(unreachable_patterns)]
 
 use std::fmt;

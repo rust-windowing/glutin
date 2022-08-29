@@ -1,4 +1,4 @@
-//! A cross platform GL surface representation.
+//! A cross platform OpenGL surface representation.
 #![allow(unreachable_patterns)]
 
 use std::marker::PhantomData;

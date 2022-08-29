@@ -1,4 +1,4 @@
-//! The catch all error used by glutin.
+//! Glutin error handling.
 
 use std::fmt;
 

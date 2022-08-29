@@ -1,4 +1,4 @@
-//! GL config picking and creating utils.
+//! Api config picking and creating utils.
 #![allow(unreachable_patterns)]
 
 use std::num::NonZeroU32;

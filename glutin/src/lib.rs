@@ -1,21 +1,20 @@
-//! The purpose of this library is to provide OpenGL `[context]` on as many
-//! platforms as possible abstracting away the platform inconsistencies,
-//! while providing direct access to them to make the use of platform specific
-//! extensions when needed.
+//! The purpose of this library is to provide an OpenGL [`context`] for as many
+//! platforms as possible, abstracting away the underlying differences without
+//! losing access to platform specific extensions.
 //!
-//! Glutin does not force to use the cross platform abstraction,
-//! for example, when only `[EGL]` is desired, it can be used directly.
+//! However Glutin doesn't force users into using the cross platform
+//! abstractions. When only a particular [`Api`] is desired, it can
+//! be used directly.
 //!
-//! The initialization starts by loading and connecting to the underlying
-//! graphics platform Api when creating a `[display]`. A display is used to
-//! create all the common platform Api objects, such as `[config]`, `[context]`,
-//! and `[surface]`.
+//! The initialization starts by loading and connecting to the platform's
+//! graphics Api when creating a [`display`]. This object is used to create all
+//! the OpenGL objects, such as [`config`], [`context`], and [`surface`].
 //!
-//! [display]: crate::display
-//! [context]: crate::context
-//! [surface]: crate::surface
-//! [config]: crate::config
-//! [EGL]: crate::api::egl
+//! [`display`]: crate::display
+//! [`context`]: crate::context
+//! [`surface`]: crate::surface
+//! [`config`]: crate::config
+//! [`Api`]: crate::api
 
 #![deny(rust_2018_idioms)]
 #![deny(rustdoc::broken_intra_doc_links)]

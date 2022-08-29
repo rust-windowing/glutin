@@ -1,4 +1,4 @@
-//! OpenGL context handling.
+//! OpenGL context creation and initialization.
 
 #![allow(unreachable_patterns)]
 use std::ffi::{self, CStr};
