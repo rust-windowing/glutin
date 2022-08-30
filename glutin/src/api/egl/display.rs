@@ -164,7 +164,10 @@ impl Display {
                 (egl::PLATFORM_X11_EXT, handle.display)
             },
             #[cfg(x11_platform)]
-            RawDisplayHandle::Xcb(handle) if extensions.contains("EGL_MESA_platform_xcb") => {
+            RawDisplayHandle::Xcb(handle)
+                if extensions.contains("EGL_MESA_platform_xcb")
+                    || extensions.contains("EGL_EXT_platform_xcb") =>
+            {
                 attrs.push(egl::PLATFORM_XCB_EXT as EGLint);
                 attrs.push(handle.screen as EGLint);
                 (egl::PLATFORM_XCB_EXT, handle.connection)

@@ -211,7 +211,7 @@ impl Display {
                 }
             },
             #[cfg(cgl_backend)]
-            DisplayApiPreferences::Cgl => unsafe { Ok(Self::Cgl(CglDisplay::from_raw(display)?)) },
+            DisplayApiPreference::Cgl => unsafe { Ok(Self::Cgl(CglDisplay::from_raw(display)?)) },
         }
     }
 }
@@ -408,11 +408,11 @@ impl fmt::Debug for DisplayApiPreference {
             #[cfg(all(egl_backend, glx_backend))]
             DisplayApiPreference::EglThenGlx(_) => "EglThenGlx",
             #[cfg(wgl_backend)]
-            DisplayApiPreference::Wgl => "Wgl",
+            DisplayApiPreference::Wgl(_) => "Wgl",
             #[cfg(all(egl_backend, wgl_backend))]
-            DisplayApiPreference::EglThenWgl => "EglThenWgl",
+            DisplayApiPreference::EglThenWgl(_) => "EglThenWgl",
             #[cfg(all(egl_backend, wgl_backend))]
-            DisplayApiPreference::WglThenEgl => "WglThenEgl",
+            DisplayApiPreference::WglThenEgl(_) => "WglThenEgl",
             #[cfg(cgl_backend)]
             DisplayApiPreference::Cgl => "Cgl",
         };

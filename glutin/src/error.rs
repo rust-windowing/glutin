@@ -76,7 +76,8 @@ impl From<ErrorKind> for Error {
 /// errors.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum ErrorKind {
-    /// The requested resource wasn't found.
+    /// The requested display wasn't found or some required symbol in it was
+    /// missing.
     NotFound,
 
     /// Failed to perform resource initialization.

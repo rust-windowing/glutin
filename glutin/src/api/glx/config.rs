@@ -193,7 +193,7 @@ impl Config {
         }
     }
 
-    pub(crate) fn is_singe_buffered(&self) -> bool {
+    pub(crate) fn is_single_buffered(&self) -> bool {
         self.raw_attribute(glx::DOUBLEBUFFER as c_int) == 0
     }
 }
@@ -271,7 +271,7 @@ impl GlConfig for Config {
         let mut api = Api::OPENGL;
         if self.inner.display.inner.client_extensions.contains("GLX_EXT_create_context_es2_profile")
         {
-            api |= Api::GLES2;
+            api |= Api::GLES1 | Api::GLES2;
         }
 
         api

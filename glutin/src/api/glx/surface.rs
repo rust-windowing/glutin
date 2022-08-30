@@ -205,7 +205,7 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     }
 
     fn is_single_buffered(&self) -> bool {
-        self.config.is_singe_buffered()
+        self.config.is_single_buffered()
     }
 
     fn swap_buffers(&self, _context: &Self::Context) -> Result<()> {
