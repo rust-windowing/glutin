@@ -161,61 +161,57 @@ impl Display {
     /// The `display` must point to the valid platform display and be valid for
     /// the entire lifetime of all Objects created with that display.
     ///
-    /// The `picker` must contain pointers to the valid values if GLX or WGL
+    /// The `preference` must contain pointers to the valid values if GLX or WGL
     /// specific options were used.
-    pub unsafe fn from_raw(display: RawDisplayHandle, picker: DisplayPicker) -> Result<Self> {
-        #[cfg(glx_backend)]
-        let registrar = picker
-            .glx_error_registrar
-            .expect("glx was requested, but error hook registrar wasn't provided.");
-
-        match picker.api_preference {
+    pub unsafe fn from_raw(
+        display: RawDisplayHandle,
+        preference: DisplayApiPreference,
+    ) -> Result<Self> {
+        match preference {
             #[cfg(egl_backend)]
             DisplayApiPreference::Egl => unsafe { Ok(Self::Egl(EglDisplay::from_raw(display)?)) },
             #[cfg(glx_backend)]
-            DisplayApiPreference::Glx => unsafe {
+            DisplayApiPreference::Glx(registrar) => unsafe {
                 Ok(Self::Glx(GlxDisplay::from_raw(display, registrar)?))
             },
-            #[cfg(wgl_backend)]
-            DisplayApiPreference::Wgl => unsafe {
-                Ok(Self::Wgl(WglDisplay::from_raw(display, picker.window_handle)?))
-            },
-            #[cfg(cgl_backend)]
-            DisplayApiPreference::Cgl => Ok(Self::Cgl(CglDisplay::from_raw(display)?)),
-
             #[cfg(all(egl_backend, glx_backend))]
-            DisplayApiPreference::EglThenGlx => unsafe {
-                if let Ok(display) = EglDisplay::from_raw(display) {
-                    Ok(Self::Egl(display))
-                } else {
-                    Ok(Self::Glx(GlxDisplay::from_raw(display, registrar)?))
-                }
-            },
-            #[cfg(all(egl_backend, glx_backend))]
-            DisplayApiPreference::GlxThenEgl => unsafe {
+            DisplayApiPreference::GlxThenEgl(registrar) => unsafe {
                 if let Ok(display) = GlxDisplay::from_raw(display, registrar) {
                     Ok(Self::Glx(display))
                 } else {
                     Ok(Self::Egl(EglDisplay::from_raw(display)?))
                 }
             },
-
-            #[cfg(all(egl_backend, wgl_backend))]
-            DisplayApiPreference::EglThenWgl => unsafe {
+            #[cfg(all(egl_backend, glx_backend))]
+            DisplayApiPreference::EglThenGlx(registrar) => unsafe {
                 if let Ok(display) = EglDisplay::from_raw(display) {
                     Ok(Self::Egl(display))
                 } else {
-                    Ok(Self::Wgl(WglDisplay::from_raw(display, picker.window_handle)?))
+                    Ok(Self::Glx(GlxDisplay::from_raw(display, registrar)?))
+                }
+            },
+            #[cfg(wgl_backend)]
+            DisplayApiPreference::Wgl(window_handle) => unsafe {
+                Ok(Self::Wgl(WglDisplay::from_raw(display, window_handle)?))
+            },
+            #[cfg(all(egl_backend, wgl_backend))]
+            DisplayApiPreference::EglThenWgl(window_handle) => unsafe {
+                if let Ok(display) = EglDisplay::from_raw(display) {
+                    Ok(Self::Egl(display))
+                } else {
+                    Ok(Self::Wgl(WglDisplay::from_raw(display, window_handle)?))
                 }
             },
             #[cfg(all(egl_backend, wgl_backend))]
-            DisplayApiPreference::WglThenEgl => unsafe {
-                if let Ok(display) = WglDisplay::from_raw(display, picker.window_handle) {
+            DisplayApiPreference::WglThenEgl(window_handle) => unsafe {
+                if let Ok(display) = WglDisplay::from_raw(display, window_handle) {
                     Ok(Self::Wgl(display))
                 } else {
                     Ok(Self::Egl(EglDisplay::from_raw(display)?))
                 }
             },
+            #[cfg(cgl_backend)]
+            DisplayApiPreferences::Cgl => unsafe { Ok(Self::Cgl(CglDisplay::from_raw(display)?)) },
         }
     }
 }
@@ -364,131 +360,65 @@ impl AsRawDisplay for Display {
 
 impl Sealed for Display {}
 
-/// Settings to control automatic display picking.
-pub struct DisplayPicker {
-    pub(crate) api_preference: DisplayApiPreference,
-    #[cfg(glx_backend)]
-    pub(crate) glx_error_registrar: Option<XlibErrorHookRegistrar>,
-    #[cfg(wgl_backend)]
-    pub(crate) window_handle: Option<raw_window_handle::RawWindowHandle>,
-}
-
-impl DisplayPicker {
-    /// Create a default display picker.
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    /// The preference of the underlying system Api.
-    ///
-    /// For platforms supporting `EGL` the default is `EGL` given that other api
-    /// providers require extra options to get them work.
-    pub fn with_api_preference(mut self, api_preference: DisplayApiPreference) -> Self {
-        self.api_preference = api_preference;
-        self
-    }
-
-    /// Create WGL display which will be the most suitable to operate with the
-    /// given window.
-    ///
-    /// When the window isn't provided the support for extensions and pixel
-    /// formats may be lacking.
-    #[cfg(wgl_backend)]
-    pub fn with_most_compatible_for_window(
-        mut self,
-        window_handle: raw_window_handle::RawWindowHandle,
-    ) -> Self {
-        self.window_handle = Some(window_handle);
-        self
-    }
-
-    /// The hook to register glutin error handler in X11 error handling
-    /// function.
-    ///
-    /// The hook registrar must be provided in case GLX will be used.
-    #[cfg(glx_backend)]
-    pub fn with_glx_error_registrar(mut self, error_registrar: XlibErrorHookRegistrar) -> Self {
-        self.glx_error_registrar = Some(error_registrar);
-        self
-    }
-}
-
-impl Default for DisplayPicker {
-    #[cfg(all(egl_backend, glx_backend))]
-    fn default() -> Self {
-        Self { api_preference: DisplayApiPreference::Egl, glx_error_registrar: None }
-    }
-
-    #[cfg(all(egl_backend, not(glx_backend), not(wgl_backend)))]
-    fn default() -> Self {
-        Self { api_preference: DisplayApiPreference::Egl }
-    }
-
-    #[cfg(all(glx_backend, not(egl_backend)))]
-    fn default() -> Self {
-        Self { api_preference: DisplayApiPreference::Glx, glx_error_registrar: None }
-    }
-
-    #[cfg(all(wgl_backend, not(egl_backend)))]
-    fn default() -> Self {
-        Self { api_preference: DisplayApiPreference::Wgl, window_handle: None }
-    }
-
-    #[cfg(all(wgl_backend, egl_backend))]
-    fn default() -> Self {
-        Self { api_preference: DisplayApiPreference::WglThenEgl, window_handle: None }
-    }
-
-    #[cfg(cgl_backend)]
-    fn default() -> Self {
-        Self { api_preference: DisplayApiPreference::Cgl }
-    }
-}
-
-impl fmt::Debug for DisplayPicker {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut f = f.debug_struct("DisplayPicker");
-        let f = f.field("api_preference", &self.api_preference);
-
-        #[cfg(glx_backend)]
-        let f = f.field("glx_registrar", &self.glx_error_registrar.is_some());
-
-        #[cfg(wgl_backend)]
-        let f = f.field("window_handle", &self.window_handle);
-
-        f.finish()
-    }
-}
-
 /// Preference of the display that should be used.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DisplayApiPreference {
     /// Prefer EGL.
     #[cfg(egl_backend)]
     Egl,
     /// Prefer GLX.
+    ///
+    /// The hook to register glutin error handler in the X11 error handling
+    /// function.
     #[cfg(glx_backend)]
-    Glx,
+    Glx(XlibErrorHookRegistrar),
     /// Prefer WGL.
+    ///
+    /// When raw window handle isn't provided the display will lack extensions
+    /// support and most features will be lacking.
     #[cfg(wgl_backend)]
-    Wgl,
+    Wgl(Option<raw_window_handle::RawWindowHandle>),
     /// Prefer CGL.
     #[cfg(cgl_backend)]
     Cgl,
 
     /// Prefer EGL and fallback to GLX.
     #[cfg(all(egl_backend, glx_backend))]
-    EglThenGlx,
+    EglThenGlx(XlibErrorHookRegistrar),
     /// Prefer GLX and fallback to EGL.
     #[cfg(all(egl_backend, glx_backend))]
-    GlxThenEgl,
+    GlxThenEgl(XlibErrorHookRegistrar),
 
     /// Prefer EGL and fallback to GLX.
     #[cfg(all(egl_backend, wgl_backend))]
-    EglThenWgl,
-    /// Prefer GLX and fallback to EGL.
+    EglThenWgl(Option<raw_window_handle::RawWindowHandle>),
+    /// Prefer WGL and fallback to EGL.
     #[cfg(all(egl_backend, wgl_backend))]
-    WglThenEgl,
+    WglThenEgl(Option<raw_window_handle::RawWindowHandle>),
+}
+
+impl fmt::Debug for DisplayApiPreference {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let api = match self {
+            #[cfg(egl_backend)]
+            DisplayApiPreference::Egl => "Egl",
+            #[cfg(glx_backend)]
+            DisplayApiPreference::Glx(_) => "Glx",
+            #[cfg(all(egl_backend, glx_backend))]
+            DisplayApiPreference::GlxThenEgl(_) => "GlxThenEgl",
+            #[cfg(all(egl_backend, glx_backend))]
+            DisplayApiPreference::EglThenGlx(_) => "EglThenGlx",
+            #[cfg(wgl_backend)]
+            DisplayApiPreference::Wgl => "Wgl",
+            #[cfg(all(egl_backend, wgl_backend))]
+            DisplayApiPreference::EglThenWgl => "EglThenWgl",
+            #[cfg(all(egl_backend, wgl_backend))]
+            DisplayApiPreference::WglThenEgl => "WglThenEgl",
+            #[cfg(cgl_backend)]
+            DisplayApiPreference::Cgl => "Cgl",
+        };
+
+        f.write_fmt(format_args!("DisplayApiPreference::{}", api))
+    }
 }
 
 /// Raw GL platform display.

@@ -12,7 +12,7 @@ use winit::platform::unix;
 use winit::window::{Window, WindowBuilder};
 
 use glutin::config::{Config, ConfigSurfaceTypes, ConfigTemplate, ConfigTemplateBuilder};
-use glutin::display::{Display, DisplayPicker};
+use glutin::display::{Display, DisplayApiPreference};
 use glutin::prelude::*;
 use glutin::surface::{Surface, SurfaceAttributes, SurfaceAttributesBuilder, WindowSurface};
 
@@ -68,24 +68,24 @@ pub fn create_display(
     raw_display: RawDisplayHandle,
     raw_window_handle: RawWindowHandle,
 ) -> Display {
-    #[cfg(not(all(glx_backend, wgl_backend)))]
-    let picker = DisplayPicker::new();
+    #[cfg(egl_backend)]
+    let preference = DisplayApiPreference::Egl;
+
+    #[cfg(glx_backend)]
+    let preference = DisplayApiPreference::Glx(Box::new(unix::register_xlib_error_hook));
+
+    #[cfg(cgl_backend)]
+    let preference = DisplayApiPreference::Cgl;
+
+    #[cfg(wgl_backend)]
+    let preference = DisplayApiPreference::Wgl(Some(raw_window_handle));
 
     #[cfg(all(egl_backend, wgl_backend))]
-    let picker = DisplayPicker::new()
-        .with_most_compatible_for_window(raw_window_handle)
-        .with_api_preference(glutin::display::DisplayApiPreference::WglThenEgl);
+    let preference = DisplayApiPreference::WglThenEgl(Some(raw_window_handle));
 
     #[cfg(all(egl_backend, glx_backend))]
-    let picker = DisplayPicker::new()
-        .with_api_preference(glutin::display::DisplayApiPreference::GlxThenEgl)
-        .with_glx_error_registrar(Box::new(unix::register_xlib_error_hook));
-
-    #[cfg(all(glx_backend, not(egl_backend)))]
-    let picker = DisplayPicker::new()
-        .with_api_preference(glutin::display::DisplayApiPreference::Glx)
-        .with_glx_error_registrar(Box::new(unix::register_xlib_error_hook));
+    let preference = DisplayApiPreference::GlxThenEgl(Box::new(unix::register_xlib_error_hook));
 
     // Create connection to underlying OpenGL client Api.
-    unsafe { Display::from_raw(raw_display, picker).unwrap() }
+    unsafe { Display::from_raw(raw_display, preference).unwrap() }
 }

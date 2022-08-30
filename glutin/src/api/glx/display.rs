@@ -35,7 +35,9 @@ impl Display {
     ///
     /// # Safety
     ///
-    /// The `display` must point to the valid Xlib display.
+    /// The `display` must point to the valid Xlib display and
+    /// `error_hook_registrar` must be registered in your Xlib error handling
+    /// callback.
     pub unsafe fn from_raw(
         display: RawDisplayHandle,
         error_hook_registrar: XlibErrorHookRegistrar,

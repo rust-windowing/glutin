@@ -176,8 +176,8 @@ impl ConfigTemplateBuilder {
     ///
     /// # Api-specific
     ///
-    /// EGL on X11 doesn't provide a way to create a transparent surface. Use
-    /// GLX for that instead.
+    /// EGL on X11 doesn't provide a way to create a transparent surface at the
+    /// time of writing. Use GLX for that instead.
     #[inline]
     pub fn with_transparency(mut self, transparency: bool) -> Self {
         self.template.transparency = transparency;
