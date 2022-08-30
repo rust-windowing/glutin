@@ -190,7 +190,10 @@ pub struct Config {
 }
 
 impl Config {
-    fn raw_attribute(&self, attr: c_int) -> c_int {
+    /// # Safety
+    ///
+    /// The caller must ensure that the attribute could be present.
+    unsafe fn raw_attribute(&self, attr: c_int) -> c_int {
         unsafe {
             let mut val = 0;
             self.inner.display.inner.glx.GetFBConfigAttrib(
@@ -204,30 +207,33 @@ impl Config {
     }
 
     pub(crate) fn is_single_buffered(&self) -> bool {
-        self.raw_attribute(glx::DOUBLEBUFFER as c_int) == 0
+        unsafe { self.raw_attribute(glx::DOUBLEBUFFER as c_int) == 0 }
     }
 }
 
 impl GlConfig for Config {
-    fn color_buffer_type(&self) -> ColorBufferType {
-        match self.raw_attribute(glx::X_VISUAL_TYPE as c_int) as _ {
-            glx::TRUE_COLOR => {
-                let r_size = self.raw_attribute(glx::RED_SIZE as c_int) as u8;
-                let g_size = self.raw_attribute(glx::GREEN_SIZE as c_int) as u8;
-                let b_size = self.raw_attribute(glx::BLUE_SIZE as c_int) as u8;
-                ColorBufferType::Rgb { r_size, g_size, b_size }
-            },
-            glx::GRAY_SCALE => {
-                let luma = self.raw_attribute(glx::RED_SIZE as c_int);
-                ColorBufferType::Luminance(luma as u8)
-            },
-            _ => unimplemented!(),
+    fn color_buffer_type(&self) -> Option<ColorBufferType> {
+        unsafe {
+            match self.raw_attribute(glx::X_VISUAL_TYPE as c_int) as _ {
+                glx::TRUE_COLOR => {
+                    let r_size = self.raw_attribute(glx::RED_SIZE as c_int) as u8;
+                    let g_size = self.raw_attribute(glx::GREEN_SIZE as c_int) as u8;
+                    let b_size = self.raw_attribute(glx::BLUE_SIZE as c_int) as u8;
+                    Some(ColorBufferType::Rgb { r_size, g_size, b_size })
+                },
+                glx::GRAY_SCALE => {
+                    let luma = self.raw_attribute(glx::RED_SIZE as c_int);
+                    Some(ColorBufferType::Luminance(luma as u8))
+                },
+                _ => None,
+            }
         }
     }
 
     fn float_pixels(&self) -> bool {
         if self.inner.display.inner.client_extensions.contains(FLOAT_PIXEL_EXT) {
-            let render_type = self.raw_attribute(glx::RENDER_TYPE as c_int) as glx::types::GLenum;
+            let render_type =
+                unsafe { self.raw_attribute(glx::RENDER_TYPE as c_int) as glx::types::GLenum };
             render_type == glx_extra::RGBA_FLOAT_BIT_ARB
         } else {
             false
@@ -235,35 +241,35 @@ impl GlConfig for Config {
     }
 
     fn alpha_size(&self) -> u8 {
-        self.raw_attribute(glx::ALPHA_SIZE as c_int) as u8
+        unsafe { self.raw_attribute(glx::ALPHA_SIZE as c_int) as u8 }
     }
 
     fn srgb_capable(&self) -> bool {
         if self.inner.display.inner.client_extensions.contains("GLX_ARB_framebuffer_sRGB") {
-            self.raw_attribute(glx_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as c_int) != 0
+            unsafe { self.raw_attribute(glx_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as c_int) != 0 }
         } else if self.inner.display.inner.client_extensions.contains("GLX_EXT_framebuffer_sRGB") {
-            self.raw_attribute(glx_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as c_int) != 0
+            unsafe { self.raw_attribute(glx_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as c_int) != 0 }
         } else {
             false
         }
     }
 
     fn depth_size(&self) -> u8 {
-        self.raw_attribute(glx::DEPTH_SIZE as c_int) as u8
+        unsafe { self.raw_attribute(glx::DEPTH_SIZE as c_int) as u8 }
     }
 
     fn stencil_size(&self) -> u8 {
-        self.raw_attribute(glx::STENCIL_SIZE as c_int) as u8
+        unsafe { self.raw_attribute(glx::STENCIL_SIZE as c_int) as u8 }
     }
 
     fn sample_buffers(&self) -> u8 {
-        self.raw_attribute(glx::SAMPLE_BUFFERS as c_int) as u8
+        unsafe { self.raw_attribute(glx::SAMPLE_BUFFERS as c_int) as u8 }
     }
 
     fn config_surface_types(&self) -> ConfigSurfaceTypes {
         let mut ty = ConfigSurfaceTypes::empty();
 
-        let raw_ty = self.raw_attribute(glx::DRAWABLE_TYPE as c_int) as u32;
+        let raw_ty = unsafe { self.raw_attribute(glx::DRAWABLE_TYPE as c_int) as u32 };
         if raw_ty & glx::WINDOW_BIT as u32 != 0 {
             ty.insert(ConfigSurfaceTypes::WINDOW);
         }
@@ -280,6 +286,12 @@ impl GlConfig for Config {
     fn api(&self) -> Api {
         let mut api = Api::OPENGL;
         if self.inner.display.inner.client_extensions.contains("GLX_EXT_create_context_es2_profile")
+            || self
+                .inner
+                .display
+                .inner
+                .client_extensions
+                .contains("GLX_EXT_create_context_es_profile")
         {
             api |= Api::GLES1 | Api::GLES2;
         }

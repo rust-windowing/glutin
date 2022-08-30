@@ -24,6 +24,10 @@ pub struct Display {
 
 impl Display {
     /// Create CGL display.
+    ///
+    /// # Safety
+    ///
+    /// The function is unsafe for consistency.
     pub unsafe fn from_raw(display: RawDisplayHandle) -> Result<Self> {
         match display {
             RawDisplayHandle::AppKit(..) => Ok(Display { _marker: PhantomData }),

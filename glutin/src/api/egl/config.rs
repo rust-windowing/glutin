@@ -219,10 +219,13 @@ impl Config {
     /// The interpretation of this value is platform dependant. Consult
     /// `platform` extension you're ended up using.
     pub fn native_visual(&self) -> u32 {
-        self.raw_attribute(egl::NATIVE_VISUAL_ID as EGLint) as u32
+        unsafe { self.raw_attribute(egl::NATIVE_VISUAL_ID as EGLint) as u32 }
     }
 
-    fn raw_attribute(&self, attr: EGLint) -> EGLint {
+    /// # Safety
+    ///
+    /// The caller must ensure that the attribute could be present.
+    unsafe fn raw_attribute(&self, attr: EGLint) -> EGLint {
         unsafe {
             let mut val = 0;
             self.inner.display.inner.egl.GetConfigAttrib(
@@ -237,35 +240,39 @@ impl Config {
 }
 
 impl GlConfig for Config {
-    fn color_buffer_type(&self) -> ColorBufferType {
-        match self.raw_attribute(egl::COLOR_BUFFER_TYPE as EGLint) as _ {
-            egl::LUMINANCE_BUFFER => {
-                let luma = self.raw_attribute(egl::LUMINANCE_SIZE as EGLint);
-                ColorBufferType::Luminance(luma as u8)
-            },
-            egl::RGB_BUFFER => {
-                let r_size = self.raw_attribute(egl::RED_SIZE as EGLint) as u8;
-                let g_size = self.raw_attribute(egl::GREEN_SIZE as EGLint) as u8;
-                let b_size = self.raw_attribute(egl::BLUE_SIZE as EGLint) as u8;
-                ColorBufferType::Rgb { r_size, g_size, b_size }
-            },
-            _ => unreachable!(),
+    fn color_buffer_type(&self) -> Option<ColorBufferType> {
+        unsafe {
+            match self.raw_attribute(egl::COLOR_BUFFER_TYPE as EGLint) as _ {
+                egl::LUMINANCE_BUFFER => {
+                    let luma = self.raw_attribute(egl::LUMINANCE_SIZE as EGLint);
+                    Some(ColorBufferType::Luminance(luma as u8))
+                },
+                egl::RGB_BUFFER => {
+                    let r_size = self.raw_attribute(egl::RED_SIZE as EGLint) as u8;
+                    let g_size = self.raw_attribute(egl::GREEN_SIZE as EGLint) as u8;
+                    let b_size = self.raw_attribute(egl::BLUE_SIZE as EGLint) as u8;
+                    Some(ColorBufferType::Rgb { r_size, g_size, b_size })
+                },
+                _ => None,
+            }
         }
     }
 
     fn float_pixels(&self) -> bool {
-        if self.inner.display.inner.client_extensions.contains(FLOAT_PIXELS_EXT) {
-            matches!(
-                self.raw_attribute(egl::COLOR_COMPONENT_TYPE_EXT as EGLint) as _,
-                egl::COLOR_COMPONENT_TYPE_FLOAT_EXT
-            )
-        } else {
-            false
+        unsafe {
+            if self.inner.display.inner.client_extensions.contains(FLOAT_PIXELS_EXT) {
+                matches!(
+                    self.raw_attribute(egl::COLOR_COMPONENT_TYPE_EXT as EGLint) as _,
+                    egl::COLOR_COMPONENT_TYPE_FLOAT_EXT
+                )
+            } else {
+                false
+            }
         }
     }
 
     fn alpha_size(&self) -> u8 {
-        self.raw_attribute(egl::ALPHA_SIZE as EGLint) as u8
+        unsafe { self.raw_attribute(egl::ALPHA_SIZE as EGLint) as u8 }
     }
 
     fn srgb_capable(&self) -> bool {
@@ -273,21 +280,21 @@ impl GlConfig for Config {
     }
 
     fn depth_size(&self) -> u8 {
-        self.raw_attribute(egl::DEPTH_SIZE as EGLint) as u8
+        unsafe { self.raw_attribute(egl::DEPTH_SIZE as EGLint) as u8 }
     }
 
     fn stencil_size(&self) -> u8 {
-        self.raw_attribute(egl::STENCIL_SIZE as EGLint) as u8
+        unsafe { self.raw_attribute(egl::STENCIL_SIZE as EGLint) as u8 }
     }
 
     fn sample_buffers(&self) -> u8 {
-        self.raw_attribute(egl::SAMPLE_BUFFERS as EGLint) as u8
+        unsafe { self.raw_attribute(egl::SAMPLE_BUFFERS as EGLint) as u8 }
     }
 
     fn config_surface_types(&self) -> ConfigSurfaceTypes {
         let mut ty = ConfigSurfaceTypes::empty();
 
-        let raw_ty = self.raw_attribute(egl::SURFACE_TYPE as EGLint) as u32;
+        let raw_ty = unsafe { self.raw_attribute(egl::SURFACE_TYPE as EGLint) as u32 };
         if raw_ty & egl::WINDOW_BIT as u32 != 0 {
             ty.insert(ConfigSurfaceTypes::WINDOW);
         }
@@ -303,7 +310,7 @@ impl GlConfig for Config {
 
     fn api(&self) -> Api {
         let mut api = Api::empty();
-        let raw_api = self.raw_attribute(egl::RENDERABLE_TYPE as EGLint) as u32;
+        let raw_api = unsafe { self.raw_attribute(egl::RENDERABLE_TYPE as EGLint) as u32 };
         if raw_api & egl::OPENGL_BIT as u32 != 0 {
             api.insert(Api::OPENGL);
         }

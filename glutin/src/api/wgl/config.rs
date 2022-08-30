@@ -309,11 +309,14 @@ impl Config {
     pub(crate) fn is_single_buffered(&self) -> bool {
         match self.inner.descriptor.as_ref() {
             Some(descriptor) => (descriptor.dwFlags & gl::PFD_DOUBLEBUFFER) == 0,
-            None => self.raw_attribute(wgl_extra::DOUBLE_BUFFER_ARB as c_int) == 0,
+            None => unsafe { self.raw_attribute(wgl_extra::DOUBLE_BUFFER_ARB as c_int) == 0 },
         }
     }
 
-    fn raw_attribute(&self, attr: c_int) -> c_int {
+    /// # Safety
+    ///
+    /// The caller must ensure that the attribute could be present.
+    unsafe fn raw_attribute(&self, attr: c_int) -> c_int {
         unsafe {
             let wgl_extra = self.inner.display.inner.wgl_extra.unwrap();
             let mut res = 0;
@@ -331,10 +334,10 @@ impl Config {
 }
 
 impl GlConfig for Config {
-    fn color_buffer_type(&self) -> ColorBufferType {
+    fn color_buffer_type(&self) -> Option<ColorBufferType> {
         let (r_size, g_size, b_size) = match self.inner.descriptor.as_ref() {
             Some(descriptor) => (descriptor.cRedBits, descriptor.cGreenBits, descriptor.cBlueBits),
-            _ => {
+            _ => unsafe {
                 let r_size = self.raw_attribute(wgl_extra::RED_BITS_ARB as c_int) as u8;
                 let g_size = self.raw_attribute(wgl_extra::GREEN_BITS_ARB as c_int) as u8;
                 let b_size = self.raw_attribute(wgl_extra::BLUE_BITS_ARB as c_int) as u8;
@@ -342,18 +345,21 @@ impl GlConfig for Config {
             },
         };
 
-        ColorBufferType::Rgb { r_size, g_size, b_size }
+        Some(ColorBufferType::Rgb { r_size, g_size, b_size })
     }
 
     fn float_pixels(&self) -> bool {
-        self.raw_attribute(wgl_extra::PIXEL_TYPE_ARB as c_int)
-            == wgl_extra::TYPE_RGBA_FLOAT_ARB as c_int
+        unsafe {
+            self.inner.display.inner.client_extensions.contains("WGL_ARB_pixel_format_float")
+                && self.raw_attribute(wgl_extra::PIXEL_TYPE_ARB as c_int)
+                    == wgl_extra::TYPE_RGBA_FLOAT_ARB as c_int
+        }
     }
 
     fn alpha_size(&self) -> u8 {
         match self.inner.descriptor.as_ref() {
             Some(descriptor) => descriptor.cAlphaBits,
-            _ => self.raw_attribute(wgl_extra::ALPHA_BITS_ARB as c_int) as _,
+            _ => unsafe { self.raw_attribute(wgl_extra::ALPHA_BITS_ARB as c_int) as _ },
         }
     }
 
@@ -361,9 +367,9 @@ impl GlConfig for Config {
         if self.inner.display.inner.client_extensions.contains(SRGB_EXT)
             || self.inner.display.inner.client_extensions.contains("WGL_EXT_colorspace")
         {
-            self.raw_attribute(wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as c_int) != 0
+            unsafe { self.raw_attribute(wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as c_int) != 0 }
         } else if self.inner.display.inner.client_extensions.contains(SRGB_ARB) {
-            self.raw_attribute(wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as c_int) != 0
+            unsafe { self.raw_attribute(wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as c_int) != 0 }
         } else {
             false
         }
@@ -372,20 +378,20 @@ impl GlConfig for Config {
     fn depth_size(&self) -> u8 {
         match self.inner.descriptor.as_ref() {
             Some(descriptor) => descriptor.cDepthBits,
-            _ => self.raw_attribute(wgl_extra::DEPTH_BITS_ARB as c_int) as _,
+            _ => unsafe { self.raw_attribute(wgl_extra::DEPTH_BITS_ARB as c_int) as _ },
         }
     }
 
     fn stencil_size(&self) -> u8 {
         match self.inner.descriptor.as_ref() {
             Some(descriptor) => descriptor.cStencilBits,
-            _ => self.raw_attribute(wgl_extra::STENCIL_BITS_ARB as c_int) as _,
+            _ => unsafe { self.raw_attribute(wgl_extra::STENCIL_BITS_ARB as c_int) as _ },
         }
     }
 
     fn sample_buffers(&self) -> u8 {
         if self.inner.display.inner.client_extensions.contains(MULTI_SAMPLE_ARB) {
-            self.raw_attribute(wgl_extra::SAMPLES_ARB as c_int) as _
+            unsafe { self.raw_attribute(wgl_extra::SAMPLES_ARB as c_int) as _ }
         } else {
             0
         }
@@ -404,7 +410,7 @@ impl GlConfig for Config {
                     flags |= ConfigSurfaceTypes::PIXMAP;
                 }
             },
-            _ => {
+            _ => unsafe {
                 if self.raw_attribute(wgl_extra::DRAW_TO_WINDOW_ARB as c_int) != 0 {
                     flags |= ConfigSurfaceTypes::WINDOW
                 }
@@ -420,6 +426,12 @@ impl GlConfig for Config {
     fn api(&self) -> Api {
         let mut api = Api::OPENGL;
         if self.inner.display.inner.client_extensions.contains("WGL_EXT_create_context_es2_profile")
+            || self
+                .inner
+                .display
+                .inner
+                .client_extensions
+                .contains("WGL_EXT_create_context_es_profile")
         {
             api |= Api::GLES1 | Api::GLES2;
         }

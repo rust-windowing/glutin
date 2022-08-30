@@ -24,7 +24,9 @@ use crate::api::wgl::config::Config as WglConfig;
 /// The trait to group all common config option.
 pub trait GlConfig: Sealed {
     /// The type of the underlying color buffer.
-    fn color_buffer_type(&self) -> ColorBufferType;
+    ///
+    /// `None` is returned when the format can not be identified.
+    fn color_buffer_type(&self) -> Option<ColorBufferType>;
 
     /// Whether the config uses floating pixels.
     fn float_pixels(&self) -> bool;
@@ -416,7 +418,7 @@ pub enum Config {
 }
 
 impl GlConfig for Config {
-    fn color_buffer_type(&self) -> ColorBufferType {
+    fn color_buffer_type(&self) -> Option<ColorBufferType> {
         gl_api_dispatch!(self; Self(config) => config.color_buffer_type())
     }
 

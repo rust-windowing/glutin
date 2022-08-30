@@ -154,7 +154,10 @@ pub struct Surface<T: SurfaceTypeTrait> {
 }
 
 impl<T: SurfaceTypeTrait> Surface<T> {
-    fn raw_attribute(&self, attr: c_int) -> c_uint {
+    /// # Safety
+    ///
+    /// The caller must ensure that the attribute could be present.
+    unsafe fn raw_attribute(&self, attr: c_int) -> c_uint {
         unsafe {
             let mut value = 0;
             // This shouldn't generate any errors given that we know that the surface is
@@ -193,15 +196,20 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     type SurfaceType = T;
 
     fn buffer_age(&self) -> u32 {
-        self.raw_attribute(glx_extra::BACK_BUFFER_AGE_EXT as c_int) as u32
+        self.display
+            .inner
+            .client_extensions
+            .contains("GLX_EXT_buffer_age")
+            .then(|| unsafe { self.raw_attribute(glx_extra::BACK_BUFFER_AGE_EXT as c_int) })
+            .unwrap_or(0) as u32
     }
 
     fn width(&self) -> Option<u32> {
-        Some(self.raw_attribute(glx::HEIGHT as c_int) as u32)
+        unsafe { Some(self.raw_attribute(glx::HEIGHT as c_int) as u32) }
     }
 
     fn height(&self) -> Option<u32> {
-        Some(self.raw_attribute(glx::HEIGHT as c_int) as u32)
+        unsafe { Some(self.raw_attribute(glx::HEIGHT as c_int) as u32) }
     }
 
     fn is_single_buffered(&self) -> bool {

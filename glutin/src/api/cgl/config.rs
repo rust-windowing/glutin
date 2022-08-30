@@ -130,7 +130,7 @@ impl Config {
 }
 
 impl GlConfig for Config {
-    fn color_buffer_type(&self) -> ColorBufferType {
+    fn color_buffer_type(&self) -> Option<ColorBufferType> {
         // On macos all color formats divide by 3 without reminder, except for the RGB
         // 565. So we can convert it in a hopefully reliable way. Also we should remove
         // alpha.
@@ -139,7 +139,7 @@ impl GlConfig for Config {
         let r_size = (color / 3) as u8;
         let b_size = (color / 3) as u8;
         let g_size = (color - r_size as i32 - b_size as i32) as u8;
-        ColorBufferType::Rgb { r_size, g_size, b_size }
+        Some(ColorBufferType::Rgb { r_size, g_size, b_size })
     }
 
     fn float_pixels(&self) -> bool {

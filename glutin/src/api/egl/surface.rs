@@ -263,7 +263,10 @@ impl<T: SurfaceTypeTrait> Surface<T> {
         }
     }
 
-    fn raw_attribute(&self, attr: EGLint) -> EGLint {
+    /// # Safety
+    ///
+    /// The caller must ensure that the attribute could be present.
+    unsafe fn raw_attribute(&self, attr: EGLint) -> EGLint {
         unsafe {
             let mut value = 0;
             self.display.inner.egl.QuerySurface(
@@ -290,19 +293,24 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     type SurfaceType = T;
 
     fn buffer_age(&self) -> u32 {
-        self.raw_attribute(egl::BUFFER_AGE_EXT as EGLint) as u32
+        self.display
+            .inner
+            .client_extensions
+            .contains("EGL_EXT_buffer_age")
+            .then(|| unsafe { self.raw_attribute(egl::BUFFER_AGE_EXT as EGLint) })
+            .unwrap_or(0) as u32
     }
 
     fn width(&self) -> Option<u32> {
-        Some(self.raw_attribute(egl::HEIGHT as EGLint) as u32)
+        unsafe { Some(self.raw_attribute(egl::HEIGHT as EGLint) as u32) }
     }
 
     fn height(&self) -> Option<u32> {
-        Some(self.raw_attribute(egl::HEIGHT as EGLint) as u32)
+        unsafe { Some(self.raw_attribute(egl::HEIGHT as EGLint) as u32) }
     }
 
     fn is_single_buffered(&self) -> bool {
-        self.raw_attribute(egl::RENDER_BUFFER as EGLint) != egl::SINGLE_BUFFER as i32
+        unsafe { self.raw_attribute(egl::RENDER_BUFFER as EGLint) != egl::SINGLE_BUFFER as i32 }
     }
 
     fn swap_buffers(&self, _context: &Self::Context) -> Result<()> {
