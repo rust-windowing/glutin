@@ -192,6 +192,15 @@ impl ConfigTemplateBuilder {
         self
     }
 
+    /// Wether the configuration should prefer hardware accelerated formats or
+    /// not.
+    ///
+    /// By default hardware acceleration or its absence is not requested.
+    pub fn prefer_hardware_accelerated(mut self, hardware_accerelated: Option<bool>) -> Self {
+        self.template.hardware_accelerated = hardware_accerelated;
+        self
+    }
+
     /// Request config that can render to a particular native window.
     ///
     /// # Platform-specific
@@ -277,6 +286,9 @@ pub struct ConfigTemplate {
     /// The maximum width of the pbuffer.
     pub(crate) max_pbuffer_width: Option<u32>,
 
+    /// The config should prefer hardware accelerated formats.
+    pub(crate) hardware_accelerated: Option<bool>,
+
     /// The maximum height of the pbuffer.
     pub(crate) max_pbuffer_height: Option<u32>,
 
@@ -315,6 +327,7 @@ impl Default for ConfigTemplate {
             max_pbuffer_height: None,
 
             native_window: None,
+            hardware_accelerated: None,
 
             api: Api::OPENGL,
         }

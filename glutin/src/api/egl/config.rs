@@ -93,6 +93,16 @@ impl Display {
         }
         config_attributes.push(surface_type as EGLint);
 
+        // Add caveat.
+        if let Some(hardware_accelerated) = template.hardware_accelerated {
+            config_attributes.push(egl::CONFIG_CAVEAT as EGLint);
+            if hardware_accelerated {
+                config_attributes.push(egl::NONE as EGLint);
+            } else {
+                config_attributes.push(egl::SLOW_CONFIG as EGLint);
+            }
+        }
+
         // Add minimum swap interval.
         if let Some(min_swap_interval) = template.min_swap_interval {
             config_attributes.push(egl::MIN_SWAP_INTERVAL as EGLint);

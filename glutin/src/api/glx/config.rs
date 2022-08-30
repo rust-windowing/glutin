@@ -70,6 +70,16 @@ impl Display {
             config_attributes.push(glx::RGBA_BIT as c_int);
         }
 
+        // Add caveat.
+        if let Some(hardware_accelerated) = template.hardware_accelerated {
+            config_attributes.push(glx::CONFIG_CAVEAT as c_int);
+            if hardware_accelerated {
+                config_attributes.push(glx::NONE as c_int);
+            } else {
+                config_attributes.push(glx::SLOW_CONFIG as c_int);
+            }
+        }
+
         // Double buffer.
         config_attributes.push(glx::DOUBLEBUFFER as c_int);
         config_attributes.push(!template.single_buffering as c_int);

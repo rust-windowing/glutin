@@ -24,7 +24,7 @@ pub struct Display {
 
 impl Display {
     /// Create CGL display.
-    pub fn from_raw(display: RawDisplayHandle) -> Result<Self> {
+    pub unsafe fn from_raw(display: RawDisplayHandle) -> Result<Self> {
         match display {
             RawDisplayHandle::AppKit(..) => Ok(Display { _marker: PhantomData }),
             _ => Err(ErrorKind::NotSupported("provided native display is not supported").into()),

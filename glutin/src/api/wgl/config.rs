@@ -83,6 +83,13 @@ impl Display {
             None => gl::PFD_STEREO_DONTCARE,
         };
 
+        // Hardware acceleration.
+        dw_flags |= match template.hardware_accelerated {
+            Some(true) => gl::PFD_GENERIC_ACCELERATED,
+            Some(false) => gl::PFD_GENERIC_FORMAT,
+            None => 0,
+        };
+
         let pixel_format_descriptor = PIXELFORMATDESCRIPTOR {
             nSize: mem::size_of::<PIXELFORMATDESCRIPTOR>() as _,
             // Should be one according to the docs.
@@ -210,6 +217,15 @@ impl Display {
         if let Some(stereo) = template.stereoscopy {
             attrs.push(wgl_extra::STEREO_ARB as c_int);
             attrs.push(stereo as c_int)
+        }
+
+        if let Some(hardware_accelerated) = template.hardware_accelerated {
+            attrs.push(wgl_extra::ACCELERATION_ARB as c_int);
+            if hardware_accelerated {
+                attrs.push(wgl_extra::FULL_ACCELERATION_ARB as c_int);
+            } else {
+                attrs.push(wgl_extra::NO_ACCELERATION_ARB as c_int);
+            }
         }
 
         if template.config_surface_types.contains(ConfigSurfaceTypes::WINDOW) {

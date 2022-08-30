@@ -70,6 +70,10 @@ impl Display {
             attrs.push(NSOpenGLPixelFormatAttribute::NSOpenGLPFADoubleBuffer as u32);
         }
 
+        if template.hardware_accelerated == Some(true) {
+            attrs.push(NSOpenGLPixelFormatAttribute::NSOpenGLPFAAccelerated as u32);
+        }
+
         // Stereo.
         if template.stereoscopy == Some(true) {
             attrs.push(NSOpenGLPixelFormatAttribute::NSOpenGLPFAStereo as u32);
