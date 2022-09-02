@@ -188,8 +188,7 @@ impl Context {
                     Context::X11(ref ctx) => ctx,
                     _ => unreachable!(),
                 });
-                return x11::Context::new_headless(&el, pf_reqs, &gl_attr, size)
-                    .map(Context::X11);
+                return x11::Context::new_headless(&el, pf_reqs, &gl_attr, size).map(Context::X11);
             }
             #[cfg(feature = "kms")]
             Backend::Kms => {
@@ -198,8 +197,7 @@ impl Context {
                     Context::Drm(ref ctx) => ctx,
                     _ => unreachable!(),
                 });
-                return kms::Context::new_headless(&el, pf_reqs, &gl_attr, size)
-                    .map(Context::Drm);
+                return kms::Context::new_headless(&el, pf_reqs, &gl_attr, size).map(Context::Drm);
             }
         }
     }
