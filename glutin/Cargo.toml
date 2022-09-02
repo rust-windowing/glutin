@@ -18,14 +18,15 @@ rust-version = "1.57"
 features = ["serde"]
 
 [features]
-default = ["x11", "wayland", "wayland-dlopen", "wayland-csd-adwaita"]
+default = ["x11", "wayland", "wayland-dlopen", "wayland-csd-adwaita", "kms"]
 serde = ["winit/serde"]
 x11 = ["winit/x11", "glutin_glx_sys"]
 wayland = ["winit/wayland", "winit/wayland-dlopen", "wayland-client", "wayland-egl"]
 wayland-dlopen = ["winit/wayland-dlopen"]
 kms = ["drm", "gbm", "winit/kms"]
 kms-ext = ["winit/kms-ext"]
-default = ["x11", "wayland", "wayland-dlopen", "kms"]
+wayland-csd-adwaita = ["winit/wayland-csd-adwaita"]
+wayland-csd-adwaita-notitle = ["winit/wayland-csd-adwaita-notitle"]
 
 [dependencies]
 once_cell = "1.13"
