@@ -22,10 +22,6 @@ use winit::window::{Window, WindowBuilder};
 /// let windowed_context = unsafe { windowed_context.make_current().unwrap() };
 /// # }
 /// ```
-///
-/// [`ContextWrapper<T, Window>`]: struct.ContextWrapper.html
-/// [`Window`]: struct.Window.html
-/// [`Context`]: struct.Context.html
 pub type WindowedContext<T> = ContextWrapper<T, Window>;
 
 /// Represents an OpenGL [`Context`] which has an underlying window that is
@@ -35,23 +31,20 @@ pub type WindowedContext<T> = ContextWrapper<T, Window>;
 ///
 ///  * [`platform::unix::RawContextExt`]
 ///  * [`platform::windows::RawContextExt`]
-///  * [`WindowedContext<T>::split`]
+///  * [`WindowedContext<T>::split()`]
 ///
-/// Please see [`ContextWrapper<T, ()>`].
+/// Please see [`ContextWrapper<T, W>`].
 ///
-/// [`ContextWrapper<T, ()>`]: struct.ContextWrapper.html
-/// [`WindowedContext<T>::split`]: type.WindowedContext.html#method.split
-/// [`Context`]: struct.Context.html
 #[cfg_attr(
     target_os = "windows",
     doc = "\
-[`platform::windows::RawContextExt`]: os/windows/enum.RawHandle.html
+[`platform::windows::RawContextExt`]: crate::platform::windows::RawContextExt
 "
 )]
 #[cfg_attr(
     not(target_os = "windows",),
     doc = "\
-[`platform::windows::RawContextExt`]: os/index.html
+[`platform::windows::RawContextExt`]: crate::platform
 "
 )]
 #[cfg_attr(
@@ -63,7 +56,7 @@ pub type WindowedContext<T> = ContextWrapper<T, Window>;
         target_os = "openbsd",
     )),
     doc = "\
-[`platform::unix::RawContextExt`]: os/index.html
+[`platform::unix::RawContextExt`]: crate::platform
 "
 )]
 #[cfg_attr(
@@ -75,7 +68,7 @@ pub type WindowedContext<T> = ContextWrapper<T, Window>;
         target_os = "openbsd",
     ),
     doc = "\
-[`platform::unix::RawContextExt`]: os/unix/enum.RawHandle.html
+[`platform::unix::RawContextExt`]: crate::platform::unix::RawContextExt
 "
 )]
 pub type RawContext<T> = ContextWrapper<T, ()>;
@@ -85,10 +78,6 @@ pub type RawContext<T> = ContextWrapper<T, ()>;
 ///
 /// If the window is stored separately, it is a [`RawContext<T>`]. Otherwise,
 /// it is a [`WindowedContext<T>`].
-///
-/// [`WindowedContext<T>`]: type.WindowedContext.html
-/// [`RawContext<T>`]: type.RawContext.html
-/// [`Context`]: struct.Context.html
 #[derive(Debug)]
 pub struct ContextWrapper<T: ContextCurrentState, W> {
     pub(crate) context: Context<T>,
@@ -107,10 +96,6 @@ impl<T: ContextCurrentState> WindowedContext<T> {
     ///
     /// Unsaftey:
     ///   - The OpenGL [`Context`] must be dropped before the [`Window`].
-    ///
-    /// [`RawContext<T>`]: type.RawContext.html
-    /// [`Window`]: struct.Window.html
-    /// [`Context`]: struct.Context.html
     pub unsafe fn split(self) -> (RawContext<T>, Window) {
         (RawContext { context: self.context, window: () }, self.window)
     }
@@ -125,7 +110,7 @@ impl<W> ContextWrapper<PossiblyCurrent, W> {
     /// **Warning**: if you enabled vsync, this function will block until the
     /// next time the screen is refreshed. However drivers can choose to
     /// override your vsync settings, which means that you can't know in
-    /// advance whether `swap_buffers` will block or not.
+    /// advance whether `swap_buffers()` will block or not.
     pub fn swap_buffers(&self) -> Result<(), ContextError> {
         self.context.context.swap_buffers()
     }
@@ -139,7 +124,7 @@ impl<W> ContextWrapper<PossiblyCurrent, W> {
     /// **Warning**: if you enabled vsync, this function will block until the
     /// next time the screen is refreshed. However drivers can choose to
     /// override your vsync settings, which means that you can't know in
-    /// advance whether `swap_buffers` will block or not.
+    /// advance whether `swap_buffers_with_damage()` will block or not.
     pub fn swap_buffers_with_damage(&self, rects: &[Rect]) -> Result<(), ContextError> {
         self.context.context.swap_buffers_with_damage(rects)
     }
@@ -161,11 +146,10 @@ impl<W> ContextWrapper<PossiblyCurrent, W> {
     /// Some platforms (macOS, Wayland) require being manually updated when
     /// their window or surface is resized.
     ///
-    /// The easiest way of doing this is to take every [`Resized`] window event
-    /// that is received and pass its [`PhysicalSize`] into this function.
+    /// The easiest way of doing this is to take every [`WindowEvent::Resized`]
+    /// that is received and pass its [`dpi::PhysicalSize`] into this function.
     ///
-    /// [`PhysicalSize`]: dpi/struct.PhysicalSize.html
-    /// [`Resized`]: event/enum.WindowEvent.html#variant.Resized
+    /// [`WindowEvent::Resized`]: winit::event::WindowEvent::Resized
     pub fn resize(&self, size: dpi::PhysicalSize<u32>) {
         let (width, height) = size.into();
         self.context.context.resize(width, height);
@@ -182,8 +166,6 @@ impl<W> ContextWrapper<PossiblyCurrent, W> {
 
 impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
     /// Borrow the inner GL [`Context`].
-    ///
-    /// [`Context`]: struct.Context.html
     pub fn context(&self) -> &Context<T> {
         &self.context
     }
@@ -197,51 +179,51 @@ impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
     ///
     /// To attempt to recover and get back into a know state, either:
     ///
-    ///  * attempt to use [`is_current`] to find the new current context; or
-    ///  * call [`make_not_current`] on both the previously
-    ///  current context and this context.
+    ///  * attempt to use [`is_current()`] to find the new current context; or
+    ///  * call [`make_not_current()`] on both the previously current context
+    ///    and this context.
     ///
-    /// # An higher level overview.
+    /// # A higher level overview.
     ///
     /// In OpenGl, only a single context can be current in a thread at a time.
     /// Making a new context current will make the old one not current.
     /// Contexts can only be sent to different threads if they are not current.
     ///
-    /// If you call `make_current` on some context, you should call
-    /// [`treat_as_not_current`] as soon as possible on the previously current
-    /// context.
+    /// If you call [`make_current()`] on some context, you
+    /// should call [`treat_as_not_current()`] as soon as
+    /// possible on the previously current context.
     ///
     /// If you wish to move a currently current context to a different thread,
     /// you should do one of two options:
     ///
-    ///  * Call `make_current` on another context, then call
-    ///  [`treat_as_not_current`] on this context.
-    ///  * Call [`make_not_current`] on this context.
+    ///  * Call [`make_current()`] on another context, then call
+    ///    [`treat_as_not_current()`] on this context.
+    ///  * Call [`make_not_current()`] on this context.
     ///
     /// If you are aware of what context you intend to make current next, it is
-    /// preferable for performance reasons to call `make_current` on that
-    /// context, then [`treat_as_not_current`] on this context.
+    /// preferable for performance reasons to call [`make_current()`] on that
+    /// context, then call [`treat_as_not_current()`] on this context.
     ///
     /// If you are not aware of what context you intend to make current next,
     /// consider waiting until you do. If you need this context not current
     /// immediately (e.g. to transfer it to another thread), then call
-    /// [`make_not_current`] on this context.
+    /// [`make_not_current()`] on this context.
     ///
-    /// Please avoid calling [`make_not_current`] on one context only to call
-    /// `make_current` on another context before and/or after. This hurts
+    /// Please avoid calling [`make_not_current()`] on one context only to call
+    /// [`make_current()`] on another context before and/or after. This hurts
     /// performance by requiring glutin to:
     ///
     ///  * Check if this context is current; then
     ///  * If it is, change the current context from this context to none; then
     ///  * Change the current context from none to the new context.
     ///
-    /// Instead prefer the method we mentioned above with `make_current` and
-    /// [`treat_as_not_current`].
+    /// Instead prefer the method we mentioned above with [`make_current()`] and
+    /// [`treat_as_not_current()`].
     ///
-    /// [`make_not_current`]: struct.ContextWrapper.html#method.make_not_current
-    /// [`treat_as_not_current`]:
-    /// struct.ContextWrapper.html#method.treat_as_not_current
-    /// [`is_current`]: struct.ContextWrapper.html#method.is_current
+    /// [`is_current()`]: Self::is_current()
+    /// [`make_not_current()`]: Self::make_not_current()
+    /// [`make_current()`]: Self::make_current()
+    /// [`treat_as_not_current()`]: Self::treat_as_not_current()
     pub unsafe fn make_current(
         self,
     ) -> Result<ContextWrapper<PossiblyCurrent, W>, (Self, ContextError)> {
@@ -255,9 +237,7 @@ impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
     /// If this context is current, makes this context not current. If this
     /// context is not current however, this function does nothing.
     ///
-    /// Please see [`make_current`].
-    ///
-    /// [`make_current`]: struct.ContextWrapper.html#method.make_current
+    /// Please see [`make_current()`][Self::make_current()].
     pub unsafe fn make_not_current(
         self,
     ) -> Result<ContextWrapper<NotCurrent, W>, (Self, ContextError)> {
@@ -272,13 +252,10 @@ impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
     /// checks to confirm that this is actually case.
     ///
     /// If unsure whether or not this context is current, please use
-    /// [`make_not_current`] which will do nothing if this context is not
-    /// current.
+    /// [`make_not_current()`][Self::make_not_current()] which will do nothing if this
+    /// context is not current.
     ///
-    /// Please see [`make_current`].
-    ///
-    /// [`make_not_current`]: struct.ContextWrapper.html#method.make_not_current
-    /// [`make_current`]: struct.ContextWrapper.html#method.make_current
+    /// Please see [`make_current()`][Self::make_current()].
     pub unsafe fn treat_as_not_current(self) -> ContextWrapper<NotCurrent, W> {
         ContextWrapper { context: self.context.treat_as_not_current(), window: self.window }
     }
@@ -290,12 +267,8 @@ impl<T: ContextCurrentState, W> ContextWrapper<T, W> {
     /// currency without the limited aid of glutin, and you wish to store
     /// all the [`Context`]s as [`NotCurrent`].
     ///
-    /// Please see [`make_current`] for the prefered method of handling context
-    /// currency.
-    ///
-    /// [`make_current`]: struct.ContextWrapper.html#method.make_current
-    /// [`NotCurrent`]: enum.NotCurrent.html
-    /// [`Context`]: struct.Context.html
+    /// Please see [`make_current()`][Self::make_current()] for the preferred method
+    /// of handling context currency.
     pub unsafe fn treat_as_current(self) -> ContextWrapper<PossiblyCurrent, W> {
         ContextWrapper { context: self.context.treat_as_current(), window: self.window }
     }
@@ -336,9 +309,6 @@ impl<'a, T: ContextCurrentState> ContextBuilder<'a, T> {
     ///  - If the OpenGL [`Context`] could not be created. This generally
     ///    happens
     ///  because the underlying platform doesn't support a requested feature.
-    ///
-    /// [`WindowedContext<T>`]: type.WindowedContext.html
-    /// [`Context`]: struct.Context.html
     pub fn build_windowed<TE>(
         self,
         wb: WindowBuilder,

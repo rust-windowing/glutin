@@ -16,7 +16,7 @@ fn main() {
         let wb = WindowBuilder::new().with_title(title);
         let windowed_context = ContextBuilder::new().build_windowed(wb, &el).unwrap();
         let windowed_context = unsafe { windowed_context.make_current().unwrap() };
-        let gl = support::load(&windowed_context.context());
+        let gl = support::load(windowed_context.context());
         let window_id = windowed_context.window().id();
         let context_id = ct.insert(ContextCurrentWrapper::PossiblyCurrent(
             ContextWrapper::Windowed(windowed_context),

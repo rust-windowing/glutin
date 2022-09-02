@@ -6,7 +6,7 @@ A low-level library for OpenGL context creation, written in pure Rust.
 
 ```toml
 [dependencies]
-glutin = "0.28.0"
+glutin = "0.29.1"
 ```
 
 ## [Documentation](https://docs.rs/glutin)
@@ -20,7 +20,10 @@ Join us in any of these:
 
 ## Usage Examples
 
-Warning: these are examples for master. For the [latest released version](https://github.com/rust-windowing/glutin/releases/tag/v0.27.0)
+Warning: these are examples for master. For the latest released version you can
+find them [here](https://github.com/rust-windowing/glutin/releases/tag/v0.29.1).
+
+The examples use [gl_generator](https://crates.io/crates/gl_generator) to generate OpenGL bindings.
 
 ### Try it!
 
@@ -50,11 +53,7 @@ Glutin is only officially supported on the latest stable version of the Rust com
 
 To compile the examples for android, you have to use the `cargo apk` utility.
 
-See [the `android-rs-glue` repository](https://github.com/rust-windowing/android-rs-glue) for instructions.
-
-### Emscripten with asmjs
-
-Emscripten support has been deprecated in favor of platforms like stdweb. To get an OpenGL context on these platforms, please use crates like [glow](https://crates.io/crates/glow) instead.
+See [`cargo-apk` in the `android-ndk-rs` repository](https://github.com/rust-windowing/android-ndk-rs/tree/master/cargo-apk) for instructions.
 
 ### X11
 

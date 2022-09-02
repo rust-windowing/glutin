@@ -7,7 +7,13 @@
     target_os = "netbsd",
     target_os = "openbsd"
 ))]
-#![allow(non_camel_case_types)]
+#![allow(
+    clippy::manual_non_exhaustive,
+    clippy::missing_safety_doc,
+    clippy::unnecessary_cast,
+    non_camel_case_types
+)]
+#![cfg_attr(feature = "cargo-clippy", deny(warnings))]
 
 pub mod egl {
     pub type khronos_utime_nanoseconds_t = super::khronos_utime_nanoseconds_t;

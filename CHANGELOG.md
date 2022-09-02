@@ -1,13 +1,27 @@
 # Unreleased
 
-- Fix crash when creating OpenGLES context without explicit version
-- Add `buffer_age` method on `WindowedContext`
+# Version 0.29.1 (2022-08-10)
+
+- Fix build failures when building from crates.io
+
+# Version 0.29.0 (2022-07-30)
+
+- Fix crash when creating OpenGLES context without explicit version.
+- Add `buffer_age` method on `WindowedContext`.
+- Return an `Err` instead of panicking when surfaceless GLX context creation fails on Linux.
+- Fix compilation on Android:
+  - Switch from `StaticStructGenerator` to `StructGenerator` to dynamically load symbols.
+  - Replace `android_glue` dependency with `raw-window-handle`, and remove broken lifecycle event handling.
+  - Glutin can now be used on Android, however, the application must ensure it only creates the `Context` following a winit `Event::Resumed` event, and destroys the `Context` in response to a `Event::Suspended` event.
+- Updated winit dependency to 0.27.0. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/releases/tag/v0.27.0) for more info.
+- On Windows, `build_raw_context` now uses `isize` for `hwnd` to follow winit change.
 
 # Version 0.28.0 (2021-12-02)
 
 - On Linux, add KMS/DRM support
 - On Windows, fixed a panic for headless contexts because of active drag-and-drop (OleInitialize failed! Result was: `RPC_E_CHANGED_MODE`)
 - Updated winit dependency to 0.26.0. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/releases/tag/v0.26.0) for more info.
+- Remove emscripten support leftover.
 
 # Version 0.27.0 (2021-06-01)
 

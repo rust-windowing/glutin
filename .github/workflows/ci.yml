@@ -14,7 +14,8 @@ on:
       - '.github/workflows/ci.yml'
 
 jobs:
-  Check_Formatting:
+  check-formatting:
+    name: Check formatting
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
@@ -25,11 +26,12 @@ jobs:
     - name: Check Formatting
       run: cargo +stable fmt --all -- --check
 
-  Tests:
+  tests:
+    name: Tests
     strategy:
       fail-fast: false
       matrix:
-        rust_version: [stable, nightly]
+        rust_version: [1.57.0, stable, nightly]
         platform:
           - { target: x86_64-pc-windows-msvc,   os: windows-latest,  }
           - { target: i686-pc-windows-msvc,     os: windows-latest,  }
@@ -39,6 +41,8 @@ jobs:
           - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest,   }
           - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest, options: --no-default-features, features: x11 }
           - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest, options: --no-default-features, features: wayland }
+          - { target: aarch64-linux-android,    os: ubuntu-latest,   }
+          - { target: arm-linux-androideabi,    os: ubuntu-latest,   }
           - { target: x86_64-apple-darwin,      os: macos-latest,    }
           - { target: x86_64-apple-ios,         os: macos-latest,    }
           - { target: aarch64-apple-ios,        os: macos-latest,    }
@@ -50,10 +54,12 @@ jobs:
     env:
       RUST_BACKTRACE: 1
       CARGO_INCREMENTAL: 0
+      PKG_CONFIG_ALLOW_CROSS: 1
       RUSTFLAGS: "-C debuginfo=0"
       OPTIONS: ${{ matrix.platform.options }}
       FEATURES: ${{ format(',{0}', matrix.platform.features ) }}
       WEB: ${{ matrix.platform.web }}
+      RUSTDOCFLAGS: -Dwarnings
 
     runs-on: ${{ matrix.platform.os }}
     steps:
@@ -69,10 +75,19 @@ jobs:
       with:
         rust-version: ${{ matrix.rust_version }}${{ matrix.platform.host }}
         targets: ${{ matrix.platform.target }}
+        components: clippy
 
+    - name: Setup NDK path
+      shell: bash
+      # "Temporary" workaround until https://github.com/actions/virtual-environments/issues/5879#issuecomment-1195156618
+      # gets looked into.
+      run: echo "ANDROID_NDK_ROOT=$ANDROID_NDK_LATEST_HOME" >> $GITHUB_ENV
+    - name: Install Linux dependencies
+      if: (matrix.platform.os == 'ubuntu-latest')
+      run: sudo apt-get update && sudo apt-get install pkg-config cmake libfreetype6-dev libfontconfig1-dev libxkbcommon-dev
     - name: Install GCC Multilib
       if: (matrix.platform.os == 'ubuntu-latest') && contains(matrix.platform.target, 'i686')
-      run: sudo apt-get update && sudo apt-get install gcc-multilib
+      run: sudo dpkg --add-architecture i386 && sudo apt-get update && sudo apt-get install g++-multilib gcc-multilib libfreetype6-dev:i386 libfontconfig1-dev:i386 libxkbcommon-dev:i386
     - name: Install cargo-web
       continue-on-error: true
       if: contains(matrix.platform.target, 'wasm32')
@@ -81,7 +96,12 @@ jobs:
     - name: Check documentation
       shell: bash
       if: matrix.platform.target != 'wasm32-unknown-unknown'
-      run: cd glutin && cargo doc --no-deps --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES
+      run: cd glutin && cargo doc --no-deps --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES --document-private-items
+
+    - name: Lint with clippy
+      shell: bash
+      if: matrix.rust_version == '1.57.0'
+      run: cargo clippy --workspace --all-targets --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES -- -Dwarnings
 
     - name: Build glutin
       shell: bash
@@ -93,25 +113,27 @@ jobs:
 
     - name: Build tests
       shell: bash
+      if: (!contains(matrix.platform.target, 'android'))
       run: cd glutin && cargo $WEB test --no-run --verbose --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES
     - name: Build tests all
       shell: bash
-      if: (!contains(matrix.platform.target, 'wasm32'))
+      if: (!contains(matrix.platform.target, 'android') && !contains(matrix.platform.target, 'wasm32'))
       run: cargo $WEB test --no-run --verbose --target ${{ matrix.platform.target }}
     - name: Run tests
       shell: bash
-      if: (!contains(matrix.platform.target, 'ios') && !contains(matrix.platform.target, 'wasm32'))
+      if: (!contains(matrix.platform.target, 'ios') && !contains(matrix.platform.target, 'android') && !contains(matrix.platform.target, 'wasm32'))
       run: cd glutin && cargo $WEB test --verbose --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES
-
 
     - name: Build with serde enabled
       shell: bash
+      if: (!contains(matrix.platform.target, 'android'))
       run: cd glutin && cargo $WEB build --verbose --target ${{ matrix.platform.target }} $OPTIONS --features serde,$FEATURES
 
     - name: Build tests with serde enabled
       shell: bash
+      if: (!contains(matrix.platform.target, 'android'))
       run: cd glutin && cargo $WEB test --no-run --verbose --target ${{ matrix.platform.target }} $OPTIONS --features serde,$FEATURES
     - name: Run tests with serde enabled
       shell: bash
-      if: (!contains(matrix.platform.target, 'ios') && !contains(matrix.platform.target, 'wasm32'))
+      if: (!contains(matrix.platform.target, 'ios') && !contains(matrix.platform.target, 'android') && !contains(matrix.platform.target, 'wasm32'))
       run: cd glutin && cargo $WEB test --verbose --target ${{ matrix.platform.target }} $OPTIONS --features serde,$FEATURES

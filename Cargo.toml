@@ -7,5 +7,4 @@ members = [
     "glutin_glx_sys",
     "glutin_wgl_sys",
     "glutin_gles2_sys",
-    "glutin_emscripten_sys",
 ]

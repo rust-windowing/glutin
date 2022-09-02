@@ -1,4 +1,5 @@
 #![cfg(target_os = "macos")]
+#![allow(clippy::let_unit_value)]
 use crate::{
     ContextError, CreationError, GlAttributes, PixelFormat, PixelFormatRequirements, Rect,
     Robustness,
@@ -14,7 +15,7 @@ use core_foundation::string::CFString;
 use objc::runtime::{BOOL, NO};
 
 use crate::platform::macos::WindowExtMacOS;
-use winit;
+
 use winit::dpi;
 use winit::event_loop::EventLoopWindowTarget;
 use winit::window::{Window, WindowBuilder};
@@ -51,7 +52,7 @@ impl Context {
         pf_reqs: &PixelFormatRequirements,
         gl_attr: &GlAttributes<&Context>,
     ) -> Result<(Window, Self), CreationError> {
-        let transparent = wb.window.transparent;
+        let transparent = wb.transparent();
         let win = wb.build(el)?;
 
         let share_ctx = gl_attr.sharing.map_or(nil, |c| *c.get_id());
@@ -126,11 +127,11 @@ impl Context {
             );
 
             if transparent {
-                let mut opacity = 0;
+                let opacity = 0;
                 CGLSetParameter(
                     gl_context.CGLContextObj() as *mut _,
                     kCGLCPSurfaceOpacity,
-                    &mut opacity,
+                    &opacity,
                 );
             }
 
@@ -339,7 +340,7 @@ impl Drop for IdRef {
 
 impl Deref for IdRef {
     type Target = id;
-    fn deref<'a>(&'a self) -> &'a id {
+    fn deref(&self) -> &id {
         &self.0
     }
 }

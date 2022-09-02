@@ -36,9 +36,7 @@ pub mod run_return {
 
 use std::os::raw;
 
-/// Platform-specific extensions for OpenGL [`Context`]s.
-///
-/// [`Context`]: ../struct.Context.html
+/// Platform-specific extensions for OpenGL [`Context`][crate::Context]s.
 pub trait ContextTraitExt {
     /// Raw context handle.
     type Handle;
@@ -49,7 +47,7 @@ pub trait ContextTraitExt {
     /// Returns a pointer to the `EGLDisplay` object of EGL that is used by this
     /// context.
     ///
-    /// Return `None` if the context doesn't use EGL.
+    /// Return [`None`] if the context doesn't use EGL.
     // The pointer will become invalid when the context is destroyed.
     unsafe fn get_egl_display(&self) -> Option<*const raw::c_void>;
 }

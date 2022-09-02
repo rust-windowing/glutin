@@ -14,7 +14,7 @@ fn main() {
 
     let mut num = String::new();
     stdin().read_line(&mut num).unwrap();
-    let num = num.trim().parse().ok().expect("Please enter a number");
+    let num = num.trim().parse().expect("Please enter a number");
 
     let fullscreen = Some(match num {
         1 => Fullscreen::Exclusive(prompt_for_video_mode(&prompt_for_monitor(&el))),
@@ -32,7 +32,7 @@ fn main() {
 
     let windowed_context = unsafe { windowed_context.make_current().unwrap() };
 
-    let gl = support::load(&windowed_context.context());
+    let gl = support::load(windowed_context.context());
 
     el.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
@@ -90,7 +90,7 @@ fn prompt_for_monitor(el: &EventLoop<()>) -> MonitorHandle {
 
     let mut num = String::new();
     stdin().read_line(&mut num).unwrap();
-    let num = num.trim().parse().ok().expect("Please enter a number");
+    let num = num.trim().parse().expect("Please enter a number");
     let monitor = el.available_monitors().nth(num).expect("Please enter a valid ID");
 
     println!("Using {:?}", monitor.name());
@@ -108,7 +108,7 @@ fn prompt_for_video_mode(monitor: &MonitorHandle) -> VideoMode {
 
     let mut num = String::new();
     stdin().read_line(&mut num).unwrap();
-    let num = num.trim().parse().ok().expect("Please enter a number");
+    let num = num.trim().parse().expect("Please enter a number");
     let video_mode = monitor.video_modes().nth(num).expect("Please enter a valid ID");
 
     println!("Using {}", video_mode);

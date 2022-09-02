@@ -3,7 +3,17 @@ use glutin::{self, PossiblyCurrent};
 use std::ffi::CStr;
 
 pub mod gl {
+    #![allow(
+        clippy::manual_non_exhaustive,
+        clippy::too_many_arguments,
+        clippy::unused_unit,
+        clippy::upper_case_acronyms,
+        non_camel_case_types
+    )]
+
     pub use self::Gles2 as Gl;
+
+    // gl_bindings.rs is generated in build.rs using https://crates.io/crates/gl_generator
     include!(concat!(env!("OUT_DIR"), "/gl_bindings.rs"));
 }
 
@@ -94,7 +104,7 @@ static VERTEX_DATA: [f32; 15] = [
      0.5, -0.5,  0.0,  0.0,  1.0,
 ];
 
-const VS_SRC: &'static [u8] = b"
+const VS_SRC: &[u8] = b"
 #version 100
 precision mediump float;
 
@@ -109,7 +119,7 @@ void main() {
 }
 \0";
 
-const FS_SRC: &'static [u8] = b"
+const FS_SRC: &[u8] = b"
 #version 100
 precision mediump float;
 

@@ -76,7 +76,7 @@ impl Context {
                     Context::OsMesa(_) => Ok(()),
                     _ => {
                         let msg = "Cannot share an OSMesa context with a non-OSMesa context";
-                        return Err(CreationError::PlatformSpecific(msg.into()));
+                        Err(CreationError::PlatformSpecific(msg.into()))
                     }
                 },
                 #[cfg(feature = "x11")]
@@ -84,7 +84,7 @@ impl Context {
                     Context::X11(_) => Ok(()),
                     _ => {
                         let msg = "Cannot share an X11 context with a non-X11 context";
-                        return Err(CreationError::PlatformSpecific(msg.into()));
+                        Err(CreationError::PlatformSpecific(msg.into()))
                     }
                 },
                 #[cfg(feature = "wayland")]
@@ -92,7 +92,7 @@ impl Context {
                     Context::Wayland(_) => Ok(()),
                     _ => {
                         let msg = "Cannot share a Wayland context with a non-Wayland context";
-                        return Err(CreationError::PlatformSpecific(msg.into()));
+                        Err(CreationError::PlatformSpecific(msg.into()))
                     }
                 },
                 #[cfg(feature = "kms")]
@@ -179,7 +179,7 @@ impl Context {
                     _ => unreachable!(),
                 });
                 return wayland::Context::new_headless(&el, pf_reqs, &gl_attr, size)
-                    .map(|ctx| Context::Wayland(ctx));
+                    .map(Context::Wayland);
             }
             #[cfg(feature = "x11")]
             Backend::X => {
@@ -189,7 +189,7 @@ impl Context {
                     _ => unreachable!(),
                 });
                 return x11::Context::new_headless(&el, pf_reqs, &gl_attr, size)
-                    .map(|ctx| Context::X11(ctx));
+                    .map(Context::X11);
             }
             #[cfg(feature = "kms")]
             Backend::Kms => {
@@ -199,7 +199,7 @@ impl Context {
                     _ => unreachable!(),
                 });
                 return kms::Context::new_headless(&el, pf_reqs, &gl_attr, size)
-                    .map(|ctx| Context::Drm(ctx));
+                    .map(Context::Drm);
             }
         }
     }
@@ -376,18 +376,14 @@ impl Context {
     }
 }
 
-/// A unix-specific extension to the [`ContextBuilder`] which allows building
-/// unix-specific headless contexts.
-///
-/// [`ContextBuilder`]: ../../struct.ContextBuilder.html
+/// A unix-specific extension to the [`ContextBuilder`][crate::ContextBuilder]
+/// which allows building unix-specific headless contexts.
 pub trait HeadlessContextExt {
     /// Builds an OsMesa context.
     ///
-    /// Errors can occur if the OpenGL [`Context`] could not be created. This
-    /// generally happens because the underlying platform doesn't support a
+    /// Errors can occur if the OpenGL [`Context`][crate::Context] could not be created.
+    /// This generally happens because the underlying platform doesn't support a
     /// requested feature.
-    ///
-    /// [`Context`]: struct.Context.html
     fn build_osmesa(
         self,
         size: dpi::PhysicalSize<u32>,
@@ -397,11 +393,9 @@ pub trait HeadlessContextExt {
 
     /// Builds an EGL-surfaceless context.
     ///
-    /// Errors can occur if the OpenGL [`Context`] could not be created. This
-    /// generally happens because the underlying platform doesn't support a
+    /// Errors can occur if the OpenGL [`Context`][crate::Context] could not be created.
+    /// This generally happens because the underlying platform doesn't support a
     /// requested feature.
-    ///
-    /// [`Context`]: struct.Context.html
     fn build_surfaceless<TE>(
         self,
         el: &EventLoopWindowTarget<TE>,
@@ -427,7 +421,7 @@ impl<'a, T: ContextCurrentState> HeadlessContextExt for crate::ContextBuilder<'a
             _ => unreachable!(),
         });
         osmesa::OsMesaContext::new(&pf_reqs, &gl_attr, size)
-            .map(|context| Context::OsMesa(context))
+            .map(Context::OsMesa)
             .map(|context| crate::Context { context, phantom: PhantomData })
     }
 
@@ -446,11 +440,8 @@ impl<'a, T: ContextCurrentState> HeadlessContextExt for crate::ContextBuilder<'a
     }
 }
 
-/// A unix-specific extension for the [`ContextBuilder`] which allows
-/// assembling [`RawContext<T>`]s.
-///
-/// [`RawContext<T>`]: ../../type.RawContext.html
-/// [`ContextBuilder`]: ../../struct.ContextBuilder.html
+/// A unix-specific extension for the [`ContextBuilder`][crate::ContextBuilder]
+/// which allows assembling [`RawContext<T>`][crate::RawContext]s.
 pub trait RawContextExt {
     /// Creates a raw context on the provided surface.
     ///
@@ -520,7 +511,7 @@ impl<'a, T: ContextCurrentState> RawContextExt for crate::ContextBuilder<'a, T> 
             _ => unreachable!(),
         });
         wayland::Context::new_raw_context(display_ptr, surface, width, height, &pf_reqs, &gl_attr)
-            .map(|context| Context::Wayland(context))
+            .map(Context::Wayland)
             .map(|context| crate::Context { context, phantom: PhantomData })
             .map(|context| crate::RawContext { context, window: () })
     }
@@ -543,7 +534,7 @@ impl<'a, T: ContextCurrentState> RawContextExt for crate::ContextBuilder<'a, T> 
             _ => unreachable!(),
         });
         x11::Context::new_raw_context(xconn, xwin, &pf_reqs, &gl_attr)
-            .map(|context| Context::X11(context))
+            .map(Context::X11)
             .map(|context| crate::Context { context, phantom: PhantomData })
             .map(|context| crate::RawContext { context, window: () })
     }

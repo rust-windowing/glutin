@@ -8,7 +8,7 @@ use crate::{
 use crate::platform::unix::{EventLoopWindowTargetExtUnix, WindowExtUnix};
 use glutin_egl_sys as ffi;
 pub use wayland_client::sys::client::wl_display;
-use winit;
+
 use winit::dpi;
 use winit::event_loop::EventLoopWindowTarget;
 use winit::window::{Window, WindowBuilder};
@@ -190,6 +190,6 @@ impl Context {
 
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
-        (**self).get_pixel_format().clone()
+        (**self).get_pixel_format()
     }
 }

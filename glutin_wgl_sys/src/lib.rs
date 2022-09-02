@@ -1,4 +1,6 @@
 #![cfg(any(target_os = "windows"))]
+#![allow(clippy::manual_non_exhaustive, clippy::missing_safety_doc, clippy::too_many_arguments)]
+#![cfg_attr(feature = "cargo-clippy", deny(warnings))]
 
 /// WGL bindings
 pub mod wgl {

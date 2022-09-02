@@ -31,7 +31,7 @@ pub fn get_visual_info_from_xid(xconn: &Arc<XConnection>, xid: ffi::VisualID) ->
 #[derive(Clone, Copy, Debug)]
 pub enum Lacks {
     Transparency,
-    XID,
+    Xid,
 }
 
 /// Should always check for lack of xid before lack of transparency.
@@ -43,7 +43,7 @@ pub fn examine_visual_info(
 ) -> Result<(), Lacks> {
     if let Some(want_xid) = want_xid {
         if visual_infos.visualid != want_xid {
-            return Err(Lacks::XID);
+            return Err(Lacks::Xid);
         }
     }
 
@@ -63,7 +63,7 @@ pub fn examine_visual_info(
         }
     }
 
-    return Ok(());
+    Ok(())
 }
 
 pub use super::select_config;

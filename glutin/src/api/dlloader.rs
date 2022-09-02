@@ -5,6 +5,7 @@
     target_os = "freebsd",
     target_os = "netbsd",
     target_os = "openbsd",
+    target_os = "android",
 ))]
 
 use libloading::Library;
@@ -41,11 +42,8 @@ impl<T: SymTrait> SymWrapper<T> {
             #[cfg(not(target_os = "windows"))]
             let lib = unsafe { Library::new(path) };
 
-            if lib.is_ok() {
-                return Ok(SymWrapper {
-                    inner: T::load_with(lib.as_ref().unwrap()),
-                    _lib: Arc::new(lib.unwrap()),
-                });
+            if let Ok(lib) = lib {
+                return Ok(SymWrapper { inner: T::load_with(&lib), _lib: Arc::new(lib) });
             }
         }
 
