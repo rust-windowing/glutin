@@ -1,5 +1,7 @@
 # Unreleased
 
+# Version 0.30.0-beta.2 (2022-09-03)
+
 - macOS: Fix memory leak in `Surface`.
 
 # Version 0.30.0-beta.1 (2022-09-03)
