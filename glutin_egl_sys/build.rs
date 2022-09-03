@@ -19,28 +19,23 @@ fn main() {
         || target.contains("ios")
     {
         let mut file = File::create(&dest.join("egl_bindings.rs")).unwrap();
-        let reg = Registry::new(
-            Api::Egl,
-            (1, 5),
-            Profile::Core,
-            Fallbacks::All,
-            [
-                "EGL_EXT_buffer_age",
-                "EGL_EXT_create_context_robustness",
-                "EGL_EXT_platform_base",
-                "EGL_EXT_platform_device",
-                "EGL_EXT_platform_wayland",
-                "EGL_EXT_platform_x11",
-                "EGL_KHR_create_context",
-                "EGL_KHR_create_context_no_error",
-                "EGL_KHR_platform_android",
-                "EGL_KHR_platform_gbm",
-                "EGL_KHR_platform_wayland",
-                "EGL_KHR_platform_x11",
-                "EGL_KHR_swap_buffers_with_damage",
-                "EGL_MESA_platform_gbm",
-            ],
-        );
+        let reg = Registry::new(Api::Egl, (1, 5), Profile::Core, Fallbacks::All, [
+            "EGL_EXT_buffer_age",
+            "EGL_EXT_create_context_robustness",
+            "EGL_EXT_pixel_format_float",
+            "EGL_EXT_platform_base",
+            "EGL_EXT_platform_device",
+            "EGL_EXT_platform_wayland",
+            "EGL_EXT_platform_x11",
+            "EGL_KHR_create_context",
+            "EGL_KHR_create_context_no_error",
+            "EGL_KHR_platform_android",
+            "EGL_KHR_platform_gbm",
+            "EGL_KHR_platform_wayland",
+            "EGL_KHR_platform_x11",
+            "EGL_KHR_swap_buffers_with_damage",
+            "EGL_MESA_platform_gbm",
+        ]);
 
         if target.contains("ios") {
             reg.write_bindings(gl_generator::StaticStructGenerator, &mut file)

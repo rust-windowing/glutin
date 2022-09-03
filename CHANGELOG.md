@@ -1,5 +1,12 @@
 # Unreleased
 
+- Replace `winit` dependency with `raw-window-handle`.
+- The Api is now built around `Display`, `Surface`, `Config`, and `Surface` for more info see crate documentation and examples.
+- The ios support was removed for the lack of maintainance for now. In case there's a need for it, contributions are welcome.
+- The context creation is no longer limited to winit's supported platforms.
+- The underlying Api providers are publically exposed now, so glutin could be used with just e.g. `EGL`.
+- Fixed soundness issues with `Surface` MT safety, since before `EGLSurface` could be sent to a different thread, which is not safe.
+ 
 # Version 0.29.1 (2022-08-10)
 
 - Fix build failures when building from crates.io

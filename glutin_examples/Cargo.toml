@@ -7,13 +7,22 @@ repository = "https://github.com/rust-windowing/glutin"
 license = "Apache-2.0"
 readme = "../README.md"
 build = "build.rs"
-edition = "2018"
+edition = "2021"
 publish = false
 
+[features]
+default = ["egl", "glx", "x11", "wayland", "wgl"]
+egl = ["glutin/egl"]
+glx = ["glutin/glx", "glutin/x11", "winit/x11", "x11"]
+wgl = ["glutin/wgl"]
+x11 = ["glutin/x11", "winit/x11"]
+wayland = ["glutin/wayland", "winit/wayland", "winit/wayland-dlopen", "winit/wayland-csd-adwaita-notitle"]
+
 [dependencies]
-glutin = { path = "../glutin" }
-takeable-option = "0.4"
-image = "0.24"
+glutin = { path = "../glutin", default-features = false }
+winit = { version = "0.27.2", default-features = false }
+raw-window-handle = "0.5.0"
 
 [build-dependencies]
 gl_generator = "0.14"
+cfg_aliases = "0.1.1"

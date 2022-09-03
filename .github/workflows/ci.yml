@@ -21,10 +21,10 @@ jobs:
     - uses: actions/checkout@v1
     - uses: hecrj/setup-rust-action@v1
       with:
-        rust-version: stable
+        rust-version: nightly
         components: rustfmt
     - name: Check Formatting
-      run: cargo +stable fmt --all -- --check
+      run: cargo +nightly fmt --all -- --check
 
   tests:
     name: Tests
@@ -35,30 +35,27 @@ jobs:
         platform:
           - { target: x86_64-pc-windows-msvc,   os: windows-latest,  }
           - { target: i686-pc-windows-msvc,     os: windows-latest,  }
+          - { target: i686-pc-windows-msvc,     os: windows-latest, options: --no-default-features, features: wgl }
+          - { target: i686-pc-windows-msvc,     os: windows-latest, options: --no-default-features, features: egl }
           - { target: x86_64-pc-windows-gnu,    os: windows-latest, host: -x86_64-pc-windows-gnu }
           - { target: i686-pc-windows-gnu,      os: windows-latest, host: -i686-pc-windows-gnu }
           - { target: i686-unknown-linux-gnu,   os: ubuntu-latest,   }
           - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest,   }
-          - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest, options: --no-default-features, features: x11 }
-          - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest, options: --no-default-features, features: wayland }
-          - { target: aarch64-linux-android,    os: ubuntu-latest,   }
-          - { target: arm-linux-androideabi,    os: ubuntu-latest,   }
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest, options: --no-default-features, features: "egl,wayland,x11" }
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest, options: --no-default-features, features: glx }
+          - { target: aarch64-linux-android,    os: ubuntu-latest, cmd: 'apk --'   }
           - { target: x86_64-apple-darwin,      os: macos-latest,    }
-          - { target: x86_64-apple-ios,         os: macos-latest,    }
-          - { target: aarch64-apple-ios,        os: macos-latest,    }
-          # We're using Windows rather than Ubuntu to run the wasm tests because caching cargo-web
-          # doesn't currently work on Linux.
-          #- { target: wasm32-unknown-unknown,   os: windows-latest, features: stdweb,  web: web }
-          #- { target: wasm32-unknown-unknown,   os: windows-latest, features: web-sys, web: web }
+          # We don't support ios for now.
+          # - { target: x86_64-apple-ios,         os: macos-latest,    }
+          # - { target: aarch64-apple-ios,        os: macos-latest,    }
 
     env:
       RUST_BACKTRACE: 1
       CARGO_INCREMENTAL: 0
-      PKG_CONFIG_ALLOW_CROSS: 1
       RUSTFLAGS: "-C debuginfo=0"
       OPTIONS: ${{ matrix.platform.options }}
+      CMD: ${{ matrix.platform.cmd }}
       FEATURES: ${{ format(',{0}', matrix.platform.features ) }}
-      WEB: ${{ matrix.platform.web }}
       RUSTDOCFLAGS: -Dwarnings
 
     runs-on: ${{ matrix.platform.os }}
@@ -82,58 +79,33 @@ jobs:
       # "Temporary" workaround until https://github.com/actions/virtual-environments/issues/5879#issuecomment-1195156618
       # gets looked into.
       run: echo "ANDROID_NDK_ROOT=$ANDROID_NDK_LATEST_HOME" >> $GITHUB_ENV
-    - name: Install Linux dependencies
-      if: (matrix.platform.os == 'ubuntu-latest')
-      run: sudo apt-get update && sudo apt-get install pkg-config cmake libfreetype6-dev libfontconfig1-dev libxkbcommon-dev
+      # We need those for examples.
+
     - name: Install GCC Multilib
       if: (matrix.platform.os == 'ubuntu-latest') && contains(matrix.platform.target, 'i686')
-      run: sudo dpkg --add-architecture i386 && sudo apt-get update && sudo apt-get install g++-multilib gcc-multilib libfreetype6-dev:i386 libfontconfig1-dev:i386 libxkbcommon-dev:i386
-    - name: Install cargo-web
-      continue-on-error: true
-      if: contains(matrix.platform.target, 'wasm32')
-      run: cargo install cargo-web
+      run: sudo apt-get update && sudo apt-get install gcc-multilib
 
-    - name: Check documentation
-      shell: bash
-      if: matrix.platform.target != 'wasm32-unknown-unknown'
-      run: cd glutin && cargo doc --no-deps --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES --document-private-items
-
-    - name: Lint with clippy
-      shell: bash
-      if: matrix.rust_version == '1.57.0'
-      run: cargo clippy --workspace --all-targets --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES -- -Dwarnings
-
-    - name: Build glutin
-      shell: bash
-      run: cd glutin && cargo $WEB build --verbose --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES
-    - name: Build all
-      shell: bash
-      if: (!contains(matrix.platform.target, 'wasm32'))
-      run: cargo $WEB build --verbose --target ${{ matrix.platform.target }}
+    - name: Install cargo-apk
+      if: contains(matrix.platform.target, 'android')
+      run: cargo install cargo-apk
 
     - name: Build tests
       shell: bash
-      if: (!contains(matrix.platform.target, 'android'))
-      run: cd glutin && cargo $WEB test --no-run --verbose --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES
-    - name: Build tests all
-      shell: bash
-      if: (!contains(matrix.platform.target, 'android') && !contains(matrix.platform.target, 'wasm32'))
-      run: cargo $WEB test --no-run --verbose --target ${{ matrix.platform.target }}
+      run: cargo $CMD test -p glutin --no-run --verbose --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES
     - name: Run tests
       shell: bash
-      if: (!contains(matrix.platform.target, 'ios') && !contains(matrix.platform.target, 'android') && !contains(matrix.platform.target, 'wasm32'))
-      run: cd glutin && cargo $WEB test --verbose --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES
+      if: (
+        !contains(matrix.platform.target, 'android') &&
+        !contains(matrix.platform.target, 'ios') &&
+        !contains(matrix.platform.target, 'wasm32'))
+      run: cargo $CMD test --verbose --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES
 
-    - name: Build with serde enabled
+    - name: Check documentation
       shell: bash
-      if: (!contains(matrix.platform.target, 'android'))
-      run: cd glutin && cargo $WEB build --verbose --target ${{ matrix.platform.target }} $OPTIONS --features serde,$FEATURES
+      run: cd glutin && cargo $CMD doc --no-deps --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES --document-private-items
 
-    - name: Build tests with serde enabled
+    - name: Lint with clippy
       shell: bash
-      if: (!contains(matrix.platform.target, 'android'))
-      run: cd glutin && cargo $WEB test --no-run --verbose --target ${{ matrix.platform.target }} $OPTIONS --features serde,$FEATURES
-    - name: Run tests with serde enabled
-      shell: bash
-      if: (!contains(matrix.platform.target, 'ios') && !contains(matrix.platform.target, 'android') && !contains(matrix.platform.target, 'wasm32'))
-      run: cd glutin && cargo $WEB test --verbose --target ${{ matrix.platform.target }} $OPTIONS --features serde,$FEATURES
+      if: (matrix.rust_version == '1.57.0') && !contains(matrix.platform.options, '--no-default-features')
+      run: cargo clippy --workspace --all-targets --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES -- -Dwarnings
+
