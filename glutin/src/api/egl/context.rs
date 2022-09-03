@@ -135,7 +135,8 @@ impl Display {
                 return Err(super::check_error().err().unwrap());
             }
 
-            let inner = ContextInner { display: self.clone(), config, raw: EglContext(context) };
+            let inner =
+                ContextInner { display: self.clone(), config, raw: EglContext(context), api };
             Ok(NotCurrentContext::new(inner))
         }
     }
@@ -207,7 +208,7 @@ impl Sealed for NotCurrentContext {}
 /// A wrapper around `EGLContext` that could be current for the current thread.
 #[derive(Debug)]
 pub struct PossiblyCurrentContext {
-    inner: ContextInner,
+    pub(crate) inner: ContextInner,
     _nosendsync: PhantomData<EGLContext>,
 }
 
@@ -220,7 +221,10 @@ impl PossiblyCurrentGlContext for PossiblyCurrentContext {
     }
 
     fn is_current(&self) -> bool {
-        unsafe { self.inner.display.inner.egl.GetCurrentContext() == *self.inner.raw }
+        unsafe {
+            self.inner.bind_api();
+            self.inner.display.inner.egl.GetCurrentContext() == *self.inner.raw
+        }
     }
 
     fn get_proc_address(&self, addr: &CStr) -> *const ffi::c_void {
@@ -268,10 +272,11 @@ impl AsRawContext for PossiblyCurrentContext {
 
 impl Sealed for PossiblyCurrentContext {}
 
-struct ContextInner {
+pub(crate) struct ContextInner {
     display: Display,
     config: Config,
     raw: EglContext,
+    api: egl::types::EGLenum,
 }
 
 impl ContextInner {
@@ -295,6 +300,8 @@ impl ContextInner {
 
     fn make_not_current(&self) -> Result<()> {
         unsafe {
+            self.bind_api();
+
             if self.display.inner.egl.MakeCurrent(
                 *self.display.inner.raw,
                 egl::NO_SURFACE,
@@ -305,6 +312,24 @@ impl ContextInner {
                 super::check_error()
             } else {
                 Ok(())
+            }
+        }
+    }
+
+    /// This function could panic, but it does that for sanity reasons.
+    ///
+    /// When we create context we bind api and then store it and rebind
+    /// on functions requiring it, so if it fails it means that it worked
+    /// before, but for some reason stopped working, which should not
+    /// happen according to the specification.
+    pub(crate) fn bind_api(&self) {
+        unsafe {
+            if self.display.inner.egl.QueryAPI() == self.api {
+                return;
+            }
+
+            if self.display.inner.egl.BindAPI(self.api) == egl::FALSE {
+                panic!("EGL Api couldn't be bound anymore.");
             }
         }
     }
