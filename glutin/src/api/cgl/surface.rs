@@ -71,7 +71,7 @@ impl<T: SurfaceTypeTrait> Drop for Surface<T> {
     fn drop(&mut self) {
         unsafe {
             if self.ns_view != nil {
-                let _: () = msg_send![self.ns_view, retain];
+                let _: () = msg_send![self.ns_view, release];
             }
         }
     }
