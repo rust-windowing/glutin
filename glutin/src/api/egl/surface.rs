@@ -245,10 +245,12 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     /// the system compositor.
     pub fn swap_buffers_with_damage(
         &self,
-        _context: &PossiblyCurrentContext,
+        context: &PossiblyCurrentContext,
         rects: &[DamageRect],
     ) -> Result<()> {
         unsafe {
+            context.inner.bind_api();
+
             if self.display.inner.egl.SwapBuffersWithDamageKHR(
                 *self.display.inner.raw,
                 self.raw,
@@ -313,8 +315,10 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
         unsafe { self.raw_attribute(egl::RENDER_BUFFER as EGLint) != egl::SINGLE_BUFFER as i32 }
     }
 
-    fn swap_buffers(&self, _context: &Self::Context) -> Result<()> {
+    fn swap_buffers(&self, context: &Self::Context) -> Result<()> {
         unsafe {
+            context.inner.bind_api();
+
             if self.display.inner.egl.SwapBuffers(*self.display.inner.raw, self.raw) == egl::FALSE {
                 super::check_error()
             } else {
@@ -323,8 +327,10 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
         }
     }
 
-    fn set_swap_interval(&self, _context: &Self::Context, interval: SwapInterval) -> Result<()> {
+    fn set_swap_interval(&self, context: &Self::Context, interval: SwapInterval) -> Result<()> {
         unsafe {
+            context.inner.bind_api();
+
             let interval = match interval {
                 SwapInterval::DontWait => 0,
                 SwapInterval::Wait(interval) => interval.get() as EGLint,
@@ -342,12 +348,18 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
         self.is_current_draw(context) && self.is_current_read(context)
     }
 
-    fn is_current_draw(&self, _context: &Self::Context) -> bool {
-        unsafe { self.display.inner.egl.GetCurrentSurface(egl::DRAW as EGLint) == self.raw }
+    fn is_current_draw(&self, context: &Self::Context) -> bool {
+        unsafe {
+            context.inner.bind_api();
+            self.display.inner.egl.GetCurrentSurface(egl::DRAW as EGLint) == self.raw
+        }
     }
 
-    fn is_current_read(&self, _context: &Self::Context) -> bool {
-        unsafe { self.display.inner.egl.GetCurrentSurface(egl::READ as EGLint) == self.raw }
+    fn is_current_read(&self, context: &Self::Context) -> bool {
+        unsafe {
+            context.inner.bind_api();
+            self.display.inner.egl.GetCurrentSurface(egl::READ as EGLint) == self.raw
+        }
     }
 
     fn resize(&self, _context: &Self::Context, width: NonZeroU32, height: NonZeroU32) {
