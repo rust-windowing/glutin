@@ -202,7 +202,7 @@ impl ContextAttributesBuilder {
     ///
     /// The `raw_window_handle` isn't required and here for WGL compatibility.
     ///
-    /// #Api-specific
+    /// # Api-specific
     ///
     /// **WGL:** - you must pass `raw_window_handle` for if you plan to use it
     /// with window.
