@@ -93,7 +93,7 @@ impl Display {
         let inner = Arc::new(ConfigInner {
             display: self.clone(),
             raw: NSOpenGLPixelFormatId(raw),
-            transrarency: template.transparency,
+            transparency: template.transparency,
         });
         let config = Config { inner };
 
@@ -193,7 +193,7 @@ impl Sealed for Config {}
 
 pub(crate) struct ConfigInner {
     display: Display,
-    pub(crate) transrarency: bool,
+    pub(crate) transparency: bool,
     pub(crate) raw: NSOpenGLPixelFormatId,
 }
 
