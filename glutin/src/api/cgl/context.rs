@@ -50,7 +50,7 @@ impl Display {
             let raw = NSOpenGLContext::alloc(nil)
                 .initWithFormat_shareContext_(*config.inner.raw, share_context as *mut _);
 
-            if config.inner.transrarency {
+            if config.inner.transparency {
                 let opacity = 0;
                 super::check_error(CGLSetParameter(
                     raw.CGLContextObj().cast(),
