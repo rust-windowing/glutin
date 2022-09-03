@@ -1,16 +1,16 @@
 [package]
 name = "glutin_gles2_sys"
-version = "0.1.5"
-authors = ["The glutin contributors", "Hal Gentz <zegentzy@protonmail.com>"]
+version = "0.1.6"
+authors = ["Kirill Chibisov <contact@kchibisov.com>"]
 description = "The gles2 bindings for glutin"
 repository = "https://github.com/rust-windowing/glutin"
 license = "Apache-2.0"
 readme = "README.md"
-build = "build.rs"
-edition = "2018"
+rust-version = "1.57.0"
+edition = "2021"
 
 [build-dependencies]
 gl_generator = "0.14"
 
 [target.'cfg(target_os = "ios")'.dependencies]
-objc = "0.2"
+objc = "0.2.7"

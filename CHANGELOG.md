@@ -1,5 +1,7 @@
 # Unreleased
 
+# Version 0.30.0-beta.1 (2022-09-03)
+
 - Replace `winit` dependency with `raw-window-handle`.
 - The Api is now built around `Display`, `Surface`, `Config`, and `Surface` for more info see crate documentation and examples.
 - The ios support was removed for the lack of maintainance for now. In case there's a need for it, contributions are welcome.
