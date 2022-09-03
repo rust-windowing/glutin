@@ -1,6 +1,6 @@
 [package]
 name = "glutin_glx_sys"
-version = "0.1.9"
+version = "0.2.0"
 authors = ["Kirill Chibisov <contact@kchibisov.com>"]
 description = "The glx bindings for glutin"
 repository = "https://github.com/rust-windowing/glutin"
