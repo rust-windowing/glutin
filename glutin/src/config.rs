@@ -147,10 +147,10 @@ impl ConfigTemplateBuilder {
 
     /// The set of apis that are supported by configuration.
     ///
-    /// By default `OpenGL` api is used.
+    /// By default api isn't specified when requesting the configuration.
     #[inline]
     pub fn with_api(mut self, api: Api) -> Self {
-        self.template.api = api;
+        self.template.api = Some(api);
         self
     }
 
@@ -271,7 +271,7 @@ pub struct ConfigTemplate {
     pub(crate) config_surface_types: ConfigSurfaceTypes,
 
     /// The rendering Api's supported by the configuration.
-    pub(crate) api: Api,
+    pub(crate) api: Option<Api>,
 
     /// The config should support transparency.
     pub(crate) transparency: bool,
@@ -331,7 +331,7 @@ impl Default for ConfigTemplate {
             native_window: None,
             hardware_accelerated: None,
 
-            api: Api::OPENGL,
+            api: None,
         }
     }
 }

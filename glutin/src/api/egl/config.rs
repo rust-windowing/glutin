@@ -119,21 +119,23 @@ impl Display {
         config_attributes.push(egl::SAMPLE_BUFFERS as EGLint);
         config_attributes.push(template.sample_buffers as EGLint);
 
-        let mut api = 0;
-        if template.api.contains(Api::GLES1) {
-            api |= egl::OPENGL_ES_API;
+        if let Some(requested_api) = template.api {
+            let mut api = 0;
+            if requested_api.contains(Api::GLES1) {
+                api |= egl::OPENGL_ES_API;
+            }
+            if requested_api.contains(Api::GLES2) {
+                api |= egl::OPENGL_ES2_BIT;
+            }
+            if requested_api.contains(Api::GLES3) {
+                api |= egl::OPENGL_ES3_BIT;
+            }
+            if requested_api.contains(Api::OPENGL) {
+                api |= egl::OPENGL_BIT;
+            }
+            config_attributes.push(egl::RENDERABLE_TYPE as EGLint);
+            config_attributes.push(api as EGLint);
         }
-        if template.api.contains(Api::GLES2) {
-            api |= egl::OPENGL_ES2_BIT;
-        }
-        if template.api.contains(Api::GLES3) {
-            api |= egl::OPENGL_ES3_BIT;
-        }
-        if template.api.contains(Api::OPENGL) {
-            api |= egl::OPENGL_BIT;
-        }
-        config_attributes.push(egl::RENDERABLE_TYPE as EGLint);
-        config_attributes.push(api as EGLint);
 
         // Add maximum height of pbuffer.
         if let Some(pbuffer_width) = template.max_pbuffer_width {

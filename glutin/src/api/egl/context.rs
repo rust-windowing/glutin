@@ -8,7 +8,7 @@ use std::ops::Deref;
 use glutin_egl_sys::egl::types::EGLint;
 use glutin_egl_sys::{egl, EGLContext};
 
-use crate::config::GetGlConfig;
+use crate::config::{Api, GetGlConfig};
 use crate::context::{
     AsRawContext, ContextApi, ContextAttributes, GlProfile, RawContext, Robustness, Version,
 };
@@ -33,8 +33,10 @@ impl Display {
         let supports_opengl = self.inner.version > Version::new(1, 3);
 
         let (api, version) = match context_attributes.api {
-            ContextApi::OpenGl(version) if supports_opengl => (egl::OPENGL_API, version),
-            ContextApi::Gles(version) => (egl::OPENGL_ES_API, version),
+            Some(ContextApi::OpenGl(version)) if supports_opengl => (egl::OPENGL_API, version),
+            Some(ContextApi::Gles(version)) => (egl::OPENGL_ES_API, version),
+            None if config.api().contains(Api::OPENGL) => (egl::OPENGL_API, None),
+            None => (egl::OPENGL_ES_BIT, None),
             _ => {
                 return Err(
                     ErrorKind::NotSupported("the requested context Api isn't supported.").into()
