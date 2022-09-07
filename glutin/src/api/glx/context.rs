@@ -79,14 +79,14 @@ impl Display {
                 || self.inner.client_extensions.contains("GLX_EXT_create_context_es_profile");
 
         let (profile, version) = match context_attributes.api {
-            ContextApi::OpenGl(version) => {
+            api @ Some(ContextApi::OpenGl(_)) | api @ None => {
                 let profile = context_attributes.profile.map(|profile| match profile {
                     GlProfile::Core => glx_extra::CONTEXT_CORE_PROFILE_BIT_ARB,
                     GlProfile::Compatibility => glx_extra::CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
                 });
-                (profile, version)
+                (profile, api.and_then(|api| api.version()))
             },
-            ContextApi::Gles(version) if supports_es => {
+            Some(ContextApi::Gles(version)) if supports_es => {
                 (Some(glx_extra::CONTEXT_ES2_PROFILE_BIT_EXT), version)
             },
             _ => {

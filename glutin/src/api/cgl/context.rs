@@ -37,7 +37,7 @@ impl Display {
             _ => nil,
         };
 
-        if matches!(context_attributes.api, ContextApi::Gles(_)) {
+        if matches!(context_attributes.api, Some(ContextApi::Gles(_))) {
             return Err(ErrorKind::NotSupported("gles is not supported with CGL").into());
         }
 

@@ -190,11 +190,11 @@ impl ContextAttributesBuilder {
 
     /// Set the desired OpenGL context api. See the docs of [`ContextApi`].
     ///
-    /// By default OpenGL is requested.
+    /// By default the lastest supported by the config is picked.
     ///
     /// [`ContextApi`]: crate::context::ContextApi
     pub fn with_context_api(mut self, api: ContextApi) -> Self {
-        self.attributes.api = api;
+        self.attributes.api = Some(api);
         self
     }
 
@@ -223,7 +223,7 @@ pub struct ContextAttributes {
 
     pub(crate) profile: Option<GlProfile>,
 
-    pub(crate) api: ContextApi,
+    pub(crate) api: Option<ContextApi>,
 
     pub(crate) shared_context: Option<RawContext>,
 
@@ -291,6 +291,17 @@ pub enum ContextApi {
     ///
     /// When using `None` as a `ApiVersion` any Gles context will be picked.
     Gles(Option<Version>),
+}
+
+#[cfg(any(glx_backend, wgl_backend))]
+impl ContextApi {
+    pub(crate) fn version(&self) -> Option<Version> {
+        match self {
+            Self::OpenGl(version) => *version,
+            Self::Gles(version) => *version,
+            _ => None,
+        }
+    }
 }
 
 impl Default for ContextApi {
