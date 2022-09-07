@@ -1,6 +1,6 @@
 # Unreleased
 
-- Config doesn't force OpenGL Api by default.
+- `Config` doesn't force OpenGL `Api` by default.
 - `Display::create_context` now uses the most recent available `Api` from the `Config` when `ContextApi` is not specified in `ContextAttributes`.
 
 # Version 0.30.0-beta.2 (2022-09-03)

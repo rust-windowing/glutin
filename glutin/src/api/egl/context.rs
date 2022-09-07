@@ -36,7 +36,7 @@ impl Display {
             Some(ContextApi::OpenGl(version)) if supports_opengl => (egl::OPENGL_API, version),
             Some(ContextApi::Gles(version)) => (egl::OPENGL_ES_API, version),
             None if config.api().contains(Api::OPENGL) => (egl::OPENGL_API, None),
-            None => (egl::OPENGL_ES_BIT, None),
+            None => (egl::OPENGL_ES_API, None),
             _ => {
                 return Err(
                     ErrorKind::NotSupported("the requested context Api isn't supported.").into()

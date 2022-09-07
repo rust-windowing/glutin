@@ -122,7 +122,7 @@ impl Display {
         if let Some(requested_api) = template.api {
             let mut api = 0;
             if requested_api.contains(Api::GLES1) {
-                api |= egl::OPENGL_ES_API;
+                api |= egl::OPENGL_ES_BIT;
             }
             if requested_api.contains(Api::GLES2) {
                 api |= egl::OPENGL_ES2_BIT;
