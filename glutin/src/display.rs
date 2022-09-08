@@ -108,7 +108,7 @@ pub trait GlDisplay: Sealed {
     ///
     /// # Api-specific
     ///
-    /// **WGL:** - To load all the funcitons you must have a current context on
+    /// **WGL:** - To load all the functions you must have a current context on
     /// the calling thread, otherwise only limited set of functions will be
     /// loaded.
     fn get_proc_address(&self, addr: &CStr) -> *const ffi::c_void;
