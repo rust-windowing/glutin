@@ -48,9 +48,12 @@ fn main() {
     // Make it current and load symbols.
     let gl_context = gl_context.make_current(&gl_window.surface).unwrap();
 
+    // WGL requires current context on the calling thread to load symbols properly,
+    // so the call here is for portability reasons. In case you don't target WGL
+    // you can call it right after display creation.
     gl::load_with(|symbol| {
         let symbol = CString::new(symbol).unwrap();
-        gl_context.get_proc_address(symbol.as_c_str()) as *const _
+        gl_display.get_proc_address(symbol.as_c_str()) as *const _
     });
 
     // Try setting vsync.

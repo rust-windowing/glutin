@@ -1,6 +1,5 @@
 //! WGL context handling.
 
-use std::ffi::{self, CStr};
 use std::fmt;
 use std::io::Error as IoError;
 use std::marker::PhantomData;
@@ -11,7 +10,6 @@ use glutin_wgl_sys::wgl::types::HGLRC;
 use glutin_wgl_sys::{wgl, wgl_extra};
 use raw_window_handle::RawWindowHandle;
 use windows_sys::Win32::Graphics::Gdi::{self as gdi, HDC};
-use windows_sys::Win32::System::LibraryLoader as dll_loader;
 
 use crate::config::GetGlConfig;
 use crate::context::{
@@ -292,19 +290,6 @@ impl PossiblyCurrentGlContext for PossiblyCurrentContext {
 
     fn is_current(&self) -> bool {
         unsafe { wgl::GetCurrentContext() == *self.inner.raw }
-    }
-
-    fn get_proc_address(&self, addr: &CStr) -> *const ffi::c_void {
-        unsafe {
-            let addr = addr.as_ptr();
-            let fn_ptr = wgl::GetProcAddress(addr);
-            if !fn_ptr.is_null() {
-                fn_ptr.cast()
-            } else {
-                dll_loader::GetProcAddress(self.inner.display.inner.lib_opengl32, addr.cast())
-                    .map_or(std::ptr::null(), |fn_ptr| fn_ptr as *const _)
-            }
-        }
     }
 }
 

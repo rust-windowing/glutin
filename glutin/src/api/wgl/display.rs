@@ -1,11 +1,12 @@
 //! WGL display initialization and extension loading.
 
 use std::collections::HashSet;
-use std::ffi::{CStr, OsStr};
+use std::ffi::{self, CStr, OsStr};
 use std::fmt;
 use std::os::windows::ffi::OsStrExt;
 use std::sync::Arc;
 
+use glutin_wgl_sys::wgl;
 use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
 use windows_sys::Win32::Foundation::HINSTANCE;
 use windows_sys::Win32::Graphics::Gdi::HDC;
@@ -116,6 +117,19 @@ impl GlDisplay for Display {
         surface_attributes: &SurfaceAttributes<PixmapSurface>,
     ) -> Result<Self::PixmapSurface> {
         unsafe { Self::create_pixmap_surface(self, config, surface_attributes) }
+    }
+
+    fn get_proc_address(&self, addr: &CStr) -> *const ffi::c_void {
+        unsafe {
+            let addr = addr.as_ptr();
+            let fn_ptr = wgl::GetProcAddress(addr);
+            if !fn_ptr.is_null() {
+                fn_ptr.cast()
+            } else {
+                dll_loader::GetProcAddress(self.inner.lib_opengl32, addr.cast())
+                    .map_or(std::ptr::null(), |fn_ptr| fn_ptr as *const _)
+            }
+        }
     }
 }
 
