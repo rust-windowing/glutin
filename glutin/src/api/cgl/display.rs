@@ -1,7 +1,11 @@
 //! A CGL display.
 
+use std::ffi::{self, CStr};
 use std::marker::PhantomData;
 
+use core_foundation::base::TCFType;
+use core_foundation::bundle::{CFBundleGetBundleWithIdentifier, CFBundleGetFunctionPointerForName};
+use core_foundation::string::CFString;
 use raw_window_handle::RawDisplayHandle;
 
 use crate::config::ConfigTemplate;
@@ -80,6 +84,15 @@ impl GlDisplay for Display {
         surface_attributes: &SurfaceAttributes<PixmapSurface>,
     ) -> Result<Self::PixmapSurface> {
         unsafe { Self::create_pixmap_surface(self, config, surface_attributes) }
+    }
+
+    fn get_proc_address(&self, addr: &CStr) -> *const ffi::c_void {
+        let symbol_name = CFString::new(addr.to_str().unwrap());
+        let framework_name = CFString::new("com.apple.opengl");
+        unsafe {
+            let framework = CFBundleGetBundleWithIdentifier(framework_name.as_concrete_TypeRef());
+            CFBundleGetFunctionPointerForName(framework, symbol_name.as_concrete_TypeRef()).cast()
+        }
     }
 }
 

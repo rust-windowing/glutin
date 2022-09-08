@@ -1,7 +1,7 @@
 //! OpenGL context creation and initialization.
 
 #![allow(unreachable_patterns)]
-use std::ffi::{self, CStr};
+use std::ffi::{self};
 
 use raw_window_handle::RawWindowHandle;
 
@@ -77,10 +77,6 @@ pub trait PossiblyCurrentGlContext: Sealed {
     /// [`Self::NotCurrentContext`] to indicate that the context is a not
     /// current to allow sending it to the different thread.
     fn make_not_current(self) -> Result<Self::NotCurrentContext>;
-
-    /// Returns the address of an OpenGL function. The context must be current
-    /// when doing so.
-    fn get_proc_address(&self, addr: &CStr) -> *const ffi::c_void;
 }
 
 /// A trait that splits the methods accessing [`crate::surface::Surface`].
@@ -505,10 +501,6 @@ impl PossiblyCurrentGlContext for PossiblyCurrentContext {
         Ok(
             gl_api_dispatch!(self; Self(context) => context.make_not_current()?; as NotCurrentContext),
         )
-    }
-
-    fn get_proc_address(&self, addr: &CStr) -> *const ffi::c_void {
-        gl_api_dispatch!(self; Self(context) => context.get_proc_address(addr))
     }
 }
 

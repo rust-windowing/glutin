@@ -1,7 +1,7 @@
 //! GLX object creation.
 
 use std::collections::HashSet;
-use std::ffi::CStr;
+use std::ffi::{self, CStr};
 use std::fmt;
 use std::ops::Deref;
 use std::sync::atomic::Ordering;
@@ -152,6 +152,10 @@ impl GlDisplay for Display {
         surface_attributes: &SurfaceAttributes<PixmapSurface>,
     ) -> Result<Self::PixmapSurface> {
         unsafe { Self::create_pixmap_surface(self, config, surface_attributes) }
+    }
+
+    fn get_proc_address(&self, addr: &CStr) -> *const ffi::c_void {
+        unsafe { self.inner.glx.GetProcAddress(addr.as_ptr() as *const _) as *const _ }
     }
 }
 

@@ -1,6 +1,5 @@
 //! Everything related to `GLXContext`.
 
-use std::ffi::{self, CStr};
 use std::fmt;
 use std::marker::PhantomData;
 use std::ops::Deref;
@@ -295,12 +294,6 @@ impl PossiblyCurrentGlContext for PossiblyCurrentContext {
 
     fn is_current(&self) -> bool {
         unsafe { self.inner.display.inner.glx.GetCurrentContext() == *self.inner.raw }
-    }
-
-    fn get_proc_address(&self, addr: &CStr) -> *const ffi::c_void {
-        unsafe {
-            self.inner.display.inner.glx.GetProcAddress(addr.as_ptr() as *const _) as *const _
-        }
     }
 }
 

@@ -1,6 +1,5 @@
 //! Everything related to `NSOpenGLContext`.
 
-use std::ffi::{self, CStr};
 use std::fmt;
 use std::marker::PhantomData;
 use std::ops::Deref;
@@ -8,9 +7,7 @@ use std::ops::Deref;
 use cgl::CGLSetParameter;
 use cocoa::appkit::{NSOpenGLContext, NSOpenGLContextParameter};
 use cocoa::base::{id, nil};
-use core_foundation::base::TCFType;
-use core_foundation::bundle::{CFBundleGetBundleWithIdentifier, CFBundleGetFunctionPointerForName};
-use core_foundation::string::CFString;
+
 use objc::rc::autoreleasepool;
 use objc::runtime::{BOOL, NO};
 
@@ -157,15 +154,6 @@ impl PossiblyCurrentGlContext for PossiblyCurrentContext {
                 false
             }
         })
-    }
-
-    fn get_proc_address(&self, addr: &CStr) -> *const ffi::c_void {
-        let symbol_name = CFString::new(addr.to_str().unwrap());
-        let framework_name = CFString::new("com.apple.opengl");
-        unsafe {
-            let framework = CFBundleGetBundleWithIdentifier(framework_name.as_concrete_TypeRef());
-            CFBundleGetFunctionPointerForName(framework, symbol_name.as_concrete_TypeRef()).cast()
-        }
     }
 }
 

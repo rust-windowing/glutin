@@ -1,6 +1,7 @@
 //! The OpenGL platform display selection and creation.
 #![allow(unreachable_patterns)]
 
+use std::ffi::{self, CStr};
 use std::fmt;
 
 use raw_window_handle::RawDisplayHandle;
@@ -102,6 +103,15 @@ pub trait GlDisplay: Sealed {
         config: &Self::Config,
         surface_attributes: &SurfaceAttributes<PixmapSurface>,
     ) -> Result<Self::PixmapSurface>;
+
+    /// Return the address of an OpenGL function.
+    ///
+    /// # Api-specific
+    ///
+    /// **WGL:** - To load all the functions you must have a current context on
+    /// the calling thread, otherwise only limited set of functions will be
+    /// loaded.
+    fn get_proc_address(&self, addr: &CStr) -> *const ffi::c_void;
 }
 
 /// Get the [`Display`].
@@ -349,6 +359,10 @@ impl GlDisplay for Display {
             },
             _ => unreachable!(),
         }
+    }
+
+    fn get_proc_address(&self, addr: &CStr) -> *const ffi::c_void {
+        gl_api_dispatch!(self; Self(display) => display.get_proc_address(addr))
     }
 }
 
