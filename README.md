@@ -46,7 +46,7 @@ Note that glutin aims at being a low-level brick in your rendering
 infrastructure. You are encouraged to write another layer of abstraction
 between glutin and your application.
 
-The minimum rust version target by glutin is `1.57.0`.
+The minimum rust version target by glutin is `1.60.0`.
 
 ## Platform-specific notes
 

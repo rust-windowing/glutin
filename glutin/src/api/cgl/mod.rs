@@ -1,6 +1,7 @@
 //! The CGL Api.
 
 #![allow(non_upper_case_globals)]
+#![allow(clippy::let_unit_value)] // Temporary
 
 use std::ffi::CStr;
 use std::os::raw::c_int;
