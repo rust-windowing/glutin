@@ -134,12 +134,16 @@ impl Display {
             config_attributes.push(stereoscopy as c_int);
         }
 
-        // Add multisampling if supported.
-        if self.inner.version >= Version::new(1, 4)
-            || self.inner.client_extensions.contains("GLX_ARB_multisample")
-        {
-            config_attributes.push(glx::SAMPLE_BUFFERS as c_int);
-            config_attributes.push(template.sample_buffers as c_int);
+        // Add multisampling.
+        if let Some(num_samples) = template.num_samples {
+            if self.inner.version >= Version::new(1, 4)
+                || self.inner.client_extensions.contains("GLX_ARB_multisample")
+            {
+                config_attributes.push(glx::SAMPLE_BUFFERS as c_int);
+                config_attributes.push(1);
+                config_attributes.push(glx::SAMPLES as c_int);
+                config_attributes.push(num_samples as c_int);
+            }
         }
 
         // Push `glx::NONE` to terminate the list.
@@ -262,8 +266,8 @@ impl GlConfig for Config {
         unsafe { self.raw_attribute(glx::STENCIL_SIZE as c_int) as u8 }
     }
 
-    fn sample_buffers(&self) -> u8 {
-        unsafe { self.raw_attribute(glx::SAMPLE_BUFFERS as c_int) as u8 }
+    fn num_samples(&self) -> u8 {
+        unsafe { self.raw_attribute(glx::SAMPLES as c_int) as u8 }
     }
 
     fn config_surface_types(&self) -> ConfigSurfaceTypes {

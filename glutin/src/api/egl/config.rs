@@ -115,9 +115,13 @@ impl Display {
             config_attributes.push(max_swap_interval as EGLint)
         }
 
-        // Add samples.
-        config_attributes.push(egl::SAMPLE_BUFFERS as EGLint);
-        config_attributes.push(template.sample_buffers as EGLint);
+        // Add multisampling.
+        if let Some(num_samples) = template.num_samples {
+            config_attributes.push(egl::SAMPLE_BUFFERS as EGLint);
+            config_attributes.push(1);
+            config_attributes.push(egl::SAMPLES as EGLint);
+            config_attributes.push(num_samples as EGLint);
+        }
 
         if let Some(requested_api) = template.api {
             let mut api = 0;
@@ -289,8 +293,8 @@ impl GlConfig for Config {
         unsafe { self.raw_attribute(egl::STENCIL_SIZE as EGLint) as u8 }
     }
 
-    fn sample_buffers(&self) -> u8 {
-        unsafe { self.raw_attribute(egl::SAMPLE_BUFFERS as EGLint) as u8 }
+    fn num_samples(&self) -> u8 {
+        unsafe { self.raw_attribute(egl::SAMPLES as EGLint) as u8 }
     }
 
     fn config_surface_types(&self) -> ConfigSurfaceTypes {

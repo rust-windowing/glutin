@@ -59,10 +59,12 @@ impl Display {
         }
 
         // Sample buffers.
-        if template.sample_buffers != 0 {
+        if let Some(num_samples) = template.num_samples {
             attrs.push(NSOpenGLPixelFormatAttribute::NSOpenGLPFAMultisample as u32);
             attrs.push(NSOpenGLPixelFormatAttribute::NSOpenGLPFASampleBuffers as u32);
-            attrs.push(template.sample_buffers as u32);
+            attrs.push(1);
+            attrs.push(NSOpenGLPixelFormatAttribute::NSOpenGLPFASamples as u32);
+            attrs.push(num_samples as u32);
         }
 
         // Double buffering.
@@ -162,8 +164,8 @@ impl GlConfig for Config {
         self.raw_attribute(NSOpenGLPixelFormatAttribute::NSOpenGLPFAStencilSize) as u8
     }
 
-    fn sample_buffers(&self) -> u8 {
-        self.raw_attribute(NSOpenGLPixelFormatAttribute::NSOpenGLPFASampleBuffers) as u8
+    fn num_samples(&self) -> u8 {
+        self.raw_attribute(NSOpenGLPixelFormatAttribute::NSOpenGLPFASamples) as u8
     }
 
     fn config_surface_types(&self) -> ConfigSurfaceTypes {
