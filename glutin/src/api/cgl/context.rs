@@ -2,14 +2,10 @@
 
 use std::fmt;
 use std::marker::PhantomData;
-use std::ops::Deref;
 
 use cgl::CGLSetParameter;
-use cocoa::appkit::{NSOpenGLContext, NSOpenGLContextParameter};
-use cocoa::base::{id, nil};
-
-use objc::rc::autoreleasepool;
-use objc::runtime::{BOOL, NO};
+use objc2::foundation::NSObject;
+use objc2::rc::{autoreleasepool, Id, Shared};
 
 use crate::config::GetGlConfig;
 use crate::context::{AsRawContext, ContextApi, ContextAttributes, RawContext, Robustness};
@@ -19,6 +15,7 @@ use crate::prelude::*;
 use crate::private::Sealed;
 use crate::surface::{SurfaceTypeTrait, SwapInterval};
 
+use super::appkit::{NSOpenGLCPSwapInterval, NSOpenGLContext};
 use super::config::Config;
 use super::display::Display;
 use super::surface::Surface;
@@ -30,8 +27,10 @@ impl Display {
         context_attributes: &ContextAttributes,
     ) -> Result<NotCurrentContext> {
         let share_context = match context_attributes.shared_context.as_ref() {
-            Some(RawContext::Cgl(share_context)) => share_context.cast(),
-            _ => nil,
+            Some(RawContext::Cgl(share_context)) => unsafe {
+                share_context.cast::<NSOpenGLContext>().as_ref()
+            },
+            _ => None,
         };
 
         if matches!(context_attributes.api, Some(ContextApi::Gles(_))) {
@@ -42,25 +41,21 @@ impl Display {
             return Err(ErrorKind::NotSupported("robustness is not supported with CGL").into());
         }
 
-        unsafe {
-            let config = config.clone();
-            let raw = NSOpenGLContext::alloc(nil)
-                .initWithFormat_shareContext_(*config.inner.raw, share_context as *mut _);
+        let config = config.clone();
+        let raw = NSOpenGLContext::newWithFormat_shareContext(&config.inner.raw, share_context)
+            .ok_or(ErrorKind::BadConfig)?;
 
-            if config.inner.transparency {
-                let opacity = 0;
-                super::check_error(CGLSetParameter(
-                    raw.CGLContextObj().cast(),
-                    cgl::kCGLCPSurfaceOpacity,
-                    &opacity,
-                ))?;
-            }
-
-            let inner = ContextInner { display: self.clone(), config, raw: NSOpenGLContextId(raw) };
-            let context = NotCurrentContext { inner };
-
-            Ok(context)
+        if config.inner.transparency {
+            let opacity = 0;
+            super::check_error(unsafe {
+                CGLSetParameter(raw.CGLContextObj().cast(), cgl::kCGLCPSurfaceOpacity, &opacity)
+            })?;
         }
+
+        let inner = ContextInner { display: self.clone(), config, raw };
+        let context = NotCurrentContext::new(inner);
+
+        Ok(context)
     }
 }
 
@@ -69,11 +64,12 @@ impl Display {
 #[derive(Debug)]
 pub struct NotCurrentContext {
     pub(crate) inner: ContextInner,
+    _nosync: PhantomData<std::cell::UnsafeCell<()>>,
 }
 
 impl NotCurrentContext {
     fn new(inner: ContextInner) -> Self {
-        Self { inner }
+        Self { inner, _nosync: PhantomData }
     }
 }
 
@@ -127,7 +123,7 @@ impl GetGlDisplay for NotCurrentContext {
 
 impl AsRawContext for NotCurrentContext {
     fn raw_context(&self) -> RawContext {
-        RawContext::Cgl(self.inner.raw.cast())
+        RawContext::Cgl(Id::as_ptr(&self.inner.raw).cast())
     }
 }
 
@@ -139,7 +135,7 @@ impl Sealed for NotCurrentContext {}
 pub struct PossiblyCurrentContext {
     pub(crate) inner: ContextInner,
     // The context could be current only on the one thread.
-    _nosendsync: PhantomData<id>,
+    _nosendsync: PhantomData<*mut ()>,
 }
 
 impl PossiblyCurrentGlContext for PossiblyCurrentContext {
@@ -151,15 +147,11 @@ impl PossiblyCurrentGlContext for PossiblyCurrentContext {
     }
 
     fn is_current(&self) -> bool {
-        autoreleasepool(|| unsafe {
-            let current = NSOpenGLContext::currentContext(nil);
-            if current != nil {
-                let is_equal: BOOL = msg_send![current, isEqual: *self.inner.raw];
-                is_equal != NO
-            } else {
-                false
-            }
-        })
+        if let Some(current) = NSOpenGLContext::currentContext() {
+            current == self.inner.raw
+        } else {
+            false
+        }
     }
 }
 
@@ -203,7 +195,7 @@ impl GetGlDisplay for PossiblyCurrentContext {
 
 impl AsRawContext for PossiblyCurrentContext {
     fn raw_context(&self) -> RawContext {
-        RawContext::Cgl(self.inner.raw.cast())
+        RawContext::Cgl(Id::as_ptr(&self.inner.raw).cast())
     }
 }
 
@@ -212,7 +204,7 @@ impl Sealed for PossiblyCurrentContext {}
 pub(crate) struct ContextInner {
     display: Display,
     config: Config,
-    pub(crate) raw: NSOpenGLContextId,
+    pub(crate) raw: Id<NSOpenGLContext, Shared>,
 }
 
 impl ContextInner {
@@ -225,10 +217,10 @@ impl ContextInner {
     }
 
     fn make_current<T: SurfaceTypeTrait>(&self, surface: &Surface<T>) -> Result<()> {
-        autoreleasepool(|| unsafe {
+        autoreleasepool(|_| {
             self.raw.update();
             self.raw.makeCurrentContext();
-            self.raw.setView_(surface.ns_view);
+            unsafe { self.raw.setView(Some(&surface.ns_view)) };
             Ok(())
         })
     }
@@ -243,45 +235,30 @@ impl ContextInner {
             SwapInterval::Wait(_) => 1,
         };
 
-        autoreleasepool(|| unsafe {
-            self.raw.setValues_forParameter_(
-                &interval,
-                NSOpenGLContextParameter::NSOpenGLCPSwapInterval,
-            );
+        autoreleasepool(|_| unsafe {
+            self.raw.setValues_forParameter(&interval, NSOpenGLCPSwapInterval);
         })
     }
 
     pub(crate) fn update(&self) {
-        unsafe { self.raw.update() }
+        self.raw.update();
     }
 
     pub(crate) fn flush_buffer(&self) -> Result<()> {
-        autoreleasepool(|| unsafe {
+        autoreleasepool(|_| {
             self.raw.flushBuffer();
             Ok(())
         })
     }
 
-    pub(crate) fn current_view(&self) -> id {
-        unsafe { self.raw.view() }
+    pub(crate) fn current_view(&self) -> Id<NSObject, Shared> {
+        self.raw.view().expect("context to have a current view")
     }
 
     fn make_not_current(&self) -> Result<()> {
-        unsafe {
-            self.raw.update();
-            NSOpenGLContext::clearCurrentContext(nil);
-            Ok(())
-        }
-    }
-}
-
-impl Drop for ContextInner {
-    fn drop(&mut self) {
-        unsafe {
-            if *self.raw != nil {
-                let _: () = msg_send![*self.raw, release];
-            }
-        }
+        self.raw.update();
+        NSOpenGLContext::clearCurrentContext();
+        Ok(())
     }
 }
 
@@ -291,18 +268,5 @@ impl fmt::Debug for ContextInner {
             .field("config", &self.config.inner.raw)
             .field("raw", &self.raw)
             .finish()
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct NSOpenGLContextId(id);
-
-unsafe impl Send for NSOpenGLContextId {}
-
-impl Deref for NSOpenGLContextId {
-    type Target = id;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }

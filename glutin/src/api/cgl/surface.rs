@@ -4,7 +4,8 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
 
-use cocoa::base::{id, nil};
+use objc2::foundation::NSObject;
+use objc2::rc::{Id, Shared};
 use raw_window_handle::RawWindowHandle;
 
 use crate::config::GetGlConfig;
@@ -51,8 +52,9 @@ impl Display {
             },
         };
 
-        let ns_view: id = native_window.ns_view.cast();
-        let _: () = msg_send![ns_view, retain];
+        // SAFETY: Validity of the view is ensured by caller
+        let ns_view =
+            unsafe { Id::retain(native_window.ns_view.cast()) }.expect("NSView to be non-null");
         let surface =
             Surface { display: self.clone(), config: config.clone(), ns_view, _ty: PhantomData };
         Ok(surface)
@@ -63,18 +65,8 @@ impl Display {
 pub struct Surface<T: SurfaceTypeTrait> {
     display: Display,
     config: Config,
-    pub(crate) ns_view: id,
+    pub(crate) ns_view: Id<NSObject, Shared>,
     _ty: PhantomData<T>,
-}
-
-impl<T: SurfaceTypeTrait> Drop for Surface<T> {
-    fn drop(&mut self) {
-        unsafe {
-            if self.ns_view != nil {
-                let _: () = msg_send![self.ns_view, release];
-            }
-        }
-    }
 }
 
 impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
@@ -141,7 +133,7 @@ impl<T: SurfaceTypeTrait> GetGlDisplay for Surface<T> {
 
 impl<T: SurfaceTypeTrait> AsRawSurface for Surface<T> {
     fn raw_surface(&self) -> RawSurface {
-        RawSurface::Cgl(self.ns_view.cast())
+        RawSurface::Cgl(Id::as_ptr(&self.ns_view).cast())
     }
 }
 

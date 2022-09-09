@@ -1,14 +1,9 @@
 //! Everything related to `NSOpenGLPixelFormat`.
 
-use std::ops::Deref;
 use std::sync::Arc;
 use std::{fmt, iter};
 
-use cocoa::appkit::{
-    NSOpenGLPFAAllowOfflineRenderers, NSOpenGLPixelFormat, NSOpenGLPixelFormatAttribute,
-    NSOpenGLProfileVersion3_2Core, NSOpenGLProfileVersion4_1Core, NSOpenGLProfileVersionLegacy,
-};
-use cocoa::base::{id, nil, BOOL, NO};
+use objc2::rc::{Id, Shared};
 
 use crate::config::{
     Api, AsRawConfig, ColorBufferType, ConfigSurfaceTypes, ConfigTemplate, GlConfig, RawConfig,
@@ -17,6 +12,14 @@ use crate::display::GetGlDisplay;
 use crate::error::{ErrorKind, Result};
 use crate::private::Sealed;
 
+use super::appkit::{
+    NSOpenGLPFAAccelerated, NSOpenGLPFAAllowOfflineRenderers, NSOpenGLPFAAlphaSize,
+    NSOpenGLPFAColorFloat, NSOpenGLPFAColorSize, NSOpenGLPFADepthSize, NSOpenGLPFADoubleBuffer,
+    NSOpenGLPFAMinimumPolicy, NSOpenGLPFAMultisample, NSOpenGLPFAOpenGLProfile,
+    NSOpenGLPFASampleBuffers, NSOpenGLPFASamples, NSOpenGLPFAStencilSize, NSOpenGLPFAStereo,
+    NSOpenGLPFATripleBuffer, NSOpenGLPixelFormat, NSOpenGLPixelFormatAttribute,
+    NSOpenGLProfileVersion3_2Core, NSOpenGLProfileVersion4_1Core, NSOpenGLProfileVersionLegacy,
+};
 use super::display::Display;
 
 impl Display {
@@ -24,18 +27,18 @@ impl Display {
         &self,
         template: ConfigTemplate,
     ) -> Result<Box<dyn Iterator<Item = Config> + '_>> {
-        let mut attrs = Vec::<u32>::with_capacity(32);
+        let mut attrs = Vec::<NSOpenGLPixelFormatAttribute>::with_capacity(32);
 
         // We use minimum to follow behavior of other platforms here.
-        attrs.push(NSOpenGLPixelFormatAttribute::NSOpenGLPFAMinimumPolicy as u32);
+        attrs.push(NSOpenGLPFAMinimumPolicy);
 
         // Allow offline renderers.
-        attrs.push(NSOpenGLPFAAllowOfflineRenderers as u32);
+        attrs.push(NSOpenGLPFAAllowOfflineRenderers);
 
         // Color.
         match template.color_buffer_type {
             ColorBufferType::Rgb { r_size, g_size, b_size } => {
-                attrs.push(NSOpenGLPixelFormatAttribute::NSOpenGLPFAColorSize as u32);
+                attrs.push(NSOpenGLPFAColorSize);
                 // We can't specify particular color, so we provide the sum, and also requires
                 // an alpha.
                 attrs.push((r_size + g_size + b_size + template.alpha_size) as u32);
@@ -48,51 +51,51 @@ impl Display {
         }
 
         // Alpha.
-        attrs.push(NSOpenGLPixelFormatAttribute::NSOpenGLPFAAlphaSize as u32);
+        attrs.push(NSOpenGLPFAAlphaSize);
         attrs.push(template.alpha_size as u32);
 
         // Depth.
-        attrs.push(NSOpenGLPixelFormatAttribute::NSOpenGLPFADepthSize as u32);
+        attrs.push(NSOpenGLPFADepthSize);
         attrs.push(template.depth_size as u32);
 
         // Stencil.
-        attrs.push(NSOpenGLPixelFormatAttribute::NSOpenGLPFAStencilSize as u32);
+        attrs.push(NSOpenGLPFAStencilSize);
         attrs.push(template.stencil_size as u32);
 
         // Float colors.
         if template.float_pixels {
-            attrs.push(NSOpenGLPixelFormatAttribute::NSOpenGLPFAColorFloat as u32);
+            attrs.push(NSOpenGLPFAColorFloat);
         }
 
         // Sample buffers.
         if let Some(num_samples) = template.num_samples {
-            attrs.push(NSOpenGLPixelFormatAttribute::NSOpenGLPFAMultisample as u32);
-            attrs.push(NSOpenGLPixelFormatAttribute::NSOpenGLPFASampleBuffers as u32);
+            attrs.push(NSOpenGLPFAMultisample);
+            attrs.push(NSOpenGLPFASampleBuffers);
             attrs.push(1);
-            attrs.push(NSOpenGLPixelFormatAttribute::NSOpenGLPFASamples as u32);
+            attrs.push(NSOpenGLPFASamples);
             attrs.push(num_samples as u32);
         }
 
         // Double buffering.
         if !template.single_buffering {
-            attrs.push(NSOpenGLPixelFormatAttribute::NSOpenGLPFADoubleBuffer as u32);
+            attrs.push(NSOpenGLPFADoubleBuffer);
         }
 
         if template.hardware_accelerated == Some(true) {
-            attrs.push(NSOpenGLPixelFormatAttribute::NSOpenGLPFAAccelerated as u32);
+            attrs.push(NSOpenGLPFAAccelerated);
         }
 
         // Stereo.
         if template.stereoscopy == Some(true) {
-            attrs.push(NSOpenGLPixelFormatAttribute::NSOpenGLPFAStereo as u32);
+            attrs.push(NSOpenGLPFAStereo);
         }
 
-        attrs.push(NSOpenGLPixelFormatAttribute::NSOpenGLPFAOpenGLProfile as u32);
+        attrs.push(NSOpenGLPFAOpenGLProfile);
 
         // Stash profile pos for latter insert.
         let profile_attr_pos = attrs.len();
         // Add place holder for the GL profile.
-        attrs.push(NSOpenGLProfileVersion4_1Core as u32);
+        attrs.push(NSOpenGLProfileVersion4_1Core);
 
         // Terminate attrs with zero.
         attrs.push(0);
@@ -104,24 +107,16 @@ impl Display {
             NSOpenGLProfileVersionLegacy,
         ]
         .into_iter()
-        .find_map(|profile| unsafe {
-            attrs[profile_attr_pos] = profile as u32;
-            let raw = NSOpenGLPixelFormat::alloc(nil).initWithAttributes_(&attrs);
-            if raw.is_null() {
-                None
-            } else {
-                Some(raw)
-            }
-        });
-
-        let raw = match raw {
-            Some(raw) => raw,
-            None => return Err(ErrorKind::BadConfig.into()),
-        };
+        .find_map(|profile| {
+            attrs[profile_attr_pos] = profile;
+            // initWithAttributes returns None if the attributes were invalid
+            unsafe { NSOpenGLPixelFormat::newWithAttributes(&attrs) }
+        })
+        .ok_or(ErrorKind::BadConfig)?;
 
         let inner = Arc::new(ConfigInner {
             display: self.clone(),
-            raw: NSOpenGLPixelFormatId(raw),
+            raw,
             transparency: template.transparency,
         });
         let config = Config { inner };
@@ -140,10 +135,8 @@ impl Config {
     fn raw_attribute(&self, attrib: NSOpenGLPixelFormatAttribute) -> i32 {
         unsafe {
             let mut value = 0;
-            NSOpenGLPixelFormat::getValues_forAttribute_forVirtualScreen_(
-                *self.inner.raw,
-                &mut value,
-                attrib,
+            self.inner.raw.getValues_forAttribute_forVirtualScreen(
+                &mut value, attrib,
                 // They do differ per monitor and require context. Which is kind of insane, but
                 // whatever. Zero is a primary monitor.
                 0,
@@ -153,8 +146,8 @@ impl Config {
     }
 
     pub(crate) fn is_single_buffered(&self) -> bool {
-        self.raw_attribute(NSOpenGLPixelFormatAttribute::NSOpenGLPFATripleBuffer) == 0
-            && self.raw_attribute(NSOpenGLPixelFormatAttribute::NSOpenGLPFADoubleBuffer) == 0
+        self.raw_attribute(NSOpenGLPFATripleBuffer) == 0
+            && self.raw_attribute(NSOpenGLPFADoubleBuffer) == 0
     }
 }
 
@@ -163,8 +156,7 @@ impl GlConfig for Config {
         // On macos all color formats divide by 3 without reminder, except for the RGB
         // 565. So we can convert it in a hopefully reliable way. Also we should remove
         // alpha.
-        let color = self.raw_attribute(NSOpenGLPixelFormatAttribute::NSOpenGLPFAColorSize)
-            - self.alpha_size() as i32;
+        let color = self.raw_attribute(NSOpenGLPFAColorSize) - self.alpha_size() as i32;
         let r_size = (color / 3) as u8;
         let b_size = (color / 3) as u8;
         let g_size = (color - r_size as i32 - b_size as i32) as u8;
@@ -172,11 +164,11 @@ impl GlConfig for Config {
     }
 
     fn float_pixels(&self) -> bool {
-        self.raw_attribute(NSOpenGLPixelFormatAttribute::NSOpenGLPFAColorFloat) != 0
+        self.raw_attribute(NSOpenGLPFAColorFloat) != 0
     }
 
     fn alpha_size(&self) -> u8 {
-        self.raw_attribute(NSOpenGLPixelFormatAttribute::NSOpenGLPFAAlphaSize) as u8
+        self.raw_attribute(NSOpenGLPFAAlphaSize) as u8
     }
 
     fn srgb_capable(&self) -> bool {
@@ -184,19 +176,19 @@ impl GlConfig for Config {
     }
 
     fn hardware_accelerated(&self) -> bool {
-        self.raw_attribute(NSOpenGLPixelFormatAttribute::NSOpenGLPFAAccelerated) != 0
+        self.raw_attribute(NSOpenGLPFAAccelerated) != 0
     }
 
     fn depth_size(&self) -> u8 {
-        self.raw_attribute(NSOpenGLPixelFormatAttribute::NSOpenGLPFADepthSize) as u8
+        self.raw_attribute(NSOpenGLPFADepthSize) as u8
     }
 
     fn stencil_size(&self) -> u8 {
-        self.raw_attribute(NSOpenGLPixelFormatAttribute::NSOpenGLPFAStencilSize) as u8
+        self.raw_attribute(NSOpenGLPFAStencilSize) as u8
     }
 
     fn num_samples(&self) -> u8 {
-        self.raw_attribute(NSOpenGLPixelFormatAttribute::NSOpenGLPFASamples) as u8
+        self.raw_attribute(NSOpenGLPFASamples) as u8
     }
 
     fn config_surface_types(&self) -> ConfigSurfaceTypes {
@@ -222,7 +214,7 @@ impl GetGlDisplay for Config {
 
 impl AsRawConfig for Config {
     fn raw_config(&self) -> RawConfig {
-        RawConfig::Cgl(self.inner.raw.cast())
+        RawConfig::Cgl(Id::as_ptr(&self.inner.raw).cast())
     }
 }
 
@@ -231,23 +223,12 @@ impl Sealed for Config {}
 pub(crate) struct ConfigInner {
     display: Display,
     pub(crate) transparency: bool,
-    pub(crate) raw: NSOpenGLPixelFormatId,
-}
-
-impl Drop for ConfigInner {
-    fn drop(&mut self) {
-        if *self.raw != nil {
-            let _: () = unsafe { msg_send![*self.raw, release] };
-        }
-    }
+    pub(crate) raw: Id<NSOpenGLPixelFormat, Shared>,
 }
 
 impl PartialEq for ConfigInner {
     fn eq(&self, other: &Self) -> bool {
-        unsafe {
-            let is_equal: BOOL = msg_send![*self.raw, isEqual: *other.raw];
-            is_equal != NO
-        }
+        self.raw == other.raw
     }
 }
 
@@ -256,19 +237,5 @@ impl Eq for ConfigInner {}
 impl fmt::Debug for ConfigInner {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Config").field("id", &self.raw).finish()
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct NSOpenGLPixelFormatId(id);
-
-unsafe impl Send for NSOpenGLPixelFormatId {}
-unsafe impl Sync for NSOpenGLPixelFormatId {}
-
-impl Deref for NSOpenGLPixelFormatId {
-    type Target = id;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }
