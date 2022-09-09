@@ -30,12 +30,23 @@ impl Display {
         let mut attrs = Vec::<EGLint>::new();
 
         let supports_opengl = self.inner.version > Version::new(1, 3);
+        let config_api = config.api();
 
-        let (api, version) = match context_attributes.api {
-            Some(ContextApi::OpenGl(version)) if supports_opengl => (egl::OPENGL_API, version),
-            Some(ContextApi::Gles(version)) => (egl::OPENGL_ES_API, version),
-            None if config.api().contains(Api::OPENGL) => (egl::OPENGL_API, None),
-            None => (egl::OPENGL_ES_API, None),
+        let (api, mut version) = match context_attributes.api {
+            api @ Some(ContextApi::OpenGl(_)) | api @ None
+                if supports_opengl && config_api.contains(Api::OPENGL) =>
+            {
+                (egl::OPENGL_API, api.and_then(|api| api.version()))
+            },
+            api @ Some(ContextApi::Gles(_)) | api @ None => {
+                let version = match api.and_then(|api| api.version()) {
+                    Some(version) => version,
+                    None if config_api.contains(Api::GLES3) => Version::new(3, 0),
+                    None if config_api.contains(Api::GLES2) => Version::new(2, 0),
+                    _ => Version::new(1, 0),
+                };
+                (egl::OPENGL_ES_API, Some(version))
+            },
             _ => {
                 return Err(
                     ErrorKind::NotSupported("the requested context Api isn't supported.").into()
@@ -50,7 +61,11 @@ impl Display {
             // Add profile for the OpenGL Api.
             if api == egl::OPENGL_API {
                 let profile = match context_attributes.profile {
-                    Some(GlProfile::Core) | None => egl::CONTEXT_OPENGL_CORE_PROFILE_BIT,
+                    Some(GlProfile::Core) | None => {
+                        version = Some(Version::new(3, 3));
+                        egl::CONTEXT_OPENGL_CORE_PROFILE_BIT
+                    },
+
                     Some(GlProfile::Compatibility) => egl::CONTEXT_OPENGL_COMPATIBILITY_PROFILE_BIT,
                 };
 

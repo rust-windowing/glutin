@@ -176,7 +176,7 @@ impl ContextAttributesBuilder {
     ///
     /// # Api-specific
     ///
-    /// **macOS:** - not supported.
+    /// **macOS:** - not supported, the latest is picked automatically.
     ///
     /// [`GlProfile`]: crate::context::GlProfile
     pub fn with_profile(mut self, profile: GlProfile) -> Self {
@@ -186,7 +186,7 @@ impl ContextAttributesBuilder {
 
     /// Set the desired OpenGL context api. See the docs of [`ContextApi`].
     ///
-    /// By default the lastest supported by the config is picked.
+    /// By default the supported api will be picked.
     ///
     /// [`ContextApi`]: crate::context::ContextApi
     pub fn with_context_api(mut self, api: ContextApi) -> Self {
@@ -268,6 +268,8 @@ impl Default for Robustness {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GlProfile {
     /// Include all the future-compatible functions and definitions.
+    ///
+    /// The requested OpenGL version with [`ContextApi`] should be at least 3.3.
     Core,
     /// Include all the immediate more functions and definitions.
     ///
@@ -280,16 +282,20 @@ pub enum GlProfile {
 pub enum ContextApi {
     /// OpenGL Api version that should be used by the context.
     ///
-    /// When using `None` as a `ApiVersion` any OpenGl context will be picked.
+    /// When using `None` as `Version` any OpenGL context will be picked,
+    /// however when the [`GlProfile::Core`] is used at least 3.3 will be
+    /// requested.
     OpenGl(Option<Version>),
 
     /// OpenGL Api version that should be used by the context.
     ///
-    /// When using `None` as a `ApiVersion` any Gles context will be picked.
+    /// When using `None` as `Version` the latest **known** major version is
+    /// picked. Versions that are higher than what was picked automatically
+    /// could still be supported.
     Gles(Option<Version>),
 }
 
-#[cfg(any(glx_backend, wgl_backend))]
+#[cfg(any(egl_backend, glx_backend, wgl_backend))]
 impl ContextApi {
     pub(crate) fn version(&self) -> Option<Version> {
         match self {
@@ -317,7 +323,7 @@ pub struct Version {
 
 impl Version {
     /// Create new version with the given `major` and `minor` values.
-    pub fn new(major: u8, minor: u8) -> Self {
+    pub const fn new(major: u8, minor: u8) -> Self {
         Self { major, minor }
     }
 }
