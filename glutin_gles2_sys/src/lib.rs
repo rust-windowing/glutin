@@ -8,85 +8,35 @@ pub mod gles {
     include!(concat!(env!("OUT_DIR"), "/gles2_bindings.rs"));
 }
 
-use objc::runtime::Object;
-use objc::{Encode, Encoding};
-
 use std::os::raw;
 
-pub type id = *mut Object;
-pub const nil: id = 0 as id;
+pub const UIViewAutoresizingFlexibleWidth: usize = 1 << 1;
+pub const UIViewAutoresizingFlexibleHeight: usize = 1 << 4;
 
-pub const UIViewAutoresizingFlexibleWidth: NSUInteger = 1 << 1;
-pub const UIViewAutoresizingFlexibleHeight: NSUInteger = 1 << 4;
+pub const GLKViewDrawableColorFormatRGBA8888: gles::types::GLint = 0;
+pub const GLKViewDrawableColorFormatRGB565: gles::types::GLint = 1;
+pub const GLKViewDrawableColorFormatSRGBA8888: gles::types::GLint = 2;
 
-#[cfg(target_pointer_width = "32")]
-pub type CGFloat = f32;
-#[cfg(target_pointer_width = "64")]
-pub type CGFloat = f64;
+pub const GLKViewDrawableDepthFormatNone: gles::types::GLint = 0;
+pub const GLKViewDrawableDepthFormat16: gles::types::GLint = 1;
+pub const GLKViewDrawableDepthFormat24: gles::types::GLint = 2;
 
-#[cfg(target_pointer_width = "32")]
-pub type NSUInteger = u32;
-#[cfg(target_pointer_width = "64")]
-pub type NSUInteger = u64;
+pub const GLKViewDrawableStencilFormatNone: gles::types::GLint = 0;
+pub const GLKViewDrawableStencilFormat8: gles::types::GLint = 1;
 
-#[repr(C)]
-#[derive(Debug, Clone)]
-pub struct CGPoint {
-    pub x: CGFloat,
-    pub y: CGFloat,
-}
+pub const GLKViewDrawableMultisampleNone: gles::types::GLint = 0;
+pub const GLKViewDrawableMultisample4X: gles::types::GLint = 1;
 
-#[repr(C)]
-#[derive(Debug, Clone)]
-pub struct CGRect {
-    pub origin: CGPoint,
-    pub size: CGSize,
-}
-
-unsafe impl Encode for CGRect {
-    fn encode() -> Encoding {
-        #[cfg(target_pointer_width = "32")]
-        unsafe {
-            Encoding::from_str("{CGRect={CGPoint=ff}{CGSize=ff}}")
-        }
-        #[cfg(target_pointer_width = "64")]
-        unsafe {
-            Encoding::from_str("{CGRect={CGPoint=dd}{CGSize=dd}}")
-        }
-    }
-}
-
-#[repr(C)]
-#[derive(Debug, Clone)]
-pub struct CGSize {
-    pub width: CGFloat,
-    pub height: CGFloat,
-}
-
-pub const GLKViewDrawableColorFormatRGBA8888: NSUInteger = 0;
-pub const GLKViewDrawableColorFormatRGB565: NSUInteger = 1;
-pub const GLKViewDrawableColorFormatSRGBA8888: NSUInteger = 2;
-
-pub const GLKViewDrawableDepthFormatNone: NSUInteger = 0;
-pub const GLKViewDrawableDepthFormat16: NSUInteger = 1;
-pub const GLKViewDrawableDepthFormat24: NSUInteger = 2;
-
-pub const GLKViewDrawableStencilFormatNone: NSUInteger = 0;
-pub const GLKViewDrawableStencilFormat8: NSUInteger = 1;
-
-pub const GLKViewDrawableMultisampleNone: NSUInteger = 0;
-pub const GLKViewDrawableMultisample4X: NSUInteger = 1;
-
-pub const kEAGLRenderingAPIOpenGLES1: NSUInteger = 1;
+pub const kEAGLRenderingAPIOpenGLES1: usize = 1;
 #[allow(dead_code)]
-pub const kEAGLRenderingAPIOpenGLES2: NSUInteger = 2;
-pub const kEAGLRenderingAPIOpenGLES3: NSUInteger = 3;
+pub const kEAGLRenderingAPIOpenGLES2: usize = 2;
+pub const kEAGLRenderingAPIOpenGLES3: usize = 3;
 
 extern "C" {
-    pub static kEAGLColorFormatRGB565: id;
-    // pub static kEAGLColorFormatRGBA8: id;
-    pub static kEAGLDrawablePropertyColorFormat: id;
-    pub static kEAGLDrawablePropertyRetainedBacking: id;
+    pub static kEAGLColorFormatRGB565: *const raw::c_void;
+    // pub static kEAGLColorFormatRGBA8: *const raw::c_void;
+    pub static kEAGLDrawablePropertyColorFormat: *const raw::c_void;
+    pub static kEAGLDrawablePropertyRetainedBacking: *const raw::c_void;
 }
 
 pub const RTLD_LAZY: raw::c_int = 0x001;
