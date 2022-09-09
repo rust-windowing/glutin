@@ -204,11 +204,13 @@ impl Display {
             wgl_extra::TYPE_RGBA_ARB
         };
 
-        if self.inner.client_extensions.contains(MULTI_SAMPLE_ARB) {
-            attrs.push(wgl_extra::SAMPLE_BUFFERS_ARB as c_int);
-            attrs.push((template.sample_buffers != 0) as c_int);
-            attrs.push(wgl_extra::SAMPLES_ARB as c_int);
-            attrs.push(template.sample_buffers as c_int);
+        if let Some(num_samples) = template.num_samples {
+            if self.inner.client_extensions.contains(MULTI_SAMPLE_ARB) {
+                attrs.push(wgl_extra::SAMPLE_BUFFERS_ARB as c_int);
+                attrs.push(1);
+                attrs.push(wgl_extra::SAMPLES_ARB as c_int);
+                attrs.push(num_samples as c_int);
+            }
         }
 
         attrs.push(wgl_extra::PIXEL_TYPE_ARB as c_int);
@@ -389,7 +391,7 @@ impl GlConfig for Config {
         }
     }
 
-    fn sample_buffers(&self) -> u8 {
+    fn num_samples(&self) -> u8 {
         if self.inner.display.inner.client_extensions.contains(MULTI_SAMPLE_ARB) {
             unsafe { self.raw_attribute(wgl_extra::SAMPLES_ARB as c_int) as _ }
         } else {

@@ -40,8 +40,10 @@ pub trait GlConfig: Sealed {
     /// The size of the stencil buffer.
     fn stencil_size(&self) -> u8;
 
-    /// The number of sample buffers used for multisampling.
-    fn sample_buffers(&self) -> u8;
+    /// The number of samples in multisample buffer.
+    ///
+    /// Zero would mean that there're no samples.
+    fn num_samples(&self) -> u8;
 
     /// Whether the config supports creating srgb capable
     /// [`crate::surface::Surface`].
@@ -118,12 +120,14 @@ impl ConfigTemplateBuilder {
         self
     }
 
-    /// Number of sample buffers.
+    /// Whether multisampling configurations should be picked. The `num_samples`
+    /// must be a power of two.
     ///
-    /// By default `0` is requested.
+    /// By default multisampling is not specified.
     #[inline]
-    pub fn with_sample_buffers(mut self, sample_buffers: u8) -> Self {
-        self.template.sample_buffers = sample_buffers;
+    pub fn with_multisampling(mut self, num_samples: u8) -> Self {
+        debug_assert!(num_samples.is_power_of_two());
+        self.template.num_samples = Some(num_samples);
         self
     }
 
@@ -258,8 +262,8 @@ pub struct ConfigTemplate {
     /// Bits of stencil in the stencil buffer.
     pub(crate) stencil_size: u8,
 
-    /// The amount of sample buffers.
-    pub(crate) sample_buffers: u8,
+    /// The amount of samples in multisample buffer.
+    pub(crate) num_samples: Option<u8>,
 
     /// The minimum swap interval supported by the configuration.
     pub(crate) min_swap_interval: Option<u16>,
@@ -309,9 +313,9 @@ impl Default for ConfigTemplate {
 
             stencil_size: 8,
 
-            sample_buffers: 0,
+            num_samples: None,
 
-            transparency: true,
+            transparency: false,
 
             stereoscopy: None,
 
@@ -438,8 +442,8 @@ impl GlConfig for Config {
         gl_api_dispatch!(self; Self(config) => config.stencil_size())
     }
 
-    fn sample_buffers(&self) -> u8 {
-        gl_api_dispatch!(self; Self(config) => config.sample_buffers())
+    fn num_samples(&self) -> u8 {
+        gl_api_dispatch!(self; Self(config) => config.num_samples())
     }
 
     fn srgb_capable(&self) -> bool {
