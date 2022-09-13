@@ -4,7 +4,10 @@ use std::ops::Deref;
 use std::sync::Arc;
 use std::{fmt, iter};
 
-use cocoa::appkit::{NSOpenGLPixelFormat, NSOpenGLPixelFormatAttribute};
+use cocoa::appkit::{
+    NSOpenGLPixelFormat, NSOpenGLPixelFormatAttribute, NSOpenGLProfileVersion3_2Core,
+    NSOpenGLProfileVersion4_1Core, NSOpenGLProfileVersionLegacy,
+};
 use cocoa::base::{id, nil, BOOL};
 
 use crate::config::{
@@ -81,15 +84,36 @@ impl Display {
             attrs.push(NSOpenGLPixelFormatAttribute::NSOpenGLPFAStereo as u32);
         }
 
+        attrs.push(NSOpenGLPixelFormatAttribute::NSOpenGLPFAOpenGLProfile as u32);
+
+        // Stash profile pos for latter insert.
+        let profile_attr_pos = attrs.len();
+        // Add place holder for the GL profile.
+        attrs.push(NSOpenGLProfileVersion4_1Core as u32);
+
         // Terminate attrs with zero.
         attrs.push(0);
 
-        let raw = unsafe {
+        // Automatically pick the latest profile.
+        let raw = [
+            NSOpenGLProfileVersion4_1Core,
+            NSOpenGLProfileVersion3_2Core,
+            NSOpenGLProfileVersionLegacy,
+        ]
+        .into_iter()
+        .find_map(|profile| unsafe {
+            attrs[profile_attr_pos] = profile as u32;
             let raw = NSOpenGLPixelFormat::alloc(nil).initWithAttributes_(&attrs);
             if raw.is_null() {
-                return Err(ErrorKind::BadConfig.into());
+                None
+            } else {
+                Some(raw)
             }
-            raw
+        });
+
+        let raw = match raw {
+            Some(raw) => raw,
+            None => return Err(ErrorKind::BadConfig.into()),
         };
 
         let inner = Arc::new(ConfigInner {

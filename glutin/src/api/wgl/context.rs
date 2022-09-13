@@ -14,7 +14,7 @@ use windows_sys::Win32::Graphics::Gdi::{self as gdi, HDC};
 use crate::config::GetGlConfig;
 use crate::context::{
     AsRawContext, ContextApi, ContextAttributes, GlProfile, RawContext, ReleaseBehaviour,
-    Robustness,
+    Robustness, Version,
 };
 use crate::display::GetGlDisplay;
 use crate::error::{ErrorKind, Result};
@@ -84,15 +84,23 @@ impl Display {
 
         let (profile, version) = match context_attributes.api {
             api @ Some(ContextApi::OpenGl(_)) | api @ None => {
-                let profile = context_attributes.profile.map(|profile| match profile {
-                    GlProfile::Core => wgl_extra::CONTEXT_CORE_PROFILE_BIT_ARB,
-                    GlProfile::Compatibility => wgl_extra::CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
-                });
-                (profile, api.and_then(|api| api.version()))
+                let mut version = api.and_then(|api| api.version());
+                let profile = match context_attributes.profile {
+                    Some(GlProfile::Core) | None => {
+                        version = Some(version.unwrap_or(Version::new(3, 3)));
+                        wgl_extra::CONTEXT_CORE_PROFILE_BIT_ARB
+                    },
+                    Some(GlProfile::Compatibility) => {
+                        wgl_extra::CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB
+                    },
+                };
+
+                (Some(profile), version)
             },
-            Some(ContextApi::Gles(version)) if supports_es => {
-                (Some(wgl_extra::CONTEXT_ES2_PROFILE_BIT_EXT), version)
-            },
+            Some(ContextApi::Gles(version)) if supports_es => (
+                Some(wgl_extra::CONTEXT_ES2_PROFILE_BIT_EXT),
+                Some(version.unwrap_or(Version::new(2, 0))),
+            ),
             _ => {
                 return Err(ErrorKind::NotSupported(
                     "extension to create ES context with wgl is not present",
