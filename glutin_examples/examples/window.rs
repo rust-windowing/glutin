@@ -1,5 +1,3 @@
-mod support;
-
 fn main() {
-    support::main()
+    glutin_examples::main()
 }

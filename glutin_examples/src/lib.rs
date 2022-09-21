@@ -23,7 +23,7 @@ use glutin::surface::{
     Surface, SurfaceAttributes, SurfaceAttributesBuilder, SwapInterval, WindowSurface,
 };
 
-pub(crate) fn main() {
+pub fn main() {
     let event_loop = EventLoop::new();
 
     let raw_display = event_loop.raw_display_handle();
