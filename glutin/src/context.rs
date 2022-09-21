@@ -146,13 +146,9 @@ impl ContextAttributesBuilder {
     /// Sets the robustness of the OpenGL context. See the docs of
     /// [`Robustness`].
     ///
-    /// The default is [`NotRobust`], because this is what typically expected
-    /// when you create an OpenGL context.  However for safety you should
-    /// consider [`RobustLoseContextOnReset`].
-    ///
-    /// [`Robustness`]: crate::context::Robustness
-    /// [`NotRobust`]: crate::context::Robustness::NotRobust
-    /// [`RobustLoseContextOnReset`]: crate::context::Robustness::RobustLoseContextOnReset
+    /// The default is [`Robustness::NotRobust`], because this is what typically
+    /// expected when you create an OpenGL context.  However for safety you
+    /// should consider [`Robustness::RobustLoseContextOnReset`].
     pub fn with_robustness(mut self, robustness: Robustness) -> Self {
         self.attributes.robustness = robustness;
         self
@@ -161,10 +157,7 @@ impl ContextAttributesBuilder {
     /// The behaviour when changing the current context. See the docs of
     /// [`ReleaseBehaviour`].
     ///
-    /// The default is [`Flush`].
-    ///
-    /// [`ReleaseBehaviour`]: crate::context::ReleaseBehaviour
-    /// [`Flush`]: crate::context::ReleaseBehaviour::Flush
+    /// The default is [`ReleaseBehaviour::Flush`].
     pub fn with_release_behavior(mut self, release_behavior: ReleaseBehaviour) -> Self {
         self.attributes.release_behavior = release_behavior;
         self
@@ -177,8 +170,6 @@ impl ContextAttributesBuilder {
     /// # Api-specific
     ///
     /// **macOS:** - not supported, the latest is picked automatically.
-    ///
-    /// [`GlProfile`]: crate::context::GlProfile
     pub fn with_profile(mut self, profile: GlProfile) -> Self {
         self.attributes.profile = Some(profile);
         self
@@ -187,8 +178,6 @@ impl ContextAttributesBuilder {
     /// Set the desired OpenGL context api. See the docs of [`ContextApi`].
     ///
     /// By default the supported api will be picked.
-    ///
-    /// [`ContextApi`]: crate::context::ContextApi
     pub fn with_context_api(mut self, api: ContextApi) -> Self {
         self.attributes.api = Some(api);
         self
@@ -241,9 +230,7 @@ pub enum Robustness {
     ///
     /// Since this option is purely an optimization, no error will be returned
     /// if the backend doesn't support it. Instead it will automatically
-    /// fall back to [`NotRobust`].
-    ///
-    /// [`NotRobust`]: crate::context::Robustness::NotRobust
+    /// fall back to [`Robustness::NotRobust`].
     NoError,
 
     /// Everything is checked to avoid any crash. The driver will attempt to
@@ -466,7 +453,7 @@ impl Sealed for NotCurrentContext {}
 ///
 /// The context that could be current on the current thread can neither be
 /// [`Send`] nor [`Sync`]. In case you need to use it on a different thread
-/// [`make it not current`].
+/// [make it not current].
 /// ```compile_fail
 /// fn test_send<T: Send>() {}
 /// test_send::<glutin::context::PossiblyCurrentContext>();
@@ -476,7 +463,8 @@ impl Sealed for NotCurrentContext {}
 /// fn test_sync<T: Sync>() {}
 /// test_sync::<glutin::context::PossiblyCurrentContext>();
 /// ```
-/// [`make it not current`]: crate::context::PossiblyCurrentGlContext::make_not_current
+///
+/// [make it not current]: crate::context::PossiblyCurrentGlContext::make_not_current
 #[derive(Debug)]
 pub enum PossiblyCurrentContext {
     /// The EGL context.

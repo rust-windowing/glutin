@@ -3,18 +3,12 @@
 //! losing access to platform specific extensions.
 //!
 //! However Glutin doesn't force users into using the cross platform
-//! abstractions. When only a particular [`Api`] is desired, it can
+//! abstractions. When only a particular [`api`] is desired, it can
 //! be used directly.
 //!
 //! The initialization starts by loading and connecting to the platform's
 //! graphics Api when creating a [`display`]. This object is used to create all
 //! the OpenGL objects, such as [`config`], [`context`], and [`surface`].
-//!
-//! [`display`]: crate::display
-//! [`context`]: crate::context
-//! [`surface`]: crate::surface
-//! [`config`]: crate::config
-//! [`Api`]: crate::api
 
 #![deny(rust_2018_idioms)]
 #![deny(rustdoc::broken_intra_doc_links)]
