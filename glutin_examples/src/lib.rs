@@ -31,7 +31,7 @@ pub fn main() {
     // We create a window before the display to accomodate for WGL, since it
     // requires creating HDC for properly loading the WGL and it should be taken
     // from the window you'll be rendering into.
-    let window = WindowBuilder::new().with_transparent(true).build(&event_loop).unwrap();
+    let window = WindowBuilder::new().build(&event_loop).unwrap();
     let raw_window_handle = window.raw_window_handle();
 
     // Create the GL display. This will create display automatically for the
@@ -121,6 +121,7 @@ pub fn main() {
                             NonZeroU32::new(size.height).unwrap(),
                         );
                         renderer.resize(size.width as i32, size.height as i32);
+                        gl_window.window.request_redraw();
                     }
                 },
                 WindowEvent::CloseRequested => {
@@ -128,10 +129,8 @@ pub fn main() {
                 },
                 _ => (),
             },
-            Event::RedrawEventsCleared => {
+            Event::RedrawRequested(_) | Event::RedrawEventsCleared => {
                 renderer.draw();
-                gl_window.window.request_redraw();
-
                 gl_window.surface.swap_buffers(&gl_context).unwrap();
             },
             _ => (),
