@@ -1,4 +1,4 @@
-#![cfg(target_os = "windows")]
+#![cfg(windows)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::missing_safety_doc)]
 #![allow(clippy::manual_non_exhaustive)]

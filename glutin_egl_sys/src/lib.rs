@@ -1,5 +1,5 @@
 #![cfg(any(
-    target_os = "windows",
+    windows,
     target_os = "linux",
     target_os = "android",
     target_os = "dragonfly",
@@ -43,7 +43,7 @@ pub type EGLenum = raw::c_uint;
 pub type EGLNativeDisplayType = *const raw::c_void;
 pub type EGLNativePixmapType = *const raw::c_void; // FIXME: egl_native_pixmap_t instead
 
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 pub type EGLNativeWindowType = windows_sys::Win32::Foundation::HWND;
 #[cfg(target_os = "linux")]
 pub type EGLNativeWindowType = *const raw::c_void;
