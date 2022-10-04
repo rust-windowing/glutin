@@ -45,7 +45,7 @@ impl Display {
     /// `raw_display` must point to a valid system display. Using zero or
     /// `[std::ptr::null]` for the display will result in using
     /// `EGL_DEFAULT_DISPLAY`, which is not recommended or will
-    /// work on a platfrom with a concept of native display, like Wayland.
+    /// work on a platform with a concept of native display, like Wayland.
     pub unsafe fn from_raw(raw_display: RawDisplayHandle) -> Result<Self> {
         let egl = match EGL.as_ref() {
             Some(egl) => egl,
