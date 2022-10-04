@@ -10,14 +10,18 @@ use raw_window_handle::{
 };
 
 use winit::event::{Event, WindowEvent};
-use winit::event_loop::{ControlFlow, EventLoop};
+use winit::event_loop::EventLoop;
 #[cfg(glx_backend)]
 use winit::platform::unix;
+#[cfg(x11_platform)]
+use winit::platform::unix::WindowBuilderExtUnix;
 use winit::window::{Window, WindowBuilder};
 
 use glutin::config::{Config, ConfigSurfaceTypes, ConfigTemplate, ConfigTemplateBuilder};
 use glutin::context::{ContextApi, ContextAttributesBuilder};
 use glutin::display::{Display, DisplayApiPreference};
+#[cfg(x11_platform)]
+use glutin::platform::x11::X11GlConfigExt;
 use glutin::prelude::*;
 use glutin::surface::{
     Surface, SurfaceAttributes, SurfaceAttributesBuilder, SwapInterval, WindowSurface,
@@ -28,13 +32,10 @@ pub fn main() {
 
     let raw_display = event_loop.raw_display_handle();
 
-    let mut window = cfg!(any(wgl_backend, glx_backend)).then(|| {
+    let mut window = cfg!(wgl_backend).then(|| {
         // We create a window before the display to accommodate for WGL, since it
         // requires creating HDC for properly loading the WGL and it should be taken
         // from the window you'll be rendering into.
-
-        // On GLX the window should be available for config_template() + find_configs()
-        // to propagate its Xlib visual ID.
         WindowBuilder::new().with_transparent(true).build(&event_loop).unwrap()
     });
     let raw_window_handle = window.as_ref().map(|w| w.raw_window_handle());
@@ -58,7 +59,21 @@ pub fn main() {
             //
             // XXX however on macOS you can request only one config, so you should do
             // a search with the help of `find_configs` and adjusting your template.
-            if config.num_samples() > accum.num_samples() {
+
+            // Since we try to show off transparency try to pick the config that supports it
+            // on X11 over the ones without it. XXX Configs that support
+            // transparency on X11 tend to not have multisapmling, so be aware
+            // of that.
+
+            #[cfg(x11_platform)]
+            let transparency_check =
+                config.x11_visual().map(|v| v.supports_transparency()).unwrap_or(false)
+                    & !accum.x11_visual().map(|v| v.supports_transparency()).unwrap_or(false);
+
+            #[cfg(not(x11_platform))]
+            let transparency_check = false;
+
+            if transparency_check || config.num_samples() > accum.num_samples() {
                 config
             } else {
                 accum
@@ -90,7 +105,7 @@ pub fn main() {
     let mut renderer = None;
 
     event_loop.run(move |event, event_loop_window_target, control_flow| {
-        *control_flow = ControlFlow::Wait;
+        control_flow.set_wait();
         match event {
             Event::Resumed => {
                 // While this event is only relevant for Android, it is raised on all platforms
@@ -101,7 +116,26 @@ pub fn main() {
 
                 // Take a possibly early created window, or create a new one
                 let window = window.take().unwrap_or_else(|| {
-                    WindowBuilder::new().build(event_loop_window_target).unwrap()
+                    // On X11 opacity is controlled by the visual we pass to the window latter on,
+                    // other platforms decide on that by what you draw, so there's no need to pass
+                    // this information to the window.
+                    #[cfg(not(cgl_backend))]
+                    let window = WindowBuilder::new();
+
+                    // Request opacity for window on macOS explicitly.
+                    #[cfg(cgl_backend)]
+                    let window = WindowBuilder::new().with_transparent(true);
+
+                    // We must pass the visual into the X11 window upon creation, otherwise we
+                    // could have mismatch errors during context activation and swap buffers.
+                    #[cfg(x11_platform)]
+                    let window = if let Some(visual) = config.x11_visual() {
+                        window.with_x11_visual(visual.into_raw())
+                    } else {
+                        window
+                    };
+
+                    window.build(event_loop_window_target).unwrap()
                 });
 
                 // Create a wrapper for GL window and surface.
@@ -133,6 +167,7 @@ pub fn main() {
                 // This event is only raised on Android, where the backing NativeWindow for a GL
                 // Surface can appear and disappear at any moment.
                 println!("Android window removed");
+
                 // Destroy the GL Surface and un-current the GL Context before ndk-glue releases
                 // the window back to the system.
                 let (gl_context, _) = state.take().unwrap();
@@ -160,7 +195,7 @@ pub fn main() {
                     }
                 },
                 WindowEvent::CloseRequested => {
-                    *control_flow = ControlFlow::Exit;
+                    control_flow.set_exit();
                 },
                 _ => (),
             },
