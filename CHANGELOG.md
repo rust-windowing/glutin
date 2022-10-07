@@ -9,6 +9,7 @@
 - Fix `GlProfile::Core` requesting without explicit version.
 - Pick the latest available profile on macOS.
 - When using `ContextApi::Gles(None)` in `ContextAttributesBuilder` the latest known supported `major` ES version will be picked.
+- Fix `Eq` implementation for `Config` on `CGL`.
 
 # Version 0.30.0-beta.2 (2022-09-03)
 
