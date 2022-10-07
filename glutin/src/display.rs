@@ -1,6 +1,7 @@
 //! The OpenGL platform display selection and creation.
 #![allow(unreachable_patterns)]
 
+use std::collections::HashSet;
 use std::ffi::{self, CStr};
 use std::fmt;
 
@@ -121,6 +122,17 @@ pub trait GetGlDisplay: Sealed {
 
     /// Obtain the GL display used to create a particular GL object.
     fn display(&self) -> Self::Target;
+}
+
+/// Obtain the underlying api extensions.
+pub trait GetDisplayExtensions: Sealed {
+    /// Supported extensions by the display.
+    ///
+    /// # Api-specific
+    ///
+    /// **WGL:** - To have extensions loaded, `raw_window_handle` must be used
+    /// when creating display.
+    fn extensions(&self) -> &HashSet<&'static str>;
 }
 
 /// Get the raw handle to the [`Display`].

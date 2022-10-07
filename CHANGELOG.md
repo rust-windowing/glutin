@@ -2,14 +2,15 @@
 
 - `Config` doesn't force OpenGL `Api` by default.
 - `Display::create_context` now uses the most recent available `Api` from the `Config` when `ContextApi` is not specified in `ContextAttributes`.
-- `PossiblyCurrentGlContext::get_proc_address` method was moved to `GlDisplay::get_proc_address`.
-- `ConfigTemplateBuilder::with_sample_buffers` now called `ConfigTemplateBuilder::with_multisampling`.
-- `GlConfig::sample_buffers` now called `GlConfig::num_samples` and returns the amount of samples in multisample buffer.
+- **Breaking:** `PossiblyCurrentGlContext::get_proc_address` method was moved to `GlDisplay::get_proc_address`.
+- **Breaking:** `ConfigTemplateBuilder::with_sample_buffers` now called `ConfigTemplateBuilder::with_multisampling`.
+- **Breaking:** `GlConfig::sample_buffers` now called `GlConfig::num_samples` and returns the amount of samples in multisample buffer.
 - **Breaking:** Bump MSRV from `1.57` to `1.60`.
 - Fix `GlProfile::Core` requesting without explicit version.
 - Pick the latest available profile on macOS.
 - When using `ContextApi::Gles(None)` in `ContextAttributesBuilder` the latest known supported `major` ES version will be picked.
 - Fix `Eq` implementation for `Config` on `CGL`.
+- Add `GetDisplayExtensions` trait to obtain api display extensions implemented on  `EGL`, `WGL`, and `GLX`.
 
 # Version 0.30.0-beta.2 (2022-09-03)
 

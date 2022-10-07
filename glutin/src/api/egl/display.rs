@@ -15,7 +15,7 @@ use raw_window_handle::RawDisplayHandle;
 
 use crate::config::ConfigTemplate;
 use crate::context::Version;
-use crate::display::{AsRawDisplay, RawDisplay};
+use crate::display::{AsRawDisplay, GetDisplayExtensions, RawDisplay};
 use crate::error::{ErrorKind, Result};
 use crate::prelude::*;
 use crate::private::Sealed;
@@ -274,6 +274,12 @@ impl GlDisplay for Display {
 
     fn get_proc_address(&self, addr: &CStr) -> *const ffi::c_void {
         unsafe { self.inner.egl.GetProcAddress(addr.as_ptr()) as *const _ }
+    }
+}
+
+impl GetDisplayExtensions for Display {
+    fn extensions(&self) -> &HashSet<&'static str> {
+        &self.inner.client_extensions
     }
 }
 
