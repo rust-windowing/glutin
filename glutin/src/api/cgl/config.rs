@@ -8,7 +8,7 @@ use cocoa::appkit::{
     NSOpenGLPixelFormat, NSOpenGLPixelFormatAttribute, NSOpenGLProfileVersion3_2Core,
     NSOpenGLProfileVersion4_1Core, NSOpenGLProfileVersionLegacy,
 };
-use cocoa::base::{id, nil, BOOL};
+use cocoa::base::{id, nil, BOOL, NO};
 
 use crate::config::{
     Api, AsRawConfig, ColorBufferType, ConfigSurfaceTypes, ConfigTemplate, GlConfig, RawConfig,
@@ -235,7 +235,7 @@ impl PartialEq for ConfigInner {
     fn eq(&self, other: &Self) -> bool {
         unsafe {
             let is_equal: BOOL = msg_send![*self.raw, isEqual: *other.raw];
-            is_equal != 0
+            is_equal != NO
         }
     }
 }
