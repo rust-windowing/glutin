@@ -312,6 +312,63 @@ impl fmt::Debug for DisplayInner {
     }
 }
 
+impl Drop for DisplayInner {
+    fn drop(&mut self) {
+        // We cannot call safely call `eglTerminate`.
+        //
+        // This may sound confusing, but this is a result of how EGL works:
+        //
+        // From the documentation of `eglGetDisplay`:
+        // > Multiple calls made to eglGetDisplay with the same display_id will
+        // > return the same EGLDisplay handle.
+        //
+        // And from the documentation of `eglGetPlatformDisplay`:
+        // > Multiple calls made to eglGetPlatformDisplay with the same
+        // > parameters will return the same
+        // > EGLDisplay handle.
+        //
+        // Furthermore the following is done when a display is initialized:
+        // > Initializing an already initialized EGL display connection has no
+        // > effect besides returning the
+        // > version numbers.
+        //
+        // Terminating a display connection and then creating a new display
+        // connection will reference the same display. This effectively
+        // makes an EGLDisplay a singleton for the specified display_id or
+        // platform and native display.
+        //
+        // Because EGLDisplay is a singleton, this makes the following sequence
+        // problematic:
+        //
+        // 1. A display is created for a platform
+        // 2. A second display is created for the same platform
+        // 3. The first display is dropped, resulting in eglTerminate being
+        // called.
+        // 4. A context created from the second display is made
+        // current, but it has been terminated and returns an EGL_BAD_DISPLAY
+        // error.
+        //
+        // But wait? This causes a memory leak!
+        //
+        // Yes it does indeed result in a memory leak since we do not terminate
+        // displays on drop. For most applications there is only ever a
+        // single EGLDisplay for the lifetime of the application. The cost
+        // of not dropping the display is negligible because the display will
+        // probably be destroyed on app termination and we can let the
+        // operating system deal with tearing down EGL instead.
+        //
+        // # Possible future work:
+        //
+        // For platform displays, we could track the use of individual raw
+        // window handles and display attributes (recall the "with the
+        // same parameters" line) and use that to determine if it is safe to
+        // terminate the display, but that increases maintenance burden and is
+        // possibly flaky to implement.
+
+        // unsafe { self.egl.Terminate(self.raw) };
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct NativeDisplay(RawDisplayHandle);
 
