@@ -153,7 +153,7 @@ impl SurfaceAttributesBuilder<PbufferSurface> {
     }
 
     /// The same as in
-    /// [`SurfaceAttributesBuilder::<WindowSurface>::with_single_buffer``].
+    /// [`SurfaceAttributesBuilder::<WindowSurface>::with_single_buffer`].
     pub fn with_single_buffer(mut self, single_buffer: bool) -> Self {
         self.attributes.single_buffer = single_buffer;
         self

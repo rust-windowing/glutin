@@ -13,7 +13,7 @@ use windows_sys::Win32::Graphics::Gdi::HDC;
 use windows_sys::Win32::System::LibraryLoader as dll_loader;
 
 use crate::config::ConfigTemplate;
-use crate::display::{AsRawDisplay, RawDisplay};
+use crate::display::{AsRawDisplay, GetDisplayExtensions, RawDisplay};
 use crate::error::{ErrorKind, Result};
 use crate::prelude::*;
 use crate::private::Sealed;
@@ -130,6 +130,12 @@ impl GlDisplay for Display {
                     .map_or(std::ptr::null(), |fn_ptr| fn_ptr as *const _)
             }
         }
+    }
+}
+
+impl GetDisplayExtensions for Display {
+    fn extensions(&self) -> &HashSet<&'static str> {
+        &self.inner.client_extensions
     }
 }
 
