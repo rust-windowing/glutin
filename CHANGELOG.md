@@ -12,6 +12,7 @@
 - Fix `Eq` implementation for `Config` on `CGL`.
 - Add `GetDisplayExtensions` trait to obtain api display extensions implemented on  `EGL`, `WGL`, and `GLX`.
 - Fallback to `Surface::swap_buffers` when `Surface::swap_buffers_with_damage` is not supported on `EGL`.
+- Add missing `GetGlConfig` implementation for `NotCurrentContext` and `PossiblyCurrentContext`.
 
 # Version 0.30.0-beta.2 (2022-09-03)
 
