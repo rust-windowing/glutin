@@ -308,7 +308,7 @@ impl GlConfig for Config {
     #[cfg(any(wayland_platform, x11_platform))]
     fn supports_transparency(&self) -> Option<bool> {
         use raw_window_handle::RawDisplayHandle;
-        match *self.inner.display.inner._native_display {
+        match *self.inner.display.inner._native_display? {
             #[cfg(x11_platform)]
             RawDisplayHandle::Xlib(_) | RawDisplayHandle::Xcb(_) => {
                 self.x11_visual().map(|visual| visual.supports_transparency())
@@ -356,7 +356,7 @@ impl AsRawConfig for Config {
 #[cfg(x11_platform)]
 impl X11GlConfigExt for Config {
     fn x11_visual(&self) -> Option<X11VisualInfo> {
-        match *self.inner.display.inner._native_display {
+        match *self.inner.display.inner._native_display? {
             raw_window_handle::RawDisplayHandle::Xlib(display_handle) => unsafe {
                 let xid = self.native_visual();
                 X11VisualInfo::from_xid(display_handle.display as *mut _, xid as _)

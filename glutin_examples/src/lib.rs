@@ -4,6 +4,7 @@
 
 use std::ffi::{CStr, CString};
 use std::num::NonZeroU32;
+use std::ops::Deref;
 
 use raw_window_handle::{
     HasRawDisplayHandle, HasRawWindowHandle, RawDisplayHandle, RawWindowHandle,
@@ -294,7 +295,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(gl_display: &Display) -> Self {
+    pub fn new<D: GlDisplay>(gl_display: &D) -> Self {
         unsafe {
             let gl = gl::Gl::load_with(|symbol| {
                 let symbol = CString::new(symbol).unwrap();
@@ -383,6 +384,14 @@ impl Renderer {
         unsafe {
             self.gl.Viewport(0, 0, width, height);
         }
+    }
+}
+
+impl Deref for Renderer {
+    type Target = gl::Gl;
+
+    fn deref(&self) -> &Self::Target {
+        &self.gl
     }
 }
 
