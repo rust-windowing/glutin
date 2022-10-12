@@ -5,6 +5,7 @@ use std::ffi::{self};
 
 use raw_window_handle::RawWindowHandle;
 
+use crate::config::{Config, GetGlConfig};
 use crate::display::{Display, GetGlDisplay};
 use crate::error::Result;
 use crate::private::{gl_api_dispatch, Sealed};
@@ -433,6 +434,14 @@ impl<T: SurfaceTypeTrait> NotCurrentGlContextSurfaceAccessor<T> for NotCurrentCo
     }
 }
 
+impl GetGlConfig for NotCurrentContext {
+    type Target = Config;
+
+    fn config(&self) -> Self::Target {
+        gl_api_dispatch!(self; Self(context) => context.config(); as Config)
+    }
+}
+
 impl GetGlDisplay for NotCurrentContext {
     type Target = Display;
 
@@ -539,6 +548,14 @@ impl<T: SurfaceTypeTrait> PossiblyCurrentContextGlSurfaceAccessor<T> for Possibl
             },
             _ => unreachable!(),
         }
+    }
+}
+
+impl GetGlConfig for PossiblyCurrentContext {
+    type Target = Config;
+
+    fn config(&self) -> Self::Target {
+        gl_api_dispatch!(self; Self(context) => context.config(); as Config)
     }
 }
 
