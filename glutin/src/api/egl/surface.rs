@@ -17,7 +17,7 @@ use crate::error::{ErrorKind, Result};
 use crate::prelude::*;
 use crate::private::Sealed;
 use crate::surface::{
-    AsRawSurface, NativePixmap, PbufferSurface, PixmapSurface, RawSurface, SurfaceAttributes,
+    AsRawSurface, NativePixmap, PbufferSurface, PixmapSurface, RawSurface, Rect, SurfaceAttributes,
     SurfaceTypeTrait, SwapInterval, WindowSurface,
 };
 
@@ -238,7 +238,7 @@ pub struct Surface<T: SurfaceTypeTrait> {
 
 impl<T: SurfaceTypeTrait> Surface<T> {
     /// Swaps the underlying back buffers when the surface is not single
-    /// buffered and pass the [`DamageRect`] information to the system
+    /// buffered and pass the [`Rect`] information to the system
     /// compositor. Providing empty slice will damage the entire surface.
     ///
     /// When the underlying extensions are not supported the function acts like
@@ -249,7 +249,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     pub fn swap_buffers_with_damage(
         &self,
         context: &PossiblyCurrentContext,
-        rects: &[DamageRect],
+        rects: &[Rect],
     ) -> Result<()> {
         context.inner.bind_api();
 
@@ -531,27 +531,5 @@ impl NativePixmap {
             Self::XcbPixmap(xid) => xid as *const _ as *mut _,
             Self::WindowsPixmap(hbitmap) => hbitmap as *const _ as *mut _,
         }
-    }
-}
-
-/// The damage rect that is being used in [`Surface::swap_buffers_with_damage`].
-/// The origin is in the bottom left of the surface.
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Default)]
-pub struct DamageRect {
-    /// `X` of the origin.
-    pub x: i32,
-    /// `Y` of the origin.
-    pub y: i32,
-    /// Rect width.
-    pub width: i32,
-    /// Rect height.
-    pub height: i32,
-}
-
-impl DamageRect {
-    /// Helper to simplify damage rectangle creation.
-    pub fn new(x: i32, y: i32, width: i32, height: i32) -> Self {
-        Self { x, y, width, height }
     }
 }
