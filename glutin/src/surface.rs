@@ -91,7 +91,7 @@ pub trait AsRawSurface {
 }
 
 /// Builder to get the required set of attributes initialized before hand.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct SurfaceAttributesBuilder<T: SurfaceTypeTrait + Default> {
     attributes: SurfaceAttributes<T>,
 }
