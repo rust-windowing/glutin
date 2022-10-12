@@ -72,7 +72,7 @@ pub trait AsRawConfig {
 }
 
 /// Builder for the [`ConfigTemplate`].
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct ConfigTemplateBuilder {
     template: ConfigTemplate,
 }

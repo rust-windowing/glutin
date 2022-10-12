@@ -108,7 +108,7 @@ pub trait AsRawContext {
 }
 
 /// The builder to help customizing context
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct ContextAttributesBuilder {
     attributes: ContextAttributes,
 }
@@ -199,7 +199,7 @@ impl ContextAttributesBuilder {
 }
 
 /// The attributes that are used to create a graphics context.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct ContextAttributes {
     pub(crate) release_behavior: ReleaseBehaviour,
 
