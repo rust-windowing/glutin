@@ -241,6 +241,9 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     /// buffered and pass the [`DamageRect`] information to the system
     /// compositor. Providing empty slice will damage the entire surface.
     ///
+    /// When the underlying extensions are not supported the function acts like
+    /// [`Self::swap_buffers`].
+    ///
     /// This Api doesn't do any partial rendering, it just provides hints for
     /// the system compositor.
     pub fn swap_buffers_with_damage(
@@ -248,20 +251,37 @@ impl<T: SurfaceTypeTrait> Surface<T> {
         context: &PossiblyCurrentContext,
         rects: &[DamageRect],
     ) -> Result<()> {
-        unsafe {
-            context.inner.bind_api();
+        context.inner.bind_api();
 
-            if self.display.inner.egl.SwapBuffersWithDamageKHR(
-                *self.display.inner.raw,
-                self.raw,
-                rects.as_ptr() as *mut _,
-                (rects.len() * 4) as _,
-            ) == egl::FALSE
+        let res = unsafe {
+            if self.display.inner.client_extensions.contains("EGL_KHR_swap_buffers_with_damage") {
+                self.display.inner.egl.SwapBuffersWithDamageKHR(
+                    *self.display.inner.raw,
+                    self.raw,
+                    rects.as_ptr() as *mut _,
+                    (rects.len() * 4) as _,
+                )
+            } else if self
+                .display
+                .inner
+                .client_extensions
+                .contains("EGL_EXT_swap_buffers_with_damage")
             {
-                super::check_error()
+                self.display.inner.egl.SwapBuffersWithDamageEXT(
+                    *self.display.inner.raw,
+                    self.raw,
+                    rects.as_ptr() as *mut _,
+                    (rects.len() * 4) as _,
+                )
             } else {
-                Ok(())
+                self.display.inner.egl.SwapBuffers(*self.display.inner.raw, self.raw)
             }
+        };
+
+        if res == egl::FALSE {
+            super::check_error()
+        } else {
+            Ok(())
         }
     }
 
