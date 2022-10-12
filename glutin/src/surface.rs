@@ -499,3 +499,26 @@ pub enum RawSurface {
     #[cfg(cgl_backend)]
     Cgl(*const std::ffi::c_void),
 }
+
+/// The rect that is being used in various surface operations.
+///
+/// The origin is in the bottom left of the surface.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Rect {
+    /// `X` of the origin.
+    pub x: i32,
+    /// `Y` of the origin.
+    pub y: i32,
+    /// Rect width.
+    pub width: i32,
+    /// Rect height.
+    pub height: i32,
+}
+
+impl Rect {
+    /// Helper to simplify rectangle creation.
+    pub fn new(x: i32, y: i32, width: i32, height: i32) -> Self {
+        Self { x, y, width, height }
+    }
+}

@@ -14,6 +14,7 @@
 - Fallback to `Surface::swap_buffers` when `Surface::swap_buffers_with_damage` is not supported on `EGL`.
 - Add missing `GetGlConfig` implementation for `NotCurrentContext` and `PossiblyCurrentContext`.
 - Implement `Clone` for builders.
+- **Breaking:** move `DamageRect` into `surface::Rect`.
 
 # Version 0.30.0-beta.2 (2022-09-03)
 
