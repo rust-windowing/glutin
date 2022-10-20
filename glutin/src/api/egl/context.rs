@@ -173,7 +173,7 @@ impl NotCurrentContext {
 impl NotCurrentGlContext for NotCurrentContext {
     type PossiblyCurrentContext = PossiblyCurrentContext;
 
-    fn treat_as_current(self) -> Self::PossiblyCurrentContext {
+    fn treat_as_possibly_current(self) -> Self::PossiblyCurrentContext {
         PossiblyCurrentContext { inner: self.inner, _nosendsync: PhantomData }
     }
 }
