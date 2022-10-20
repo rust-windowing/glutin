@@ -275,6 +275,10 @@ impl GlDisplay for Display {
     fn get_proc_address(&self, addr: &CStr) -> *const ffi::c_void {
         unsafe { self.inner.egl.GetProcAddress(addr.as_ptr()) as *const _ }
     }
+
+    fn version_string(&self) -> String {
+        format!("EGL {}.{}", self.inner.version.major, self.inner.version.minor)
+    }
 }
 
 impl GetDisplayExtensions for Display {

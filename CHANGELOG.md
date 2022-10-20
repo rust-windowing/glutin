@@ -15,6 +15,7 @@
 - Add missing `GetGlConfig` implementation for `NotCurrentContext` and `PossiblyCurrentContext`.
 - Implement `Clone` for builders.
 - **Breaking:** move `DamageRect` into `surface::Rect`.
+- Added `Display::version_string` to help with logging the display information.
 
 # Version 0.30.0-beta.2 (2022-09-03)
 

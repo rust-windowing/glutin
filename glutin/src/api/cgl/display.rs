@@ -94,6 +94,10 @@ impl GlDisplay for Display {
             CFBundleGetFunctionPointerForName(framework, symbol_name.as_concrete_TypeRef()).cast()
         }
     }
+
+    fn version_string(&self) -> String {
+        String::from("Apple CGL")
+    }
 }
 
 impl AsRawDisplay for Display {
