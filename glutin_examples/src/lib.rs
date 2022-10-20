@@ -43,6 +43,7 @@ pub fn main() {
     // Create the GL display. This will create display automatically for the
     // underlying GL platform. See support module on how it's being done.
     let gl_display = create_display(raw_display, raw_window_handle);
+    println!("Running on: {}", gl_display.version_string());
 
     // Create the config we'll be used for window. We'll use the native window
     // raw-window-handle for it to get the right visual and use proper hdc. Note

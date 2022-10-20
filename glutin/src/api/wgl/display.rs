@@ -131,6 +131,10 @@ impl GlDisplay for Display {
             }
         }
     }
+
+    fn version_string(&self) -> String {
+        String::from("WGL")
+    }
 }
 
 impl GetDisplayExtensions for Display {

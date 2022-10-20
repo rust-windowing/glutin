@@ -157,6 +157,10 @@ impl GlDisplay for Display {
     fn get_proc_address(&self, addr: &CStr) -> *const ffi::c_void {
         unsafe { self.inner.glx.GetProcAddress(addr.as_ptr() as *const _) as *const _ }
     }
+
+    fn version_string(&self) -> String {
+        format!("GLX {}.{}", self.inner.version.major, self.inner.version.minor)
+    }
 }
 
 impl GetDisplayExtensions for Display {

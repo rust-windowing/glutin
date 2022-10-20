@@ -113,6 +113,12 @@ pub trait GlDisplay: Sealed {
     /// the calling thread, otherwise only limited set of functions will be
     /// loaded.
     fn get_proc_address(&self, addr: &CStr) -> *const ffi::c_void;
+
+    /// Helper to obtain the information about the underlying display.
+    ///
+    /// This function is intended to be used for logging purposes to help with
+    /// trouble shooting issues.
+    fn version_string(&self) -> String;
 }
 
 /// Get the [`Display`].
@@ -375,6 +381,10 @@ impl GlDisplay for Display {
 
     fn get_proc_address(&self, addr: &CStr) -> *const ffi::c_void {
         gl_api_dispatch!(self; Self(display) => display.get_proc_address(addr))
+    }
+
+    fn version_string(&self) -> String {
+        gl_api_dispatch!(self; Self(display) => display.version_string())
     }
 }
 
