@@ -10,7 +10,7 @@ use windows_sys::Win32::Foundation::HWND;
 use windows_sys::Win32::Graphics::{Gdi as gdi, OpenGL as gl};
 
 use crate::config::GetGlConfig;
-use crate::display::GetGlDisplay;
+use crate::display::{DisplayFeatures, GetGlDisplay};
 use crate::error::{ErrorKind, Result};
 use crate::prelude::*;
 use crate::private::Sealed;
@@ -116,9 +116,9 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
         };
 
         let res = match self.display.inner.wgl_extra {
-            Some(extra)
-                if self.display.inner.client_extensions.contains("WGL_EXT_swap_control") =>
-            unsafe { extra.SwapIntervalEXT(interval as _) },
+            Some(extra) if self.display.inner.features.contains(DisplayFeatures::SWAP_CONTROL) => unsafe {
+                extra.SwapIntervalEXT(interval as _)
+            },
             _ => {
                 return Err(
                     ErrorKind::NotSupported("swap contol extrensions are not supported").into()

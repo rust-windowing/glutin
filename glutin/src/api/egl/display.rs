@@ -15,7 +15,7 @@ use raw_window_handle::RawDisplayHandle;
 
 use crate::config::ConfigTemplate;
 use crate::context::Version;
-use crate::display::{AsRawDisplay, GetDisplayExtensions, RawDisplay};
+use crate::display::{AsRawDisplay, DisplayFeatures, GetDisplayExtensions, RawDisplay};
 use crate::error::{ErrorKind, Result};
 use crate::prelude::*;
 use crate::private::Sealed;
@@ -83,12 +83,14 @@ impl Display {
 
         // Load extensions.
         let client_extensions = get_extensions(egl, display);
+        let features = Self::extract_display_features(&client_extensions, version);
 
         let inner = Arc::new(DisplayInner {
             egl,
             raw: EglDisplay(display),
             _native_display: NativeDisplay(raw_display),
             version,
+            features,
             client_extensions,
         });
         Ok(Self { inner })
@@ -217,6 +219,38 @@ impl Display {
         Self::check_display_error(display)
     }
 
+    fn extract_display_features(
+        extensions: &HashSet<&'static str>,
+        version: Version,
+    ) -> DisplayFeatures {
+        // Extract features.
+        let mut supported_features = DisplayFeatures::CREATE_ES_CONTEXT
+            | DisplayFeatures::MULTISAMPLING_PIXEL_FORMATS
+            | DisplayFeatures::SWAP_CONTROL;
+
+        supported_features.set(
+            DisplayFeatures::FLOAT_PIXEL_FORMAT,
+            extensions.contains("EGL_EXT_pixel_format_float"),
+        );
+
+        supported_features
+            .set(DisplayFeatures::SRGB_FRAMEBUFFERS, extensions.contains("EGL_KHR_gl_colorspace"));
+
+        let is_one_five = version >= Version::new(1, 5);
+
+        supported_features.set(
+            DisplayFeatures::CONTEXT_ROBUSTNESS,
+            is_one_five || extensions.contains("EGL_EXT_create_context_robustness"),
+        );
+
+        supported_features.set(
+            DisplayFeatures::CONTEXT_NO_ERROR,
+            extensions.contains("EGL_KHR_create_context_no_error"),
+        );
+
+        supported_features
+    }
+
     fn check_display_error(display: EGLDisplay) -> Result<EGLDisplay> {
         if display == egl::NO_DISPLAY {
             Err(super::check_error().err().unwrap())
@@ -279,6 +313,10 @@ impl GlDisplay for Display {
     fn version_string(&self) -> String {
         format!("EGL {}.{}", self.inner.version.major, self.inner.version.minor)
     }
+
+    fn supported_features(&self) -> DisplayFeatures {
+        self.inner.features
+    }
 }
 
 impl GetDisplayExtensions for Display {
@@ -308,6 +346,9 @@ pub(crate) struct DisplayInner {
     /// Client EGL extensions.
     pub(crate) client_extensions: HashSet<&'static str>,
 
+    /// The features supported by the display.
+    pub(crate) features: DisplayFeatures,
+
     /// The raw display used to create EGL display.
     pub(crate) _native_display: NativeDisplay,
 }
@@ -317,6 +358,7 @@ impl fmt::Debug for DisplayInner {
         f.debug_struct("Display")
             .field("raw", &self.raw)
             .field("version", &self.version)
+            .field("features", &self.features)
             .field("extensions", &self.client_extensions)
             .finish()
     }

@@ -1,7 +1,7 @@
 //! OpenGL context creation and initialization.
 
 #![allow(unreachable_patterns)]
-use std::ffi::{self};
+use std::ffi;
 
 use raw_window_handle::RawWindowHandle;
 
@@ -155,11 +155,11 @@ impl ContextAttributesBuilder {
         self
     }
 
-    /// The behaviour when changing the current context. See the docs of
-    /// [`ReleaseBehaviour`].
+    /// The behavior when changing the current context. See the docs of
+    /// [`ReleaseBehavior`].
     ///
-    /// The default is [`ReleaseBehaviour::Flush`].
-    pub fn with_release_behavior(mut self, release_behavior: ReleaseBehaviour) -> Self {
+    /// The default is [`ReleaseBehavior::Flush`].
+    pub fn with_release_behavior(mut self, release_behavior: ReleaseBehavior) -> Self {
         self.attributes.release_behavior = release_behavior;
         self
     }
@@ -201,7 +201,7 @@ impl ContextAttributesBuilder {
 /// The attributes that are used to create a graphics context.
 #[derive(Default, Debug, Clone)]
 pub struct ContextAttributes {
-    pub(crate) release_behavior: ReleaseBehaviour,
+    pub(crate) release_behavior: ReleaseBehavior,
 
     pub(crate) debug: bool,
 
@@ -318,7 +318,7 @@ impl Version {
 
 /// The behavior of the driver when you change the current context.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum ReleaseBehaviour {
+pub enum ReleaseBehavior {
     /// Doesn't do anything. Most notably doesn't flush. Not supported by all
     /// drivers.
     ///
@@ -328,14 +328,14 @@ pub enum ReleaseBehaviour {
     None,
 
     /// Flushes the context that was previously current as if `glFlush` was
-    /// called. This is the default behaviour.
+    /// called. This is the default behavior.
     Flush,
 }
 
-impl Default for ReleaseBehaviour {
+impl Default for ReleaseBehavior {
     #[inline]
     fn default() -> Self {
-        ReleaseBehaviour::Flush
+        ReleaseBehavior::Flush
     }
 }
 

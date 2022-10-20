@@ -13,7 +13,7 @@ use raw_window_handle::RawDisplayHandle;
 
 use crate::config::ConfigTemplate;
 use crate::context::Version;
-use crate::display::{AsRawDisplay, GetDisplayExtensions, RawDisplay};
+use crate::display::{AsRawDisplay, DisplayFeatures, GetDisplayExtensions, RawDisplay};
 use crate::error::{ErrorKind, Result};
 use crate::prelude::*;
 use crate::private::Sealed;
@@ -94,6 +94,7 @@ impl Display {
         error_hook_registrar(Box::new(super::glx_error_hook));
 
         let client_extensions = get_extensions(glx, display);
+        let features = Self::extract_display_features(&client_extensions, version);
 
         let inner = Arc::new(DisplayInner {
             raw: display,
@@ -101,10 +102,64 @@ impl Display {
             glx_extra: GLX_EXTRA.as_ref(),
             version,
             screen,
+            features,
             client_extensions,
         });
 
         Ok(Self { inner })
+    }
+
+    fn extract_display_features(
+        extensions: &HashSet<&'static str>,
+        version: Version,
+    ) -> DisplayFeatures {
+        let mut features = DisplayFeatures::empty();
+
+        features.set(
+            DisplayFeatures::MULTISAMPLING_PIXEL_FORMATS,
+            version >= Version::new(1, 4) || extensions.contains("GLX_ARB_multisample"),
+        );
+
+        features.set(
+            DisplayFeatures::FLOAT_PIXEL_FORMAT,
+            extensions.contains("GLX_ARB_fbconfig_float"),
+        );
+
+        features.set(
+            DisplayFeatures::SRGB_FRAMEBUFFERS,
+            extensions.contains("GLX_ARB_framebuffer_sRGB")
+                || extensions.contains("GLX_EXT_framebuffer_sRGB"),
+        );
+
+        features.set(
+            DisplayFeatures::CREATE_ES_CONTEXT,
+            extensions.contains("GLX_EXT_create_context_es2_profile")
+                || extensions.contains("GLX_EXT_create_context_es_profile"),
+        );
+
+        features.set(
+            DisplayFeatures::SWAP_CONTROL,
+            extensions.contains("GLX_EXT_swap_control")
+                || extensions.contains("GLX_SGI_swap_control")
+                || extensions.contains("GLX_MESA_swap_control"),
+        );
+
+        features.set(
+            DisplayFeatures::CONTEXT_ROBUSTNESS,
+            extensions.contains("GLX_ARB_create_context_robustness"),
+        );
+
+        features.set(
+            DisplayFeatures::CONTEXT_RELEASE_BEHAVIOR,
+            extensions.contains("GLX_ARB_context_flush_control"),
+        );
+
+        features.set(
+            DisplayFeatures::CONTEXT_NO_ERROR,
+            extensions.contains("GLX_ARB_create_context_no_error"),
+        );
+
+        features
     }
 }
 
@@ -161,6 +216,10 @@ impl GlDisplay for Display {
     fn version_string(&self) -> String {
         format!("GLX {}.{}", self.inner.version.major, self.inner.version.minor)
     }
+
+    fn supported_features(&self) -> DisplayFeatures {
+        self.inner.features
+    }
 }
 
 impl GetDisplayExtensions for Display {
@@ -183,6 +242,7 @@ pub(crate) struct DisplayInner {
     pub(crate) raw: GlxDisplay,
     pub(crate) screen: i32,
     pub(crate) version: Version,
+    pub(crate) features: DisplayFeatures,
     /// Client GLX extensions.
     pub(crate) client_extensions: HashSet<&'static str>,
 }
@@ -193,6 +253,7 @@ impl fmt::Debug for DisplayInner {
             .field("raw", &self.raw)
             .field("version", &self.version)
             .field("screen", &self.screen)
+            .field("features", &self.features)
             .field("extensions", &self.client_extensions)
             .finish()
     }

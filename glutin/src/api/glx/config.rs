@@ -12,15 +12,12 @@ use raw_window_handle::RawWindowHandle;
 use crate::config::{
     Api, AsRawConfig, ColorBufferType, ConfigSurfaceTypes, ConfigTemplate, GlConfig, RawConfig,
 };
-use crate::context::Version;
-use crate::display::GetGlDisplay;
+use crate::display::{DisplayFeatures, GetGlDisplay};
 use crate::error::{ErrorKind, Result};
 use crate::platform::x11::{X11GlConfigExt, X11VisualInfo, XLIB};
 use crate::private::Sealed;
 
 use super::display::Display;
-
-const FLOAT_PIXEL_EXT: &str = "GLX_ARB_fbconfig_float";
 
 impl Display {
     pub(crate) unsafe fn find_configs(
@@ -62,7 +59,9 @@ impl Display {
         // Render type.
         config_attributes.push(glx::RENDER_TYPE as c_int);
 
-        if template.float_pixels && self.inner.client_extensions.contains(FLOAT_PIXEL_EXT) {
+        if template.float_pixels
+            && self.inner.features.contains(DisplayFeatures::FLOAT_PIXEL_FORMAT)
+        {
             config_attributes.push(glx_extra::RGBA_FLOAT_BIT_ARB as c_int);
         } else if template.float_pixels {
             return Err(ErrorKind::NotSupported("float pixels are not supported").into());
@@ -136,9 +135,7 @@ impl Display {
 
         // Add multisampling.
         if let Some(num_samples) = template.num_samples {
-            if self.inner.version >= Version::new(1, 4)
-                || self.inner.client_extensions.contains("GLX_ARB_multisample")
-            {
+            if self.inner.features.contains(DisplayFeatures::MULTISAMPLING_PIXEL_FORMATS) {
                 config_attributes.push(glx::SAMPLE_BUFFERS as c_int);
                 config_attributes.push(1);
                 config_attributes.push(glx::SAMPLES as c_int);
@@ -235,7 +232,7 @@ impl GlConfig for Config {
     }
 
     fn float_pixels(&self) -> bool {
-        if self.inner.display.inner.client_extensions.contains(FLOAT_PIXEL_EXT) {
+        if self.inner.display.inner.features.contains(DisplayFeatures::FLOAT_PIXEL_FORMAT) {
             let render_type =
                 unsafe { self.raw_attribute(glx::RENDER_TYPE as c_int) as glx::types::GLenum };
             render_type == glx_extra::RGBA_FLOAT_BIT_ARB
@@ -289,14 +286,7 @@ impl GlConfig for Config {
 
     fn api(&self) -> Api {
         let mut api = Api::OPENGL;
-        if self.inner.display.inner.client_extensions.contains("GLX_EXT_create_context_es2_profile")
-            || self
-                .inner
-                .display
-                .inner
-                .client_extensions
-                .contains("GLX_EXT_create_context_es_profile")
-        {
+        if self.inner.display.inner.features.contains(DisplayFeatures::CREATE_ES_CONTEXT) {
             api |= Api::GLES1 | Api::GLES2;
         }
 
