@@ -36,7 +36,7 @@ pub trait NotCurrentGlContext: Sealed {
     /// Treat the not current context as possibly current. The operation is safe
     /// because the possibly current context is more restricted and not
     /// guaranteed to be current.
-    fn treat_as_current(self) -> Self::PossiblyCurrentContext;
+    fn treat_as_possibly_current(self) -> Self::PossiblyCurrentContext;
 }
 
 /// A trait that splits the methods accessing [`crate::surface::Surface`] on not
@@ -376,8 +376,8 @@ pub enum NotCurrentContext {
 impl NotCurrentGlContext for NotCurrentContext {
     type PossiblyCurrentContext = PossiblyCurrentContext;
 
-    fn treat_as_current(self) -> Self::PossiblyCurrentContext {
-        gl_api_dispatch!(self; Self(context) => context.treat_as_current(); as PossiblyCurrentContext)
+    fn treat_as_possibly_current(self) -> Self::PossiblyCurrentContext {
+        gl_api_dispatch!(self; Self(context) => context.treat_as_possibly_current(); as PossiblyCurrentContext)
     }
 }
 
