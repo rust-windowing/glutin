@@ -21,6 +21,7 @@
 - Added `GlDisplay::supported_features` to allow checking for extensions support beforehand.
 - **Breaking:** renamed `ReleaseBehaviour` to `ReleaseBehavior`.
 - Fix GLX not working with nvidia binary drivers.
+- Fix crash in `glx::surface::Surface::set_swap_interval`.
 
 # Version 0.30.0-beta.2 (2022-09-03)
 
