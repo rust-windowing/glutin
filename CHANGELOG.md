@@ -22,6 +22,7 @@
 - **Breaking:** renamed `ReleaseBehaviour` to `ReleaseBehavior`.
 - Fix GLX not working with nvidia binary drivers.
 - Fix crash in `glx::surface::Surface::set_swap_interval`.
+- Enable `doc_auto_cfg` when generating documentation for docs.rs
 
 # Version 0.30.0-beta.2 (2022-09-03)
 

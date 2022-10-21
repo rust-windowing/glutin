@@ -11,6 +11,9 @@ documentation = "https://docs.rs/glutin"
 rust-version = "1.60.0"
 edition = "2021"
 
+[package.metadata.docs.rs]
+rustdoc-args = ["--cfg", "docsrs"]
+
 [features]
 default = ["egl", "glx", "x11", "wayland", "wgl"]
 egl = ["glutin_egl_sys", "libloading"]

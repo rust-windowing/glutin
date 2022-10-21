@@ -17,6 +17,8 @@
 #![deny(clippy::all)]
 #![deny(missing_debug_implementations)]
 #![deny(missing_docs)]
+// Doc feature labels can be tested locally by running RUSTDOCFLAGS="--cfg=docsrs" cargo +nightly doc
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![cfg_attr(feature = "cargo-clippy", deny(warnings))]
 
 #[cfg(all(not(egl_backend), not(glx_backend), not(wgl_backend), not(cgl_backend)))]
