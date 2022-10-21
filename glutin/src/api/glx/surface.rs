@@ -233,7 +233,7 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
             Some(extra)
                 if self.display.inner.client_extensions.contains("GLX_EXT_swap_control") =>
             unsafe {
-                extra.SwapIntervalEXT(*self.display.inner.raw.cast(), self.raw, interval as _);
+                extra.SwapIntervalEXT(self.display.inner.raw.cast(), self.raw, interval as _);
                 // Check for error explicitly here, other apis do have indication for failure.
                 0
             },
