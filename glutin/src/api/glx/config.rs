@@ -143,8 +143,8 @@ impl Display {
             }
         }
 
-        // Push `glx::NONE` to terminate the list.
-        config_attributes.push(glx::NONE as c_int);
+        // Push X11 `None` to terminate the list.
+        config_attributes.push(0);
 
         unsafe {
             let mut num_configs = 0;

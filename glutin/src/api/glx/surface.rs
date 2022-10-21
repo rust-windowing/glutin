@@ -43,8 +43,8 @@ impl Display {
 
         let mut attrs = Vec::<c_int>::with_capacity(ATTR_SIZE_HINT);
 
-        // Push `glx::NONE` to terminate the list.
-        attrs.push(glx::NONE as c_int);
+        // Push X11 `None` to terminate the list.
+        attrs.push(0);
 
         let config = config.clone();
         let surface = unsafe {
@@ -84,8 +84,8 @@ impl Display {
         attrs.push(glx::LARGEST_PBUFFER as c_int);
         attrs.push(surface_attributes.largest_pbuffer as c_int);
 
-        // Push `glx::NONE` to terminate the list.
-        attrs.push(glx::NONE as c_int);
+        // Push X11 `None` to terminate the list.
+        attrs.push(0);
 
         let config = config.clone();
         let surface = unsafe {
@@ -119,8 +119,8 @@ impl Display {
 
         let mut attrs = Vec::<c_int>::with_capacity(ATTR_SIZE_HINT);
 
-        // Push `glx::NONE` to terminate the list.
-        attrs.push(glx::NONE as c_int);
+        // Push X11 `None` to terminate the list.
+        attrs.push(0);
 
         let config = config.clone();
         let surface = unsafe {

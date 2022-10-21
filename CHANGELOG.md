@@ -20,6 +20,7 @@
 - Rename `Display::from_raw` to `Display::new`.
 - Added `GlDisplay::supported_features` to allow checking for extensions support beforehand.
 - **Breaking:** renamed `ReleaseBehaviour` to `ReleaseBehavior`.
+- Fix GLX not working with nvidia binary drivers.
 
 # Version 0.30.0-beta.2 (2022-09-03)
 
