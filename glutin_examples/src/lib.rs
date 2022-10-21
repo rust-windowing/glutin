@@ -293,7 +293,7 @@ pub fn create_display(
     let preference = DisplayApiPreference::GlxThenEgl(Box::new(unix::register_xlib_error_hook));
 
     // Create connection to underlying OpenGL client Api.
-    unsafe { Display::from_raw(raw_display, preference).unwrap() }
+    unsafe { Display::new(raw_display, preference).unwrap() }
 }
 
 pub struct Renderer {

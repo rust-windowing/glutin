@@ -46,7 +46,7 @@ impl Display {
     /// `[std::ptr::null]` for the display will result in using
     /// `EGL_DEFAULT_DISPLAY`, which is not recommended or will
     /// work on a platform with a concept of native display, like Wayland.
-    pub unsafe fn from_raw(raw_display: RawDisplayHandle) -> Result<Self> {
+    pub unsafe fn new(raw_display: RawDisplayHandle) -> Result<Self> {
         let egl = match EGL.as_ref() {
             Some(egl) => egl,
             None => return Err(ErrorKind::NotFound.into()),

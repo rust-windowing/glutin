@@ -191,55 +191,52 @@ impl Display {
     ///
     /// The `preference` must contain pointers to the valid values if GLX or WGL
     /// specific options were used.
-    pub unsafe fn from_raw(
-        display: RawDisplayHandle,
-        preference: DisplayApiPreference,
-    ) -> Result<Self> {
+    pub unsafe fn new(display: RawDisplayHandle, preference: DisplayApiPreference) -> Result<Self> {
         match preference {
             #[cfg(egl_backend)]
-            DisplayApiPreference::Egl => unsafe { Ok(Self::Egl(EglDisplay::from_raw(display)?)) },
+            DisplayApiPreference::Egl => unsafe { Ok(Self::Egl(EglDisplay::new(display)?)) },
             #[cfg(glx_backend)]
             DisplayApiPreference::Glx(registrar) => unsafe {
-                Ok(Self::Glx(GlxDisplay::from_raw(display, registrar)?))
+                Ok(Self::Glx(GlxDisplay::new(display, registrar)?))
             },
             #[cfg(all(egl_backend, glx_backend))]
             DisplayApiPreference::GlxThenEgl(registrar) => unsafe {
-                if let Ok(display) = GlxDisplay::from_raw(display, registrar) {
+                if let Ok(display) = GlxDisplay::new(display, registrar) {
                     Ok(Self::Glx(display))
                 } else {
-                    Ok(Self::Egl(EglDisplay::from_raw(display)?))
+                    Ok(Self::Egl(EglDisplay::new(display)?))
                 }
             },
             #[cfg(all(egl_backend, glx_backend))]
             DisplayApiPreference::EglThenGlx(registrar) => unsafe {
-                if let Ok(display) = EglDisplay::from_raw(display) {
+                if let Ok(display) = EglDisplay::new(display) {
                     Ok(Self::Egl(display))
                 } else {
-                    Ok(Self::Glx(GlxDisplay::from_raw(display, registrar)?))
+                    Ok(Self::Glx(GlxDisplay::new(display, registrar)?))
                 }
             },
             #[cfg(wgl_backend)]
             DisplayApiPreference::Wgl(window_handle) => unsafe {
-                Ok(Self::Wgl(WglDisplay::from_raw(display, window_handle)?))
+                Ok(Self::Wgl(WglDisplay::new(display, window_handle)?))
             },
             #[cfg(all(egl_backend, wgl_backend))]
             DisplayApiPreference::EglThenWgl(window_handle) => unsafe {
-                if let Ok(display) = EglDisplay::from_raw(display) {
+                if let Ok(display) = EglDisplay::new(display) {
                     Ok(Self::Egl(display))
                 } else {
-                    Ok(Self::Wgl(WglDisplay::from_raw(display, window_handle)?))
+                    Ok(Self::Wgl(WglDisplay::new(display, window_handle)?))
                 }
             },
             #[cfg(all(egl_backend, wgl_backend))]
             DisplayApiPreference::WglThenEgl(window_handle) => unsafe {
-                if let Ok(display) = WglDisplay::from_raw(display, window_handle) {
+                if let Ok(display) = WglDisplay::new(display, window_handle) {
                     Ok(Self::Wgl(display))
                 } else {
-                    Ok(Self::Egl(EglDisplay::from_raw(display)?))
+                    Ok(Self::Egl(EglDisplay::new(display)?))
                 }
             },
             #[cfg(cgl_backend)]
-            DisplayApiPreference::Cgl => unsafe { Ok(Self::Cgl(CglDisplay::from_raw(display)?)) },
+            DisplayApiPreference::Cgl => unsafe { Ok(Self::Cgl(CglDisplay::new(display)?)) },
         }
     }
 }
