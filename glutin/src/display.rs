@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use std::ffi::{self, CStr};
 use std::fmt;
 
+use bitflags::bitflags;
 use raw_window_handle::RawDisplayHandle;
 
 use crate::config::{Config, ConfigTemplate, GlConfig};
@@ -117,8 +118,14 @@ pub trait GlDisplay: Sealed {
     /// Helper to obtain the information about the underlying display.
     ///
     /// This function is intended to be used for logging purposes to help with
-    /// trouble shooting issues.
+    /// troubleshooting issues.
     fn version_string(&self) -> String;
+
+    /// Get the features supported by the display.
+    ///
+    /// These features could be used to check that something is supported
+    /// beforehand instead of doing fallback.
+    fn supported_features(&self) -> DisplayFeatures;
 }
 
 /// Get the [`Display`].
@@ -383,6 +390,10 @@ impl GlDisplay for Display {
     fn version_string(&self) -> String {
         gl_api_dispatch!(self; Self(display) => display.version_string())
     }
+
+    fn supported_features(&self) -> DisplayFeatures {
+        gl_api_dispatch!(self; Self(display) => display.supported_features())
+    }
 }
 
 impl AsRawDisplay for Display {
@@ -451,6 +462,51 @@ impl fmt::Debug for DisplayApiPreference {
         };
 
         f.write_fmt(format_args!("DisplayApiPreference::{}", api))
+    }
+}
+
+bitflags! {
+    /// The features and extensions supported by the [`Display`].
+    pub struct DisplayFeatures: u8 {
+        /// The display supports creating [`robust`] context.
+        ///
+        /// [`robust`]: crate::context::Robustness
+        const CONTEXT_ROBUSTNESS          = 0b0000_0001;
+
+        /// The display supports creating [`no error`] context.
+        ///
+        /// [`no error`]: crate::context::Robustness::NoError
+        const CONTEXT_NO_ERROR            = 0b0000_0010;
+
+        /// The display supports [`floating`] pixel formats.
+        ///
+        /// [`floating`]: crate::config::ConfigTemplateBuilder::with_float_pixels
+        const FLOAT_PIXEL_FORMAT          = 0b0000_0100;
+
+        /// The display supports changing the [`swap interval`] on surfaces.
+        ///
+        /// [`swap interval`]: crate::surface::GlSurface::set_swap_interval
+        const SWAP_CONTROL                = 0b0000_1000;
+
+        /// The display supports creating context with explicit [`release behavior`].
+        ///
+        /// [`release behavior`]: crate::context::ReleaseBehavior
+        const CONTEXT_RELEASE_BEHAVIOR   = 0b0001_0000;
+
+        /// The display supports creating OpenGL ES [`context`].
+        ///
+        /// [`context`]: crate::context::ContextApi::Gles
+        const CREATE_ES_CONTEXT           = 0b0010_0000;
+
+        /// The display supports pixel formats with [`multisampling`].
+        ///
+        /// [`multisampling`]: crate::config::ConfigTemplateBuilder::with_multisampling
+        const MULTISAMPLING_PIXEL_FORMATS = 0b0100_0000;
+
+        /// The display supports creating surfaces backed by [`SRGB`] framebuffers.
+        ///
+        /// [`SRGB`]: crate::surface::SurfaceAttributesBuilder::with_srgb
+        const SRGB_FRAMEBUFFERS           = 0b1000_0000;
     }
 }
 

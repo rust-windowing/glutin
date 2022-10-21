@@ -10,7 +10,7 @@ use glutin_egl_sys::egl::types::{EGLConfig, EGLint};
 use crate::config::{
     Api, AsRawConfig, ColorBufferType, ConfigSurfaceTypes, ConfigTemplate, RawConfig,
 };
-use crate::display::GetGlDisplay;
+use crate::display::{DisplayFeatures, GetGlDisplay};
 use crate::error::{ErrorKind, Result};
 use crate::prelude::*;
 use crate::private::Sealed;
@@ -19,9 +19,6 @@ use crate::private::Sealed;
 use crate::platform::x11::{X11GlConfigExt, X11VisualInfo};
 
 use super::display::Display;
-
-const FLOAT_PIXELS_EXT: &str = "EGL_EXT_pixel_format_float";
-const SRGB_SURFACE: &str = "EGL_KHR_gl_colorspace";
 
 impl Display {
     pub(crate) unsafe fn find_configs(
@@ -60,7 +57,9 @@ impl Display {
             },
         };
 
-        if template.float_pixels && self.inner.client_extensions.contains(FLOAT_PIXELS_EXT) {
+        if template.float_pixels
+            && self.inner.features.contains(DisplayFeatures::FLOAT_PIXEL_FORMAT)
+        {
             config_attributes.push(egl::COLOR_COMPONENT_TYPE_EXT as EGLint);
             config_attributes.push(egl::COLOR_COMPONENT_TYPE_FLOAT_EXT as EGLint);
         } else if template.float_pixels {
@@ -266,7 +265,7 @@ impl GlConfig for Config {
 
     fn float_pixels(&self) -> bool {
         unsafe {
-            if self.inner.display.inner.client_extensions.contains(FLOAT_PIXELS_EXT) {
+            if self.inner.display.inner.features.contains(DisplayFeatures::FLOAT_PIXEL_FORMAT) {
                 matches!(
                     self.raw_attribute(egl::COLOR_COMPONENT_TYPE_EXT as EGLint) as _,
                     egl::COLOR_COMPONENT_TYPE_FLOAT_EXT
@@ -282,7 +281,7 @@ impl GlConfig for Config {
     }
 
     fn srgb_capable(&self) -> bool {
-        self.inner.display.inner.client_extensions.contains(SRGB_SURFACE)
+        self.inner.display.inner.features.contains(DisplayFeatures::SRGB_FRAMEBUFFERS)
     }
 
     fn depth_size(&self) -> u8 {

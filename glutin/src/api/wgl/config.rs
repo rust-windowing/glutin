@@ -14,7 +14,7 @@ use windows_sys::Win32::Graphics::OpenGL::{self as gl, PIXELFORMATDESCRIPTOR};
 use crate::config::{
     Api, AsRawConfig, ColorBufferType, ConfigSurfaceTypes, ConfigTemplate, GlConfig, RawConfig,
 };
-use crate::display::GetGlDisplay;
+use crate::display::{DisplayFeatures, GetGlDisplay};
 use crate::error::{ErrorKind, Result};
 use crate::private::Sealed;
 
@@ -23,12 +23,9 @@ use super::display::Display;
 /// The maximum amount of configs to query.
 const MAX_QUERY_CONFIGS: usize = 256;
 
-// Multisampling extension.
-const MULTI_SAMPLE_ARB: &str = "WGL_ARB_multisample";
-
 // Srgb extensions.
 const SRGB_ARB: &str = "WGL_ARB_framebuffer_sRGB";
-const SRGB_EXT: &str = "WGL_ARB_framebuffer_sRGB";
+const SRGB_EXT: &str = "WGL_EXT_framebuffer_sRGB";
 
 impl Display {
     pub(crate) unsafe fn find_configs(
@@ -194,7 +191,7 @@ impl Display {
         attrs.push(wgl_extra::DOUBLE_BUFFER_ARB as c_int);
         attrs.push(!template.single_buffering as c_int);
 
-        let pixel_type = if self.inner.client_extensions.contains("WGL_ARB_pixel_format_float")
+        let pixel_type = if self.inner.features.contains(DisplayFeatures::FLOAT_PIXEL_FORMAT)
             && template.float_pixels
         {
             wgl_extra::TYPE_RGBA_FLOAT_ARB
@@ -205,7 +202,7 @@ impl Display {
         };
 
         if let Some(num_samples) = template.num_samples {
-            if self.inner.client_extensions.contains(MULTI_SAMPLE_ARB) {
+            if self.inner.features.contains(DisplayFeatures::MULTISAMPLING_PIXEL_FORMATS) {
                 attrs.push(wgl_extra::SAMPLE_BUFFERS_ARB as c_int);
                 attrs.push(1);
                 attrs.push(wgl_extra::SAMPLES_ARB as c_int);
@@ -352,7 +349,7 @@ impl GlConfig for Config {
 
     fn float_pixels(&self) -> bool {
         unsafe {
-            self.inner.display.inner.client_extensions.contains("WGL_ARB_pixel_format_float")
+            self.inner.display.inner.features.contains(DisplayFeatures::FLOAT_PIXEL_FORMAT)
                 && self.raw_attribute(wgl_extra::PIXEL_TYPE_ARB as c_int)
                     == wgl_extra::TYPE_RGBA_FLOAT_ARB as c_int
         }
@@ -392,7 +389,8 @@ impl GlConfig for Config {
     }
 
     fn num_samples(&self) -> u8 {
-        if self.inner.display.inner.client_extensions.contains(MULTI_SAMPLE_ARB) {
+        if self.inner.display.inner.features.contains(DisplayFeatures::MULTISAMPLING_PIXEL_FORMATS)
+        {
             unsafe { self.raw_attribute(wgl_extra::SAMPLES_ARB as c_int) as _ }
         } else {
             0
@@ -427,14 +425,7 @@ impl GlConfig for Config {
 
     fn api(&self) -> Api {
         let mut api = Api::OPENGL;
-        if self.inner.display.inner.client_extensions.contains("WGL_EXT_create_context_es2_profile")
-            || self
-                .inner
-                .display
-                .inner
-                .client_extensions
-                .contains("WGL_EXT_create_context_es_profile")
-        {
+        if self.inner.display.inner.features.contains(DisplayFeatures::CREATE_ES_CONTEXT) {
             api |= Api::GLES1 | Api::GLES2;
         }
 

@@ -13,10 +13,10 @@ use windows_sys::Win32::Graphics::Gdi::{self as gdi, HDC};
 
 use crate::config::GetGlConfig;
 use crate::context::{
-    AsRawContext, ContextApi, ContextAttributes, GlProfile, RawContext, ReleaseBehaviour,
+    AsRawContext, ContextApi, ContextAttributes, GlProfile, RawContext, ReleaseBehavior,
     Robustness, Version,
 };
-use crate::display::GetGlDisplay;
+use crate::display::{DisplayFeatures, GetGlDisplay};
 use crate::error::{ErrorKind, Result};
 use crate::prelude::*;
 use crate::private::Sealed;
@@ -78,9 +78,7 @@ impl Display {
         let mut attrs = Vec::<c_int>::with_capacity(16);
 
         // Check whether the ES context creation is supported.
-        let supports_es =
-            self.inner.client_extensions.contains("WGL_EXT_create_context_es2_profile")
-                || self.inner.client_extensions.contains("WGL_EXT_create_context_es_profile");
+        let supports_es = self.inner.features.contains(DisplayFeatures::CREATE_ES_CONTEXT);
 
         let (profile, version) = match context_attributes.api {
             api @ Some(ContextApi::OpenGl(_)) | api @ None => {
@@ -134,7 +132,7 @@ impl Display {
         }
 
         let mut flags: c_int = 0;
-        if self.inner.client_extensions.contains("WGL_ARB_create_context_robustness") {
+        if self.inner.features.contains(DisplayFeatures::CONTEXT_ROBUSTNESS) {
             match context_attributes.robustness {
                 Robustness::NotRobust => (),
                 Robustness::RobustNoResetNotification => {
@@ -148,7 +146,7 @@ impl Display {
                     flags |= wgl_extra::CONTEXT_ROBUST_ACCESS_BIT_ARB as c_int;
                 },
                 Robustness::NoError => {
-                    if !self.inner.client_extensions.contains("WGL_ARB_create_context_no_error") {
+                    if !self.inner.features.contains(DisplayFeatures::CONTEXT_NO_ERROR) {
                         return Err(ErrorKind::NotSupported(
                             "WGL_ARB_create_context_no_error not supported",
                         )
@@ -176,18 +174,18 @@ impl Display {
         }
 
         // Flush control.
-        if self.inner.client_extensions.contains("WGL_ARB_context_flush_control") {
+        if self.inner.features.contains(DisplayFeatures::CONTEXT_RELEASE_BEHAVIOR) {
             match context_attributes.release_behavior {
-                ReleaseBehaviour::Flush => {
+                ReleaseBehavior::Flush => {
                     attrs.push(wgl_extra::CONTEXT_RELEASE_BEHAVIOR_ARB as c_int);
                     attrs.push(wgl_extra::CONTEXT_RELEASE_BEHAVIOR_FLUSH_ARB as c_int);
                 },
-                ReleaseBehaviour::None => {
+                ReleaseBehavior::None => {
                     attrs.push(wgl_extra::CONTEXT_RELEASE_BEHAVIOR_ARB as c_int);
                     attrs.push(wgl_extra::CONTEXT_RELEASE_BEHAVIOR_NONE_ARB as c_int);
                 },
             }
-        } else if context_attributes.release_behavior != ReleaseBehaviour::Flush {
+        } else if context_attributes.release_behavior != ReleaseBehavior::Flush {
             return Err(ErrorKind::NotSupported(
                 "flush control behavior WGL_ARB_context_flush_control",
             )

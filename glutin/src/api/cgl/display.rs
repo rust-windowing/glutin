@@ -9,7 +9,7 @@ use core_foundation::string::CFString;
 use raw_window_handle::RawDisplayHandle;
 
 use crate::config::ConfigTemplate;
-use crate::display::{AsRawDisplay, RawDisplay};
+use crate::display::{AsRawDisplay, DisplayFeatures, RawDisplay};
 use crate::error::{ErrorKind, Result};
 use crate::prelude::*;
 use crate::private::Sealed;
@@ -97,6 +97,13 @@ impl GlDisplay for Display {
 
     fn version_string(&self) -> String {
         String::from("Apple CGL")
+    }
+
+    fn supported_features(&self) -> DisplayFeatures {
+        DisplayFeatures::MULTISAMPLING_PIXEL_FORMATS
+            | DisplayFeatures::FLOAT_PIXEL_FORMAT
+            | DisplayFeatures::SRGB_FRAMEBUFFERS
+            | DisplayFeatures::SWAP_CONTROL
     }
 }
 

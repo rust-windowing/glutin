@@ -11,7 +11,7 @@ use crate::config::{Api, GetGlConfig};
 use crate::context::{
     AsRawContext, ContextApi, ContextAttributes, GlProfile, RawContext, Robustness, Version,
 };
-use crate::display::GetGlDisplay;
+use crate::display::{DisplayFeatures, GetGlDisplay};
 use crate::error::{ErrorKind, Result};
 use crate::prelude::*;
 use crate::private::Sealed;
@@ -80,10 +80,8 @@ impl Display {
                 attrs.push(version.minor as EGLint);
             }
 
-            let has_robustsess = is_one_five
-                || self.inner.client_extensions.contains("EGL_EXT_create_context_robustness");
-            let has_no_error =
-                self.inner.client_extensions.contains("EGL_KHR_create_context_no_error");
+            let has_robustsess = self.inner.features.contains(DisplayFeatures::CONTEXT_ROBUSTNESS);
+            let has_no_error = self.inner.features.contains(DisplayFeatures::CONTEXT_NO_ERROR);
 
             match context_attributes.robustness {
                 Robustness::NotRobust => (),

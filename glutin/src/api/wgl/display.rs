@@ -13,7 +13,7 @@ use windows_sys::Win32::Graphics::Gdi::HDC;
 use windows_sys::Win32::System::LibraryLoader as dll_loader;
 
 use crate::config::ConfigTemplate;
-use crate::display::{AsRawDisplay, GetDisplayExtensions, RawDisplay};
+use crate::display::{AsRawDisplay, DisplayFeatures, GetDisplayExtensions, RawDisplay};
 use crate::error::{ErrorKind, Result};
 use crate::prelude::*;
 use crate::private::Sealed;
@@ -68,8 +68,57 @@ impl Display {
                 (None, HashSet::new())
             };
 
-        let inner = Arc::new(DisplayInner { lib_opengl32, wgl_extra, client_extensions });
+        let features = Self::extract_display_features(&client_extensions);
+
+        let inner = Arc::new(DisplayInner { lib_opengl32, wgl_extra, features, client_extensions });
+
         Ok(Display { inner })
+    }
+
+    fn extract_display_features(extensions: &HashSet<&'static str>) -> DisplayFeatures {
+        let mut features = DisplayFeatures::empty();
+
+        features.set(
+            DisplayFeatures::MULTISAMPLING_PIXEL_FORMATS,
+            extensions.contains("WGL_ARB_multisample"),
+        );
+
+        features.set(
+            DisplayFeatures::FLOAT_PIXEL_FORMAT,
+            extensions.contains("WGL_ARB_pixel_format_float"),
+        );
+
+        features.set(
+            DisplayFeatures::SRGB_FRAMEBUFFERS,
+            extensions.contains("WGL_ARB_framebuffer_sRGB")
+                || extensions.contains("WGL_EXT_framebuffer_sRGB")
+                || extensions.contains("WGL_EXT_colorspace"),
+        );
+
+        features.set(
+            DisplayFeatures::CREATE_ES_CONTEXT,
+            extensions.contains("WGL_EXT_create_context_es2_profile")
+                || extensions.contains("WGL_EXT_create_context_es_profile"),
+        );
+
+        features.set(DisplayFeatures::SWAP_CONTROL, extensions.contains("WGL_EXT_swap_control"));
+
+        features.set(
+            DisplayFeatures::CONTEXT_ROBUSTNESS,
+            extensions.contains("WGL_ARB_create_context_robustness"),
+        );
+
+        features.set(
+            DisplayFeatures::CONTEXT_RELEASE_BEHAVIOR,
+            extensions.contains("WGL_ARB_context_flush_control"),
+        );
+
+        features.set(
+            DisplayFeatures::CONTEXT_NO_ERROR,
+            extensions.contains("WGL_ARB_create_context_no_error"),
+        );
+
+        features
     }
 }
 
@@ -135,6 +184,10 @@ impl GlDisplay for Display {
     fn version_string(&self) -> String {
         String::from("WGL")
     }
+
+    fn supported_features(&self) -> DisplayFeatures {
+        self.inner.features
+    }
 }
 
 impl GetDisplayExtensions for Display {
@@ -158,12 +211,17 @@ pub(crate) struct DisplayInner {
     /// Extra functions used by the impl.
     pub(crate) wgl_extra: Option<&'static WglExtra>,
 
+    pub(crate) features: DisplayFeatures,
+
     pub(crate) client_extensions: HashSet<&'static str>,
 }
 
 impl fmt::Debug for DisplayInner {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Display").field("extensions", &self.client_extensions).finish()
+        f.debug_struct("Display")
+            .field("features", &self.features)
+            .field("extensions", &self.client_extensions)
+            .finish()
     }
 }
 

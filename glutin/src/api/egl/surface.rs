@@ -84,9 +84,7 @@ impl Display {
 
         let mut attrs = Vec::<EGLAttrib>::with_capacity(ATTR_SIZE_HINT);
 
-        if surface_attributes.srgb.is_some()
-            && self.inner.client_extensions.contains("EGL_KHR_gl_colorspace")
-        {
+        if surface_attributes.srgb.is_some() && config.srgb_capable() {
             attrs.push(egl::GL_COLORSPACE as EGLAttrib);
             let colorspace = match surface_attributes.srgb {
                 Some(true) => egl::GL_COLORSPACE_SRGB as EGLAttrib,
@@ -162,9 +160,7 @@ impl Display {
         attrs.push(buffer);
 
         // // Add colorspace if the extension is present.
-        if surface_attributes.srgb.is_some()
-            && self.inner.client_extensions.contains("EGL_KHR_gl_colorspace")
-        {
+        if surface_attributes.srgb.is_some() && config.srgb_capable() {
             attrs.push(egl::GL_COLORSPACE as EGLAttrib);
             let colorspace = match surface_attributes.srgb {
                 Some(true) => egl::GL_COLORSPACE_SRGB as EGLAttrib,
