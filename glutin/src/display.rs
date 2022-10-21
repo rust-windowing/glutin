@@ -467,7 +467,7 @@ impl fmt::Debug for DisplayApiPreference {
 
 bitflags! {
     /// The features and extensions supported by the [`Display`].
-    pub struct DisplayFeatures: u8 {
+    pub struct DisplayFeatures: u32 {
         /// The display supports creating [`robust`] context.
         ///
         /// [`robust`]: crate::context::Robustness

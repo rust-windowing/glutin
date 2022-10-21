@@ -236,11 +236,10 @@ impl Display {
         supported_features
             .set(DisplayFeatures::SRGB_FRAMEBUFFERS, extensions.contains("EGL_KHR_gl_colorspace"));
 
-        let is_one_five = version >= Version::new(1, 5);
-
         supported_features.set(
             DisplayFeatures::CONTEXT_ROBUSTNESS,
-            is_one_five || extensions.contains("EGL_EXT_create_context_robustness"),
+            version > Version::new(1, 5)
+                || extensions.contains("EGL_EXT_create_context_robustness"),
         );
 
         supported_features.set(
