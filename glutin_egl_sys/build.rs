@@ -20,8 +20,14 @@ fn main() {
     {
         let mut file = File::create(&dest.join("egl_bindings.rs")).unwrap();
         let reg = Registry::new(Api::Egl, (1, 5), Profile::Core, Fallbacks::All, [
+            "EGL_ANDROID_native_fence_sync",
             "EGL_EXT_buffer_age",
             "EGL_EXT_create_context_robustness",
+            "EGL_EXT_device_base",
+            "EGL_EXT_device_drm",
+            "EGL_EXT_device_drm_render_node",
+            "EGL_EXT_device_enumeration",
+            "EGL_EXT_device_query",
             "EGL_EXT_pixel_format_float",
             "EGL_EXT_platform_base",
             "EGL_EXT_platform_device",
@@ -30,11 +36,13 @@ fn main() {
             "EGL_EXT_swap_buffers_with_damage",
             "EGL_KHR_create_context",
             "EGL_KHR_create_context_no_error",
+            "EGL_KHR_fence_sync",
             "EGL_KHR_platform_android",
             "EGL_KHR_platform_gbm",
             "EGL_KHR_platform_wayland",
             "EGL_KHR_platform_x11",
             "EGL_KHR_swap_buffers_with_damage",
+            "EGL_KHR_wait_sync",
             "EGL_MESA_platform_gbm",
         ]);
 
