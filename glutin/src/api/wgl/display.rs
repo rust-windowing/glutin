@@ -41,7 +41,7 @@ impl Display {
     ///
     /// The `native_window` must point to the valid platform window and have
     /// valid `hinstance`.
-    pub unsafe fn from_raw(
+    pub unsafe fn new(
         display: RawDisplayHandle,
         native_window: Option<RawWindowHandle>,
     ) -> Result<Self> {

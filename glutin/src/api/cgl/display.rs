@@ -32,7 +32,7 @@ impl Display {
     /// # Safety
     ///
     /// The function is unsafe for consistency.
-    pub unsafe fn from_raw(display: RawDisplayHandle) -> Result<Self> {
+    pub unsafe fn new(display: RawDisplayHandle) -> Result<Self> {
         match display {
             RawDisplayHandle::AppKit(..) => Ok(Display { _marker: PhantomData }),
             _ => Err(ErrorKind::NotSupported("provided native display is not supported").into()),
