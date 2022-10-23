@@ -1,5 +1,7 @@
 # Unreleased
 
+# Version 0.30.0-beta.3
+
 - `Config` doesn't force OpenGL `Api` by default.
 - `Display::create_context` now uses the most recent available `Api` from the `Config` when `ContextApi` is not specified in `ContextAttributes`.
 - **Breaking:** `PossiblyCurrentGlContext::get_proc_address` method was moved to `GlDisplay::get_proc_address`.
