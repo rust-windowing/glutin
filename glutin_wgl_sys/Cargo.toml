@@ -1,6 +1,6 @@
 [package]
 name = "glutin_wgl_sys"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Kirill Chibisov <contact@kchibisov.com>"]
 description = "The wgl bindings for glutin"
 repository = "https://github.com/rust-windowing/glutin"
