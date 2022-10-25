@@ -1,42 +1,15 @@
 # Unreleased
 
-# Version 0.30.0-beta.3
+# Version 0.30.0
 
-- `Config` doesn't force OpenGL `Api` by default.
-- `Display::create_context` now uses the most recent available `Api` from the `Config` when `ContextApi` is not specified in `ContextAttributes`.
-- **Breaking:** `PossiblyCurrentGlContext::get_proc_address` method was moved to `GlDisplay::get_proc_address`.
-- **Breaking:** `ConfigTemplateBuilder::with_sample_buffers` now called `ConfigTemplateBuilder::with_multisampling`.
-- **Breaking:** `GlConfig::sample_buffers` now called `GlConfig::num_samples` and returns the amount of samples in multisample buffer.
+- **This version of `glutin` has been rewritten from the ground and no longer depends on `winit`, the `raw-window-handle` is now used instead of it.**
+- The Api is now built around `Display`, `Surface`, `Config`, and `Surface`. For more info see crate documentation and examples.
 - **Breaking:** Bump MSRV from `1.57` to `1.60`.
-- Fix `GlProfile::Core` requesting without explicit version.
-- Pick the latest available profile on macOS.
-- When using `ContextApi::Gles(None)` in `ContextAttributesBuilder` the latest known supported `major` ES version will be picked.
-- Fix `Eq` implementation for `Config` on `CGL`.
-- Add `GetDisplayExtensions` trait to obtain api display extensions implemented on  `EGL`, `WGL`, and `GLX`.
-- Fallback to `Surface::swap_buffers` when `Surface::swap_buffers_with_damage` is not supported on `EGL`.
-- Add missing `GetGlConfig` implementation for `NotCurrentContext` and `PossiblyCurrentContext`.
-- Implement `Clone` for builders.
-- **Breaking:** move `DamageRect` into `surface::Rect`.
-- Add `GlDisplay::version_string` to help with logging the display information.
-- Rename `NotCurrentGlContext::treat_as_current` to `NotCurrentGlContext::treat_as_possibly_current`.
-- Rename `Display::from_raw` to `Display::new`.
-- Added `GlDisplay::supported_features` to allow checking for extensions support beforehand.
-- **Breaking:** renamed `ReleaseBehaviour` to `ReleaseBehavior`.
-- Fix GLX not working with nvidia binary drivers.
-- Fix crash in `glx::surface::Surface::set_swap_interval`.
-
-# Version 0.30.0-beta.2 (2022-09-03)
-
-- macOS: Fix memory leak in `Surface`.
-
-# Version 0.30.0-beta.1 (2022-09-03)
-
-- Replace `winit` dependency with `raw-window-handle`.
-- The Api is now built around `Display`, `Surface`, `Config`, and `Surface` for more info see crate documentation and examples.
 - The ios support was removed for the lack of maintainance for now. In case there's a need for it, contributions are welcome.
 - The context creation is no longer limited to winit's supported platforms.
 - The underlying Api providers are publically exposed now, so glutin could be used with just e.g. `EGL`.
 - Fixed soundness issues with `Surface` MT safety, since before `EGLSurface` could be sent to a different thread, which is not safe.
+- Fallback to `Surface::swap_buffers` when `Surface::swap_buffers_with_damage` is not supported on `EGL`.
  
 # Version 0.29.1 (2022-08-10)
 
