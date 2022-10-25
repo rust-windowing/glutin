@@ -16,7 +16,7 @@ glutin = "0.30.0-beta.3"
 
 Join us in any of these:
 
-[![Matrix](https://img.shields.io/badge/Matrix-%23rust--windowing%3Amatrix.org-blueviolet.svg)](https://matrix.to/#/#rust-windowing:matrix.org)
+[![Matrix](https://img.shields.io/badge/Matrix-%23winit%3Amatrix.org-blueviolet.svg)](https://matrix.to/#/#winit:matrix.org)
 [![Libera.Chat](https://img.shields.io/badge/libera.chat-%23winit-red.svg)](https://web.libera.chat/#winit)
 
 ## Usage Examples
