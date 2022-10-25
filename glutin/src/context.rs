@@ -594,3 +594,20 @@ pub enum RawContext {
     #[cfg(cgl_backend)]
     Cgl(*const ffi::c_void),
 }
+
+/// Pick `GlProfile` and `Version` based on the provided params.
+#[cfg(any(egl_backend, glx_backend, wgl_backend))]
+pub(crate) fn pick_profile(
+    profile: Option<GlProfile>,
+    version: Option<Version>,
+) -> (GlProfile, Version) {
+    match (profile, version) {
+        (Some(GlProfile::Core), Some(version)) => (GlProfile::Core, version),
+        (Some(GlProfile::Compatibility), Some(version)) => (GlProfile::Compatibility, version),
+        (None, Some(version)) if version >= Version::new(3, 3) => (GlProfile::Core, version),
+        (None, Some(version)) => (GlProfile::Compatibility, version),
+        (Some(GlProfile::Core), None) => (GlProfile::Core, Version::new(3, 3)),
+        (Some(GlProfile::Compatibility), None) => (GlProfile::Compatibility, Version::new(2, 1)),
+        (None, None) => (GlProfile::Core, Version::new(3, 3)),
+    }
+}

@@ -10,7 +10,7 @@ use glutin_glx_sys::{glx, glx_extra};
 
 use crate::config::GetGlConfig;
 use crate::context::{
-    AsRawContext, ContextApi, ContextAttributes, GlProfile, RawContext, ReleaseBehavior,
+    self, AsRawContext, ContextApi, ContextAttributes, GlProfile, RawContext, ReleaseBehavior,
     Robustness, Version,
 };
 use crate::display::{DisplayFeatures, GetGlDisplay};
@@ -77,18 +77,14 @@ impl Display {
 
         let (profile, version) = match context_attributes.api {
             api @ Some(ContextApi::OpenGl(_)) | api @ None => {
-                let mut version = api.and_then(|api| api.version());
-                let profile = match context_attributes.profile {
-                    Some(GlProfile::Core) | None => {
-                        version = Some(version.unwrap_or(Version::new(3, 3)));
-                        glx_extra::CONTEXT_CORE_PROFILE_BIT_ARB
-                    },
-                    Some(GlProfile::Compatibility) => {
-                        glx_extra::CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB
-                    },
+                let version = api.and_then(|api| api.version());
+                let (profile, version) = context::pick_profile(context_attributes.profile, version);
+                let profile = match profile {
+                    GlProfile::Core => glx_extra::CONTEXT_CORE_PROFILE_BIT_ARB,
+                    GlProfile::Compatibility => glx_extra::CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
                 };
 
-                (Some(profile), version)
+                (Some(profile), Some(version))
             },
             Some(ContextApi::Gles(version)) if supports_es => (
                 Some(glx_extra::CONTEXT_ES2_PROFILE_BIT_EXT),

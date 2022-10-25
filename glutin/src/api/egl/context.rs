@@ -9,7 +9,7 @@ use glutin_egl_sys::{egl, EGLContext};
 
 use crate::config::{Api, GetGlConfig};
 use crate::context::{
-    AsRawContext, ContextApi, ContextAttributes, GlProfile, RawContext, Robustness, Version,
+    self, AsRawContext, ContextApi, ContextAttributes, GlProfile, RawContext, Robustness, Version,
 };
 use crate::display::{DisplayFeatures, GetGlDisplay};
 use crate::error::{ErrorKind, Result};
@@ -60,13 +60,12 @@ impl Display {
 
             // Add profile for the OpenGL Api.
             if api == egl::OPENGL_API {
-                let profile = match context_attributes.profile {
-                    Some(GlProfile::Core) | None => {
-                        version = Some(Version::new(3, 3));
-                        egl::CONTEXT_OPENGL_CORE_PROFILE_BIT
-                    },
-
-                    Some(GlProfile::Compatibility) => egl::CONTEXT_OPENGL_COMPATIBILITY_PROFILE_BIT,
+                let (profile, new_version) =
+                    context::pick_profile(context_attributes.profile, version);
+                version = Some(new_version);
+                let profile = match profile {
+                    GlProfile::Core => egl::CONTEXT_OPENGL_CORE_PROFILE_BIT,
+                    GlProfile::Compatibility => egl::CONTEXT_OPENGL_COMPATIBILITY_PROFILE_BIT,
                 };
 
                 attrs.push(egl::CONTEXT_OPENGL_PROFILE_MASK as EGLint);
