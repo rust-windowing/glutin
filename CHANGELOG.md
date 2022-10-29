@@ -1,6 +1,6 @@
 # Unreleased
 
-- On Windows (WGL), fixed that `Surface::swap_buffers` takes longer with every call caused by frequent calls of the win32 function `HDC GetDC(HWND hWnd)`.
+- On WGL, fixed that `Surface::swap_buffers` takes longer with every call caused by frequent calls of the win32 function `HDC GetDC(HWND hWnd)`.
 
 # Version 0.30.0
 
