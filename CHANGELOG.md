@@ -1,5 +1,7 @@
 # Unreleased
 
+- On Windows (WGL), fixed that `Surface::swap_buffers` takes longer with every call caused by frequent calls of the win32 function `HDC GetDC(HWND hWnd)`.
+
 # Version 0.30.0
 
 - **This version of `glutin` has been rewritten from the ground and no longer depends on `winit`, the `raw-window-handle` is now used instead of it.**
