@@ -78,7 +78,7 @@ pub struct Surface<T: SurfaceTypeTrait> {
 
 impl<T: SurfaceTypeTrait> Drop for Surface<T> {
     fn drop(&mut self) {
-        // This line intentionally left blank.
+        unsafe { gdi::ReleaseDC(self.hwnd, self.hdc); }
     }
 }
 
@@ -158,6 +158,7 @@ impl<T: SurfaceTypeTrait> fmt::Debug for Surface<T> {
         f.debug_struct("Surface")
             .field("config", &self.config.inner.pixel_format_index)
             .field("hwnd", &self.hwnd)
+            .field("hdc", &self.hdc)
             .finish()
     }
 }
