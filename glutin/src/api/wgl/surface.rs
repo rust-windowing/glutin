@@ -7,6 +7,7 @@ use std::num::NonZeroU32;
 
 use raw_window_handle::RawWindowHandle;
 use windows_sys::Win32::Foundation::HWND;
+use windows_sys::Win32::Graphics::Gdi::HDC;
 use windows_sys::Win32::Graphics::{Gdi as gdi, OpenGL as gl};
 
 use crate::config::GetGlConfig;
@@ -57,8 +58,10 @@ impl Display {
             },
         };
 
+        let hdc = unsafe { gdi::GetDC(hwnd) };
+
         let surface =
-            Surface { display: self.clone(), config: config.clone(), hwnd, _ty: PhantomData };
+            Surface { display: self.clone(), config: config.clone(), hwnd, hdc, _ty: PhantomData };
 
         Ok(surface)
     }
@@ -69,12 +72,15 @@ pub struct Surface<T: SurfaceTypeTrait> {
     display: Display,
     config: Config,
     pub(crate) hwnd: HWND,
+    pub(crate) hdc: HDC,
     _ty: PhantomData<T>,
 }
 
 impl<T: SurfaceTypeTrait> Drop for Surface<T> {
     fn drop(&mut self) {
-        // This line intentionally left blank.
+        unsafe {
+            gdi::ReleaseDC(self.hwnd, self.hdc);
+        }
     }
 }
 
@@ -100,8 +106,7 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
 
     fn swap_buffers(&self, _context: &Self::Context) -> Result<()> {
         unsafe {
-            let hdc = gdi::GetDC(self.hwnd);
-            if gl::SwapBuffers(hdc) == 0 {
+            if gl::SwapBuffers(self.hdc) == 0 {
                 Err(IoError::last_os_error().into())
             } else {
                 Ok(())
@@ -155,6 +160,7 @@ impl<T: SurfaceTypeTrait> fmt::Debug for Surface<T> {
         f.debug_struct("Surface")
             .field("config", &self.config.inner.pixel_format_index)
             .field("hwnd", &self.hwnd)
+            .field("hdc", &self.hdc)
             .finish()
     }
 }
