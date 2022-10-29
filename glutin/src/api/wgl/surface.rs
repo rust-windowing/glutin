@@ -78,7 +78,9 @@ pub struct Surface<T: SurfaceTypeTrait> {
 
 impl<T: SurfaceTypeTrait> Drop for Surface<T> {
     fn drop(&mut self) {
-        unsafe { gdi::ReleaseDC(self.hwnd, self.hdc); }
+        unsafe { 
+            gdi::ReleaseDC(self.hwnd, self.hdc);
+        }
     }
 }
 
