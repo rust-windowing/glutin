@@ -1,5 +1,6 @@
 # Unreleased
 
+- Added new `glutin-winit` crate to help bootstrapping new `glutin` with `winit`.
 - Added `EGLDevice` wrappers for EGL.
 - Added EGL dependent api to make a context current without a surface.
 - Added `supports_transparency` on `GlConfig`.

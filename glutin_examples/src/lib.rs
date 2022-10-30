@@ -1,79 +1,71 @@
-//! Support module for the glutin examples.
-#![allow(dead_code)]
-#![allow(unused_variables)]
-
 use std::ffi::{CStr, CString};
 use std::num::NonZeroU32;
 use std::ops::Deref;
 
-use raw_window_handle::{
-    HasRawDisplayHandle, HasRawWindowHandle, RawDisplayHandle, RawWindowHandle,
-};
-
 use winit::event::{Event, WindowEvent};
-use winit::event_loop::EventLoop;
-#[cfg(glx_backend)]
-use winit::platform::unix;
-#[cfg(x11_platform)]
-use winit::platform::unix::WindowBuilderExtUnix;
+use winit::event_loop::EventLoopBuilder;
 use winit::window::{Window, WindowBuilder};
 
-use glutin::config::{Config, ConfigSurfaceTypes, ConfigTemplate, ConfigTemplateBuilder};
+use raw_window_handle::HasRawWindowHandle;
+
+use glutin::config::{Config, ConfigTemplateBuilder};
 use glutin::context::{ContextApi, ContextAttributesBuilder};
-use glutin::display::{Display, DisplayApiPreference};
-#[cfg(x11_platform)]
-use glutin::platform::x11::X11GlConfigExt;
+use glutin::display::GetGlDisplay;
 use glutin::prelude::*;
-use glutin::surface::{
-    Surface, SurfaceAttributes, SurfaceAttributesBuilder, SwapInterval, WindowSurface,
-};
+use glutin::surface::{Surface, SurfaceAttributesBuilder, SwapInterval, WindowSurface};
+
+use glutin_winit::{self, DisplayBuilder};
+
+pub mod gl {
+    #![allow(clippy::all)]
+    include!(concat!(env!("OUT_DIR"), "/gl_bindings.rs"));
+
+    pub use Gles2 as Gl;
+}
 
 pub fn main() {
-    let event_loop = EventLoop::new();
+    let event_loop = EventLoopBuilder::new().build();
 
-    let raw_display = event_loop.raw_display_handle();
+    // Only windows requires the window to be present before creating the display.
+    // Other platforms don't really need one.
+    //
+    // XXX if you don't care about running on android or so you can safely remove
+    // this condition and always pass the window builder.
+    let window_builder =
+        if cfg!(wgl_backend) { Some(WindowBuilder::new().with_transparent(true)) } else { None };
 
-    let mut window = cfg!(wgl_backend).then(|| {
-        // We create a window before the display to accommodate for WGL, since it
-        // requires creating HDC for properly loading the WGL and it should be taken
-        // from the window you'll be rendering into.
-        WindowBuilder::new().with_transparent(true).build(&event_loop).unwrap()
-    });
-    let raw_window_handle = window.as_ref().map(|w| w.raw_window_handle());
+    // The template will match only the configurations supporting rendering to
+    // windows.
+    let template = ConfigTemplateBuilder::new().with_alpha_size(8);
 
-    // Create the GL display. This will create display automatically for the
-    // underlying GL platform. See support module on how it's being done.
-    let gl_display = create_display(raw_display, raw_window_handle);
-    println!("Running on: {}", gl_display.version_string());
+    let display_builder = DisplayBuilder::new().with_window_builder(window_builder);
 
-    // Create the config we'll be used for window. We'll use the native window
-    // raw-window-handle for it to get the right visual and use proper hdc. Note
-    // that you can likely use it for other windows using the same config.
-    let template = config_template(raw_window_handle);
-    let config = unsafe { gl_display.find_configs(template) }
-        .unwrap()
-        .reduce(|accum, config| {
-            // Find the config with the maximum number of samples.
-            //
-            // In general if you're not sure what you want in template you can request or
-            // don't want to require multisampling for example, you can search for a
-            // specific option you want afterwards.
-            //
-            // XXX however on macOS you can request only one config, so you should do
-            // a search with the help of `find_configs` and adjusting your template.
+    let (mut window, gl_config) = display_builder
+        .build(&event_loop, template, |configs| {
+            // Find the config with the maximum number of samples, so our triangle will
+            // be smooth.
+            configs
+                .reduce(|accum, config| {
+                    let transparency_check = config.supports_transparency().unwrap_or(false)
+                        & !accum.supports_transparency().unwrap_or(false);
 
-            let transparency_check = config.supports_transparency().unwrap_or(false)
-                & !accum.supports_transparency().unwrap_or(false);
-
-            if transparency_check || config.num_samples() > accum.num_samples() {
-                config
-            } else {
-                accum
-            }
+                    if transparency_check || config.num_samples() > accum.num_samples() {
+                        config
+                    } else {
+                        accum
+                    }
+                })
+                .unwrap()
         })
         .unwrap();
 
-    println!("Picked a config with {} samples", config.num_samples());
+    println!("Picked a config with {} samples", gl_config.num_samples());
+
+    let raw_window_handle = window.as_ref().map(|window| window.raw_window_handle());
+
+    // XXX The display could be obtained from the any object created by it, so we
+    // can query it from the config.
+    let gl_display = gl_config.display();
 
     // The context creation part. It can be created before surface and that's how
     // it's expected in multithreaded + multiwindow operation mode, since you
@@ -86,52 +78,29 @@ pub fn main() {
         .with_context_api(ContextApi::Gles(None))
         .build(raw_window_handle);
     let mut not_current_gl_context = Some(unsafe {
-        gl_display.create_context(&config, &context_attributes).unwrap_or_else(|_| {
+        gl_display.create_context(&gl_config, &context_attributes).unwrap_or_else(|_| {
             gl_display
-                .create_context(&config, &fallback_context_attributes)
+                .create_context(&gl_config, &fallback_context_attributes)
                 .expect("failed to create context")
         })
     });
 
     let mut state = None;
     let mut renderer = None;
-
-    event_loop.run(move |event, event_loop_window_target, control_flow| {
+    event_loop.run(move |event, window_target, control_flow| {
         control_flow.set_wait();
         match event {
             Event::Resumed => {
-                // While this event is only relevant for Android, it is raised on all platforms
-                // to provide a consistent place to create windows
-
                 #[cfg(target_os = "android")]
                 println!("Android window available");
 
-                // Take a possibly early created window, or create a new one
                 let window = window.take().unwrap_or_else(|| {
-                    // On X11 opacity is controlled by the visual we pass to the window latter on,
-                    // other platforms decide on that by what you draw, so there's no need to pass
-                    // this information to the window.
-                    #[cfg(not(cgl_backend))]
-                    let window = WindowBuilder::new();
-
-                    // Request opacity for window on macOS explicitly.
-                    #[cfg(cgl_backend)]
-                    let window = WindowBuilder::new().with_transparent(true);
-
-                    // We must pass the visual into the X11 window upon creation, otherwise we
-                    // could have mismatch errors during context activation and swap buffers.
-                    #[cfg(x11_platform)]
-                    let window = if let Some(visual) = config.x11_visual() {
-                        window.with_x11_visual(visual.into_raw())
-                    } else {
-                        window
-                    };
-
-                    window.build(event_loop_window_target).unwrap()
+                    let window_builder = WindowBuilder::new().with_transparent(true);
+                    glutin_winit::finalize_window(window_target, window_builder, &gl_config)
+                        .unwrap()
                 });
 
-                // Create a wrapper for GL window and surface.
-                let gl_window = GlWindow::from_existing(&gl_display, window, &config);
+                let gl_window = GlWindow::new(window, &gl_config);
 
                 // Make it current.
                 let gl_context = not_current_gl_context
@@ -167,7 +136,6 @@ pub fn main() {
                     .replace(gl_context.make_not_current().unwrap())
                     .is_none());
             },
-
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::Resized(size) => {
                     if size.width != 0 && size.height != 0 {
@@ -202,89 +170,30 @@ pub fn main() {
             },
             _ => (),
         }
-    });
+    })
 }
 
-pub mod gl {
-    #![allow(clippy::all)]
-    include!(concat!(env!("OUT_DIR"), "/gl_bindings.rs"));
-
-    pub use Gles2 as Gl;
-}
-
-/// Structure to hold winit window and gl surface.
 pub struct GlWindow {
+    // XXX the surface must be dropped before the window.
     pub surface: Surface<WindowSurface>,
+
     pub window: Window,
 }
 
 impl GlWindow {
-    pub fn new<T>(event_loop: &EventLoop<T>, display: &Display, config: &Config) -> Self {
-        let window = WindowBuilder::new().with_transparent(true).build(event_loop).unwrap();
-        let attrs = surface_attributes(&window);
-        let surface = unsafe { display.create_window_surface(config, &attrs).unwrap() };
+    pub fn new(window: Window, config: &Config) -> Self {
+        let (width, height): (u32, u32) = window.inner_size().into();
+        let raw_window_handle = window.raw_window_handle();
+        let attrs = SurfaceAttributesBuilder::<WindowSurface>::new().build(
+            raw_window_handle,
+            NonZeroU32::new(width).unwrap(),
+            NonZeroU32::new(height).unwrap(),
+        );
+
+        let surface = unsafe { config.display().create_window_surface(config, &attrs).unwrap() };
+
         Self { window, surface }
     }
-
-    pub fn from_existing(display: &Display, window: Window, config: &Config) -> Self {
-        let attrs = surface_attributes(&window);
-        let surface = unsafe { display.create_window_surface(config, &attrs).unwrap() };
-        Self { window, surface }
-    }
-}
-
-/// Create template to find OpenGL config.
-pub fn config_template(raw_window_handle: Option<RawWindowHandle>) -> ConfigTemplate {
-    let mut builder = ConfigTemplateBuilder::new().with_alpha_size(8);
-
-    if let Some(raw_window_handle) = raw_window_handle {
-        builder = builder
-            .compatible_with_native_window(raw_window_handle)
-            .with_surface_type(ConfigSurfaceTypes::WINDOW);
-    }
-
-    #[cfg(cgl_backend)]
-    let builder = builder.with_transparency(true).with_multisampling(8);
-
-    builder.build()
-}
-
-/// Create surface attributes for window surface.
-pub fn surface_attributes(window: &Window) -> SurfaceAttributes<WindowSurface> {
-    let (width, height): (u32, u32) = window.inner_size().into();
-    let raw_window_handle = window.raw_window_handle();
-    SurfaceAttributesBuilder::<WindowSurface>::new().build(
-        raw_window_handle,
-        NonZeroU32::new(width).unwrap(),
-        NonZeroU32::new(height).unwrap(),
-    )
-}
-
-/// Create the display.
-pub fn create_display(
-    raw_display: RawDisplayHandle,
-    raw_window_handle: Option<RawWindowHandle>,
-) -> Display {
-    #[cfg(egl_backend)]
-    let preference = DisplayApiPreference::Egl;
-
-    #[cfg(glx_backend)]
-    let preference = DisplayApiPreference::Glx(Box::new(unix::register_xlib_error_hook));
-
-    #[cfg(cgl_backend)]
-    let preference = DisplayApiPreference::Cgl;
-
-    #[cfg(wgl_backend)]
-    let preference = DisplayApiPreference::Wgl(Some(raw_window_handle.unwrap()));
-
-    #[cfg(all(egl_backend, wgl_backend))]
-    let preference = DisplayApiPreference::WglThenEgl(Some(raw_window_handle.unwrap()));
-
-    #[cfg(all(egl_backend, glx_backend))]
-    let preference = DisplayApiPreference::GlxThenEgl(Box::new(unix::register_xlib_error_hook));
-
-    // Create connection to underlying OpenGL client Api.
-    unsafe { Display::new(raw_display, preference).unwrap() }
 }
 
 pub struct Renderer {
