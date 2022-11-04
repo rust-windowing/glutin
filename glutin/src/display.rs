@@ -406,36 +406,82 @@ impl Sealed for Display {}
 
 /// Preference of the display that should be used.
 pub enum DisplayApiPreference {
-    /// Prefer EGL.
+    /// Use only EGL.
+    ///
+    /// The EGL is a cross platform recent OpenGL platform. That being said
+    /// it's usually lacking on Windows and not present at all on macOS
+    /// natively.
+    ///
+    /// Be also aware that some features may not be present with it, like window
+    /// transparency on X11 with mesa.
+    ///
+    /// But despite this issues it should be preferred on at least Linux over
+    /// GLX, given that GLX is phasing away.
     #[cfg(egl_backend)]
     Egl,
-    /// Prefer GLX.
+
+    /// Use only GLX.
+    ///
+    /// The native GLX platform, it's not very optimal since it's usually tied
+    /// to Xlib. It's know to work fine, but be aware that you must register
+    /// glutin with your X11  error handling callback, since it's a
+    /// per-process global state.
     ///
     /// The hook to register glutin error handler in the X11 error handling
     /// function.
     #[cfg(glx_backend)]
     Glx(XlibErrorHookRegistrar),
-    /// Prefer WGL.
+
+    /// Use only WGL.
+    ///
+    /// The most spread platform on Windows and what should be used on it by
+    /// default. EGL usually not present there so you'd have to account for that
+    /// and create the window beforehand.
     ///
     /// When raw window handle isn't provided the display will lack extensions
     /// support and most features will be lacking.
     #[cfg(wgl_backend)]
     Wgl(Option<raw_window_handle::RawWindowHandle>),
-    /// Prefer CGL.
+
+    /// Use only CGL.
+    ///
+    /// The only option on macOS for now.
     #[cfg(cgl_backend)]
     Cgl,
 
     /// Prefer EGL and fallback to GLX.
+    ///
+    /// See [`Egl`] and [`Glx`] to decide what you want.
+    ///
+    /// [`Egl`]: Self::Egl
+    /// [`Glx`]: Self::Glx
     #[cfg(all(egl_backend, glx_backend))]
     EglThenGlx(XlibErrorHookRegistrar),
+
     /// Prefer GLX and fallback to EGL.
+    ///
+    /// See [`Egl`] and [`Glx`] to decide what you want.
+    ///
+    /// [`Egl`]: Self::Egl
+    /// [`Glx`]: Self::Glx
     #[cfg(all(egl_backend, glx_backend))]
     GlxThenEgl(XlibErrorHookRegistrar),
 
-    /// Prefer EGL and fallback to GLX.
+    /// Prefer EGL and fallback to WGL.
+    ///
+    /// See [`Egl`] and [`Wgl`] to decide what you want.
+    ///
+    /// [`Egl`]: Self::Egl
+    /// [`Wgl`]: Self::Wgl
     #[cfg(all(egl_backend, wgl_backend))]
     EglThenWgl(Option<raw_window_handle::RawWindowHandle>),
+
     /// Prefer WGL and fallback to EGL.
+    ///
+    /// See [`Egl`] and [`Wgl`] to decide what you want.
+    ///
+    /// [`Egl`]: Self::Egl
+    /// [`Wgl`]: Self::Wgl
     #[cfg(all(egl_backend, wgl_backend))]
     WglThenEgl(Option<raw_window_handle::RawWindowHandle>),
 }
