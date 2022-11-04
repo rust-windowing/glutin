@@ -10,7 +10,7 @@ use glutin_glx_sys::{glx, glx_extra};
 use raw_window_handle::RawWindowHandle;
 
 use crate::config::GetGlConfig;
-use crate::display::GetGlDisplay;
+use crate::display::{DisplayFeatures, GetGlDisplay};
 use crate::error::{ErrorKind, Result};
 use crate::private::Sealed;
 use crate::surface::{
@@ -224,36 +224,50 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     }
 
     fn set_swap_interval(&self, _context: &Self::Context, interval: SwapInterval) -> Result<()> {
+        let extra = match self.display.inner.glx_extra {
+            Some(extra) if self.display.inner.features.contains(DisplayFeatures::SWAP_CONTROL) => {
+                extra
+            },
+            _ => {
+                return Err(
+                    ErrorKind::NotSupported("swap contol extrensions are not supported").into()
+                );
+            },
+        };
+
         let interval = match interval {
             SwapInterval::DontWait => 0,
             SwapInterval::Wait(n) => n.get(),
         };
 
-        let res = match self.display.inner.glx_extra {
-            Some(extra)
-                if self.display.inner.client_extensions.contains("GLX_EXT_swap_control") =>
-            unsafe {
-                extra.SwapIntervalEXT(self.display.inner.raw.cast(), self.raw, interval as _);
-                // Check for error explicitly here, other apis do have indication for failure.
-                0
-            },
-            Some(extra)
-                if self.display.inner.client_extensions.contains("GLX_SGI_swap_control") =>
-            unsafe { extra.SwapIntervalSGI(interval as _) },
-            Some(extra)
-                if self.display.inner.client_extensions.contains("GLX_MESA_swap_control") =>
-            unsafe { extra.SwapIntervalMESA(interval as _) },
-            _ => {
-                return Err(
-                    ErrorKind::NotSupported("swap contol extrensions are not supported").into()
-                )
-            },
-        };
+        let mut applied = false;
 
-        if res == 0 {
-            super::last_glx_error(self.display.inner.raw)
-        } else {
+        // Apply the `EXT` first since it's per window.
+        if !applied && self.display.inner.client_extensions.contains("GLX_EXT_swap_control") {
+            unsafe {
+                // Check for error explicitly here, other apis do have indication for failure.
+                extra.SwapIntervalEXT(self.display.inner.raw.cast(), self.raw, interval as _);
+                super::last_glx_error(self.display.inner.raw)?;
+                applied = true;
+            }
+        }
+
+        if !applied && self.display.inner.client_extensions.contains("GLX_MESA_swap_control") {
+            unsafe {
+                applied = extra.SwapIntervalMESA(interval as _) != glx::BAD_CONTEXT as _;
+            }
+        }
+
+        if !applied && self.display.inner.client_extensions.contains("GLX_SGI_swap_control") {
+            unsafe {
+                applied = extra.SwapIntervalSGI(interval as _) != glx::BAD_CONTEXT as _;
+            }
+        }
+
+        if applied {
             Ok(())
+        } else {
+            Err(ErrorKind::BadContext.into())
         }
     }
 

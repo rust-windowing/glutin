@@ -18,7 +18,7 @@ fn main() {
         || target.contains("android")
         || target.contains("ios")
     {
-        let mut file = File::create(&dest.join("egl_bindings.rs")).unwrap();
+        let mut file = File::create(dest.join("egl_bindings.rs")).unwrap();
         let reg = Registry::new(Api::Egl, (1, 5), Profile::Core, Fallbacks::All, [
             "EGL_ANDROID_native_fence_sync",
             "EGL_EXT_buffer_age",
