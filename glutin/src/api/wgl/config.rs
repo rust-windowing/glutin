@@ -423,6 +423,14 @@ impl GlConfig for Config {
         flags
     }
 
+    fn supports_transparency(&self) -> Option<bool> {
+        if self.inner.descriptor.as_ref().is_some() {
+            None
+        } else {
+            unsafe { Some(self.raw_attribute(wgl_extra::TRANSPARENT_ARB as c_int) != 0) }
+        }
+    }
+
     fn api(&self) -> Api {
         let mut api = Api::OPENGL;
         if self.inner.display.inner.features.contains(DisplayFeatures::CREATE_ES_CONTEXT) {

@@ -45,9 +45,16 @@ pub trait GlConfig: Sealed {
     /// Zero would mean that there're no samples.
     fn num_samples(&self) -> u8;
 
-    /// Whether the config supports creating srgb capable
-    /// [`crate::surface::Surface`].
+    /// Whether the config supports creating srgb capable [`Surface`].
+    ///
+    /// [`Surface`]: crate::surface::Surface
     fn srgb_capable(&self) -> bool;
+
+    /// Whether the config supports creating transparent surfaces.
+    ///
+    /// This function will return `None` when the property couldn't be
+    /// identified, in that case transparent window could still work.
+    fn supports_transparency(&self) -> Option<bool>;
 
     /// The type of the surfaces that can be created with this config.
     fn config_surface_types(&self) -> ConfigSurfaceTypes;
@@ -452,6 +459,10 @@ impl GlConfig for Config {
 
     fn config_surface_types(&self) -> ConfigSurfaceTypes {
         gl_api_dispatch!(self; Self(config) => config.config_surface_types())
+    }
+
+    fn supports_transparency(&self) -> Option<bool> {
+        gl_api_dispatch!(self; Self(config) => config.supports_transparency())
     }
 
     fn api(&self) -> Api {
