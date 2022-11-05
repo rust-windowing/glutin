@@ -12,7 +12,7 @@ fn main() {
     if target.contains("ios") {
         println!("cargo:rustc-link-lib=framework=GLKit");
         println!("cargo:rustc-link-lib=framework=OpenGLES");
-        let mut file = File::create(&dest.join("gles2_bindings.rs")).unwrap();
+        let mut file = File::create(dest.join("gles2_bindings.rs")).unwrap();
         Registry::new(Api::Gles2, (2, 0), Profile::Core, Fallbacks::None, [])
             .write_bindings(gl_generator::StaticStructGenerator, &mut file)
             .unwrap();

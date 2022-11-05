@@ -15,12 +15,12 @@ fn main() {
         || target.contains("netbsd")
         || target.contains("openbsd")
     {
-        let mut file = File::create(&dest.join("glx_bindings.rs")).unwrap();
+        let mut file = File::create(dest.join("glx_bindings.rs")).unwrap();
         Registry::new(Api::Glx, (1, 4), Profile::Core, Fallbacks::All, [])
             .write_bindings(gl_generator::StructGenerator, &mut file)
             .unwrap();
 
-        let mut file = File::create(&dest.join("glx_extra_bindings.rs")).unwrap();
+        let mut file = File::create(dest.join("glx_extra_bindings.rs")).unwrap();
         Registry::new(Api::Glx, (1, 4), Profile::Core, Fallbacks::All, [
             "GLX_ARB_context_flush_control",
             "GLX_ARB_create_context",

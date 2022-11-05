@@ -10,12 +10,12 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
 
     if target.contains("windows") {
-        let mut file = File::create(&dest.join("wgl_bindings.rs")).unwrap();
+        let mut file = File::create(dest.join("wgl_bindings.rs")).unwrap();
         Registry::new(Api::Wgl, (1, 0), Profile::Core, Fallbacks::All, [])
             .write_bindings(gl_generator::StaticGenerator, &mut file)
             .unwrap();
 
-        let mut file = File::create(&dest.join("wgl_extra_bindings.rs")).unwrap();
+        let mut file = File::create(dest.join("wgl_extra_bindings.rs")).unwrap();
         Registry::new(Api::Wgl, (1, 0), Profile::Core, Fallbacks::All, [
             "WGL_ARB_context_flush_control",
             "WGL_ARB_create_context",
