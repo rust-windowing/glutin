@@ -162,6 +162,13 @@ pub struct NotCurrentContext {
 }
 
 impl NotCurrentContext {
+    /// Make a [`Self::PossiblyCurrentContext`] indicating that the context
+    /// could be current on the thread.
+    pub fn make_current_surfaceless(self) -> Result<PossiblyCurrentContext> {
+        self.inner.make_current_surfaceless()?;
+        Ok(PossiblyCurrentContext { inner: self.inner, _nosendsync: PhantomData })
+    }
+
     fn new(inner: ContextInner) -> Self {
         Self { inner }
     }
@@ -223,6 +230,13 @@ impl Sealed for NotCurrentContext {}
 pub struct PossiblyCurrentContext {
     pub(crate) inner: ContextInner,
     _nosendsync: PhantomData<EGLContext>,
+}
+
+impl PossiblyCurrentContext {
+    /// Make this context current on the calling thread.
+    pub fn make_current_surfaceless(&self) -> Result<()> {
+        self.inner.make_current_surfaceless()
+    }
 }
 
 impl PossiblyCurrentGlContext for PossiblyCurrentContext {
@@ -289,6 +303,22 @@ pub(crate) struct ContextInner {
 }
 
 impl ContextInner {
+    fn make_current_surfaceless(&self) -> Result<()> {
+        unsafe {
+            if self.display.inner.egl.MakeCurrent(
+                *self.display.inner.raw,
+                egl::NO_SURFACE,
+                egl::NO_SURFACE,
+                *self.raw,
+            ) == egl::FALSE
+            {
+                super::check_error()
+            } else {
+                Ok(())
+            }
+        }
+    }
+
     fn make_current_draw_read<T: SurfaceTypeTrait>(
         &self,
         surface_draw: &Surface<T>,

@@ -2,9 +2,10 @@
 
 use std::collections::HashSet;
 use std::ffi::{self, CStr};
-use std::fmt;
 use std::ops::Deref;
+use std::os::raw::c_char;
 use std::sync::Arc;
+use std::{fmt, ptr};
 
 use glutin_egl_sys::egl;
 use glutin_egl_sys::egl::types::{EGLAttrib, EGLDisplay, EGLint};
@@ -23,12 +24,13 @@ use crate::surface::{PbufferSurface, PixmapSurface, SurfaceAttributes, WindowSur
 
 use super::config::Config;
 use super::context::NotCurrentContext;
+use super::device::Device;
 use super::surface::Surface;
 
 use super::{Egl, EGL};
 
 /// Extensions that don't require any display.
-static NO_DISPLAY_EXTENSIONS: OnceCell<HashSet<&'static str>> = OnceCell::new();
+pub(crate) static NO_DISPLAY_EXTENSIONS: OnceCell<HashSet<&'static str>> = OnceCell::new();
 
 /// A wrapper for the `EGLDisplay` and its supported extensions.
 #[derive(Debug, Clone)]
@@ -72,28 +74,113 @@ impl Display {
                 }
             })?;
 
-        let version = unsafe {
-            let (mut major, mut minor) = (0, 0);
-            if egl.Initialize(display, &mut major, &mut minor) == egl::FALSE {
-                return Err(super::check_error().err().unwrap());
-            }
+        Self::initialize_display(egl, display)
+    }
 
-            Version::new(major as u8, minor as u8)
+    /// Create an EGL display using the specified device.
+    ///
+    /// In most cases, prefer [`Display::new`] unless you need to render
+    /// off screen or use other extensions like EGLStreams.
+    ///
+    /// This function may take an optional [`RawDisplayHandle`] argument. At the
+    /// moment the `raw_display` argument is ignored and this function will
+    /// return [`Err`]. This may change in the future.
+    ///
+    /// # Safety
+    ///
+    /// If `raw_display` is [`Some`], `raw_display` must point to a valid system
+    /// display.
+    pub unsafe fn with_device(
+        device: &Device,
+        raw_display: Option<RawDisplayHandle>,
+    ) -> Result<Self> {
+        let egl = match EGL.as_ref() {
+            Some(egl) => egl,
+            None => return Err(ErrorKind::NotFound.into()),
         };
 
-        // Load extensions.
-        let client_extensions = get_extensions(egl, display);
-        let features = Self::extract_display_features(&client_extensions, version);
+        if raw_display.is_some() {
+            return Err(ErrorKind::NotSupported(
+                "Display::with_device does not support a `raw_display` argument yet",
+            )
+            .into());
+        }
 
-        let inner = Arc::new(DisplayInner {
-            egl,
-            raw: EglDisplay(display),
-            _native_display: NativeDisplay(raw_display),
-            version,
-            features,
-            client_extensions,
-        });
-        Ok(Self { inner })
+        if !egl.GetPlatformDisplayEXT.is_loaded() {
+            return Err(ErrorKind::NotSupported("eglGetPlatformDisplayEXT is not supported").into());
+        }
+
+        // Okay to unwrap here because the client extensions must have been enumerated
+        // while querying the available devices or the device was gotten from an
+        // existing display.
+        let extensions = NO_DISPLAY_EXTENSIONS.get().unwrap();
+
+        if !extensions.contains("EGL_EXT_platform_base")
+            && !extensions.contains("EGL_EXT_platform_device")
+        {
+            return Err(ErrorKind::NotSupported(
+                "Creating a display from a device is not supported",
+            )
+            .into());
+        }
+
+        let mut attrs = Vec::<EGLint>::with_capacity(2);
+
+        // TODO: Some extensions exist like EGL_EXT_device_drm which allow specifying
+        // which DRM master fd to use under the hood by the implementation. This would
+        // mean there would need to be an unsafe equivalent to this function.
+
+        // Push `egl::NONE` to terminate the list.
+        attrs.push(egl::NONE as EGLint);
+
+        let display = Self::check_display_error(unsafe {
+            egl.GetPlatformDisplayEXT(
+                egl::PLATFORM_DEVICE_EXT,
+                device.raw_device() as *mut _,
+                attrs.as_ptr(),
+            )
+        })?;
+
+        Self::initialize_display(egl, display)
+    }
+
+    /// Get the [`Device`] the display is using.
+    ///
+    /// This function returns [`Err`] if the `EGL_EXT_device_query` or
+    /// `EGL_EXT_device_base` extensions are not available.
+    pub fn device(&self) -> Result<Device> {
+        let no_display_extensions = NO_DISPLAY_EXTENSIONS.get().unwrap();
+
+        // Querying the device of a display only requires EGL_EXT_device_query, but we
+        // also check if EGL_EXT_device_base is available since
+        // EGL_EXT_device_base also provides EGL_EXT_device_query.
+        if !no_display_extensions.contains("EGL_EXT_device_query")
+            || !no_display_extensions.contains("EGL_EXT_device_base")
+        {
+            return Err(ErrorKind::NotSupported(
+                "Querying the device from a display is not supported",
+            )
+            .into());
+        }
+
+        let device = ptr::null_mut();
+        if unsafe {
+            self.inner.egl.QueryDisplayAttribEXT(
+                self.inner.raw.0,
+                egl::DEVICE_EXT as EGLint,
+                device as *mut _,
+            )
+        } == egl::FALSE
+        {
+            // Check for EGL_NOT_INITIALIZED in case the display was externally terminated.
+            //
+            // EGL_BAD_ATTRIBUTE shouldn't be returned since EGL_DEVICE_EXT should be a
+            // valid display attribute.
+            super::check_error()?;
+            return Err(ErrorKind::NotSupported("Failed to query device from display").into());
+        }
+
+        Device::from_ptr(self.inner.egl, device)
     }
 
     fn get_platform_display(egl: &Egl, display: RawDisplayHandle) -> Result<EGLDisplay> {
@@ -257,6 +344,31 @@ impl Display {
             Ok(display)
         }
     }
+
+    fn initialize_display(egl: &'static Egl, display: EGLDisplay) -> Result<Self> {
+        let version = unsafe {
+            let (mut major, mut minor) = (0, 0);
+            if egl.Initialize(display, &mut major, &mut minor) == egl::FALSE {
+                return Err(super::check_error().err().unwrap());
+            }
+
+            Version::new(major as u8, minor as u8)
+        };
+
+        // Load extensions.
+        let client_extensions = get_extensions(egl, display);
+        let features = Self::extract_display_features(&client_extensions, version);
+
+        let inner = Arc::new(DisplayInner {
+            egl,
+            raw: EglDisplay(display),
+            _native_display: None,
+            version,
+            client_extensions,
+            features,
+        });
+        Ok(Self { inner })
+    }
 }
 
 impl GlDisplay for Display {
@@ -349,7 +461,7 @@ pub(crate) struct DisplayInner {
     pub(crate) features: DisplayFeatures,
 
     /// The raw display used to create EGL display.
-    pub(crate) _native_display: NativeDisplay,
+    pub(crate) _native_display: Option<NativeDisplay>,
 }
 
 impl fmt::Debug for DisplayInner {
@@ -450,17 +562,32 @@ impl Deref for EglDisplay {
 }
 
 /// Collect EGL extensions for the given `display`.
-fn get_extensions(egl: &Egl, display: EGLDisplay) -> HashSet<&'static str> {
+pub(crate) fn get_extensions(egl: &Egl, display: EGLDisplay) -> HashSet<&'static str> {
     unsafe {
         let extensions = egl.QueryString(display, egl::EXTENSIONS as i32);
-        if extensions.is_null() {
-            return HashSet::new();
-        }
+        // SAFETY: The EGL specification guarantees the returned string is
+        // static and null terminated:
+        //
+        // > eglQueryString returns a pointer to a static, zero-terminated
+        // > string describing properties of the EGL client or of an EGL
+        // > display connection.
+        extensions_from_ptr(extensions)
+    }
+}
 
-        if let Ok(extensions) = CStr::from_ptr(extensions).to_str() {
-            extensions.split(' ').collect::<HashSet<&'static str>>()
-        } else {
-            HashSet::new()
-        }
+/// # Safety
+///
+/// - The `extensions` pointer must be NULL (representing no extensions) or it
+///   must be non-null and contain a static, null terminated C string.
+pub(crate) unsafe fn extensions_from_ptr(extensions: *const c_char) -> HashSet<&'static str> {
+    if extensions.is_null() {
+        return HashSet::new();
+    }
+
+    // SAFETY: The caller has ensured the string pointer is null terminated.
+    if let Ok(extensions) = unsafe { CStr::from_ptr(extensions) }.to_str() {
+        extensions.split(' ').collect::<HashSet<&'static str>>()
+    } else {
+        HashSet::new()
     }
 }

@@ -28,6 +28,7 @@ fn main() {
             "EGL_EXT_device_drm_render_node",
             "EGL_EXT_device_enumeration",
             "EGL_EXT_device_query",
+            "EGL_EXT_device_query_name",
             "EGL_EXT_pixel_format_float",
             "EGL_EXT_platform_base",
             "EGL_EXT_platform_device",

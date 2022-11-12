@@ -12,7 +12,7 @@ publish = false
 
 [features]
 default = ["egl", "glx", "x11", "wayland", "wgl"]
-egl = ["glutin/egl"]
+egl = ["glutin/egl", "png"]
 glx = ["glutin/glx", "glutin/x11", "winit/x11", "x11"]
 wgl = ["glutin/wgl"]
 x11 = ["glutin/x11", "winit/x11"]
@@ -22,6 +22,7 @@ wayland = ["glutin/wayland", "winit/wayland", "winit/wayland-dlopen", "winit/way
 glutin = { path = "../glutin", default-features = false }
 winit = { version = "0.27.2", default-features = false }
 raw-window-handle = "0.5.0"
+png = { version = "0.17.6", optional = true }
 
 [target.'cfg(target_os = "android")'.dependencies]
 ndk-glue = "0.7" # Keep in sync with winit dependency
@@ -33,3 +34,7 @@ cfg_aliases = "0.1.1"
 [[example]]
 name = "android"
 crate-type = ["cdylib"]
+
+[[example]]
+name = "egl_device"
+required-features = ["egl"]

@@ -1,4 +1,10 @@
 //! EGL platform Api.
+//!
+//! This platform is typically available on Linux, Android and other Unix-like
+//! platforms.
+//!
+//! The EGL platform allows creating a [`Display`](self::display::Display) from
+//! a [`Device`](self::device::Device).
 
 use std::ffi::{self, CString};
 use std::ops::{Deref, DerefMut};
@@ -18,6 +24,7 @@ use crate::lib_loading::{SymLoading, SymWrapper};
 
 pub mod config;
 pub mod context;
+pub mod device;
 pub mod display;
 pub mod surface;
 
