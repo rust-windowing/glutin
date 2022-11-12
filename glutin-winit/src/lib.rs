@@ -123,6 +123,7 @@ impl DisplayBuilder {
             config_picker(configs)
         };
 
+        #[cfg(not(wgl_backend))]
         let window = if let Some(wb) = self.window_builder.take() {
             Some(finalize_window(window_target, wb, &gl_config)?)
         } else {
