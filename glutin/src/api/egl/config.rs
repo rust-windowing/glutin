@@ -182,21 +182,8 @@ impl Display {
                 let inner = Arc::new(ConfigInner { display: self.clone(), raw });
                 Config { inner }
             })
-            .filter(move |_config| {
-                #[cfg(x11_platform)]
-                if template.transparency {
-                    if let raw_window_handle::RawDisplayHandle::Xlib(display_handle) =
-                        *self.inner._native_display
-                    {
-                        let xid = _config.native_visual();
-                        let xid = unsafe {
-                            X11VisualInfo::from_xid(display_handle.display as *mut _, xid as _)
-                        };
-                        return xid.map_or(false, |xid| xid.supports_transparency());
-                    }
-                }
-
-                true
+            .filter(move |config| {
+                !template.transparency || config.supports_transparency().unwrap_or(true)
             });
 
         Ok(Box::new(configs))
@@ -311,6 +298,25 @@ impl GlConfig for Config {
         }
 
         ty
+    }
+
+    #[cfg(not(all(wayland_platform, x11_platform)))]
+    fn supports_transparency(&self) -> Option<bool> {
+        None
+    }
+
+    #[cfg(any(wayland_platform, x11_platform))]
+    fn supports_transparency(&self) -> Option<bool> {
+        use raw_window_handle::RawDisplayHandle;
+        match *self.inner.display.inner._native_display {
+            #[cfg(x11_platform)]
+            RawDisplayHandle::Xlib(_) | RawDisplayHandle::Xcb(_) => {
+                self.x11_visual().map(|visual| visual.supports_transparency())
+            },
+            #[cfg(wayland_platform)]
+            RawDisplayHandle::Wayland(_) => Some(self.alpha_size() != 0),
+            _ => None,
+        }
     }
 
     fn api(&self) -> Api {

@@ -172,11 +172,7 @@ impl Display {
                     Config { inner }
                 })
                 .filter(move |config| {
-                    if template.transparency {
-                        config.x11_visual().unwrap().supports_transparency()
-                    } else {
-                        true
-                    }
+                    !template.transparency || config.supports_transparency().unwrap_or(false)
                 });
 
             Ok(Box::new(iter))
@@ -282,6 +278,10 @@ impl GlConfig for Config {
         }
 
         ty
+    }
+
+    fn supports_transparency(&self) -> Option<bool> {
+        self.x11_visual().map(|visual| visual.supports_transparency())
     }
 
     fn api(&self) -> Api {

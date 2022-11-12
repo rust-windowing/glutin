@@ -61,18 +61,8 @@ pub fn main() {
             // XXX however on macOS you can request only one config, so you should do
             // a search with the help of `find_configs` and adjusting your template.
 
-            // Since we try to show off transparency try to pick the config that supports it
-            // on X11 over the ones without it. XXX Configs that support
-            // transparency on X11 tend to not have multisapmling, so be aware
-            // of that.
-
-            #[cfg(x11_platform)]
-            let transparency_check =
-                config.x11_visual().map(|v| v.supports_transparency()).unwrap_or(false)
-                    & !accum.x11_visual().map(|v| v.supports_transparency()).unwrap_or(false);
-
-            #[cfg(not(x11_platform))]
-            let transparency_check = false;
+            let transparency_check = config.supports_transparency().unwrap_or(false)
+                & !accum.supports_transparency().unwrap_or(false);
 
             if transparency_check || config.num_samples() > accum.num_samples() {
                 config

@@ -196,6 +196,10 @@ impl GlConfig for Config {
         ConfigSurfaceTypes::WINDOW
     }
 
+    fn supports_transparency(&self) -> Option<bool> {
+        Some(self.inner.transparency)
+    }
+
     fn api(&self) -> Api {
         Api::OPENGL
     }

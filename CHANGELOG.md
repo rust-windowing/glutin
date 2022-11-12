@@ -1,5 +1,6 @@
 # Unreleased
 
+- Added `supports_transparency` on `GlConfig`.
 - On GLX, try all extensions when setting vsync.
 - On WGL, fixed that `Surface::swap_buffers` takes longer with every call caused by frequent calls of the win32 function `HDC GetDC(HWND hWnd)`.
 
