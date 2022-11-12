@@ -57,7 +57,7 @@ impl DisplayBuilder {
     }
 
     /// The preference in picking the configuration.
-    pub fn with_prefence(mut self, preference: ApiPrefence) -> Self {
+    pub fn with_preference(mut self, preference: ApiPrefence) -> Self {
         self.preference = preference;
         self
     }
