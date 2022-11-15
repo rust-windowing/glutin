@@ -5,8 +5,8 @@ use std::sync::Arc;
 use std::{fmt, iter};
 
 use cocoa::appkit::{
-    NSOpenGLPixelFormat, NSOpenGLPixelFormatAttribute, NSOpenGLProfileVersion3_2Core,
-    NSOpenGLProfileVersion4_1Core, NSOpenGLProfileVersionLegacy,
+    NSOpenGLPFAAllowOfflineRenderers, NSOpenGLPixelFormat, NSOpenGLPixelFormatAttribute,
+    NSOpenGLProfileVersion3_2Core, NSOpenGLProfileVersion4_1Core, NSOpenGLProfileVersionLegacy,
 };
 use cocoa::base::{id, nil, BOOL, NO};
 
@@ -28,6 +28,9 @@ impl Display {
 
         // We use minimum to follow behavior of other platforms here.
         attrs.push(NSOpenGLPixelFormatAttribute::NSOpenGLPFAMinimumPolicy as u32);
+
+        // Allow offline renderers.
+        attrs.push(NSOpenGLPFAAllowOfflineRenderers as u32);
 
         // Color.
         match template.color_buffer_type {

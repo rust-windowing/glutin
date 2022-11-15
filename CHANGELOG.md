@@ -1,5 +1,7 @@
 # Unreleased
 
+- Allow offline renderers with CGL.
+
 # Version 0.30.1
 
 - Added new `glutin-winit` crate to help bootstrapping new `glutin` with `winit`.
