@@ -9,6 +9,9 @@ readme = "README.md"
 repository = "https://github.com/rust-windowing/glutin"
 edition = "2021"
 
+# Custom path for the build script
+build = "../glutin/build.rs"
+
 [features]
 default = ["egl", "glx", "x11", "wayland", "wgl"]
 egl = ["glutin/egl"]
