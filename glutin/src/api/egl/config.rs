@@ -300,7 +300,7 @@ impl GlConfig for Config {
         ty
     }
 
-    #[cfg(not(all(wayland_platform, x11_platform)))]
+    #[cfg(not(any(wayland_platform, x11_platform)))]
     fn supports_transparency(&self) -> Option<bool> {
         None
     }

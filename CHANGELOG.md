@@ -1,6 +1,7 @@
 # Unreleased
 
 - Allow offline renderers with CGL.
+- Fixed an error when compiling the EGL backend with only one of Wayland and X11 enabled.
 
 # Version 0.30.1
 
