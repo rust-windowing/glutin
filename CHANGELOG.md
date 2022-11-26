@@ -1,5 +1,6 @@
 # Unreleased
 
+- Fixed robust context creation with EGL.
 - Moved to stable version of `wayland-sys`.
 - Allow offline renderers with CGL.
 - Fixed an error when compiling the EGL backend with only one of Wayland and X11 enabled.
