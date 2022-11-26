@@ -91,12 +91,12 @@ impl Display {
                 Robustness::RobustLoseContextOnReset if has_robustsess => {
                     attrs.push(egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY as EGLint);
                     attrs.push(egl::LOSE_CONTEXT_ON_RESET as EGLint);
-                    flags |= egl::CONTEXT_OPENGL_ROBUST_ACCESS;
+                    flags |= egl::CONTEXT_OPENGL_ROBUST_ACCESS_BIT_KHR;
                 },
                 Robustness::RobustNoResetNotification if has_robustsess => {
                     attrs.push(egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY as EGLint);
                     attrs.push(egl::NO_RESET_NOTIFICATION as EGLint);
-                    flags |= egl::CONTEXT_OPENGL_ROBUST_ACCESS;
+                    flags |= egl::CONTEXT_OPENGL_ROBUST_ACCESS_BIT_KHR;
                 },
                 _ => {
                     return Err(
