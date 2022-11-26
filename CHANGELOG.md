@@ -1,5 +1,7 @@
 # Unreleased
 
+# Version 0.30.2
+
 - Fixed robust context creation with EGL.
 - Moved to stable version of `wayland-sys`.
 - Allow offline renderers with CGL.
