@@ -504,7 +504,7 @@ pub enum RawSurface {
 ///
 /// The origin is in the bottom left of the surface.
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct Rect {
     /// `X` of the origin.
     pub x: i32,
