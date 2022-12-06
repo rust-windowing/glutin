@@ -1,5 +1,7 @@
 # Unreleased
 
+- Fixed wrong amount of rects commited in `Surface::swap_buffers_with_damage` with EGL.
+
 # Version 0.30.2
 
 - Fixed robust context creation with EGL.

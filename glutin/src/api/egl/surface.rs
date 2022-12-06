@@ -255,7 +255,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
                     *self.display.inner.raw,
                     self.raw,
                     rects.as_ptr() as *mut _,
-                    (rects.len() * 4) as _,
+                    rects.len() as _,
                 )
             } else if self
                 .display
@@ -267,7 +267,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
                     *self.display.inner.raw,
                     self.raw,
                     rects.as_ptr() as *mut _,
-                    (rects.len() * 4) as _,
+                    rects.len() as _,
                 )
             } else {
                 self.display.inner.egl.SwapBuffers(*self.display.inner.raw, self.raw)
