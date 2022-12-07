@@ -1,5 +1,7 @@
 # Unreleased
 
+# Version 0.30.3
+
 - Fixed wrong amount of rects commited in `Surface::swap_buffers_with_damage` with EGL.
 - Added missing `Eq`, `PartialEq`, and `Hash` impls for `surface::Rect`.
 
