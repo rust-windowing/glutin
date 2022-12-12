@@ -45,7 +45,7 @@ jobs:
           - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest, options: --no-default-features, features: "egl,wayland" }
           - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest, options: --no-default-features, features: "egl,x11" }
           - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest, options: --no-default-features, features: glx }
-          - { target: aarch64-linux-android,    os: ubuntu-latest, options: -p glutin, cmd: 'apk --'   }
+          - { target: aarch64-linux-android,    os: ubuntu-latest, cmd: 'apk --'   }
           - { target: x86_64-apple-darwin,      os: macos-latest,    }
           # We don't support ios for now.
           # - { target: x86_64-apple-ios,         os: macos-latest,    }
@@ -94,7 +94,7 @@ jobs:
         !contains(matrix.platform.target, 'android') &&
         !contains(matrix.platform.target, 'ios') &&
         !contains(matrix.platform.target, 'wasm32'))
-      run: cargo $CMD test --verbose --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES
+      run: cargo test --verbose --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES
 
     - name: Check documentation
       shell: bash
