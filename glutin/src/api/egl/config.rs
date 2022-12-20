@@ -1,4 +1,5 @@
 //! Everything related to finding and manipulating the `EGLConfig`.
+#![allow(clippy::unnecessary_cast)] // needed for 32bit & 64bit support
 
 use std::ops::Deref;
 use std::sync::Arc;
