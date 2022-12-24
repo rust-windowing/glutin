@@ -1,4 +1,5 @@
 //! GLX platform Api.
+#![allow(clippy::unnecessary_cast)] // needed for 32bit & 64bit support
 
 use std::ffi::{self, CStr, CString};
 use std::ops::{Deref, DerefMut};
