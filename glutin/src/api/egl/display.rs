@@ -257,7 +257,7 @@ impl Display {
                 if extensions.contains("EGL_MESA_platform_xcb")
                     || extensions.contains("EGL_EXT_platform_xcb") =>
             {
-                attrs.push(egl::PLATFORM_XCB_EXT as EGLint);
+                attrs.push(egl::PLATFORM_XCB_SCREEN_EXT as EGLint);
                 attrs.push(handle.screen as EGLint);
                 (egl::PLATFORM_XCB_EXT, handle.connection)
             },

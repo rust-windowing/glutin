@@ -29,7 +29,7 @@ pub mod egl {
     // TODO should upstream these:
     // EGL_EXT_platform_xcb
     pub const PLATFORM_XCB_EXT: super::EGLenum = 0x31DC;
-    pub const PLATFORM_XCB_SCREEN_EXT: super::EGLenum = 0x31DC;
+    pub const PLATFORM_XCB_SCREEN_EXT: super::EGLenum = 0x31DE;
     // EGL_EXT_device_query_name
     pub const RENDERER_EXT: super::EGLenum = 0x335F;
 }
