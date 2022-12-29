@@ -5,6 +5,8 @@ use std::ops::Deref;
 use std::sync::Arc;
 use std::{fmt, mem};
 
+use raw_window_handle::RawWindowHandle;
+
 use glutin_egl_sys::egl;
 use glutin_egl_sys::egl::types::{EGLConfig, EGLint};
 
@@ -182,6 +184,21 @@ impl Display {
                 let raw = EglConfig(raw);
                 let inner = Arc::new(ConfigInner { display: self.clone(), raw });
                 Config { inner }
+            })
+            .filter(move |config| {
+                // Filter configs not compatible with the native window.
+                //
+                // XXX This can't be done by passing visual in the EGL attributes
+                // when calling `eglChooseConfig` since the visual is ignored.
+                match template.native_window {
+                    Some(RawWindowHandle::Xcb(xcb)) => {
+                        xcb.visual_id as u32 == config.native_visual()
+                    },
+                    Some(RawWindowHandle::Xlib(xlib)) => {
+                        xlib.visual_id as u32 == config.native_visual()
+                    },
+                    _ => true,
+                }
             })
             .filter(move |config| {
                 !template.transparency || config.supports_transparency().unwrap_or(true)
