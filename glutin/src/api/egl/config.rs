@@ -184,7 +184,23 @@ impl Display {
                 Config { inner }
             })
             .filter(move |config| {
-                !template.transparency || config.supports_transparency().unwrap_or(true)
+                let mut keep = true;
+                // Filter configs not compatible with the native window.
+                #[cfg(x11_platform)]
+                {
+                    use raw_window_handle::RawWindowHandle;
+                    keep &= match template.native_window {
+                        Some(RawWindowHandle::Xcb(xcb)) => {
+                            xcb.visual_id as u32 == config.native_visual()
+                        },
+                        Some(RawWindowHandle::Xlib(xlib)) => {
+                            xlib.visual_id as u32 == config.native_visual()
+                        },
+                        _ => true,
+                    };
+                }
+                keep &= !template.transparency || config.supports_transparency().unwrap_or(true);
+                keep
             });
 
         Ok(Box::new(configs))
