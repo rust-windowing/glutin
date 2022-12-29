@@ -36,7 +36,7 @@ pub fn main() {
 
     // The template will match only the configurations supporting rendering to
     // windows.
-    let template = ConfigTemplateBuilder::new().with_alpha_size(8);
+    let template = ConfigTemplateBuilder::new().with_alpha_size(8).with_transparency(true);
 
     let display_builder = DisplayBuilder::new().with_window_builder(window_builder);
 
