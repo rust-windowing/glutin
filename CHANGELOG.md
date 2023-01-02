@@ -1,6 +1,7 @@
 # Unreleased
 
 - Fixed EGL display initialization with XcbDisplayHandle.
+- Fixed EGL/GLX `Surface::width` returning the height instead of the width
 
 # Version 0.30.3
 
@@ -33,7 +34,7 @@
 - The underlying Api providers are publically exposed now, so glutin could be used with just e.g. `EGL`.
 - Fixed soundness issues with `Surface` MT safety, since before `EGLSurface` could be sent to a different thread, which is not safe.
 - Fallback to `Surface::swap_buffers` when `Surface::swap_buffers_with_damage` is not supported on `EGL`.
- 
+
 # Version 0.29.1 (2022-08-10)
 
 - Fix build failures when building from crates.io

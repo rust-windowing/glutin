@@ -205,7 +205,7 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     }
 
     fn width(&self) -> Option<u32> {
-        unsafe { Some(self.raw_attribute(glx::HEIGHT as c_int) as u32) }
+        unsafe { Some(self.raw_attribute(glx::WIDTH as c_int) as u32) }
     }
 
     fn height(&self) -> Option<u32> {
