@@ -32,13 +32,21 @@ pub trait GlSurface<T: SurfaceTypeTrait>: Sealed {
     /// its age. In both cases you must redraw the entire buffer.
     fn buffer_age(&self) -> u32;
 
-    /// The width of the underlying surface.
+    /// The **physical** width of the underlying surface.
     fn width(&self) -> Option<u32>;
 
-    /// The height of the underlying surface.
+    /// The **physical** height of the underlying surface.
+    ///
+    /// # Platform specific
+    ///
+    /// **macOS:** - **This will block if your main thread is blocked.**
     fn height(&self) -> Option<u32>;
 
     /// Check whether the surface is single buffered.
+    ///
+    /// # Platform specific
+    ///
+    /// **macOS:** - **This will block if your main thread is blocked.**
     fn is_single_buffered(&self) -> bool;
 
     /// Swaps the underlying back buffers when the surface is not single
@@ -68,7 +76,7 @@ pub trait GlSurface<T: SurfaceTypeTrait>: Sealed {
     /// # Platform specific
     ///
     /// **Wayland:** - resizes the surface.
-    /// **macOS:** - resizes the context to fit the surface.
+    /// **macOS:** - **This will block if your main thread is blocked.**
     /// **Other:** - no op.
     fn resize(&self, context: &Self::Context, width: NonZeroU32, height: NonZeroU32)
     where

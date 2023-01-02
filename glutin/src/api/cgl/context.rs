@@ -15,7 +15,7 @@ use crate::prelude::*;
 use crate::private::Sealed;
 use crate::surface::{SurfaceTypeTrait, SwapInterval};
 
-use super::appkit::{NSOpenGLCPSwapInterval, NSOpenGLContext};
+use super::appkit::{run_on_main, MainThreadSafe, NSOpenGLCPSwapInterval, NSOpenGLContext};
 use super::config::Config;
 use super::display::Display;
 use super::surface::Surface;
@@ -218,9 +218,15 @@ impl ContextInner {
 
     fn make_current<T: SurfaceTypeTrait>(&self, surface: &Surface<T>) -> Result<()> {
         autoreleasepool(|_| {
-            self.raw.update();
+            self.update();
             self.raw.makeCurrentContext();
-            unsafe { self.raw.setView(Some(&surface.ns_view)) };
+            let raw = MainThreadSafe(&self.raw);
+            let ns_view = MainThreadSafe(&surface.ns_view);
+
+            run_on_main(move || unsafe {
+                raw.setView(Some(*ns_view));
+            });
+
             Ok(())
         })
     }
@@ -241,7 +247,10 @@ impl ContextInner {
     }
 
     pub(crate) fn update(&self) {
-        self.raw.update();
+        let raw = MainThreadSafe(&self.raw);
+        run_on_main(move || {
+            raw.update();
+        });
     }
 
     pub(crate) fn flush_buffer(&self) -> Result<()> {
@@ -256,7 +265,7 @@ impl ContextInner {
     }
 
     fn make_not_current(&self) -> Result<()> {
-        self.raw.update();
+        self.update();
         NSOpenGLContext::clearCurrentContext();
         Ok(())
     }

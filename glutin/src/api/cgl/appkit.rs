@@ -3,14 +3,45 @@
 //! TODO: Move this to another crate.
 #![allow(dead_code)]
 #![allow(non_snake_case)]
+
+use std::ops::Deref;
+
+use dispatch::Queue;
 use objc2::encode::{Encoding, RefEncode};
-use objc2::foundation::{NSInteger, NSObject};
+use objc2::foundation::{is_main_thread, NSInteger, NSObject};
 use objc2::rc::{Id, Shared};
 use objc2::{extern_class, extern_methods, msg_send_id, ClassType};
 
 pub type GLint = i32;
 
 pub enum CGLContextObj {}
+
+// XXX borrowed from winit.
+
+// Unsafe wrapper type that allows us to dispatch things that aren't Send.
+// This should *only* be used to dispatch to the main queue.
+// While it is indeed not guaranteed that these types can safely be sent to
+// other threads, we know that they're safe to use on the main thread.
+pub(crate) struct MainThreadSafe<T>(pub(crate) T);
+
+unsafe impl<T> Send for MainThreadSafe<T> {}
+
+impl<T> Deref for MainThreadSafe<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        &self.0
+    }
+}
+
+/// Run closure on the main thread.
+pub(crate) fn run_on_main<R: Send>(f: impl FnOnce() -> R + Send) -> R {
+    if is_main_thread() {
+        f()
+    } else {
+        Queue::main().exec_sync(f)
+    }
+}
 
 unsafe impl RefEncode for CGLContextObj {
     const ENCODING_REF: Encoding = Encoding::Pointer(&Encoding::Struct("_CGLContextObject", &[]));

@@ -4,7 +4,8 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
 
-use objc2::foundation::NSObject;
+use objc2::foundation::{CGFloat, NSObject, NSRect};
+use objc2::msg_send;
 use objc2::rc::{Id, Shared};
 use raw_window_handle::RawWindowHandle;
 
@@ -17,6 +18,7 @@ use crate::surface::{
     SurfaceTypeTrait, SwapInterval, WindowSurface,
 };
 
+use super::appkit::{run_on_main, MainThreadSafe};
 use super::config::Config;
 use super::context::PossiblyCurrentContext;
 use super::display::Display;
@@ -52,11 +54,28 @@ impl Display {
             },
         };
 
-        // SAFETY: Validity of the view is ensured by caller
-        let ns_view =
-            unsafe { Id::retain(native_window.ns_view.cast()) }.expect("NSView to be non-null");
-        let surface =
-            Surface { display: self.clone(), config: config.clone(), ns_view, _ty: PhantomData };
+        // SAFETY: Validity of the view and window is ensured by caller
+        let ns_view = if let Some(ns_view) = unsafe { Id::retain(native_window.ns_view.cast()) } {
+            ns_view
+        } else {
+            return Err(ErrorKind::NotSupported("ns_view of provided native window is nil").into());
+        };
+
+        let ns_window = if let Some(ns_window) =
+            unsafe { Id::retain(native_window.ns_window.cast()) }
+        {
+            ns_window
+        } else {
+            return Err(ErrorKind::NotSupported("ns_view of provided native window is nil").into());
+        };
+
+        let surface = Surface {
+            display: self.clone(),
+            config: config.clone(),
+            ns_view,
+            ns_window,
+            _ty: PhantomData,
+        };
         Ok(surface)
     }
 }
@@ -66,6 +85,7 @@ pub struct Surface<T: SurfaceTypeTrait> {
     display: Display,
     config: Config,
     pub(crate) ns_view: Id<NSObject, Shared>,
+    ns_window: Id<NSObject, Shared>,
     _ty: PhantomData<T>,
 }
 
@@ -78,11 +98,23 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     }
 
     fn width(&self) -> Option<u32> {
-        None
+        let ns_window = MainThreadSafe(&self.ns_window);
+        let ns_view = MainThreadSafe(&self.ns_view);
+        run_on_main(move || unsafe {
+            let scale_factor: CGFloat = msg_send![*ns_window, backingScaleFactor];
+            let frame: NSRect = msg_send![*ns_view, frame];
+            Some((frame.size.width * scale_factor) as u32)
+        })
     }
 
     fn height(&self) -> Option<u32> {
-        None
+        let ns_window = MainThreadSafe(&self.ns_window);
+        let ns_view = MainThreadSafe(&self.ns_view);
+        run_on_main(move || unsafe {
+            let scale_factor: CGFloat = msg_send![*ns_window, backingScaleFactor];
+            let frame: NSRect = msg_send![*ns_view, frame];
+            Some((frame.size.height * scale_factor) as u32)
+        })
     }
 
     fn is_single_buffered(&self) -> bool {
