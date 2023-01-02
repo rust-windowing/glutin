@@ -320,7 +320,7 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     }
 
     fn width(&self) -> Option<u32> {
-        unsafe { Some(self.raw_attribute(egl::HEIGHT as EGLint) as u32) }
+        unsafe { Some(self.raw_attribute(egl::WIDTH as EGLint) as u32) }
     }
 
     fn height(&self) -> Option<u32> {
