@@ -9,7 +9,7 @@ use winit::window::{Window, WindowBuilder};
 use raw_window_handle::HasRawWindowHandle;
 
 use glutin::config::{Config, ConfigTemplateBuilder};
-use glutin::context::{ContextApi, ContextAttributesBuilder};
+use glutin::context::{ContextApi, ContextAttributesBuilder, Version};
 use glutin::display::GetGlDisplay;
 use glutin::prelude::*;
 use glutin::surface::{Surface, SurfaceAttributesBuilder, SwapInterval, WindowSurface};
@@ -77,11 +77,22 @@ pub fn main() {
     let fallback_context_attributes = ContextAttributesBuilder::new()
         .with_context_api(ContextApi::Gles(None))
         .build(raw_window_handle);
+
+    // There are also some old devices that support neither modern OpenGL nor GLES.
+    // To support these we can try and create a 2.1 context.
+    let legacy_context_attributes = ContextAttributesBuilder::new()
+        .with_context_api(ContextApi::OpenGl(Some(Version::new(2, 1))))
+        .build(raw_window_handle);
+
     let mut not_current_gl_context = Some(unsafe {
         gl_display.create_context(&gl_config, &context_attributes).unwrap_or_else(|_| {
-            gl_display
-                .create_context(&gl_config, &fallback_context_attributes)
-                .expect("failed to create context")
+            gl_display.create_context(&gl_config, &fallback_context_attributes).unwrap_or_else(
+                |_| {
+                    gl_display
+                        .create_context(&gl_config, &legacy_context_attributes)
+                        .expect("failed to create context")
+                },
+            )
         })
     });
 
