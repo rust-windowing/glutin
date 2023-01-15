@@ -1,4 +1,4 @@
-# glutin -  OpenGL, UTilities and INput
+# glutin -  OpenGL, UTilities, and INput
 
 A low-level library for OpenGL context creation.
 
@@ -21,10 +21,10 @@ Join us in any of these:
 
 ## Usage Examples
 
-**Warning:** these are examples for master. For the latest released version you can
-find them [here](https://github.com/rust-windowing/glutin/releases/tag/v0.30.3).
+**Warning:** These are examples for `master`. You can find examples for
+the latest _released version_ [here](https://github.com/rust-windowing/glutin/releases/tag/v0.30.3).
 
-The examples use [gl_generator](https://crates.io/crates/gl_generator) to
+The examples use [`gl_generator`](https://crates.io/crates/gl_generator) to
 generate OpenGL bindings.
 
 ### Try it!
@@ -37,7 +37,7 @@ cargo run --example window
 
 ### Usage
 
-Glutin is an OpenGL context creation library and doesn't directly provide
+Glutin is an OpenGL context creation library, and doesn't directly provide
 OpenGL bindings for you.
 
 For examples, please look [here](https://github.com/rust-windowing/glutin/tree/master/glutin_examples).
@@ -46,15 +46,20 @@ Note that glutin aims at being a low-level brick in your rendering
 infrastructure. You are encouraged to write another layer of abstraction
 between glutin and your application.
 
-The minimum rust version target by glutin is `1.60.0`.
+The minimum Rust version target by glutin is `1.60.0`.
 
 ## Platform-specific notes
 
 ### Android
 
-Be sure to handle Android's lifecycle correctly when using a `winit` window by only creating a GL surface after `winit` raises `Event::Resumed`, and destroy it again upon receiving `Event::Suspended`. See this in action in the [`android.rs` example](./glutin_examples/examples/android.rs).
+Be sure to handle Android's lifecycle correctly when using a `winit` window
+by only creating a GL surface after `winit` raises `Event::Resumed`, and
+destroy it again upon receiving `Event::Suspended`. See this in action in the
+[`android.rs` example](./glutin_examples/examples/android.rs).
 
-To compile and run the Android example on your device, install [`cargo-apk`](https://crates.io/crates/cargo-apk) and start the app using:
+To compile and run the Android example on your device,
+install [`cargo-apk`](https://crates.io/crates/cargo-apk)
+and start the app using:
 
 ```console
 $ cargo apk r -p glutin_examples --example android
