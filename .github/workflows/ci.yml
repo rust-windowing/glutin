@@ -83,7 +83,7 @@ jobs:
 
     - name: Install cargo-apk
       if: contains(matrix.platform.target, 'android')
-      run: cargo install cargo-apk
+      run: cargo +stable install cargo-apk
 
     - name: Build tests
       shell: bash
