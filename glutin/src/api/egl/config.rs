@@ -318,6 +318,10 @@ impl GlConfig for Config {
         ty
     }
 
+    fn hardware_accelerated(&self) -> bool {
+        unsafe { self.raw_attribute(egl::CONFIG_CAVEAT as EGLint) != egl::SLOW_CONFIG as EGLint }
+    }
+
     #[cfg(not(any(wayland_platform, x11_platform)))]
     fn supports_transparency(&self) -> Option<bool> {
         None

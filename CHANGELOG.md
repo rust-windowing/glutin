@@ -3,6 +3,7 @@
 - Fixed EGL display initialization with XcbDisplayHandle.
 - Fixed EGL/GLX `Surface::width` returning the height instead of the width.
 - On GLX, fixed handling of errors not directly requested by glutin.
+- Added `GlConfig::hardware_accelerated` to check if the config is hardware accelerated.
 
 # Version 0.30.3
 

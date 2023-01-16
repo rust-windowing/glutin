@@ -241,6 +241,10 @@ impl GlConfig for Config {
         unsafe { self.raw_attribute(glx::ALPHA_SIZE as c_int) as u8 }
     }
 
+    fn hardware_accelerated(&self) -> bool {
+        unsafe { self.raw_attribute(glx::CONFIG_CAVEAT as c_int) != glx::SLOW_CONFIG as c_int }
+    }
+
     fn srgb_capable(&self) -> bool {
         if self.inner.display.inner.client_extensions.contains("GLX_ARB_framebuffer_sRGB") {
             unsafe { self.raw_attribute(glx_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as c_int) != 0 }

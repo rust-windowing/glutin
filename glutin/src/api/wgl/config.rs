@@ -423,6 +423,17 @@ impl GlConfig for Config {
         flags
     }
 
+    fn hardware_accelerated(&self) -> bool {
+        if let Some(descriptor) = self.inner.descriptor.as_ref() {
+            descriptor.dwFlags & gl::PFD_GENERIC_ACCELERATED != 0
+        } else {
+            unsafe {
+                self.raw_attribute(wgl_extra::ACCELERATION_ARB as c_int)
+                    != wgl_extra::NO_ACCELERATION_ARB as c_int
+            }
+        }
+    }
+
     fn supports_transparency(&self) -> Option<bool> {
         if self.inner.descriptor.as_ref().is_some() {
             None
