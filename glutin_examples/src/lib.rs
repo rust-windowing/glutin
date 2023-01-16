@@ -4,17 +4,17 @@ use std::ops::Deref;
 
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::EventLoopBuilder;
-use winit::window::{Window, WindowBuilder};
+use winit::window::WindowBuilder;
 
 use raw_window_handle::HasRawWindowHandle;
 
-use glutin::config::{Config, ConfigTemplateBuilder};
+use glutin::config::ConfigTemplateBuilder;
 use glutin::context::{ContextApi, ContextAttributesBuilder, Version};
 use glutin::display::GetGlDisplay;
 use glutin::prelude::*;
-use glutin::surface::{Surface, SurfaceAttributesBuilder, SwapInterval, WindowSurface};
+use glutin::surface::SwapInterval;
 
-use glutin_winit::{self, DisplayBuilder};
+use glutin_winit::{self, DisplayBuilder, GlWindow};
 
 pub mod gl {
     #![allow(clippy::all)]
@@ -111,14 +111,14 @@ pub fn main() {
                         .unwrap()
                 });
 
-                let gl_window = GlWindow::new(window, &gl_config);
+                let attrs = window.build_surface_attributes(<_>::default());
+                let gl_surface = unsafe {
+                    gl_config.display().create_window_surface(&gl_config, &attrs).unwrap()
+                };
 
                 // Make it current.
-                let gl_context = not_current_gl_context
-                    .take()
-                    .unwrap()
-                    .make_current(&gl_window.surface)
-                    .unwrap();
+                let gl_context =
+                    not_current_gl_context.take().unwrap().make_current(&gl_surface).unwrap();
 
                 // The context needs to be current for the Renderer to set up shaders and
                 // buffers. It also performs function loading, which needs a current context on
@@ -126,14 +126,13 @@ pub fn main() {
                 renderer.get_or_insert_with(|| Renderer::new(&gl_display));
 
                 // Try setting vsync.
-                if let Err(res) = gl_window
-                    .surface
+                if let Err(res) = gl_surface
                     .set_swap_interval(&gl_context, SwapInterval::Wait(NonZeroU32::new(1).unwrap()))
                 {
                     eprintln!("Error setting vsync: {:?}", res);
                 }
 
-                assert!(state.replace((gl_context, gl_window)).is_none());
+                assert!(state.replace((gl_context, gl_surface, window)).is_none());
             },
             Event::Suspended => {
                 // This event is only raised on Android, where the backing NativeWindow for a GL
@@ -142,7 +141,7 @@ pub fn main() {
 
                 // Destroy the GL Surface and un-current the GL Context before ndk-glue releases
                 // the window back to the system.
-                let (gl_context, _) = state.take().unwrap();
+                let (gl_context, ..) = state.take().unwrap();
                 assert!(not_current_gl_context
                     .replace(gl_context.make_not_current().unwrap())
                     .is_none());
@@ -154,8 +153,8 @@ pub fn main() {
                         // Notable platforms here are Wayland and macOS, other don't require it
                         // and the function is no-op, but it's wise to resize it for portability
                         // reasons.
-                        if let Some((gl_context, gl_window)) = &state {
-                            gl_window.surface.resize(
+                        if let Some((gl_context, gl_surface, _)) = &state {
+                            gl_surface.resize(
                                 gl_context,
                                 NonZeroU32::new(size.width).unwrap(),
                                 NonZeroU32::new(size.height).unwrap(),
@@ -171,40 +170,17 @@ pub fn main() {
                 _ => (),
             },
             Event::RedrawEventsCleared => {
-                if let Some((gl_context, gl_window)) = &state {
+                if let Some((gl_context, gl_surface, window)) = &state {
                     let renderer = renderer.as_ref().unwrap();
                     renderer.draw();
-                    gl_window.window.request_redraw();
+                    window.request_redraw();
 
-                    gl_window.surface.swap_buffers(gl_context).unwrap();
+                    gl_surface.swap_buffers(gl_context).unwrap();
                 }
             },
             _ => (),
         }
     })
-}
-
-pub struct GlWindow {
-    // XXX the surface must be dropped before the window.
-    pub surface: Surface<WindowSurface>,
-
-    pub window: Window,
-}
-
-impl GlWindow {
-    pub fn new(window: Window, config: &Config) -> Self {
-        let (width, height): (u32, u32) = window.inner_size().into();
-        let raw_window_handle = window.raw_window_handle();
-        let attrs = SurfaceAttributesBuilder::<WindowSurface>::new().build(
-            raw_window_handle,
-            NonZeroU32::new(width).unwrap(),
-            NonZeroU32::new(height).unwrap(),
-        );
-
-        let surface = unsafe { config.display().create_window_surface(config, &attrs).unwrap() };
-
-        Self { window, surface }
-    }
 }
 
 pub struct Renderer {

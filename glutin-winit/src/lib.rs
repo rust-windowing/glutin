@@ -8,6 +8,10 @@
 #![deny(missing_docs)]
 #![cfg_attr(feature = "cargo-clippy", deny(warnings))]
 
+mod window;
+
+pub use window::GlWindow;
+
 use std::error::Error;
 
 use glutin::config::{Config, ConfigTemplateBuilder};
