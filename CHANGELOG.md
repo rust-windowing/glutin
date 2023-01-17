@@ -1,7 +1,8 @@
 # Unreleased
 
 - Fixed EGL display initialization with XcbDisplayHandle.
-- Fixed EGL/GLX `Surface::width` returning the height instead of the width
+- Fixed EGL/GLX `Surface::width` returning the height instead of the width.
+- On GLX, fixed handling of errors not directly requested by glutin.
 
 # Version 0.30.3
 

@@ -388,6 +388,7 @@ impl Drop for ContextInner {
         unsafe {
             self.display.inner.glx.DestroyContext(self.display.inner.raw.cast(), *self.raw);
         }
+        let _ = super::last_glx_error(self.display.inner.raw);
     }
 }
 
