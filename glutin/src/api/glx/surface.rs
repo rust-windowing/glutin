@@ -188,6 +188,7 @@ impl<T: SurfaceTypeTrait> Drop for Surface<T> {
                 },
             }
         }
+        let _ = super::last_glx_error(self.display.inner.raw);
     }
 }
 

@@ -3,7 +3,7 @@
 
 use std::ffi::{self, CStr, CString};
 use std::ops::{Deref, DerefMut};
-use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::Mutex;
 
 use libloading::Library;
@@ -29,6 +29,10 @@ pub mod surface;
 /// The hook registrar must call to the function inside xlib error
 /// [`handler`].
 ///
+/// The `bool` value returned by that hook tells wether the error was handled by
+/// it or not. So when it returns `true` it means that your error handling
+/// routine shouldn't handle the error as it was handled by the hook already.
+///
 /// [`handler`]: https://tronche.com/gui/x/xlib/event-handling/protocol-errors/XSetErrorHandler.html
 pub type XlibErrorHookRegistrar =
     Box<dyn Fn(Box<dyn Fn(*mut ffi::c_void, *mut ffi::c_void) -> bool + Send + Sync>)>;
@@ -38,6 +42,10 @@ static GLX_BASE_ERROR: AtomicI32 = AtomicI32::new(0);
 
 /// The last error arrived from GLX normalized by `GLX_BASE_ERROR`.
 static LAST_GLX_ERROR: Lazy<Mutex<Option<Error>>> = Lazy::new(|| Mutex::new(None));
+
+/// Whether we're in the process of getting GLX error. Otherwise we may handle
+/// the winit's error.
+static SYNCING_GLX_ERROR: AtomicBool = AtomicBool::new(false);
 
 static GLX: Lazy<Option<Glx>> = Lazy::new(|| {
     let paths = ["libGL.so.1", "libGL.so"];
@@ -111,6 +119,11 @@ impl DerefMut for GlxExtra {
 }
 /// Store the last error received from the GLX.
 fn glx_error_hook(_display: *mut ffi::c_void, xerror_event: *mut ffi::c_void) -> bool {
+    // In case we've not forced the sync, ignore the error.
+    if !SYNCING_GLX_ERROR.load(Ordering::Relaxed) {
+        return false;
+    }
+
     let xerror = xerror_event as *mut XErrorEvent;
     unsafe {
         let code = (*xerror).error_code;
@@ -162,13 +175,27 @@ fn glx_error_hook(_display: *mut ffi::c_void, xerror_event: *mut ffi::c_void) ->
 
 /// Get the error from the X11.
 fn last_glx_error(display: display::GlxDisplay) -> Result<()> {
+    // Ensure that the access is safe by locking the display.
+    unsafe {
+        (XLIB.as_ref().unwrap().XLockDisplay)(*display as *mut _);
+    }
+
+    // XXX mark that we're asking X11 for the errors, to prevent handling errors
+    // we're not expecting.
+    SYNCING_GLX_ERROR.store(true, Ordering::Relaxed);
     unsafe {
         // Force synchronization.
         (XLIB.as_ref().unwrap().XSync)(*display as *mut _, 0);
     }
+    SYNCING_GLX_ERROR.store(false, Ordering::Relaxed);
 
     // Reset and report last error.
     let last_error = LAST_GLX_ERROR.lock().unwrap().take();
+
+    // Unlock the display once we've read the error.
+    unsafe {
+        (XLIB.as_ref().unwrap().XUnlockDisplay)(*display as *mut _);
+    }
     match last_error {
         Some(error) => Err(error),
         None => Ok(()),
