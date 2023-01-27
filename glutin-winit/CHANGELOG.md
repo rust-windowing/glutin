@@ -1,5 +1,7 @@
 # Unreleased
 
+# Version 0.2.2
+
 - Add traits `GlWindow` with helper methods for building and resizing surfaces using a winit `Window`.
 
 # Version 0.2.1
