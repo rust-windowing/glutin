@@ -183,6 +183,10 @@ impl GlConfig for Config {
         true
     }
 
+    fn hardware_accelerated(&self) -> bool {
+        self.raw_attribute(NSOpenGLPixelFormatAttribute::NSOpenGLPFAAccelerated) != 0
+    }
+
     fn depth_size(&self) -> u8 {
         self.raw_attribute(NSOpenGLPixelFormatAttribute::NSOpenGLPFADepthSize) as u8
     }

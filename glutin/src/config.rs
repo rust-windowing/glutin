@@ -56,6 +56,14 @@ pub trait GlConfig: Sealed {
     /// identified, in that case transparent window could still work.
     fn supports_transparency(&self) -> Option<bool>;
 
+    /// Whether the config is hardware accelerated.
+    ///
+    /// The meaning of this may vary from system to system. On some it could
+    /// mean that you're using a software backend renderer, it could mean
+    /// that you're using not the fastest available GPU, like in laptops
+    /// with hybrid graphics.
+    fn hardware_accelerated(&self) -> bool;
+
     /// The type of the surfaces that can be created with this config.
     fn config_surface_types(&self) -> ConfigSurfaceTypes;
 
@@ -459,6 +467,10 @@ impl GlConfig for Config {
 
     fn config_surface_types(&self) -> ConfigSurfaceTypes {
         gl_api_dispatch!(self; Self(config) => config.config_surface_types())
+    }
+
+    fn hardware_accelerated(&self) -> bool {
+        gl_api_dispatch!(self; Self(config) => config.hardware_accelerated())
     }
 
     fn supports_transparency(&self) -> Option<bool> {
