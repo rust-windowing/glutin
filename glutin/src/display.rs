@@ -507,7 +507,7 @@ impl fmt::Debug for DisplayApiPreference {
             DisplayApiPreference::Cgl => "Cgl",
         };
 
-        f.write_fmt(format_args!("DisplayApiPreference::{}", api))
+        f.write_fmt(format_args!("DisplayApiPreference::{api}"))
     }
 }
 

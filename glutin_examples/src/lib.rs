@@ -129,7 +129,7 @@ pub fn main() {
                 if let Err(res) = gl_surface
                     .set_swap_interval(&gl_context, SwapInterval::Wait(NonZeroU32::new(1).unwrap()))
                 {
-                    eprintln!("Error setting vsync: {:?}", res);
+                    eprintln!("Error setting vsync: {res:?}");
                 }
 
                 assert!(state.replace((gl_context, gl_surface, window)).is_none());

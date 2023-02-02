@@ -30,9 +30,9 @@ use winit::event_loop::EventLoopWindowTarget;
 use winit::window::{Window, WindowBuilder};
 
 #[cfg(glx_backend)]
-use winit::platform::unix;
+use winit::platform::x11::register_xlib_error_hook;
 #[cfg(x11_platform)]
-use winit::platform::unix::WindowBuilderExtUnix;
+use winit::platform::x11::WindowBuilderExtX11;
 
 #[cfg(all(not(egl_backend), not(glx_backend), not(wgl_backend), not(cgl_backend)))]
 compile_error!("Please select at least one api backend");
@@ -147,7 +147,7 @@ fn create_display<T>(
     let _preference = DisplayApiPreference::Egl;
 
     #[cfg(glx_backend)]
-    let _preference = DisplayApiPreference::Glx(Box::new(unix::register_xlib_error_hook));
+    let _preference = DisplayApiPreference::Glx(Box::new(register_xlib_error_hook));
 
     #[cfg(cgl_backend)]
     let _preference = DisplayApiPreference::Cgl;
@@ -158,10 +158,10 @@ fn create_display<T>(
     #[cfg(all(egl_backend, glx_backend))]
     let _preference = match _api_preference {
         ApiPrefence::PreferEgl => {
-            DisplayApiPreference::EglThenGlx(Box::new(unix::register_xlib_error_hook))
+            DisplayApiPreference::EglThenGlx(Box::new(register_xlib_error_hook))
         },
         ApiPrefence::FallbackEgl => {
-            DisplayApiPreference::GlxThenEgl(Box::new(unix::register_xlib_error_hook))
+            DisplayApiPreference::GlxThenEgl(Box::new(register_xlib_error_hook))
         },
     };
 

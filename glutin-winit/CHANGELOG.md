@@ -1,5 +1,7 @@
 # Unreleased
 
+- **Breaking:** Update _winit_ to `0.28`. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/releases/tag/v0.28.0) for more info.
+
 # Version 0.2.2
 
 - Add traits `GlWindow` with helper methods for building and resizing surfaces using a winit `Window`.
