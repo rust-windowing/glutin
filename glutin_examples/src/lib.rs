@@ -3,7 +3,6 @@ use std::num::NonZeroU32;
 use std::ops::Deref;
 
 use winit::event::{Event, WindowEvent};
-use winit::event_loop::EventLoopBuilder;
 use winit::window::WindowBuilder;
 
 use raw_window_handle::HasRawWindowHandle;
@@ -23,9 +22,7 @@ pub mod gl {
     pub use Gles2 as Gl;
 }
 
-pub fn main() {
-    let event_loop = EventLoopBuilder::new().build();
-
+pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
     // Only windows requires the window to be present before creating the display.
     // Other platforms don't really need one.
     //
