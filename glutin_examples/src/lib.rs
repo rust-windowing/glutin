@@ -3,7 +3,6 @@ use std::num::NonZeroU32;
 use std::ops::Deref;
 
 use winit::event::{Event, WindowEvent};
-use winit::event_loop::EventLoopBuilder;
 use winit::window::WindowBuilder;
 
 use raw_window_handle::HasRawWindowHandle;
@@ -23,9 +22,7 @@ pub mod gl {
     pub use Gles2 as Gl;
 }
 
-pub fn main() {
-    let event_loop = EventLoopBuilder::new().build();
-
+pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
     // Only windows requires the window to be present before creating the display.
     // Other platforms don't really need one.
     //
@@ -129,7 +126,7 @@ pub fn main() {
                 if let Err(res) = gl_surface
                     .set_swap_interval(&gl_context, SwapInterval::Wait(NonZeroU32::new(1).unwrap()))
                 {
-                    eprintln!("Error setting vsync: {:?}", res);
+                    eprintln!("Error setting vsync: {res:?}");
                 }
 
                 assert!(state.replace((gl_context, gl_surface, window)).is_none());

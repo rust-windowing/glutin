@@ -50,7 +50,7 @@ impl Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(raw_code) = self.raw_code {
-            write!(f, "[{:x}] ", raw_code)?;
+            write!(f, "[{raw_code:x}] ")?;
         }
 
         let msg = if let Some(raw_os_message) = self.raw_os_message.as_ref() {
@@ -59,7 +59,7 @@ impl fmt::Display for Error {
             self.kind.as_str()
         };
 
-        write!(f, "{}", msg)
+        write!(f, "{msg}")
     }
 }
 

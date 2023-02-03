@@ -1,6 +1,10 @@
 #![cfg(target_os = "android")]
 
-#[ndk_glue::main(backtrace = "on")]
-fn main() {
-    glutin_examples::main()
+use winit::event_loop::EventLoopBuilder;
+use winit::platform::android::EventLoopBuilderExtAndroid;
+
+#[no_mangle]
+fn android_main(app: winit::platform::android::activity::AndroidApp) {
+    let event_loop = EventLoopBuilder::new().with_android_app(app).build();
+    glutin_examples::main(event_loop)
 }
