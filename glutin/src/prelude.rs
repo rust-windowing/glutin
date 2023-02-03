@@ -16,3 +16,6 @@ pub use crate::context::{
 };
 pub use crate::display::GlDisplay;
 pub use crate::surface::GlSurface;
+
+// TODO(breaking release) - make pub.
+pub(crate) use crate::context::GlContext;

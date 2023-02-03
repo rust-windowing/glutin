@@ -58,7 +58,9 @@ impl Display {
         }
 
         let config = config.clone();
-        let inner = ContextInner { display: self.clone(), config, raw: GlxContext(context) };
+        let is_gles = matches!(context_attributes.api, Some(ContextApi::Gles(_)));
+        let inner =
+            ContextInner { display: self.clone(), config, raw: GlxContext(context), is_gles };
 
         Ok(NotCurrentContext::new(inner))
     }
@@ -254,6 +256,12 @@ impl<T: SurfaceTypeTrait> NotCurrentGlContextSurfaceAccessor<T> for NotCurrentCo
     }
 }
 
+impl GlContext for NotCurrentContext {
+    fn context_api(&self) -> ContextApi {
+        self.inner.context_api()
+    }
+}
+
 impl GetGlConfig for NotCurrentContext {
     type Target = Config;
 
@@ -315,6 +323,12 @@ impl<T: SurfaceTypeTrait> PossiblyCurrentContextGlSurfaceAccessor<T> for Possibl
     }
 }
 
+impl GlContext for PossiblyCurrentContext {
+    fn context_api(&self) -> ContextApi {
+        self.inner.context_api()
+    }
+}
+
 impl GetGlConfig for PossiblyCurrentContext {
     type Target = Config;
 
@@ -343,6 +357,7 @@ struct ContextInner {
     display: Display,
     config: Config,
     raw: GlxContext,
+    is_gles: bool,
 }
 
 impl ContextInner {
@@ -379,6 +394,14 @@ impl ContextInner {
             } else {
                 Ok(())
             }
+        }
+    }
+
+    fn context_api(&self) -> ContextApi {
+        if self.is_gles {
+            ContextApi::Gles(None)
+        } else {
+            ContextApi::OpenGl(None)
         }
     }
 }

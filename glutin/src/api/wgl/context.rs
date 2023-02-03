@@ -64,7 +64,8 @@ impl Display {
         };
 
         let config = config.clone();
-        let inner = ContextInner { display: self.clone(), config, raw: context };
+        let is_gles = matches!(context_attributes.api, Some(ContextApi::Gles(_)));
+        let inner = ContextInner { display: self.clone(), config, raw: context, is_gles };
         Ok(NotCurrentContext { inner })
     }
 
@@ -321,6 +322,18 @@ impl<T: SurfaceTypeTrait> NotCurrentGlContextSurfaceAccessor<T> for NotCurrentCo
     }
 }
 
+impl GlContext for PossiblyCurrentContext {
+    fn context_api(&self) -> ContextApi {
+        self.inner.context_api()
+    }
+}
+
+impl GlContext for NotCurrentContext {
+    fn context_api(&self) -> ContextApi {
+        self.inner.context_api()
+    }
+}
+
 impl AsRawContext for PossiblyCurrentContext {
     fn raw_context(&self) -> RawContext {
         RawContext::Wgl(*self.inner.raw)
@@ -337,6 +350,7 @@ struct ContextInner {
     display: Display,
     config: Config,
     raw: WglContext,
+    is_gles: bool,
 }
 
 impl fmt::Debug for ContextInner {
@@ -377,6 +391,14 @@ impl ContextInner {
             } else {
                 Ok(())
             }
+        }
+    }
+
+    fn context_api(&self) -> ContextApi {
+        if self.is_gles {
+            ContextApi::Gles(None)
+        } else {
+            ContextApi::OpenGl(None)
         }
     }
 }

@@ -4,7 +4,7 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::ops::Deref;
 
-use glutin_egl_sys::egl::types::EGLint;
+use glutin_egl_sys::egl::types::{EGLenum, EGLint};
 use glutin_egl_sys::{egl, EGLContext};
 
 use crate::config::{Api, GetGlConfig};
@@ -201,6 +201,12 @@ impl<T: SurfaceTypeTrait> NotCurrentGlContextSurfaceAccessor<T> for NotCurrentCo
     }
 }
 
+impl GlContext for NotCurrentContext {
+    fn context_api(&self) -> ContextApi {
+        self.inner.context_api()
+    }
+}
+
 impl GetGlConfig for NotCurrentContext {
     type Target = Config;
 
@@ -268,6 +274,12 @@ impl<T: SurfaceTypeTrait> PossiblyCurrentContextGlSurfaceAccessor<T> for Possibl
         surface_read: &Self::Surface,
     ) -> Result<()> {
         self.inner.make_current_draw_read(surface_draw, surface_read)
+    }
+}
+
+impl GlContext for PossiblyCurrentContext {
+    fn context_api(&self) -> ContextApi {
+        self.inner.context_api()
     }
 }
 
@@ -351,6 +363,32 @@ impl ContextInner {
                 super::check_error()
             } else {
                 Ok(())
+            }
+        }
+    }
+
+    fn context_api(&self) -> ContextApi {
+        match self.query_attribute(egl::CONTEXT_CLIENT_TYPE as EGLint).map(|a| a as EGLenum) {
+            Some(egl::OPENGL_API) => ContextApi::OpenGl(None),
+            // Map the rest to the GLES.
+            _ => ContextApi::Gles(None),
+        }
+    }
+
+    /// Query the context attribute.
+    fn query_attribute(&self, attribute: EGLint) -> Option<EGLint> {
+        unsafe {
+            let mut attribute_value = 0;
+            if self.display.inner.egl.QueryContext(
+                self.display.inner.raw.cast(),
+                self.raw.cast(),
+                attribute,
+                &mut attribute_value,
+            ) == egl::FALSE
+            {
+                None
+            } else {
+                Some(attribute_value)
             }
         }
     }

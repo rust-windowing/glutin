@@ -103,6 +103,12 @@ impl<T: SurfaceTypeTrait> NotCurrentGlContextSurfaceAccessor<T> for NotCurrentCo
     }
 }
 
+impl GlContext for NotCurrentContext {
+    fn context_api(&self) -> ContextApi {
+        self.inner.context_api()
+    }
+}
+
 impl GetGlConfig for NotCurrentContext {
     type Target = Config;
 
@@ -173,6 +179,12 @@ impl<T: SurfaceTypeTrait> PossiblyCurrentContextGlSurfaceAccessor<T> for Possibl
     }
 }
 
+impl GlContext for PossiblyCurrentContext {
+    fn context_api(&self) -> ContextApi {
+        self.inner.context_api()
+    }
+}
+
 impl GetGlConfig for PossiblyCurrentContext {
     type Target = Config;
 
@@ -219,6 +231,10 @@ impl ContextInner {
             self.raw.setView_(surface.ns_view);
             Ok(())
         })
+    }
+
+    fn context_api(&self) -> ContextApi {
+        ContextApi::OpenGl(None)
     }
 
     pub(crate) fn set_swap_interval(&self, interval: SwapInterval) {

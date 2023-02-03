@@ -28,6 +28,14 @@ use crate::api::wgl::context::{
     NotCurrentContext as NotCurrentWglContext, PossiblyCurrentContext as PossiblyCurrentWglContext,
 };
 
+/// A trait to group common context operations.
+pub trait GlContext: Sealed {
+    /// Get the [`ContextApi`] used by the context.
+    ///
+    /// The returned value's [`Version`] will always be `None`.
+    fn context_api(&self) -> ContextApi;
+}
+
 /// A trait to group common not current operations.
 pub trait NotCurrentGlContext: Sealed {
     /// The type of possibly current context.
@@ -434,6 +442,12 @@ impl<T: SurfaceTypeTrait> NotCurrentGlContextSurfaceAccessor<T> for NotCurrentCo
     }
 }
 
+impl GlContext for NotCurrentContext {
+    fn context_api(&self) -> ContextApi {
+        gl_api_dispatch!(self; Self(context) => context.context_api())
+    }
+}
+
 impl GetGlConfig for NotCurrentContext {
     type Target = Config;
 
@@ -548,6 +562,12 @@ impl<T: SurfaceTypeTrait> PossiblyCurrentContextGlSurfaceAccessor<T> for Possibl
             },
             _ => unreachable!(),
         }
+    }
+}
+
+impl GlContext for PossiblyCurrentContext {
+    fn context_api(&self) -> ContextApi {
+        gl_api_dispatch!(self; Self(context) => context.context_api())
     }
 }
 
