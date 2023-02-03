@@ -1,6 +1,6 @@
 [package]
 name = "glutin-winit"
-version = "0.2.2"
+version = "0.3.0"
 authors = ["Kirill Chibisov <contact@kchibisov.com>"]
 description = "Glutin bootstrapping helpers with winit"
 keywords = ["windowing", "opengl", "winit"]
