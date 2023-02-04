@@ -4,6 +4,7 @@
 - Fixed EGL/GLX `Surface::width` returning the height instead of the width.
 - On GLX, fixed handling of errors not directly requested by glutin.
 - Added `GlConfig::hardware_accelerated` to check if the config is hardware accelerated.
+- Added `GlContext::context_api` to get the `ContextApi` used by the context.
 
 # Version 0.30.3
 
