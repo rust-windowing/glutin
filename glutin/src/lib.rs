@@ -35,10 +35,6 @@ pub mod surface;
 #[cfg(any(egl_backend, glx_backend))]
 mod lib_loading;
 
-#[cfg(cgl_backend)]
-#[macro_use]
-extern crate objc;
-
 pub(crate) mod private {
     /// Prevent traits from being implemented downstream, since those are used
     /// purely for documentation organization and simplify platform api

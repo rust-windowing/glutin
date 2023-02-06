@@ -11,6 +11,3 @@ edition = "2021"
 
 [build-dependencies]
 gl_generator = "0.14"
-
-[target.'cfg(target_os = "ios")'.dependencies]
-objc = "0.2.7"

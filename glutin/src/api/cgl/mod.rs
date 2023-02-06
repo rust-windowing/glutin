@@ -10,6 +10,7 @@ use cgl::{kCGLNoError, CGLError, CGLErrorString};
 
 use crate::error::{Error, ErrorKind, Result};
 
+mod appkit;
 pub mod config;
 pub mod context;
 pub mod display;
