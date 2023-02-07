@@ -1,14 +1,15 @@
 //! A wrapper around `HWND` used for GL operations.
 
-use std::fmt;
 use std::io::Error as IoError;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
+use std::{fmt, mem};
 
 use raw_window_handle::RawWindowHandle;
-use windows_sys::Win32::Foundation::HWND;
+use windows_sys::Win32::Foundation::{HWND, RECT};
 use windows_sys::Win32::Graphics::Gdi::HDC;
 use windows_sys::Win32::Graphics::{Gdi as gdi, OpenGL as gl};
+use windows_sys::Win32::UI::WindowsAndMessaging::GetClientRect;
 
 use crate::config::GetGlConfig;
 use crate::display::{DisplayFeatures, GetGlDisplay};
@@ -93,11 +94,21 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     }
 
     fn width(&self) -> Option<u32> {
-        None
+        let mut rect: RECT = unsafe { mem::zeroed() };
+        if unsafe { GetClientRect(self.hwnd, &mut rect) } == false.into() {
+            None
+        } else {
+            Some((rect.right - rect.left) as u32)
+        }
     }
 
     fn height(&self) -> Option<u32> {
-        None
+        let mut rect: RECT = unsafe { mem::zeroed() };
+        if unsafe { GetClientRect(self.hwnd, &mut rect) } == false.into() {
+            None
+        } else {
+            Some((rect.bottom - rect.top) as u32)
+        }
     }
 
     fn is_single_buffered(&self) -> bool {

@@ -5,6 +5,9 @@
 - On GLX, fixed handling of errors not directly requested by glutin.
 - Added `GlConfig::hardware_accelerated` to check if the config is hardware accelerated.
 - Added `GlContext::context_api` to get the `ContextApi` used by the context.
+- Added missing implementations of `Surface::{width,height}` for WGL/CGL
+- Fixed crash when accessing context from the off-thread on macOS.
+- **Clarified that `make_{,not}_current()`, `GlSurface::width()`, `GlSurface::height()`, and `GlSurface::resize()` could block on macOS.**
 
 # Version 0.30.3
 

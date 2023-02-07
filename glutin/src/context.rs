@@ -59,6 +59,10 @@ pub trait NotCurrentGlContextSurfaceAccessor<T: SurfaceTypeTrait>: Sealed {
     /// Make [`Self::Surface`] on the calling thread producing the
     /// [`Self::PossiblyCurrentContext`] indicating that the context could
     /// be current on the theard.
+    ///
+    /// # Platform specific
+    ///
+    /// **macOS:** - **This will block if your main thread is blocked.**
     fn make_current(self, surface: &Self::Surface) -> Result<Self::PossiblyCurrentContext>;
 
     /// The same as [`Self::make_current`], but provides a way to set read and
@@ -85,6 +89,10 @@ pub trait PossiblyCurrentGlContext: Sealed {
     /// Make the context not current to the current thread and returns a
     /// [`Self::NotCurrentContext`] to indicate that the context is a not
     /// current to allow sending it to the different thread.
+    ///
+    /// # Platform specific
+    ///
+    /// **macOS:** - **This will block if your main thread is blocked.**
     fn make_not_current(self) -> Result<Self::NotCurrentContext>;
 }
 
@@ -94,6 +102,10 @@ pub trait PossiblyCurrentContextGlSurfaceAccessor<T: SurfaceTypeTrait>: Sealed {
     type Surface: GlSurface<T>;
 
     /// Make [`Self::Surface`] current on the calling thread.
+    ///
+    /// # Platform specific
+    ///
+    /// **macOS:** - **This will block if your main thread is blocked.**
     fn make_current(&self, surface: &Self::Surface) -> Result<()>;
 
     /// The same as [`Self::make_current`] but provides a way to set read and
