@@ -97,8 +97,10 @@ impl Display {
 
         // Add visual if was provided.
         if let Some(RawWindowHandle::Xlib(window)) = template.native_window {
-            config_attributes.push(glx::VISUAL_ID as c_int);
-            config_attributes.push(window.visual_id as c_int);
+            if window.visual_id > 0 {
+                config_attributes.push(glx::VISUAL_ID as c_int);
+                config_attributes.push(window.visual_id as c_int);
+            }
         }
 
         // Add surface type.

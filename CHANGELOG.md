@@ -1,5 +1,7 @@
 # Unreleased
 
+- Fix EGL/GLX display initialization when the provided raw-window-handle has an unknown visual_id.
+
 # Version 0.30.4
 
 - Fixed EGL display initialization with XcbDisplayHandle.
