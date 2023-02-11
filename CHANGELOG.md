@@ -1,6 +1,7 @@
 # Unreleased
 
 - Fix EGL/GLX display initialization when the provided raw-window-handle has an unknown visual_id.
+- Fix EGL always returning `None` for `x11_visual()`.
 
 # Version 0.30.4
 

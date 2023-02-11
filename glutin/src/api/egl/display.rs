@@ -74,7 +74,7 @@ impl Display {
                 }
             })?;
 
-        Self::initialize_display(egl, display)
+        Self::initialize_display(egl, display, Some(raw_display))
     }
 
     /// Create an EGL display using the specified device.
@@ -141,7 +141,7 @@ impl Display {
             )
         })?;
 
-        Self::initialize_display(egl, display)
+        Self::initialize_display(egl, display, None)
     }
 
     /// Get the [`Device`] the display is using.
@@ -345,7 +345,11 @@ impl Display {
         }
     }
 
-    fn initialize_display(egl: &'static Egl, display: EGLDisplay) -> Result<Self> {
+    fn initialize_display(
+        egl: &'static Egl,
+        display: EGLDisplay,
+        raw_display_handle: Option<RawDisplayHandle>,
+    ) -> Result<Self> {
         let version = unsafe {
             let (mut major, mut minor) = (0, 0);
             if egl.Initialize(display, &mut major, &mut minor) == egl::FALSE {
@@ -362,7 +366,7 @@ impl Display {
         let inner = Arc::new(DisplayInner {
             egl,
             raw: EglDisplay(display),
-            _native_display: None,
+            _native_display: raw_display_handle.map(NativeDisplay),
             version,
             client_extensions,
             features,

@@ -31,9 +31,16 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
     let window_builder =
         if cfg!(wgl_backend) { Some(WindowBuilder::new().with_transparent(true)) } else { None };
 
-    // The template will match only the configurations supporting rendering to
-    // windows.
-    let template = ConfigTemplateBuilder::new().with_alpha_size(8).with_transparency(true);
+    // The template will match only the configurations supporting rendering
+    // to windows.
+    //
+    // XXX We force transparency only on macOS, given that EGL on X11 doesn't
+    // have it, but we still want to show window. The macOS situation is like
+    // that, because we can query only one config at a time on it, but all
+    // normal platforms will return multiple configs, so we can find the config
+    // with transparency ourselves inside the `reduce`.
+    let template =
+        ConfigTemplateBuilder::new().with_alpha_size(8).with_transparency(cfg!(cgl_backend));
 
     let display_builder = DisplayBuilder::new().with_window_builder(window_builder);
 
