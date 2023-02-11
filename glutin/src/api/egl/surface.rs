@@ -104,7 +104,7 @@ impl Display {
                 self.inner.egl.CreatePlatformPixmapSurface(
                     *self.inner.raw,
                     *config.inner.raw,
-                    native_pixmap.raw(),
+                    native_pixmap.as_ptr(),
                     attrs.as_ptr(),
                 )
             } else if self.inner.client_extensions.contains("EGL_EXT_platform_base") {
@@ -112,15 +112,16 @@ impl Display {
                 self.inner.egl.CreatePlatformPixmapSurfaceEXT(
                     *self.inner.raw,
                     *config.inner.raw,
-                    native_pixmap.raw(),
+                    native_pixmap.as_ptr(),
                     attrs.as_ptr(),
                 )
             } else {
+                // This call accepts raw value, instead of pointer.
                 let attrs: Vec<EGLint> = attrs.into_iter().map(|attr| attr as EGLint).collect();
                 self.inner.egl.CreatePixmapSurface(
                     *self.inner.raw,
                     *config.inner.raw,
-                    native_pixmap.raw(),
+                    *(native_pixmap.as_ptr() as *const egl::NativePixmapType),
                     attrs.as_ptr(),
                 )
             }
@@ -181,7 +182,7 @@ impl Display {
                 self.inner.egl.CreatePlatformWindowSurface(
                     *self.inner.raw,
                     *config.inner.raw,
-                    native_window.raw() as _,
+                    native_window.as_ptr().cast(),
                     attrs.as_ptr(),
                 )
             } else if self.inner.client_extensions.contains("EGL_EXT_platform_base") {
@@ -189,15 +190,16 @@ impl Display {
                 self.inner.egl.CreatePlatformWindowSurfaceEXT(
                     *self.inner.raw,
                     *config.inner.raw,
-                    native_window.raw() as _,
+                    native_window.as_ptr().cast(),
                     attrs.as_ptr(),
                 )
             } else {
                 let attrs: Vec<EGLint> = attrs.into_iter().map(|attr| attr as EGLint).collect();
+                // This call accepts raw value, instead of pointer.
                 self.inner.egl.CreateWindowSurface(
                     *self.inner.raw,
                     *config.inner.raw,
-                    native_window.raw() as _,
+                    *(native_window.as_ptr() as *const egl::NativeWindowType),
                     attrs.as_ptr(),
                 )
             }
@@ -494,7 +496,7 @@ impl NativeWindow {
         }
     }
 
-    fn raw(&self) -> *mut ffi::c_void {
+    fn as_ptr(&self) -> *mut ffi::c_void {
         match self {
             #[cfg(wayland_platform)]
             Self::Wayland(wl_egl_surface) => *wl_egl_surface,
@@ -521,7 +523,7 @@ impl Drop for NativeWindow {
 }
 
 impl NativePixmap {
-    fn raw(&self) -> *mut ffi::c_void {
+    fn as_ptr(&self) -> *mut ffi::c_void {
         match self {
             Self::XlibPixmap(xid) => xid as *const _ as *mut _,
             Self::XcbPixmap(xid) => xid as *const _ as *mut _,
