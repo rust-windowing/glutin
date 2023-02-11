@@ -21,6 +21,8 @@ pub mod context;
 pub mod display;
 pub mod surface;
 
+use display::GlxDisplay;
+
 /// When using Xlib we need to get errors from it somehow, however creating
 /// inner `XDisplay` to handle that or change the error hook is unsafe in
 /// multithreaded applications, given that error hook is per process and not
@@ -174,30 +176,38 @@ fn glx_error_hook(_display: *mut ffi::c_void, xerror_event: *mut ffi::c_void) ->
 }
 
 /// Get the error from the X11.
-fn last_glx_error(display: display::GlxDisplay) -> Result<()> {
+///
+/// XXX mesa and I'd guess other GLX implementations, send the error, by taking
+/// the Xlib Error handling hook, getting the current hook, and calling back to
+/// the user, meaning that no `XSync` should be done.
+fn last_glx_error<T, F: FnOnce() -> T>(display: GlxDisplay, callback: F) -> Result<T> {
     // Ensure that the access is safe by locking the display.
     unsafe {
         (XLIB.as_ref().unwrap().XLockDisplay)(*display as *mut _);
     }
 
-    // XXX mark that we're asking X11 for the errors, to prevent handling errors
-    // we're not expecting.
+    // Mark that we're syncing the error.
     SYNCING_GLX_ERROR.store(true, Ordering::Relaxed);
-    unsafe {
-        // Force synchronization.
-        (XLIB.as_ref().unwrap().XSync)(*display as *mut _, 0);
-    }
-    SYNCING_GLX_ERROR.store(false, Ordering::Relaxed);
+
+    // Execute the user routine that may produce GLX error.
+    let result = callback();
+
+    // XXX We might want to XSync here in addition, because what mesa is doing might
+    // not be common, but I'd assume that what mesa doing is common.
 
     // Reset and report last error.
-    let last_error = LAST_GLX_ERROR.lock().unwrap().take();
+    let result = match LAST_GLX_ERROR.lock().unwrap().take() {
+        Some(error) => Err(error),
+        None => Ok(result),
+    };
+
+    // Release the mark.
+    SYNCING_GLX_ERROR.store(false, Ordering::Relaxed);
 
     // Unlock the display once we've read the error.
     unsafe {
         (XLIB.as_ref().unwrap().XUnlockDisplay)(*display as *mut _);
     }
-    match last_error {
-        Some(error) => Err(error),
-        None => Ok(()),
-    }
+
+    result
 }
