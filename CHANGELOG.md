@@ -1,5 +1,7 @@
 # Unreleased
 
+# Version 0.30.5
+
 - Fixed EGL/GLX display initialization when the provided raw-window-handle has an unknown visual_id.
 - Fixed EGL always returning `None` for `x11_visual()`.
 - Fixed GLX error handling assuming that `XError`'s will arrive like they should on X11.
