@@ -47,16 +47,14 @@ impl Display {
         attrs.push(0);
 
         let config = config.clone();
-        let surface = unsafe {
+        let surface = super::last_glx_error(self.inner.raw, || unsafe {
             self.inner.glx.CreatePixmap(
                 self.inner.raw.cast(),
                 *config.inner.raw,
                 xid,
                 attrs.as_ptr(),
             )
-        };
-
-        super::last_glx_error(self.inner.raw)?;
+        })?;
 
         Ok(Surface {
             display: self.clone(),
@@ -88,11 +86,9 @@ impl Display {
         attrs.push(0);
 
         let config = config.clone();
-        let surface = unsafe {
+        let surface = super::last_glx_error(self.inner.raw, || unsafe {
             self.inner.glx.CreatePbuffer(self.inner.raw.cast(), *config.inner.raw, attrs.as_ptr())
-        };
-
-        super::last_glx_error(self.inner.raw)?;
+        })?;
 
         Ok(Surface {
             display: self.clone(),
@@ -123,16 +119,14 @@ impl Display {
         attrs.push(0);
 
         let config = config.clone();
-        let surface = unsafe {
+        let surface = super::last_glx_error(self.inner.raw, || unsafe {
             self.inner.glx.CreateWindow(
                 self.inner.raw.cast(),
                 *config.inner.raw,
                 window,
                 attrs.as_ptr() as *const _,
             )
-        };
-
-        super::last_glx_error(self.inner.raw)?;
+        })?;
 
         Ok(Surface {
             display: self.clone(),
@@ -175,7 +169,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
 
 impl<T: SurfaceTypeTrait> Drop for Surface<T> {
     fn drop(&mut self) {
-        unsafe {
+        let _ = super::last_glx_error(self.display.inner.raw, || unsafe {
             match T::surface_type() {
                 SurfaceType::Pbuffer => {
                     self.display.inner.glx.DestroyPbuffer(self.display.inner.raw.cast(), self.raw);
@@ -187,8 +181,7 @@ impl<T: SurfaceTypeTrait> Drop for Surface<T> {
                     self.display.inner.glx.DestroyPixmap(self.display.inner.raw.cast(), self.raw);
                 },
             }
-        }
-        let _ = super::last_glx_error(self.display.inner.raw);
+        });
     }
 }
 
@@ -218,10 +211,9 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     }
 
     fn swap_buffers(&self, _context: &Self::Context) -> Result<()> {
-        unsafe {
+        super::last_glx_error(self.display.inner.raw, || unsafe {
             self.display.inner.glx.SwapBuffers(self.display.inner.raw.cast(), self.raw);
-            super::last_glx_error(self.display.inner.raw)
-        }
+        })
     }
 
     fn set_swap_interval(&self, _context: &Self::Context, interval: SwapInterval) -> Result<()> {
@@ -245,12 +237,11 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
 
         // Apply the `EXT` first since it's per window.
         if !applied && self.display.inner.client_extensions.contains("GLX_EXT_swap_control") {
-            unsafe {
+            super::last_glx_error(self.display.inner.raw, || unsafe {
                 // Check for error explicitly here, other apis do have indication for failure.
                 extra.SwapIntervalEXT(self.display.inner.raw.cast(), self.raw, interval as _);
-                super::last_glx_error(self.display.inner.raw)?;
                 applied = true;
-            }
+            })?;
         }
 
         if !applied && self.display.inner.client_extensions.contains("GLX_MESA_swap_control") {

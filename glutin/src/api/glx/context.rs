@@ -46,11 +46,8 @@ impl Display {
         {
             self.create_context_arb(config, context_attributes, shared_context)?
         } else {
-            self.create_context_legacy(config, shared_context)
+            self.create_context_legacy(config, shared_context)?
         };
-
-        // Check the error from the GLX.
-        super::last_glx_error(self.inner.raw)?;
 
         // Failed to create the context.
         if context.is_null() {
@@ -188,23 +185,27 @@ impl Display {
         // Terminate list with zero.
         attrs.push(0);
 
-        unsafe {
-            Ok(extra.CreateContextAttribsARB(
+        super::last_glx_error(self.inner.raw, || unsafe {
+            extra.CreateContextAttribsARB(
                 self.inner.raw.cast(),
                 *config.inner.raw,
                 shared_context,
                 // Direct context
                 1,
                 attrs.as_ptr(),
-            ))
-        }
+            )
+        })
     }
 
-    fn create_context_legacy(&self, config: &Config, shared_context: GLXContext) -> GLXContext {
+    fn create_context_legacy(
+        &self,
+        config: &Config,
+        shared_context: GLXContext,
+    ) -> Result<GLXContext> {
         let render_type =
             if config.float_pixels() { glx_extra::RGBA_FLOAT_TYPE_ARB } else { glx::RGBA_TYPE };
 
-        unsafe {
+        super::last_glx_error(self.inner.raw, || unsafe {
             self.inner.glx.CreateNewContext(
                 self.inner.raw.cast(),
                 *config.inner.raw,
@@ -213,7 +214,7 @@ impl Display {
                 // Direct context.
                 1,
             )
-        }
+        })
     }
 }
 
@@ -366,35 +367,25 @@ impl ContextInner {
         surface_draw: &Surface<T>,
         surface_read: &Surface<T>,
     ) -> Result<()> {
-        unsafe {
-            if self.display.inner.glx.MakeContextCurrent(
+        super::last_glx_error(self.display.inner.raw, || unsafe {
+            self.display.inner.glx.MakeContextCurrent(
                 self.display.inner.raw.cast(),
                 surface_draw.raw,
                 surface_read.raw,
                 *self.raw,
-            ) == 0
-            {
-                super::last_glx_error(self.display.inner.raw)
-            } else {
-                Ok(())
-            }
-        }
+            );
+        })
     }
 
     fn make_not_current(&self) -> Result<()> {
-        unsafe {
-            if self.display.inner.glx.MakeContextCurrent(
+        super::last_glx_error(self.display.inner.raw, || unsafe {
+            self.display.inner.glx.MakeContextCurrent(
                 self.display.inner.raw.cast(),
                 0,
                 0,
                 std::ptr::null(),
-            ) == 0
-            {
-                super::last_glx_error(self.display.inner.raw)
-            } else {
-                Ok(())
-            }
-        }
+            );
+        })
     }
 
     fn context_api(&self) -> ContextApi {
@@ -408,10 +399,9 @@ impl ContextInner {
 
 impl Drop for ContextInner {
     fn drop(&mut self) {
-        unsafe {
+        let _ = super::last_glx_error(self.display.inner.raw, || unsafe {
             self.display.inner.glx.DestroyContext(self.display.inner.raw.cast(), *self.raw);
-        }
-        let _ = super::last_glx_error(self.display.inner.raw);
+        });
     }
 }
 
