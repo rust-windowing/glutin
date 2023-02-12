@@ -139,7 +139,8 @@ impl Display {
                 device.raw_device() as *mut _,
                 attrs.as_ptr(),
             )
-        })?;
+        })
+        .map(EglDisplay::Ext)?;
 
         Self::initialize_display(egl, display, None)
     }
@@ -166,7 +167,7 @@ impl Display {
         let device = ptr::null_mut();
         if unsafe {
             self.inner.egl.QueryDisplayAttribEXT(
-                self.inner.raw.0,
+                *self.inner.raw,
                 egl::DEVICE_EXT as EGLint,
                 device as *mut _,
             )
@@ -183,7 +184,7 @@ impl Display {
         Device::from_ptr(self.inner.egl, device)
     }
 
-    fn get_platform_display(egl: &Egl, display: RawDisplayHandle) -> Result<EGLDisplay> {
+    fn get_platform_display(egl: &Egl, display: RawDisplayHandle) -> Result<EglDisplay> {
         if !egl.GetPlatformDisplay.is_loaded() {
             return Err(ErrorKind::NotSupported("eglGetPlatformDisplay is not supported").into());
         }
@@ -228,10 +229,10 @@ impl Display {
         let display =
             unsafe { egl.GetPlatformDisplay(platform, display as *mut _, attrs.as_ptr()) };
 
-        Self::check_display_error(display)
+        Self::check_display_error(display).map(EglDisplay::Khr)
     }
 
-    fn get_platform_display_ext(egl: &Egl, display: RawDisplayHandle) -> Result<EGLDisplay> {
+    fn get_platform_display_ext(egl: &Egl, display: RawDisplayHandle) -> Result<EglDisplay> {
         if !egl.GetPlatformDisplayEXT.is_loaded() {
             return Err(ErrorKind::NotSupported("eglGetPlatformDisplayEXT is not supported").into());
         }
@@ -282,10 +283,10 @@ impl Display {
         let display =
             unsafe { egl.GetPlatformDisplayEXT(platform, display as *mut _, attrs.as_ptr()) };
 
-        Self::check_display_error(display)
+        Self::check_display_error(display).map(EglDisplay::Ext)
     }
 
-    fn get_display(egl: &Egl, display: RawDisplayHandle) -> Result<EGLDisplay> {
+    fn get_display(egl: &Egl, display: RawDisplayHandle) -> Result<EglDisplay> {
         let mut display = match display {
             RawDisplayHandle::Gbm(handle) => handle.gbm_device,
             #[cfg(x11_platform)]
@@ -303,7 +304,7 @@ impl Display {
         }
 
         let display = unsafe { egl.GetDisplay(display) };
-        Self::check_display_error(display)
+        Self::check_display_error(display).map(EglDisplay::Legacy)
     }
 
     fn extract_display_features(
@@ -347,12 +348,12 @@ impl Display {
 
     fn initialize_display(
         egl: &'static Egl,
-        display: EGLDisplay,
+        display: EglDisplay,
         raw_display_handle: Option<RawDisplayHandle>,
     ) -> Result<Self> {
         let version = unsafe {
             let (mut major, mut minor) = (0, 0);
-            if egl.Initialize(display, &mut major, &mut minor) == egl::FALSE {
+            if egl.Initialize(*display, &mut major, &mut minor) == egl::FALSE {
                 return Err(super::check_error().err().unwrap());
             }
 
@@ -360,12 +361,12 @@ impl Display {
         };
 
         // Load extensions.
-        let client_extensions = get_extensions(egl, display);
+        let client_extensions = get_extensions(egl, *display);
         let features = Self::extract_display_features(&client_extensions, version);
 
         let inner = Arc::new(DisplayInner {
             egl,
-            raw: EglDisplay(display),
+            raw: display,
             _native_display: raw_display_handle.map(NativeDisplay),
             version,
             client_extensions,
@@ -551,7 +552,16 @@ impl Deref for NativeDisplay {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct EglDisplay(EGLDisplay);
+pub(crate) enum EglDisplay {
+    /// The display was created with the KHR extension.
+    Khr(EGLDisplay),
+
+    /// The display was created with the EXT extension.
+    Ext(EGLDisplay),
+
+    /// The display in use is a legacy variant.
+    Legacy(EGLDisplay),
+}
 
 // The EGL display could be shared between threads.
 unsafe impl Send for EglDisplay {}
@@ -561,7 +571,11 @@ impl Deref for EglDisplay {
     type Target = EGLDisplay;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        match self {
+            EglDisplay::Khr(display) => display,
+            EglDisplay::Ext(display) => display,
+            EglDisplay::Legacy(display) => display,
+        }
     }
 }
 
