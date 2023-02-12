@@ -10,8 +10,8 @@ use raw_window_handle::RawWindowHandle;
 #[cfg(wayland_platform)]
 use wayland_sys::{egl::*, ffi_dispatch};
 
+use crate::api::egl::display::EglDisplay;
 use crate::config::GetGlConfig;
-use crate::context::Version;
 use crate::display::GetGlDisplay;
 use crate::error::{ErrorKind, Result};
 use crate::prelude::*;
@@ -97,34 +97,34 @@ impl Display {
         attrs.push(egl::NONE as EGLAttrib);
 
         let config = config.clone();
-        let surface = unsafe {
-            if self.inner.version >= Version::new(1, 5)
-                && self.inner.egl.CreatePlatformWindowSurface.is_loaded()
-            {
+        let surface = match self.inner.raw {
+            EglDisplay::Khr(display) => unsafe {
                 self.inner.egl.CreatePlatformPixmapSurface(
-                    *self.inner.raw,
+                    display,
                     *config.inner.raw,
                     native_pixmap.as_ptr(),
                     attrs.as_ptr(),
                 )
-            } else if self.inner.client_extensions.contains("EGL_EXT_platform_base") {
+            },
+            EglDisplay::Ext(display) => unsafe {
                 let attrs: Vec<EGLint> = attrs.into_iter().map(|attr| attr as EGLint).collect();
                 self.inner.egl.CreatePlatformPixmapSurfaceEXT(
-                    *self.inner.raw,
+                    display,
                     *config.inner.raw,
                     native_pixmap.as_ptr(),
                     attrs.as_ptr(),
                 )
-            } else {
+            },
+            EglDisplay::Legacy(display) => unsafe {
                 // This call accepts raw value, instead of pointer.
                 let attrs: Vec<EGLint> = attrs.into_iter().map(|attr| attr as EGLint).collect();
                 self.inner.egl.CreatePixmapSurface(
-                    *self.inner.raw,
+                    display,
                     *config.inner.raw,
                     *(native_pixmap.as_ptr() as *const egl::NativePixmapType),
                     attrs.as_ptr(),
                 )
-            }
+            },
         };
 
         let surface = Self::check_surface_error(surface)?;
@@ -175,34 +175,34 @@ impl Display {
 
         let config = config.clone();
 
-        let surface = unsafe {
-            if self.inner.version >= Version::new(1, 5)
-                && self.inner.egl.CreatePlatformWindowSurface.is_loaded()
-            {
+        let surface = match self.inner.raw {
+            EglDisplay::Khr(display) => unsafe {
                 self.inner.egl.CreatePlatformWindowSurface(
-                    *self.inner.raw,
+                    display,
                     *config.inner.raw,
                     native_window.as_ptr().cast(),
                     attrs.as_ptr(),
                 )
-            } else if self.inner.client_extensions.contains("EGL_EXT_platform_base") {
+            },
+            EglDisplay::Ext(display) => unsafe {
                 let attrs: Vec<EGLint> = attrs.into_iter().map(|attr| attr as EGLint).collect();
                 self.inner.egl.CreatePlatformWindowSurfaceEXT(
-                    *self.inner.raw,
+                    display,
                     *config.inner.raw,
                     native_window.as_ptr().cast(),
                     attrs.as_ptr(),
                 )
-            } else {
+            },
+            EglDisplay::Legacy(display) => unsafe {
                 let attrs: Vec<EGLint> = attrs.into_iter().map(|attr| attr as EGLint).collect();
                 // This call accepts raw value, instead of pointer.
                 self.inner.egl.CreateWindowSurface(
-                    *self.inner.raw,
+                    display,
                     *config.inner.raw,
                     *(native_window.as_ptr() as *const egl::NativeWindowType),
                     attrs.as_ptr(),
                 )
-            }
+            },
         };
 
         let surface = Self::check_surface_error(surface)?;
