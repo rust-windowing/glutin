@@ -1,5 +1,7 @@
 # Unreleased
 
+# Version 0.30.6
+
 - Fixed handling of `*_base` extensions with EGL.
 
 # Version 0.30.5
