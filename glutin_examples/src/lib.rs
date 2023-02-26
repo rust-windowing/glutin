@@ -181,7 +181,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
                 let renderer = renderer.as_ref().unwrap();
                 renderer.draw();
                 window.request_redraw();
-            
+
                 surface.swap_buffers(context).unwrap();
             },
             _ => (),
