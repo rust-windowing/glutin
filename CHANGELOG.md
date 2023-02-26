@@ -3,6 +3,7 @@
 # Version 0.30.6
 
 - Fixed handling of `*_base` extensions with EGL.
+- Replaced Option with tuple in examples by enum GLState
 
 # Version 0.30.5
 

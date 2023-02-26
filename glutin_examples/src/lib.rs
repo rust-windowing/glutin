@@ -189,6 +189,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
     })
 }
 
+/// GL context state
 enum GLState {
     Current { context: PossiblyCurrentContext, surface: Surface<WindowSurface>, window: Window },
     NotCurrent { context: NotCurrentContext, window: Option<Window> },
@@ -196,6 +197,7 @@ enum GLState {
 }
 
 impl GLState {
+    /// Replaces current value with GLState::Empty and returns previous
     pub fn take(&mut self) -> GLState {
         let mut state = GLState::Empty;
 
@@ -204,6 +206,7 @@ impl GLState {
         state
     }
 
+    /// Replaces current value
     pub fn put(&mut self, value: Self) {
         *self = value;
     }
