@@ -1,17 +1,20 @@
+#![feature(if_let_guard)]
 use std::ffi::{CStr, CString};
 use std::num::NonZeroU32;
 use std::ops::Deref;
 
 use winit::event::{Event, WindowEvent};
-use winit::window::WindowBuilder;
+use winit::window::{Window, WindowBuilder};
 
 use raw_window_handle::HasRawWindowHandle;
 
 use glutin::config::ConfigTemplateBuilder;
-use glutin::context::{ContextApi, ContextAttributesBuilder, Version};
+use glutin::context::{
+    ContextApi, ContextAttributesBuilder, NotCurrentContext, PossiblyCurrentContext, Version,
+};
 use glutin::display::GetGlDisplay;
 use glutin::prelude::*;
-use glutin::surface::SwapInterval;
+use glutin::surface::{Surface, SwapInterval, WindowSurface};
 
 use glutin_winit::{self, DisplayBuilder, GlWindow};
 
@@ -44,7 +47,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
 
     let display_builder = DisplayBuilder::new().with_window_builder(window_builder);
 
-    let (mut window, gl_config) = display_builder
+    let (window, gl_config) = display_builder
         .build(&event_loop, template, |configs| {
             // Find the config with the maximum number of samples, so our triangle will
             // be smooth.
@@ -88,24 +91,26 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
         .with_context_api(ContextApi::OpenGl(Some(Version::new(2, 1))))
         .build(raw_window_handle);
 
-    let mut not_current_gl_context = Some(unsafe {
-        gl_display.create_context(&gl_config, &context_attributes).unwrap_or_else(|_| {
-            gl_display.create_context(&gl_config, &fallback_context_attributes).unwrap_or_else(
-                |_| {
-                    gl_display
-                        .create_context(&gl_config, &legacy_context_attributes)
-                        .expect("failed to create context")
-                },
-            )
-        })
-    });
+    let mut state = GLState::NotCurrent {
+        context: unsafe {
+            gl_display.create_context(&gl_config, &context_attributes).unwrap_or_else(|_| {
+                gl_display.create_context(&gl_config, &fallback_context_attributes).unwrap_or_else(
+                    |_| {
+                        gl_display
+                            .create_context(&gl_config, &legacy_context_attributes)
+                            .expect("failed to create context")
+                    },
+                )
+            })
+        },
+        window,
+    };
 
-    let mut state = None;
     let mut renderer = None;
     event_loop.run(move |event, window_target, control_flow| {
         control_flow.set_wait();
         match event {
-            Event::Resumed => {
+            Event::Resumed if let GLState::NotCurrent { context, mut window } = state.take() => {
                 #[cfg(target_os = "android")]
                 println!("Android window available");
 
@@ -122,7 +127,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
 
                 // Make it current.
                 let gl_context =
-                    not_current_gl_context.take().unwrap().make_current(&gl_surface).unwrap();
+                    context.make_current(&gl_surface).unwrap();
 
                 // The context needs to be current for the Renderer to set up shaders and
                 // buffers. It also performs function loading, which needs a current context on
@@ -136,19 +141,18 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
                     eprintln!("Error setting vsync: {res:?}");
                 }
 
-                assert!(state.replace((gl_context, gl_surface, window)).is_none());
+                state.put(GLState::Current { context: gl_context, surface: gl_surface, window });
             },
-            Event::Suspended => {
+            Event::Suspended if let GLState::Current { context, surface, window } = state.take() => {
                 // This event is only raised on Android, where the backing NativeWindow for a GL
                 // Surface can appear and disappear at any moment.
                 println!("Android window removed");
 
                 // Destroy the GL Surface and un-current the GL Context before ndk-glue releases
                 // the window back to the system.
-                let (gl_context, ..) = state.take().unwrap();
-                assert!(not_current_gl_context
-                    .replace(gl_context.make_not_current().unwrap())
-                    .is_none());
+                let context = context.make_not_current().unwrap();
+
+                state.put(GLState::NotCurrent { context, window: Some(window) })
             },
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::Resized(size) => {
@@ -157,9 +161,9 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
                         // Notable platforms here are Wayland and macOS, other don't require it
                         // and the function is no-op, but it's wise to resize it for portability
                         // reasons.
-                        if let Some((gl_context, gl_surface, _)) = &state {
-                            gl_surface.resize(
-                                gl_context,
+                        if let GLState::Current { context, surface, .. } = &state {
+                            surface.resize(
+                                context,
                                 NonZeroU32::new(size.width).unwrap(),
                                 NonZeroU32::new(size.height).unwrap(),
                             );
@@ -173,18 +177,36 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
                 },
                 _ => (),
             },
-            Event::RedrawEventsCleared => {
-                if let Some((gl_context, gl_surface, window)) = &state {
-                    let renderer = renderer.as_ref().unwrap();
-                    renderer.draw();
-                    window.request_redraw();
-
-                    gl_surface.swap_buffers(gl_context).unwrap();
-                }
+            Event::RedrawEventsCleared if let GLState::Current { context, surface, window } = &state => {
+                let renderer = renderer.as_ref().unwrap();
+                renderer.draw();
+                window.request_redraw();
+            
+                surface.swap_buffers(context).unwrap();
             },
             _ => (),
         }
     })
+}
+
+enum GLState {
+    Current { context: PossiblyCurrentContext, surface: Surface<WindowSurface>, window: Window },
+    NotCurrent { context: NotCurrentContext, window: Option<Window> },
+    Empty,
+}
+
+impl GLState {
+    pub fn take(&mut self) -> GLState {
+        let mut state = GLState::Empty;
+
+        std::mem::swap(&mut state, self);
+
+        state
+    }
+
+    pub fn put(&mut self, value: Self) {
+        *self = value;
+    }
 }
 
 pub struct Renderer {
