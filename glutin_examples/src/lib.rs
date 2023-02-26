@@ -1,4 +1,3 @@
-#![feature(if_let_guard)]
 use std::ffi::{CStr, CString};
 use std::num::NonZeroU32;
 use std::ops::Deref;
@@ -110,49 +109,57 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
     event_loop.run(move |event, window_target, control_flow| {
         control_flow.set_wait();
         match event {
-            Event::Resumed if let GLState::NotCurrent { context, mut window } = state.take() => {
-                #[cfg(target_os = "android")]
-                println!("Android window available");
+            Event::Resumed => {
+                if let GLState::NotCurrent { context, mut window } = state.take() {
+                    #[cfg(target_os = "android")]
+                    println!("Android window available");
 
-                let window = window.take().unwrap_or_else(|| {
-                    let window_builder = WindowBuilder::new().with_transparent(true);
-                    glutin_winit::finalize_window(window_target, window_builder, &gl_config)
-                        .unwrap()
-                });
+                    let window = window.take().unwrap_or_else(|| {
+                        let window_builder = WindowBuilder::new().with_transparent(true);
+                        glutin_winit::finalize_window(window_target, window_builder, &gl_config)
+                            .unwrap()
+                    });
 
-                let attrs = window.build_surface_attributes(<_>::default());
-                let gl_surface = unsafe {
-                    gl_config.display().create_window_surface(&gl_config, &attrs).unwrap()
-                };
+                    let attrs = window.build_surface_attributes(<_>::default());
+                    let gl_surface = unsafe {
+                        gl_config.display().create_window_surface(&gl_config, &attrs).unwrap()
+                    };
 
-                // Make it current.
-                let gl_context =
-                    context.make_current(&gl_surface).unwrap();
+                    // Make it current.
+                    let gl_context = context.make_current(&gl_surface).unwrap();
 
-                // The context needs to be current for the Renderer to set up shaders and
-                // buffers. It also performs function loading, which needs a current context on
-                // WGL.
-                renderer.get_or_insert_with(|| Renderer::new(&gl_display));
+                    // The context needs to be current for the Renderer to set up shaders and
+                    // buffers. It also performs function loading, which needs a current context on
+                    // WGL.
+                    renderer.get_or_insert_with(|| Renderer::new(&gl_display));
 
-                // Try setting vsync.
-                if let Err(res) = gl_surface
-                    .set_swap_interval(&gl_context, SwapInterval::Wait(NonZeroU32::new(1).unwrap()))
-                {
-                    eprintln!("Error setting vsync: {res:?}");
+                    // Try setting vsync.
+                    if let Err(res) = gl_surface.set_swap_interval(
+                        &gl_context,
+                        SwapInterval::Wait(NonZeroU32::new(1).unwrap()),
+                    ) {
+                        eprintln!("Error setting vsync: {res:?}");
+                    }
+
+                    state.put(GLState::Current {
+                        context: gl_context,
+                        surface: gl_surface,
+                        window,
+                    });
                 }
-
-                state.put(GLState::Current { context: gl_context, surface: gl_surface, window });
             },
-            Event::Suspended if let GLState::Current { context, surface, window } = state.take() => {
-                // This event is only raised on Android, where the backing NativeWindow for a GL
-                // Surface can appear and disappear at any moment.
-                println!("Android window removed");
+            Event::Suspended => {
+                if let GLState::Current { context, window, .. } = state.take() {
+                    // This event is only raised on Android, where the backing NativeWindow for a GL
+                    // Surface can appear and disappear at any moment.
+                    println!("Android window removed");
 
-                // Destroy the GL Surface and un-current the GL Context before ndk-glue releases
-                // the window back to the system.
-                let context = context.make_not_current().unwrap();
+                    // Destroy the GL Surface and un-current the GL Context before ndk-glue releases
+                    // the window back to the system.
+                    let context = context.make_not_current().unwrap();
 
-                state.put(GLState::NotCurrent { context, window: Some(window) })
+                    state.put(GLState::NotCurrent { context, window: Some(window) })
+                }
             },
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::Resized(size) => {
@@ -177,12 +184,14 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
                 },
                 _ => (),
             },
-            Event::RedrawEventsCleared if let GLState::Current { context, surface, window } = &state => {
-                let renderer = renderer.as_ref().unwrap();
-                renderer.draw();
-                window.request_redraw();
+            Event::RedrawEventsCleared => {
+                if let GLState::Current { context, surface, window } = &state {
+                    let renderer = renderer.as_ref().unwrap();
+                    renderer.draw();
+                    window.request_redraw();
 
-                surface.swap_buffers(context).unwrap();
+                    surface.swap_buffers(context).unwrap();
+                }
             },
             _ => (),
         }
