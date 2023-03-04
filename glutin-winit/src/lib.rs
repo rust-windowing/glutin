@@ -50,7 +50,7 @@ compile_error!("Please select at least one api backend");
 /// [`Display`]: glutin::display::Display
 #[derive(Default, Debug, Clone)]
 pub struct DisplayBuilder {
-    preference: ApiPrefence,
+    preference: ApiPreference,
     window_builder: Option<WindowBuilder>,
 }
 
@@ -61,7 +61,7 @@ impl DisplayBuilder {
     }
 
     /// The preference in picking the configuration.
-    pub fn with_preference(mut self, preference: ApiPrefence) -> Self {
+    pub fn with_preference(mut self, preference: ApiPreference) -> Self {
         self.preference = preference;
         self
     }
@@ -140,7 +140,7 @@ impl DisplayBuilder {
 
 fn create_display<T>(
     window_target: &EventLoopWindowTarget<T>,
-    _api_preference: ApiPrefence,
+    _api_preference: ApiPreference,
     _raw_window_handle: Option<RawWindowHandle>,
 ) -> Result<Display, Box<dyn Error>> {
     #[cfg(egl_backend)]
@@ -157,18 +157,18 @@ fn create_display<T>(
 
     #[cfg(all(egl_backend, glx_backend))]
     let _preference = match _api_preference {
-        ApiPrefence::PreferEgl => {
+        ApiPreference::PreferEgl => {
             DisplayApiPreference::EglThenGlx(Box::new(register_xlib_error_hook))
         },
-        ApiPrefence::FallbackEgl => {
+        ApiPreference::FallbackEgl => {
             DisplayApiPreference::GlxThenEgl(Box::new(register_xlib_error_hook))
         },
     };
 
     #[cfg(all(wgl_backend, egl_backend))]
     let _preference = match _api_preference {
-        ApiPrefence::PreferEgl => DisplayApiPreference::EglThenWgl(_raw_window_handle),
-        ApiPrefence::FallbackEgl => DisplayApiPreference::WglThenEgl(_raw_window_handle),
+        ApiPreference::PreferEgl => DisplayApiPreference::EglThenWgl(_raw_window_handle),
+        ApiPreference::FallbackEgl => DisplayApiPreference::WglThenEgl(_raw_window_handle),
     };
 
     unsafe { Ok(Display::new(window_target.raw_display_handle(), _preference)?) }
@@ -207,7 +207,7 @@ pub fn finalize_window<T>(
 ///
 /// [`DisplayApiPreference`]: glutin::display::DisplayApiPreference
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ApiPrefence {
+pub enum ApiPreference {
     /// Prefer `EGL` over system provider like `GLX` and `WGL`.
     PreferEgl,
 
@@ -218,7 +218,7 @@ pub enum ApiPrefence {
     FallbackEgl,
 }
 
-impl Default for ApiPrefence {
+impl Default for ApiPreference {
     fn default() -> Self {
         Self::FallbackEgl
     }
