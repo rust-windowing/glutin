@@ -141,7 +141,7 @@ impl Config {
                 // whatever. Zero is a primary monitor.
                 0,
             );
-            value as i32
+            value
         }
     }
 
