@@ -262,19 +262,19 @@ impl GlDisplay for Display {
         match self {
             #[cfg(egl_backend)]
             Self::Egl(display) => unsafe {
-                Ok(Box::new(display.find_configs(template)?.into_iter().map(Config::Egl)))
+                Ok(Box::new(display.find_configs(template)?.map(Config::Egl)))
             },
             #[cfg(glx_backend)]
             Self::Glx(display) => unsafe {
-                Ok(Box::new(display.find_configs(template)?.into_iter().map(Config::Glx)))
+                Ok(Box::new(display.find_configs(template)?.map(Config::Glx)))
             },
             #[cfg(wgl_backend)]
             Self::Wgl(display) => unsafe {
-                Ok(Box::new(display.find_configs(template)?.into_iter().map(Config::Wgl)))
+                Ok(Box::new(display.find_configs(template)?.map(Config::Wgl)))
             },
             #[cfg(cgl_backend)]
             Self::Cgl(display) => unsafe {
-                Ok(Box::new(display.find_configs(template)?.into_iter().map(Config::Cgl)))
+                Ok(Box::new(display.find_configs(template)?.map(Config::Cgl)))
             },
         }
     }

@@ -239,10 +239,11 @@ pub struct ContextAttributes {
 /// Specifies the tolerance of the OpenGL context to faults. If you accept
 /// raw OpenGL commands and/or raw shader code from an untrusted source, you
 /// should definitely care about this.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub enum Robustness {
     /// Not everything is checked. Your application can crash if you do
     /// something wrong with your shaders.
+    #[default]
     NotRobust,
 
     /// The driver doesn't check anything. This option is very dangerous.
@@ -263,13 +264,6 @@ pub enum Robustness {
     /// context will enter a "context lost" state. It must then be
     /// recreated.
     RobustLoseContextOnReset,
-}
-
-impl Default for Robustness {
-    #[inline]
-    fn default() -> Self {
-        Robustness::NotRobust
-    }
 }
 
 /// Describes the requested OpenGL context profiles.
@@ -337,7 +331,7 @@ impl Version {
 }
 
 /// The behavior of the driver when you change the current context.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub enum ReleaseBehavior {
     /// Doesn't do anything. Most notably doesn't flush. Not supported by all
     /// drivers.
@@ -349,14 +343,8 @@ pub enum ReleaseBehavior {
 
     /// Flushes the context that was previously current as if `glFlush` was
     /// called. This is the default behavior.
+    #[default]
     Flush,
-}
-
-impl Default for ReleaseBehavior {
-    #[inline]
-    fn default() -> Self {
-        ReleaseBehavior::Flush
-    }
 }
 
 /// A context that is known to be not current on the current thread.

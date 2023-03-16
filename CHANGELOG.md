@@ -1,5 +1,7 @@
 # Unreleased
 
+- Bump MSRV from `1.60` to `1.64`.
+
 # Version 0.30.7
 
 - Altered specification for `objc2` crate to pull patch update.
