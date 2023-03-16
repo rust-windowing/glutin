@@ -1,5 +1,9 @@
 # Unreleased
 
+# Version 0.30.7
+
+- Altered specification for `objc2` crate to pull patch update.
+
 # Version 0.30.6
 
 - Fixed handling of `*_base` extensions with EGL.
