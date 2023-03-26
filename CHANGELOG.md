@@ -1,6 +1,6 @@
 # Unreleased
 
-- Bump MSRV from `1.60` to `1.64`.
+- Bump MSRV from `1.60` to `1.65`.
 
 # Version 0.30.7
 
