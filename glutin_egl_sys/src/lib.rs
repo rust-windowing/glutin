@@ -46,16 +46,4 @@ pub type EGLenum = raw::c_uint;
 pub type EGLNativeDisplayType = *const raw::c_void;
 pub type EGLNativePixmapType = *const raw::c_void; // FIXME: egl_native_pixmap_t instead
 
-#[cfg(windows)]
-pub type EGLNativeWindowType = windows_sys::Win32::Foundation::HWND;
-#[cfg(target_os = "linux")]
-pub type EGLNativeWindowType = *const raw::c_void;
-#[cfg(target_os = "android")]
-pub type EGLNativeWindowType = *const raw::c_void;
-#[cfg(any(
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd"
-))]
 pub type EGLNativeWindowType = *const raw::c_void;
