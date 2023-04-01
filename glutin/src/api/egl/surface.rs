@@ -121,7 +121,7 @@ impl Display {
                 self.inner.egl.CreatePixmapSurface(
                     display,
                     *config.inner.raw,
-                    *(native_pixmap.as_ptr() as *const egl::NativePixmapType),
+                    native_pixmap.as_ptr(),
                     attrs.as_ptr(),
                 )
             },
@@ -526,7 +526,7 @@ impl NativePixmap {
         match self {
             Self::XlibPixmap(xid) => xid as *const _ as *mut _,
             Self::XcbPixmap(xid) => xid as *const _ as *mut _,
-            Self::WindowsPixmap(hbitmap) => hbitmap as *const _ as *mut _,
+            Self::WindowsPixmap(hbitmap) => *hbitmap as *const ffi::c_void as *mut _,
         }
     }
 }
