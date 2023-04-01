@@ -6,7 +6,6 @@ fn main() {
     // Setup alias to reduce `cfg` boilerplate.
     cfg_aliases! {
         // Systems.
-        android: { target_os = "android" },
         wasm: { target_arch = "wasm32" },
         macos: { target_os = "macos" },
         ios: { target_os = "ios" },
