@@ -180,7 +180,7 @@ impl Display {
                 self.inner.egl.CreatePlatformWindowSurface(
                     display,
                     *config.inner.raw,
-                    native_window.as_ptr().cast(),
+                    native_window.as_ptr(),
                     attrs.as_ptr(),
                 )
             },
@@ -189,7 +189,7 @@ impl Display {
                 self.inner.egl.CreatePlatformWindowSurfaceEXT(
                     display,
                     *config.inner.raw,
-                    native_window.as_ptr().cast(),
+                    native_window.as_ptr(),
                     attrs.as_ptr(),
                 )
             },
@@ -198,7 +198,7 @@ impl Display {
                 self.inner.egl.CreateWindowSurface(
                     display,
                     *config.inner.raw,
-                    native_window.as_ptr().cast(),
+                    native_window.as_ptr(),
                     attrs.as_ptr(),
                 )
             },
