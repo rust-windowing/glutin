@@ -501,6 +501,7 @@ impl NativeWindow {
         }
     }
 
+    /// Returns the underlying handle value
     fn as_native_window(&self) -> egl::NativeWindowType {
         match *self {
             #[cfg(wayland_platform)]
@@ -518,12 +519,19 @@ impl NativeWindow {
         }
     }
 
-    // NOTE: on X11 and Windows the native window are XID and HWND
-    // respectively, however the platform window should be behind a
-    // pointer. The function accepts the `&self`, so it automatically
-    // borrows the value and then we simply cast the pointer. On other
-    // platforms though, the default window handle is a pointer already,
-    // so we simply dereference the just taken borrow.
+    /// Returns a pointer to the underlying handle value on X11 and Xlib,
+    /// the raw underlying handle value on all other platforms.
+    ///
+    /// This exists because of a discrepancy in the new
+    /// `eglCreatePlatformWindowSurface*` functions which take a pointer to the
+    /// `window_id` on X11 and Xlib, in contrast to the legacy
+    /// `eglCreateWindowSurface` which always takes the raw value.
+    ///
+    /// See also:
+    /// <https://gitlab.freedesktop.org/mesa/mesa/-/blob/4de9a4b2b8c41864aadae89be705ef125a745a0a/src/egl/main/eglapi.c#L1102-1127>
+    ///
+    /// # Safety:
+    /// The returned pointer is a cast of the `&self` borrow.
     fn as_platform_window(&self) -> *mut ffi::c_void {
         match self {
             #[cfg(wayland_platform)]
@@ -554,6 +562,7 @@ impl Drop for NativeWindow {
 }
 
 impl NativePixmap {
+    /// Returns the underlying handle value
     fn as_native_pixmap(&self) -> egl::NativePixmapType {
         match *self {
             Self::XlibPixmap(xid) => xid as egl::NativePixmapType,
@@ -562,14 +571,23 @@ impl NativePixmap {
         }
     }
 
-    // NOTE: see the `NativeWindow::as_platform_window`. The same applies to this
-    // function.
+    /// Returns a pointer to the underlying handle value on X11 and Xlib,
+    /// the raw underlying handle value on all other platforms.
+    ///
+    /// This exists because of a discrepancy in the new
+    /// `eglCreatePlatformPixmapSurface*` functions which take a pointer to the
+    /// `xid` on X11 and Xlib, in contrast to the legacy
+    /// `eglCreatePixmapSurface` which always takes the raw value.
+    ///
+    /// See also:
+    /// <https://gitlab.freedesktop.org/mesa/mesa/-/blob/4de9a4b2b8c41864aadae89be705ef125a745a0a/src/egl/main/eglapi.c#L1166-1190>
+    ///
+    /// # Safety:
+    /// The returned pointer is a cast of the `&self` borrow.
     fn as_platform_pixmap(&self) -> *mut ffi::c_void {
         match self {
             Self::XlibPixmap(xid) => xid as *const _ as *mut _,
             Self::XcbPixmap(xid) => xid as *const _ as *mut _,
-            // TODO: Consistency between HBITMAP and HWND should be solved in the next breaking release
-            // Either both are `*mut c_void`, or `isize`.
             Self::WindowsPixmap(hbitmap) => *hbitmap as *const ffi::c_void as *mut _,
         }
     }

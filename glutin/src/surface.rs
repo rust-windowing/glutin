@@ -485,6 +485,8 @@ pub enum NativePixmap {
     XcbPixmap(u32),
 
     /// HBITMAP handle for windows bitmap.
+    // TODO: Consistency between HBITMAP and HWND should be solved in the
+    // next breaking release. Either both are `*mut c_void`, or `isize`.
     WindowsPixmap(isize),
 }
 
