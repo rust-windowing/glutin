@@ -102,7 +102,7 @@ impl Display {
                 self.inner.egl.CreatePlatformPixmapSurface(
                     display,
                     *config.inner.raw,
-                    native_pixmap.as_ptr(),
+                    native_pixmap.as_platform_pixmap(),
                     attrs.as_ptr(),
                 )
             },
@@ -111,7 +111,7 @@ impl Display {
                 self.inner.egl.CreatePlatformPixmapSurfaceEXT(
                     display,
                     *config.inner.raw,
-                    native_pixmap.as_ptr(),
+                    native_pixmap.as_platform_pixmap(),
                     attrs.as_ptr(),
                 )
             },
@@ -121,7 +121,7 @@ impl Display {
                 self.inner.egl.CreatePixmapSurface(
                     display,
                     *config.inner.raw,
-                    native_pixmap.as_ptr(),
+                    native_pixmap.as_native_pixmap(),
                     attrs.as_ptr(),
                 )
             },
@@ -180,7 +180,7 @@ impl Display {
                 self.inner.egl.CreatePlatformWindowSurface(
                     display,
                     *config.inner.raw,
-                    native_window.as_ptr(),
+                    native_window.as_platform_window(),
                     attrs.as_ptr(),
                 )
             },
@@ -189,7 +189,7 @@ impl Display {
                 self.inner.egl.CreatePlatformWindowSurfaceEXT(
                     display,
                     *config.inner.raw,
-                    native_window.as_ptr(),
+                    native_window.as_platform_window(),
                     attrs.as_ptr(),
                 )
             },
@@ -198,7 +198,7 @@ impl Display {
                 self.inner.egl.CreateWindowSurface(
                     display,
                     *config.inner.raw,
-                    native_window.as_ptr(),
+                    native_window.as_native_window(),
                     attrs.as_ptr(),
                 )
             },
@@ -495,7 +495,27 @@ impl NativeWindow {
         }
     }
 
-    fn as_ptr(&self) -> *mut ffi::c_void {
+    fn as_native_window(&self) -> egl::NativeWindowType {
+        match *self {
+            #[cfg(wayland_platform)]
+            Self::Wayland(wl_egl_surface) => wl_egl_surface,
+            #[cfg(x11_platform)]
+            Self::Xlib(window_id) => window_id as egl::NativeWindowType,
+            #[cfg(x11_platform)]
+            Self::Xcb(window_id) => window_id as egl::NativeWindowType,
+            Self::Win32(hwnd) => hwnd as egl::NativeWindowType,
+            Self::Android(a_native_window) => a_native_window,
+            Self::Gbm(gbm_surface) => gbm_surface,
+        }
+    }
+
+    // NOTE: on X11 and Windows the native window are XID and HWND
+    // respectively, however the platform window should be behind a
+    // pointer. The function accepts the `&self`, so it automatically
+    // borrows the value and then we simply cast the pointer. On other
+    // platforms though, the default window handle is a pointer already,
+    // so we simply dereference the just taken borrow.
+    fn as_platform_window(&self) -> *mut ffi::c_void {
         match self {
             #[cfg(wayland_platform)]
             Self::Wayland(wl_egl_surface) => *wl_egl_surface,
@@ -522,10 +542,22 @@ impl Drop for NativeWindow {
 }
 
 impl NativePixmap {
-    fn as_ptr(&self) -> *mut ffi::c_void {
+    fn as_native_pixmap(&self) -> egl::NativePixmapType {
+        match *self {
+            Self::XlibPixmap(xid) => xid as egl::NativePixmapType,
+            Self::XcbPixmap(xid) => xid as egl::NativePixmapType,
+            Self::WindowsPixmap(hbitmap) => hbitmap as egl::NativePixmapType,
+        }
+    }
+
+    // NOTE: see the `NativeWindow::as_platform_window`. The same applies to this
+    // function.
+    fn as_platform_pixmap(&self) -> *mut ffi::c_void {
         match self {
             Self::XlibPixmap(xid) => xid as *const _ as *mut _,
             Self::XcbPixmap(xid) => xid as *const _ as *mut _,
+            // TODO: Consistency between HBITMAP and HWND should be solved in the next breaking release
+            // Either both are `*mut c_void`, or `isize`.
             Self::WindowsPixmap(hbitmap) => *hbitmap as *const ffi::c_void as *mut _,
         }
     }
