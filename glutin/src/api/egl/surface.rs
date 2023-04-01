@@ -195,11 +195,10 @@ impl Display {
             },
             EglDisplay::Legacy(display) => unsafe {
                 let attrs: Vec<EGLint> = attrs.into_iter().map(|attr| attr as EGLint).collect();
-                // This call accepts raw value, instead of pointer.
                 self.inner.egl.CreateWindowSurface(
                     display,
                     *config.inner.raw,
-                    *(native_window.as_ptr() as *const egl::NativeWindowType),
+                    native_window.as_ptr().cast(),
                     attrs.as_ptr(),
                 )
             },
