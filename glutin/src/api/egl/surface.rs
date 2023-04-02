@@ -431,13 +431,13 @@ enum NativeWindow {
     #[cfg(x11_platform)]
     Xcb(u32),
 
-    #[cfg(target_os = "android")]
+    #[cfg(android_platform)]
     Android(*mut ffi::c_void),
 
     #[cfg(windows)]
-    Win32(*mut ffi::c_void),
+    Win32(isize),
 
-    #[cfg(unix)]
+    #[cfg(free_unix)]
     Gbm(*mut ffi::c_void),
 }
 
@@ -466,13 +466,13 @@ impl NativeWindow {
             RawWindowHandle::Xlib(window_handle) => Self::Xlib(window_handle.window as _),
             #[cfg(x11_platform)]
             RawWindowHandle::Xcb(window_handle) => Self::Xcb(window_handle.window as _),
-            #[cfg(target_os = "android")]
+            #[cfg(android_platform)]
             RawWindowHandle::AndroidNdk(window_handle) => {
                 Self::Android(window_handle.a_native_window)
             },
             #[cfg(windows)]
-            RawWindowHandle::Win32(window_hanlde) => Self::Win32(window_hanlde.hwnd),
-            #[cfg(unix)]
+            RawWindowHandle::Win32(window_handle) => Self::Win32(window_handle.hwnd as _),
+            #[cfg(free_unix)]
             RawWindowHandle::Gbm(window_handle) => Self::Gbm(window_handle.gbm_surface),
             _ => {
                 return Err(
@@ -511,10 +511,10 @@ impl NativeWindow {
             #[cfg(x11_platform)]
             Self::Xcb(window_id) => window_id as egl::NativeWindowType,
             #[cfg(windows)]
-            Self::Win32(hwnd) => hwnd as egl::NativeWindowType,
-            #[cfg(target_os = "android")]
+            Self::Win32(hwnd) => hwnd,
+            #[cfg(android_platform)]
             Self::Android(a_native_window) => a_native_window,
-            #[cfg(unix)]
+            #[cfg(free_unix)]
             Self::Gbm(gbm_surface) => gbm_surface,
         }
     }
@@ -541,10 +541,10 @@ impl NativeWindow {
             #[cfg(x11_platform)]
             Self::Xcb(window_id) => window_id as *const _ as *mut ffi::c_void,
             #[cfg(windows)]
-            Self::Win32(hwnd) => *hwnd,
-            #[cfg(target_os = "android")]
+            Self::Win32(hwnd) => *hwnd as *const ffi::c_void as *mut _,
+            #[cfg(android_platform)]
             Self::Android(a_native_window) => *a_native_window,
-            #[cfg(unix)]
+            #[cfg(free_unix)]
             Self::Gbm(gbm_surface) => *gbm_surface,
         }
     }

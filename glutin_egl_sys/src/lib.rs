@@ -45,10 +45,11 @@ pub type EGLint = i32;
 pub type EGLenum = raw::c_uint;
 pub type EGLNativeDisplayType = *const raw::c_void;
 
+// FIXME: egl_native_pixmap_t instead
 #[cfg(windows)]
-pub type EGLNativePixmapType = windows_sys::Win32::Graphics::Gdi::HBITMAP; // FIXME: egl_native_pixmap_t instead
+pub type EGLNativePixmapType = windows_sys::Win32::Graphics::Gdi::HBITMAP;
 #[cfg(not(windows))]
-pub type EGLNativePixmapType = *const raw::c_void; // FIXME: egl_native_pixmap_t instead
+pub type EGLNativePixmapType = *const raw::c_void;
 
 #[cfg(windows)]
 pub type EGLNativeWindowType = windows_sys::Win32::Foundation::HWND;

@@ -106,7 +106,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
         control_flow.set_wait();
         match event {
             Event::Resumed => {
-                #[cfg(target_os = "android")]
+                #[cfg(android_platform)]
                 println!("Android window available");
 
                 let window = window.take().unwrap_or_else(|| {
