@@ -1,5 +1,7 @@
 # Unreleased
 
+- Fixed EGL dereferencing raw window handles on everything but X11 in legacy `Window` and `Pixmap` surface creation.
+
 # Version 0.30.7
 
 - Altered specification for `objc2` crate to pull patch update.
