@@ -501,7 +501,7 @@ impl NativeWindow {
         }
     }
 
-    /// Returns the underlying handle value
+    /// Returns the underlying handle value.
     fn as_native_window(&self) -> egl::NativeWindowType {
         match *self {
             #[cfg(wayland_platform)]
@@ -519,7 +519,7 @@ impl NativeWindow {
         }
     }
 
-    /// Returns a pointer to the underlying handle value on X11 and Xlib,
+    /// Returns a pointer to the underlying handle value on X11,
     /// the raw underlying handle value on all other platforms.
     ///
     /// This exists because of a discrepancy in the new
@@ -530,8 +530,9 @@ impl NativeWindow {
     /// See also:
     /// <https://gitlab.freedesktop.org/mesa/mesa/-/blob/4de9a4b2b8c41864aadae89be705ef125a745a0a/src/egl/main/eglapi.c#L1102-1127>
     ///
-    /// # Safety:
-    /// The returned pointer is a cast of the `&self` borrow.
+    /// # Safety
+    ///
+    /// On X11 the returned pointer is a cast of the `&self` borrow.
     fn as_platform_window(&self) -> *mut ffi::c_void {
         match self {
             #[cfg(wayland_platform)]
@@ -562,7 +563,7 @@ impl Drop for NativeWindow {
 }
 
 impl NativePixmap {
-    /// Returns the underlying handle value
+    /// Returns the underlying handle value.
     fn as_native_pixmap(&self) -> egl::NativePixmapType {
         match *self {
             Self::XlibPixmap(xid) => xid as egl::NativePixmapType,
@@ -571,7 +572,7 @@ impl NativePixmap {
         }
     }
 
-    /// Returns a pointer to the underlying handle value on X11 and Xlib,
+    /// Returns a pointer to the underlying handle value on X11,
     /// the raw underlying handle value on all other platforms.
     ///
     /// This exists because of a discrepancy in the new
@@ -582,8 +583,9 @@ impl NativePixmap {
     /// See also:
     /// <https://gitlab.freedesktop.org/mesa/mesa/-/blob/4de9a4b2b8c41864aadae89be705ef125a745a0a/src/egl/main/eglapi.c#L1166-1190>
     ///
-    /// # Safety:
-    /// The returned pointer is a cast of the `&self` borrow.
+    /// # Safety
+    ///
+    /// On X11 the returned pointer is a cast of the `&self` borrow.
     fn as_platform_pixmap(&self) -> *mut ffi::c_void {
         match self {
             Self::XlibPixmap(xid) => xid as *const _ as *mut _,
