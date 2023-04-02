@@ -16,4 +16,5 @@ gl_generator = "0.14"
 version = "0.45"
 features = [
     "Win32_Foundation",
+    "Win32_Graphics_Gdi",
 ]

@@ -1,6 +1,7 @@
 # Unreleased
 
 - Bump MSRV from `1.60` to `1.65`.
+- Fixed EGL dereferencing raw window handles on everything but X11 in legacy `Window` and `Pixmap` surface creation.
 
 # Version 0.30.7
 

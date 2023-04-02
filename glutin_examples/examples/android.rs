@@ -1,4 +1,4 @@
-#![cfg(target_os = "android")]
+#![cfg(android_platform)]
 
 use winit::event_loop::EventLoopBuilder;
 use winit::platform::android::EventLoopBuilderExtAndroid;
