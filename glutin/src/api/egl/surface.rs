@@ -102,7 +102,7 @@ impl Display {
                 self.inner.egl.CreatePlatformPixmapSurface(
                     display,
                     *config.inner.raw,
-                    native_pixmap.as_ptr(),
+                    native_pixmap.as_platform_pixmap(),
                     attrs.as_ptr(),
                 )
             },
@@ -111,7 +111,7 @@ impl Display {
                 self.inner.egl.CreatePlatformPixmapSurfaceEXT(
                     display,
                     *config.inner.raw,
-                    native_pixmap.as_ptr(),
+                    native_pixmap.as_platform_pixmap(),
                     attrs.as_ptr(),
                 )
             },
@@ -121,7 +121,7 @@ impl Display {
                 self.inner.egl.CreatePixmapSurface(
                     display,
                     *config.inner.raw,
-                    *(native_pixmap.as_ptr() as *const egl::NativePixmapType),
+                    native_pixmap.as_native_pixmap(),
                     attrs.as_ptr(),
                 )
             },
@@ -180,7 +180,7 @@ impl Display {
                 self.inner.egl.CreatePlatformWindowSurface(
                     display,
                     *config.inner.raw,
-                    native_window.as_ptr().cast(),
+                    native_window.as_platform_window(),
                     attrs.as_ptr(),
                 )
             },
@@ -189,17 +189,16 @@ impl Display {
                 self.inner.egl.CreatePlatformWindowSurfaceEXT(
                     display,
                     *config.inner.raw,
-                    native_window.as_ptr().cast(),
+                    native_window.as_platform_window(),
                     attrs.as_ptr(),
                 )
             },
             EglDisplay::Legacy(display) => unsafe {
                 let attrs: Vec<EGLint> = attrs.into_iter().map(|attr| attr as EGLint).collect();
-                // This call accepts raw value, instead of pointer.
                 self.inner.egl.CreateWindowSurface(
                     display,
                     *config.inner.raw,
-                    *(native_window.as_ptr() as *const egl::NativeWindowType),
+                    native_window.as_native_window(),
                     attrs.as_ptr(),
                 )
             },
@@ -432,10 +431,13 @@ enum NativeWindow {
     #[cfg(x11_platform)]
     Xcb(u32),
 
+    #[cfg(android_platform)]
     Android(*mut ffi::c_void),
 
-    Win32(*mut ffi::c_void),
+    #[cfg(windows)]
+    Win32(isize),
 
+    #[cfg(free_unix)]
     Gbm(*mut ffi::c_void),
 }
 
@@ -464,10 +466,13 @@ impl NativeWindow {
             RawWindowHandle::Xlib(window_handle) => Self::Xlib(window_handle.window as _),
             #[cfg(x11_platform)]
             RawWindowHandle::Xcb(window_handle) => Self::Xcb(window_handle.window as _),
+            #[cfg(android_platform)]
             RawWindowHandle::AndroidNdk(window_handle) => {
                 Self::Android(window_handle.a_native_window)
             },
-            RawWindowHandle::Win32(window_hanlde) => Self::Win32(window_hanlde.hwnd),
+            #[cfg(windows)]
+            RawWindowHandle::Win32(window_handle) => Self::Win32(window_handle.hwnd as _),
+            #[cfg(free_unix)]
             RawWindowHandle::Gbm(window_handle) => Self::Gbm(window_handle.gbm_surface),
             _ => {
                 return Err(
@@ -496,7 +501,39 @@ impl NativeWindow {
         }
     }
 
-    fn as_ptr(&self) -> *mut ffi::c_void {
+    /// Returns the underlying handle value.
+    fn as_native_window(&self) -> egl::NativeWindowType {
+        match *self {
+            #[cfg(wayland_platform)]
+            Self::Wayland(wl_egl_surface) => wl_egl_surface,
+            #[cfg(x11_platform)]
+            Self::Xlib(window_id) => window_id as egl::NativeWindowType,
+            #[cfg(x11_platform)]
+            Self::Xcb(window_id) => window_id as egl::NativeWindowType,
+            #[cfg(windows)]
+            Self::Win32(hwnd) => hwnd,
+            #[cfg(android_platform)]
+            Self::Android(a_native_window) => a_native_window,
+            #[cfg(free_unix)]
+            Self::Gbm(gbm_surface) => gbm_surface,
+        }
+    }
+
+    /// Returns a pointer to the underlying handle value on X11,
+    /// the raw underlying handle value on all other platforms.
+    ///
+    /// This exists because of a discrepancy in the new
+    /// `eglCreatePlatformWindowSurface*` functions which take a pointer to the
+    /// `window_id` on X11 and Xlib, in contrast to the legacy
+    /// `eglCreateWindowSurface` which always takes the raw value.
+    ///
+    /// See also:
+    /// <https://gitlab.freedesktop.org/mesa/mesa/-/blob/4de9a4b2b8c41864aadae89be705ef125a745a0a/src/egl/main/eglapi.c#L1102-1127>
+    ///
+    /// # Safety
+    ///
+    /// On X11 the returned pointer is a cast of the `&self` borrow.
+    fn as_platform_window(&self) -> *mut ffi::c_void {
         match self {
             #[cfg(wayland_platform)]
             Self::Wayland(wl_egl_surface) => *wl_egl_surface,
@@ -504,8 +541,11 @@ impl NativeWindow {
             Self::Xlib(window_id) => window_id as *const _ as *mut ffi::c_void,
             #[cfg(x11_platform)]
             Self::Xcb(window_id) => window_id as *const _ as *mut ffi::c_void,
-            Self::Win32(hwnd) => *hwnd,
+            #[cfg(windows)]
+            Self::Win32(hwnd) => *hwnd as *const ffi::c_void as *mut _,
+            #[cfg(android_platform)]
             Self::Android(a_native_window) => *a_native_window,
+            #[cfg(free_unix)]
             Self::Gbm(gbm_surface) => *gbm_surface,
         }
     }
@@ -523,11 +563,34 @@ impl Drop for NativeWindow {
 }
 
 impl NativePixmap {
-    fn as_ptr(&self) -> *mut ffi::c_void {
+    /// Returns the underlying handle value.
+    fn as_native_pixmap(&self) -> egl::NativePixmapType {
+        match *self {
+            Self::XlibPixmap(xid) => xid as egl::NativePixmapType,
+            Self::XcbPixmap(xid) => xid as egl::NativePixmapType,
+            Self::WindowsPixmap(hbitmap) => hbitmap as egl::NativePixmapType,
+        }
+    }
+
+    /// Returns a pointer to the underlying handle value on X11,
+    /// the raw underlying handle value on all other platforms.
+    ///
+    /// This exists because of a discrepancy in the new
+    /// `eglCreatePlatformPixmapSurface*` functions which take a pointer to the
+    /// `xid` on X11 and Xlib, in contrast to the legacy
+    /// `eglCreatePixmapSurface` which always takes the raw value.
+    ///
+    /// See also:
+    /// <https://gitlab.freedesktop.org/mesa/mesa/-/blob/4de9a4b2b8c41864aadae89be705ef125a745a0a/src/egl/main/eglapi.c#L1166-1190>
+    ///
+    /// # Safety
+    ///
+    /// On X11 the returned pointer is a cast of the `&self` borrow.
+    fn as_platform_pixmap(&self) -> *mut ffi::c_void {
         match self {
             Self::XlibPixmap(xid) => xid as *const _ as *mut _,
             Self::XcbPixmap(xid) => xid as *const _ as *mut _,
-            Self::WindowsPixmap(hbitmap) => hbitmap as *const _ as *mut _,
+            Self::WindowsPixmap(hbitmap) => *hbitmap as *const ffi::c_void as *mut _,
         }
     }
 }

@@ -44,18 +44,14 @@ pub type khronos_ssize_t = raw::c_long;
 pub type EGLint = i32;
 pub type EGLenum = raw::c_uint;
 pub type EGLNativeDisplayType = *const raw::c_void;
-pub type EGLNativePixmapType = *const raw::c_void; // FIXME: egl_native_pixmap_t instead
+
+// FIXME: egl_native_pixmap_t instead
+#[cfg(windows)]
+pub type EGLNativePixmapType = windows_sys::Win32::Graphics::Gdi::HBITMAP;
+#[cfg(not(windows))]
+pub type EGLNativePixmapType = *const raw::c_void;
 
 #[cfg(windows)]
 pub type EGLNativeWindowType = windows_sys::Win32::Foundation::HWND;
-#[cfg(target_os = "linux")]
-pub type EGLNativeWindowType = *const raw::c_void;
-#[cfg(target_os = "android")]
-pub type EGLNativeWindowType = *const raw::c_void;
-#[cfg(any(
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd"
-))]
+#[cfg(not(windows))]
 pub type EGLNativeWindowType = *const raw::c_void;
