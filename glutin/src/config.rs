@@ -357,6 +357,7 @@ impl Default for ConfigTemplate {
 
 bitflags! {
     /// The types of the surface supported by the config.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct ConfigSurfaceTypes: u8 {
         /// Context must support windows.
         const WINDOW  = 0b00000001;
@@ -371,6 +372,7 @@ bitflags! {
 
 bitflags! {
     /// The Api supported by the config.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct Api : u8 {
         /// Context supports OpenGL API.
         const OPENGL = 0b00000001;
