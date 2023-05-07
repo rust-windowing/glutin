@@ -203,14 +203,6 @@ impl Display {
     }
 }
 
-/// A wrapper around WGL context that could be current to the calling thread.
-#[derive(Debug)]
-pub struct PossiblyCurrentContext {
-    inner: ContextInner,
-    // The context could be current only on the one thread.
-    _nosendsync: PhantomData<HGLRC>,
-}
-
 /// A wrapper around the WGL context that is known to be not current to the
 /// calling thread.
 #[derive(Debug)]
@@ -218,7 +210,6 @@ pub struct NotCurrentContext {
     inner: ContextInner,
 }
 
-impl Sealed for PossiblyCurrentContext {}
 impl Sealed for NotCurrentContext {}
 
 impl NotCurrentContext {
@@ -227,15 +218,38 @@ impl NotCurrentContext {
     }
 }
 
-impl GetGlDisplay for NotCurrentContext {
-    type Target = Display;
+impl NotCurrentGlContext for NotCurrentContext {
+    type PossiblyCurrentContext = PossiblyCurrentContext;
+    type Surface<T: SurfaceTypeTrait> = Surface<T>;
 
-    fn display(&self) -> Self::Target {
-        self.inner.display.clone()
+    fn treat_as_possibly_current(self) -> PossiblyCurrentContext {
+        PossiblyCurrentContext { inner: self.inner, _nosendsync: PhantomData }
+    }
+
+    fn make_current<T: SurfaceTypeTrait>(
+        self,
+        surface: &Self::Surface<T>,
+    ) -> Result<Self::PossiblyCurrentContext> {
+        self.inner.make_current(surface)?;
+        Ok(PossiblyCurrentContext { inner: self.inner, _nosendsync: PhantomData })
+    }
+
+    fn make_current_draw_read<T: SurfaceTypeTrait>(
+        self,
+        surface_draw: &Self::Surface<T>,
+        surface_read: &Self::Surface<T>,
+    ) -> Result<Self::PossiblyCurrentContext> {
+        Err(self.inner.make_current_draw_read(surface_draw, surface_read).into())
     }
 }
 
-impl GetGlDisplay for PossiblyCurrentContext {
+impl GlContext for NotCurrentContext {
+    fn context_api(&self) -> ContextApi {
+        self.inner.context_api()
+    }
+}
+
+impl GetGlDisplay for NotCurrentContext {
     type Target = Display;
 
     fn display(&self) -> Self::Target {
@@ -251,32 +265,23 @@ impl GetGlConfig for NotCurrentContext {
     }
 }
 
-impl GetGlConfig for PossiblyCurrentContext {
-    type Target = Config;
-
-    fn config(&self) -> Self::Target {
-        self.inner.config.clone()
+impl AsRawContext for NotCurrentContext {
+    fn raw_context(&self) -> RawContext {
+        RawContext::Wgl(*self.inner.raw)
     }
 }
 
-impl<T: SurfaceTypeTrait> PossiblyCurrentContextGlSurfaceAccessor<T> for PossiblyCurrentContext {
-    type Surface = Surface<T>;
-
-    fn make_current(&self, surface: &Self::Surface) -> Result<()> {
-        self.inner.make_current(surface)
-    }
-
-    fn make_current_draw_read(
-        &self,
-        surface_draw: &Self::Surface,
-        surface_read: &Self::Surface,
-    ) -> Result<()> {
-        Err(self.inner.make_current_draw_read(surface_draw, surface_read).into())
-    }
+/// A wrapper around WGL context that could be current to the calling thread.
+#[derive(Debug)]
+pub struct PossiblyCurrentContext {
+    inner: ContextInner,
+    // The context could be current only on the one thread.
+    _nosendsync: PhantomData<HGLRC>,
 }
 
 impl PossiblyCurrentGlContext for PossiblyCurrentContext {
     type NotCurrentContext = NotCurrentContext;
+    type Surface<T: SurfaceTypeTrait> = Surface<T>;
 
     fn make_not_current(self) -> Result<Self::NotCurrentContext> {
         unsafe {
@@ -294,31 +299,35 @@ impl PossiblyCurrentGlContext for PossiblyCurrentContext {
     fn is_current(&self) -> bool {
         unsafe { wgl::GetCurrentContext() == *self.inner.raw }
     }
-}
 
-impl NotCurrentGlContext for NotCurrentContext {
-    type PossiblyCurrentContext = PossiblyCurrentContext;
-
-    fn treat_as_possibly_current(self) -> PossiblyCurrentContext {
-        PossiblyCurrentContext { inner: self.inner, _nosendsync: PhantomData }
-    }
-}
-
-impl<T: SurfaceTypeTrait> NotCurrentGlContextSurfaceAccessor<T> for NotCurrentContext {
-    type PossiblyCurrentContext = PossiblyCurrentContext;
-    type Surface = Surface<T>;
-
-    fn make_current(self, surface: &Self::Surface) -> Result<Self::PossiblyCurrentContext> {
-        self.inner.make_current(surface)?;
-        Ok(PossiblyCurrentContext { inner: self.inner, _nosendsync: PhantomData })
+    fn make_current<T: SurfaceTypeTrait>(&self, surface: &Self::Surface<T>) -> Result<()> {
+        self.inner.make_current(surface)
     }
 
-    fn make_current_draw_read(
-        self,
-        surface_draw: &Self::Surface,
-        surface_read: &Self::Surface,
-    ) -> Result<Self::PossiblyCurrentContext> {
+    fn make_current_draw_read<T: SurfaceTypeTrait>(
+        &self,
+        surface_draw: &Self::Surface<T>,
+        surface_read: &Self::Surface<T>,
+    ) -> Result<()> {
         Err(self.inner.make_current_draw_read(surface_draw, surface_read).into())
+    }
+}
+
+impl Sealed for PossiblyCurrentContext {}
+
+impl GetGlDisplay for PossiblyCurrentContext {
+    type Target = Display;
+
+    fn display(&self) -> Self::Target {
+        self.inner.display.clone()
+    }
+}
+
+impl GetGlConfig for PossiblyCurrentContext {
+    type Target = Config;
+
+    fn config(&self) -> Self::Target {
+        self.inner.config.clone()
     }
 }
 
@@ -328,19 +337,7 @@ impl GlContext for PossiblyCurrentContext {
     }
 }
 
-impl GlContext for NotCurrentContext {
-    fn context_api(&self) -> ContextApi {
-        self.inner.context_api()
-    }
-}
-
 impl AsRawContext for PossiblyCurrentContext {
-    fn raw_context(&self) -> RawContext {
-        RawContext::Wgl(*self.inner.raw)
-    }
-}
-
-impl AsRawContext for NotCurrentContext {
     fn raw_context(&self) -> RawContext {
         RawContext::Wgl(*self.inner.raw)
     }

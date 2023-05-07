@@ -75,25 +75,24 @@ impl NotCurrentContext {
 
 impl NotCurrentGlContext for NotCurrentContext {
     type PossiblyCurrentContext = PossiblyCurrentContext;
+    type Surface<T: SurfaceTypeTrait> = Surface<T>;
 
     fn treat_as_possibly_current(self) -> PossiblyCurrentContext {
         PossiblyCurrentContext { inner: self.inner, _nosendsync: PhantomData }
     }
-}
 
-impl<T: SurfaceTypeTrait> NotCurrentGlContextSurfaceAccessor<T> for NotCurrentContext {
-    type PossiblyCurrentContext = PossiblyCurrentContext;
-    type Surface = Surface<T>;
-
-    fn make_current(self, surface: &Self::Surface) -> Result<Self::PossiblyCurrentContext> {
+    fn make_current<T: SurfaceTypeTrait>(
+        self,
+        surface: &Self::Surface<T>,
+    ) -> Result<Self::PossiblyCurrentContext> {
         self.inner.make_current(surface)?;
         Ok(PossiblyCurrentContext { inner: self.inner, _nosendsync: PhantomData })
     }
 
-    fn make_current_draw_read(
+    fn make_current_draw_read<T: SurfaceTypeTrait>(
         self,
-        surface_draw: &Self::Surface,
-        surface_read: &Self::Surface,
+        surface_draw: &Self::Surface<T>,
+        surface_read: &Self::Surface<T>,
     ) -> Result<Self::PossiblyCurrentContext> {
         Err(self.inner.make_current_draw_read(surface_draw, surface_read).into())
     }
@@ -140,6 +139,7 @@ pub struct PossiblyCurrentContext {
 
 impl PossiblyCurrentGlContext for PossiblyCurrentContext {
     type NotCurrentContext = NotCurrentContext;
+    type Surface<T: SurfaceTypeTrait> = Surface<T>;
 
     fn make_not_current(self) -> Result<Self::NotCurrentContext> {
         self.inner.make_not_current()?;
@@ -153,19 +153,15 @@ impl PossiblyCurrentGlContext for PossiblyCurrentContext {
             false
         }
     }
-}
 
-impl<T: SurfaceTypeTrait> PossiblyCurrentContextGlSurfaceAccessor<T> for PossiblyCurrentContext {
-    type Surface = Surface<T>;
-
-    fn make_current(&self, surface: &Self::Surface) -> Result<()> {
+    fn make_current<T: SurfaceTypeTrait>(&self, surface: &Self::Surface<T>) -> Result<()> {
         self.inner.make_current(surface)
     }
 
-    fn make_current_draw_read(
+    fn make_current_draw_read<T: SurfaceTypeTrait>(
         &self,
-        surface_draw: &Self::Surface,
-        surface_read: &Self::Surface,
+        surface_draw: &Self::Surface<T>,
+        surface_read: &Self::Surface<T>,
     ) -> Result<()> {
         Err(self.inner.make_current_draw_read(surface_draw, surface_read).into())
     }
