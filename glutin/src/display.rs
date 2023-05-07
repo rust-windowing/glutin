@@ -513,6 +513,7 @@ impl fmt::Debug for DisplayApiPreference {
 
 bitflags! {
     /// The features and extensions supported by the [`Display`].
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct DisplayFeatures: u32 {
         /// The display supports creating [`robust`] context.
         ///
