@@ -41,20 +41,13 @@ pub trait NotCurrentGlContext: Sealed {
     /// The type of possibly current context.
     type PossiblyCurrentContext: PossiblyCurrentGlContext;
 
+    /// The surface supported by the context.
+    type Surface<T: SurfaceTypeTrait>: GlSurface<T>;
+
     /// Treat the not current context as possibly current. The operation is safe
     /// because the possibly current context is more restricted and not
     /// guaranteed to be current.
     fn treat_as_possibly_current(self) -> Self::PossiblyCurrentContext;
-}
-
-/// A trait that splits the methods accessing [`crate::surface::Surface`] on not
-/// current context.
-pub trait NotCurrentGlContextSurfaceAccessor<T: SurfaceTypeTrait>: Sealed {
-    /// The surface supported by the context.
-    type Surface: GlSurface<T>;
-    /// The possibly current context produced when making not current context
-    /// current.
-    type PossiblyCurrentContext: PossiblyCurrentGlContext;
 
     /// Make [`Self::Surface`] on the calling thread producing the
     /// [`Self::PossiblyCurrentContext`] indicating that the context could
@@ -63,7 +56,10 @@ pub trait NotCurrentGlContextSurfaceAccessor<T: SurfaceTypeTrait>: Sealed {
     /// # Platform specific
     ///
     /// **macOS:** - **This will block if your main thread is blocked.**
-    fn make_current(self, surface: &Self::Surface) -> Result<Self::PossiblyCurrentContext>;
+    fn make_current<T: SurfaceTypeTrait>(
+        self,
+        surface: &Self::Surface<T>,
+    ) -> Result<Self::PossiblyCurrentContext>;
 
     /// The same as [`Self::make_current`], but provides a way to set read and
     /// draw surfaces.
@@ -71,10 +67,10 @@ pub trait NotCurrentGlContextSurfaceAccessor<T: SurfaceTypeTrait>: Sealed {
     /// # Api-specific:
     ///
     /// **WGL/CGL:** - not supported.
-    fn make_current_draw_read(
+    fn make_current_draw_read<T: SurfaceTypeTrait>(
         self,
-        surface_draw: &Self::Surface,
-        surface_read: &Self::Surface,
+        surface_draw: &Self::Surface<T>,
+        surface_read: &Self::Surface<T>,
     ) -> Result<Self::PossiblyCurrentContext>;
 }
 
@@ -82,6 +78,9 @@ pub trait NotCurrentGlContextSurfaceAccessor<T: SurfaceTypeTrait>: Sealed {
 pub trait PossiblyCurrentGlContext: Sealed {
     /// The not current context type.
     type NotCurrentContext: NotCurrentGlContext;
+
+    /// The surface supported by the context.
+    type Surface<T: SurfaceTypeTrait>: GlSurface<T>;
 
     /// Returns `true` if this context is the current one in this thread.
     fn is_current(&self) -> bool;
@@ -94,19 +93,13 @@ pub trait PossiblyCurrentGlContext: Sealed {
     ///
     /// **macOS:** - **This will block if your main thread is blocked.**
     fn make_not_current(self) -> Result<Self::NotCurrentContext>;
-}
-
-/// A trait that splits the methods accessing [`crate::surface::Surface`].
-pub trait PossiblyCurrentContextGlSurfaceAccessor<T: SurfaceTypeTrait>: Sealed {
-    /// The surface supported by the context.
-    type Surface: GlSurface<T>;
 
     /// Make [`Self::Surface`] current on the calling thread.
     ///
     /// # Platform specific
     ///
     /// **macOS:** - **This will block if your main thread is blocked.**
-    fn make_current(&self, surface: &Self::Surface) -> Result<()>;
+    fn make_current<T: SurfaceTypeTrait>(&self, surface: &Self::Surface<T>) -> Result<()>;
 
     /// The same as [`Self::make_current`] but provides a way to set read and
     /// draw surfaces explicitly.
@@ -114,10 +107,10 @@ pub trait PossiblyCurrentContextGlSurfaceAccessor<T: SurfaceTypeTrait>: Sealed {
     /// # Api-specific:
     ///
     /// **CGL/WGL:** - not supported.
-    fn make_current_draw_read(
+    fn make_current_draw_read<T: SurfaceTypeTrait>(
         &self,
-        surface_draw: &Self::Surface,
-        surface_read: &Self::Surface,
+        surface_draw: &Self::Surface<T>,
+        surface_read: &Self::Surface<T>,
     ) -> Result<()>;
 }
 
@@ -383,17 +376,16 @@ pub enum NotCurrentContext {
 
 impl NotCurrentGlContext for NotCurrentContext {
     type PossiblyCurrentContext = PossiblyCurrentContext;
+    type Surface<T: SurfaceTypeTrait> = Surface<T>;
 
     fn treat_as_possibly_current(self) -> Self::PossiblyCurrentContext {
         gl_api_dispatch!(self; Self(context) => context.treat_as_possibly_current(); as PossiblyCurrentContext)
     }
-}
 
-impl<T: SurfaceTypeTrait> NotCurrentGlContextSurfaceAccessor<T> for NotCurrentContext {
-    type PossiblyCurrentContext = PossiblyCurrentContext;
-    type Surface = Surface<T>;
-
-    fn make_current(self, surface: &Self::Surface) -> Result<Self::PossiblyCurrentContext> {
+    fn make_current<T: SurfaceTypeTrait>(
+        self,
+        surface: &Self::Surface<T>,
+    ) -> Result<Self::PossiblyCurrentContext> {
         match (self, surface) {
             #[cfg(egl_backend)]
             (Self::Egl(context), Surface::Egl(surface)) => {
@@ -415,10 +407,10 @@ impl<T: SurfaceTypeTrait> NotCurrentGlContextSurfaceAccessor<T> for NotCurrentCo
         }
     }
 
-    fn make_current_draw_read(
+    fn make_current_draw_read<T: SurfaceTypeTrait>(
         self,
-        surface_draw: &Self::Surface,
-        surface_read: &Self::Surface,
+        surface_draw: &Self::Surface<T>,
+        surface_read: &Self::Surface<T>,
     ) -> Result<Self::PossiblyCurrentContext> {
         match (self, surface_draw, surface_read) {
             #[cfg(egl_backend)]
@@ -509,6 +501,7 @@ pub enum PossiblyCurrentContext {
 
 impl PossiblyCurrentGlContext for PossiblyCurrentContext {
     type NotCurrentContext = NotCurrentContext;
+    type Surface<T: SurfaceTypeTrait> = Surface<T>;
 
     fn is_current(&self) -> bool {
         gl_api_dispatch!(self; Self(context) => context.is_current())
@@ -519,12 +512,8 @@ impl PossiblyCurrentGlContext for PossiblyCurrentContext {
             gl_api_dispatch!(self; Self(context) => context.make_not_current()?; as NotCurrentContext),
         )
     }
-}
 
-impl<T: SurfaceTypeTrait> PossiblyCurrentContextGlSurfaceAccessor<T> for PossiblyCurrentContext {
-    type Surface = Surface<T>;
-
-    fn make_current(&self, surface: &Self::Surface) -> Result<()> {
+    fn make_current<T: SurfaceTypeTrait>(&self, surface: &Self::Surface<T>) -> Result<()> {
         match (self, surface) {
             #[cfg(egl_backend)]
             (Self::Egl(context), Surface::Egl(surface)) => context.make_current(surface),
@@ -538,10 +527,10 @@ impl<T: SurfaceTypeTrait> PossiblyCurrentContextGlSurfaceAccessor<T> for Possibl
         }
     }
 
-    fn make_current_draw_read(
+    fn make_current_draw_read<T: SurfaceTypeTrait>(
         &self,
-        surface_draw: &Self::Surface,
-        surface_read: &Self::Surface,
+        surface_draw: &Self::Surface<T>,
+        surface_read: &Self::Surface<T>,
     ) -> Result<()> {
         match (self, surface_draw, surface_read) {
             #[cfg(egl_backend)]

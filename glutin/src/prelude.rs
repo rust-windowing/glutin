@@ -10,12 +10,6 @@
 //! ```
 
 pub use crate::config::GlConfig;
-pub use crate::context::{
-    NotCurrentGlContext, NotCurrentGlContextSurfaceAccessor,
-    PossiblyCurrentContextGlSurfaceAccessor, PossiblyCurrentGlContext,
-};
+pub use crate::context::{GlContext, NotCurrentGlContext, PossiblyCurrentGlContext};
 pub use crate::display::GlDisplay;
 pub use crate::surface::GlSurface;
-
-// TODO(breaking release) - make pub.
-pub(crate) use crate::context::GlContext;
