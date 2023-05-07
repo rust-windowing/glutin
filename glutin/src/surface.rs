@@ -30,6 +30,12 @@ pub trait GlSurface<T: SurfaceTypeTrait>: Sealed {
     /// The age of the back buffer of that surface. The `0` indicates that the
     /// buffer is either a new one or we failed to get the information about
     /// its age. In both cases you must redraw the entire buffer.
+    ///
+    /// # Platform-specific
+    ///
+    /// **Wayland:** - This call will latch the underlying back buffer, meaning
+    /// that all resize operations will apply after the next
+    /// [`GlSurface::swap_buffers`].
     fn buffer_age(&self) -> u32;
 
     /// The **physical** width of the underlying surface.
@@ -72,6 +78,9 @@ pub trait GlSurface<T: SurfaceTypeTrait>: Sealed {
     /// Resize the surface to a new size.
     ///
     /// This call is for compatibility reasons, on most platforms it's a no-op.
+    /// It's recommended to call this function before doing any rendering and
+    /// performing [`PossiblyCurrentGlContext::make_current`], and
+    /// [`GlSurface::buffer_age`].
     ///
     /// # Platform specific
     ///
@@ -464,6 +473,15 @@ impl<T: SurfaceTypeTrait> Sealed for Surface<T> {}
 /// by external, driver-specific configuration, which means that you can't know
 /// in advance whether [`crate::surface::GlSurface::swap_buffers`] will block
 /// or not.
+///
+/// # Platform specific
+///
+/// **Wayland:** - when the window is hidden and [`SwapInterval::Wait`] is used
+/// [`GlSurface::swap_buffers`] and based on it functions may block until the
+/// window is visible again. Using this variant is not recommended on Wayland
+/// and instead the throttling should be performed by [`frame callbacks`].
+///
+/// [`frame callbacks`]: https://wayland.freedesktop.org/docs/html/apa.html#protocol-spec-wl_surface-request-frame
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SwapInterval {
     /// When this variant is used calling

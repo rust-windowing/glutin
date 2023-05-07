@@ -56,6 +56,9 @@ pub trait NotCurrentGlContext: Sealed {
     /// # Platform specific
     ///
     /// **macOS:** - **This will block if your main thread is blocked.**
+    /// **Wayland:** - This call may latch the underlying back buffer (will do
+    /// with mesa drivers), meaning that all resize operations will apply after
+    /// the next [`GlSurface::swap_buffers`].
     fn make_current<T: SurfaceTypeTrait>(
         self,
         surface: &Self::Surface<T>,
