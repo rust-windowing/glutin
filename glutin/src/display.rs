@@ -61,7 +61,16 @@ pub trait GlDisplay: Sealed {
     /// Some platforms use [`RawWindowHandle`] for context creation, so it must
     /// point to a valid object.
     ///
+    /// # Platform-specific
+    ///
+    /// **Wayland:** - This call may latch the underlying back buffer of
+    /// the currently active context (will do with mesa drivers), meaning
+    /// that all resize operations will apply for it after the next
+    /// [`GlSurface::swap_buffers`]. To workaround this behavior the current
+    /// context should be made [`not current`].
+    ///
     /// [`RawWindowHandle`]: raw_window_handle::RawWindowHandle
+    /// [`not current`]: crate::context::PossiblyCurrentGlContext::make_not_current
     unsafe fn create_context(
         &self,
         config: &Self::Config,
