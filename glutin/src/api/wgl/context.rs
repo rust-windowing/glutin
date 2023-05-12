@@ -173,10 +173,11 @@ impl Display {
         // Flush control.
         if self.inner.features.contains(DisplayFeatures::CONTEXT_RELEASE_BEHAVIOR) {
             match context_attributes.release_behavior {
-                ReleaseBehavior::Flush => {
-                    attrs.push(wgl_extra::CONTEXT_RELEASE_BEHAVIOR_ARB as c_int);
-                    attrs.push(wgl_extra::CONTEXT_RELEASE_BEHAVIOR_FLUSH_ARB as c_int);
-                },
+                // This is the default behavior in specification.
+                //
+                // XXX even though we check for extensions don't pass it because it could cause
+                // issues.
+                ReleaseBehavior::Flush => (),
                 ReleaseBehavior::None => {
                     attrs.push(wgl_extra::CONTEXT_RELEASE_BEHAVIOR_ARB as c_int);
                     attrs.push(wgl_extra::CONTEXT_RELEASE_BEHAVIOR_NONE_ARB as c_int);
