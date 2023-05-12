@@ -177,8 +177,9 @@ impl Display {
             //
             // EGL_BAD_ATTRIBUTE shouldn't be returned since EGL_DEVICE_EXT should be a
             // valid display attribute.
-            super::check_error()?;
-            return Err(ErrorKind::NotSupported("Failed to query device from display").into());
+            return Err(super::check_error().err().unwrap_or_else(|| {
+                ErrorKind::NotSupported("failed to query device from display").into()
+            }));
         }
 
         Device::from_ptr(self.inner.egl, device)
@@ -340,7 +341,11 @@ impl Display {
 
     fn check_display_error(display: EGLDisplay) -> Result<EGLDisplay> {
         if display == egl::NO_DISPLAY {
-            Err(super::check_error().err().unwrap())
+            // XXX the specification is a bit vague here, so fallback instead of hard
+            // assert.
+            Err(super::check_error().err().unwrap_or_else(|| {
+                ErrorKind::NotSupported("failed to create EGLDisplay without a reason").into()
+            }))
         } else {
             Ok(display)
         }
@@ -354,7 +359,7 @@ impl Display {
         let version = unsafe {
             let (mut major, mut minor) = (0, 0);
             if egl.Initialize(*display, &mut major, &mut minor) == egl::FALSE {
-                return Err(super::check_error().err().unwrap());
+                return Err(super::check_error().expect_err("eglInit failed without a reason"));
             }
 
             Version::new(major as u8, minor as u8)
