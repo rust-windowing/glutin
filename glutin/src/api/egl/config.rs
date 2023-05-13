@@ -125,7 +125,8 @@ impl Display {
             config_attributes.push(num_samples as EGLint);
         }
 
-        if let Some(requested_api) = template.api {
+        config_attributes.push(egl::RENDERABLE_TYPE as EGLint);
+        let api = if let Some(requested_api) = template.api {
             let mut api = 0;
             if requested_api.contains(Api::GLES1) {
                 api |= egl::OPENGL_ES_BIT;
@@ -139,9 +140,13 @@ impl Display {
             if requested_api.contains(Api::OPENGL) {
                 api |= egl::OPENGL_BIT;
             }
-            config_attributes.push(egl::RENDERABLE_TYPE as EGLint);
-            config_attributes.push(api as EGLint);
-        }
+            api
+        } else {
+            // NOTE: use ES2 by default to avoid matching pure ES1 configs,
+            // for more see https://github.com/rust-windowing/glutin/issues/1586.
+            egl::OPENGL_ES2_BIT
+        };
+        config_attributes.push(api as EGLint);
 
         // Add maximum height of pbuffer.
         if let Some(pbuffer_width) = template.max_pbuffer_width {

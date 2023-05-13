@@ -164,9 +164,17 @@ impl ConfigTemplateBuilder {
         self
     }
 
-    /// The set of apis that are supported by configuration.
+    /// The set of apis that are supported by this configuration.
     ///
-    /// By default api isn't specified when requesting the configuration.
+    /// The default [`Api`] depends on the used graphics platform interface. If
+    /// you want to do config filtering based on the [`Api`] yourself, use
+    /// [`Api::empty`].
+    ///
+    /// # Api-specific
+    ///
+    /// - **EGL:** [`Api::GLES2`] bit is set by default to avoid matching
+    ///   [`Api::GLES1`] configs;
+    /// - **GLX/WGL/CGL:** [`Api::OPENGL`] is always present in the result.
     #[inline]
     pub fn with_api(mut self, api: Api) -> Self {
         self.template.api = Some(api);
