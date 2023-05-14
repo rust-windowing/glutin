@@ -1,10 +1,13 @@
 # Unreleased
 
 - Bump MSRV from `1.60` to `1.65`.
-- Fixed EGL dereferencing raw window handles on everything but X11 in legacy `Window` and `Pixmap` surface creation.
 - **Breaking:** `bitflags` which is used as a part of public API was updated to `2.0`.
 - **Breaking:** `.*SurfaceAccessor` traits got removed; their methods now on respective `.*GlContext` traits instead.
 - **Breaking:** `GlContext` trait is now a part of the `prelude`.
+
+# Version 0.30.8
+
+- Fixed EGL dereferencing raw window handles on everything but X11 in legacy `Window` and `Pixmap` surface creation.
 - On GLX, fixed startup failure when passing default `Flush` with `KHR_context_flush_control`.
 
 # Version 0.30.7
