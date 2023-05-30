@@ -47,7 +47,7 @@ impl Display {
         attrs.push(0);
 
         let config = config.clone();
-        let surface = super::last_glx_error(self.inner.raw, || unsafe {
+        let surface = super::last_glx_error(|| unsafe {
             self.inner.glx.CreatePixmap(
                 self.inner.raw.cast(),
                 *config.inner.raw,
@@ -86,7 +86,7 @@ impl Display {
         attrs.push(0);
 
         let config = config.clone();
-        let surface = super::last_glx_error(self.inner.raw, || unsafe {
+        let surface = super::last_glx_error(|| unsafe {
             self.inner.glx.CreatePbuffer(self.inner.raw.cast(), *config.inner.raw, attrs.as_ptr())
         })?;
 
@@ -119,7 +119,7 @@ impl Display {
         attrs.push(0);
 
         let config = config.clone();
-        let surface = super::last_glx_error(self.inner.raw, || unsafe {
+        let surface = super::last_glx_error(|| unsafe {
             self.inner.glx.CreateWindow(
                 self.inner.raw.cast(),
                 *config.inner.raw,
@@ -169,7 +169,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
 
 impl<T: SurfaceTypeTrait> Drop for Surface<T> {
     fn drop(&mut self) {
-        let _ = super::last_glx_error(self.display.inner.raw, || unsafe {
+        let _ = super::last_glx_error(|| unsafe {
             match T::surface_type() {
                 SurfaceType::Pbuffer => {
                     self.display.inner.glx.DestroyPbuffer(self.display.inner.raw.cast(), self.raw);
@@ -211,7 +211,7 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     }
 
     fn swap_buffers(&self, _context: &Self::Context) -> Result<()> {
-        super::last_glx_error(self.display.inner.raw, || unsafe {
+        super::last_glx_error(|| unsafe {
             self.display.inner.glx.SwapBuffers(self.display.inner.raw.cast(), self.raw);
         })
     }
@@ -237,7 +237,7 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
 
         // Apply the `EXT` first since it's per window.
         if !applied && self.display.inner.client_extensions.contains("GLX_EXT_swap_control") {
-            super::last_glx_error(self.display.inner.raw, || unsafe {
+            super::last_glx_error(|| unsafe {
                 // Check for error explicitly here, other apis do have indication for failure.
                 extra.SwapIntervalEXT(self.display.inner.raw.cast(), self.raw, interval as _);
                 applied = true;

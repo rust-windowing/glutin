@@ -4,6 +4,7 @@
 - **Breaking:** `bitflags` which is used as a part of public API was updated to `2.0`.
 - **Breaking:** `.*SurfaceAccessor` traits got removed; their methods now on respective `.*GlContext` traits instead.
 - **Breaking:** `GlContext` trait is now a part of the `prelude`.
+- Fixed lock on SwapBuffers with some GLX drivers.
 
 # Version 0.30.8
 

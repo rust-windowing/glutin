@@ -185,7 +185,7 @@ impl Display {
         // Terminate list with zero.
         attrs.push(0);
 
-        super::last_glx_error(self.inner.raw, || unsafe {
+        super::last_glx_error(|| unsafe {
             extra.CreateContextAttribsARB(
                 self.inner.raw.cast(),
                 *config.inner.raw,
@@ -205,7 +205,7 @@ impl Display {
         let render_type =
             if config.float_pixels() { glx_extra::RGBA_FLOAT_TYPE_ARB } else { glx::RGBA_TYPE };
 
-        super::last_glx_error(self.inner.raw, || unsafe {
+        super::last_glx_error(|| unsafe {
             self.inner.glx.CreateNewContext(
                 self.inner.raw.cast(),
                 *config.inner.raw,
@@ -363,7 +363,7 @@ impl ContextInner {
         surface_draw: &Surface<T>,
         surface_read: &Surface<T>,
     ) -> Result<()> {
-        super::last_glx_error(self.display.inner.raw, || unsafe {
+        super::last_glx_error(|| unsafe {
             self.display.inner.glx.MakeContextCurrent(
                 self.display.inner.raw.cast(),
                 surface_draw.raw,
@@ -374,7 +374,7 @@ impl ContextInner {
     }
 
     fn make_not_current(&self) -> Result<()> {
-        super::last_glx_error(self.display.inner.raw, || unsafe {
+        super::last_glx_error(|| unsafe {
             self.display.inner.glx.MakeContextCurrent(
                 self.display.inner.raw.cast(),
                 0,
@@ -395,7 +395,7 @@ impl ContextInner {
 
 impl Drop for ContextInner {
     fn drop(&mut self) {
-        let _ = super::last_glx_error(self.display.inner.raw, || unsafe {
+        let _ = super::last_glx_error(|| unsafe {
             self.display.inner.glx.DestroyContext(self.display.inner.raw.cast(), *self.raw);
         });
     }
