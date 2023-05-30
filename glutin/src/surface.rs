@@ -33,9 +33,9 @@ pub trait GlSurface<T: SurfaceTypeTrait>: Sealed {
     ///
     /// # Platform-specific
     ///
-    /// **Wayland:** - This call will latch the underlying back buffer, meaning
-    /// that all resize operations will apply after the next
-    /// [`GlSurface::swap_buffers`].
+    /// - **Wayland:** this call will latch the underlying back buffer, meaning
+    ///   that all resize operations will apply after the next
+    ///   [`GlSurface::swap_buffers`].
     fn buffer_age(&self) -> u32;
 
     /// The **physical** width of the underlying surface.
@@ -45,14 +45,14 @@ pub trait GlSurface<T: SurfaceTypeTrait>: Sealed {
     ///
     /// # Platform specific
     ///
-    /// **macOS:** - **This will block if your main thread is blocked.**
+    /// - **macOS: this will block if your main thread is blocked.**
     fn height(&self) -> Option<u32>;
 
     /// Check whether the surface is single buffered.
     ///
     /// # Platform specific
     ///
-    /// **macOS:** - **This will block if your main thread is blocked.**
+    /// - **macOS: this will block if your main thread is blocked.**
     fn is_single_buffered(&self) -> bool;
 
     /// Swaps the underlying back buffers when the surface is not single
@@ -84,9 +84,9 @@ pub trait GlSurface<T: SurfaceTypeTrait>: Sealed {
     ///
     /// # Platform specific
     ///
-    /// **Wayland:** - resizes the surface.
-    /// **macOS:** - **This will block if your main thread is blocked.**
-    /// **Other:** - no op.
+    /// - **Wayland:** resizes the surface;
+    /// - **macOS: this will block if your main thread is blocked;**
+    /// - **Other:** no op.
     fn resize(&self, context: &Self::Context, width: NonZeroU32, height: NonZeroU32)
     where
         Self::SurfaceType: ResizeableSurface;
@@ -476,10 +476,11 @@ impl<T: SurfaceTypeTrait> Sealed for Surface<T> {}
 ///
 /// # Platform specific
 ///
-/// **Wayland:** - when the window is hidden and [`SwapInterval::Wait`] is used
-/// [`GlSurface::swap_buffers`] and based on it functions may block until the
-/// window is visible again. Using this variant is not recommended on Wayland
-/// and instead the throttling should be performed by [`frame callbacks`].
+/// - **Wayland:** when the window is hidden and [`SwapInterval::Wait`] is used
+///   [`GlSurface::swap_buffers`] and any function functions based on it may
+///   block until the window is visible again. Using this variant is not
+///   recommended on Wayland and instead the throttling should be performed by
+///   [`frame callbacks`].
 ///
 /// [`frame callbacks`]: https://wayland.freedesktop.org/docs/html/apa.html#protocol-spec-wl_surface-request-frame
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

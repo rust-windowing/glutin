@@ -63,11 +63,11 @@ pub trait GlDisplay: Sealed {
     ///
     /// # Platform-specific
     ///
-    /// **Wayland:** - This call may latch the underlying back buffer of
-    /// the currently active context (will do with mesa drivers), meaning
-    /// that all resize operations will apply for it after the next
-    /// [`GlSurface::swap_buffers`]. To workaround this behavior the current
-    /// context should be made [`not current`].
+    /// - **Wayland:** this call may latch the underlying back buffer of the
+    ///   currently active context (will do with mesa drivers), meaning that all
+    ///   resize operations will apply to it after the next
+    ///   [`GlSurface::swap_buffers`]. To workaround this behavior the current
+    ///   context should be made [`not current`].
     ///
     /// [`RawWindowHandle`]: raw_window_handle::RawWindowHandle
     /// [`not current`]: crate::context::PossiblyCurrentGlContext::make_not_current
@@ -119,9 +119,9 @@ pub trait GlDisplay: Sealed {
     ///
     /// # Api-specific
     ///
-    /// **WGL:** - To load all the functions you must have a current context on
-    /// the calling thread, otherwise only limited set of functions will be
-    /// loaded.
+    /// - **WGL:** to load all the functions you must have a current context on
+    ///   the calling thread, otherwise only a limited set of functions will be
+    ///   loaded.
     fn get_proc_address(&self, addr: &CStr) -> *const ffi::c_void;
 
     /// Helper to obtain the information about the underlying display.
@@ -152,8 +152,8 @@ pub trait GetDisplayExtensions: Sealed {
     ///
     /// # Api-specific
     ///
-    /// **WGL:** - To have extensions loaded, `raw_window_handle` must be used
-    /// when creating display.
+    /// - **WGL:** to have extensions loaded, `raw_window_handle` must be used
+    ///   when creating the display.
     fn extensions(&self) -> &HashSet<&'static str>;
 }
 
