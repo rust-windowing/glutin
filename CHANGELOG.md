@@ -1,5 +1,7 @@
 # Unreleased
 
+- Fixed lock on SwapBuffers with some GLX drivers.
+
 # Version 0.30.8
 
 - Fixed EGL dereferencing raw window handles on everything but X11 in legacy `Window` and `Pixmap` surface creation.
