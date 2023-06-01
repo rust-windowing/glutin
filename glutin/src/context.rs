@@ -55,10 +55,10 @@ pub trait NotCurrentGlContext: Sealed {
     ///
     /// # Platform specific
     ///
-    /// **macOS:** - **This will block if your main thread is blocked.**
-    /// **Wayland:** - This call may latch the underlying back buffer (will do
-    /// with mesa drivers), meaning that all resize operations will apply after
-    /// the next [`GlSurface::swap_buffers`].
+    /// - **macOS: this will block if your main thread is blocked**;
+    /// - **Wayland:** this call may latch the underlying back buffer (will do
+    ///   with mesa drivers), meaning that all resize operations will apply
+    ///   after the next [`GlSurface::swap_buffers`].
     fn make_current<T: SurfaceTypeTrait>(
         self,
         surface: &Self::Surface<T>,
@@ -69,7 +69,7 @@ pub trait NotCurrentGlContext: Sealed {
     ///
     /// # Api-specific:
     ///
-    /// **WGL/CGL:** - not supported.
+    /// - **WGL/CGL:** not supported.
     fn make_current_draw_read<T: SurfaceTypeTrait>(
         self,
         surface_draw: &Self::Surface<T>,
@@ -94,14 +94,14 @@ pub trait PossiblyCurrentGlContext: Sealed {
     ///
     /// # Platform specific
     ///
-    /// **macOS:** - **This will block if your main thread is blocked.**
+    /// - **macOS: this will block if your main thread is blocked.**
     fn make_not_current(self) -> Result<Self::NotCurrentContext>;
 
     /// Make [`Self::Surface`] current on the calling thread.
     ///
     /// # Platform specific
     ///
-    /// **macOS:** - **This will block if your main thread is blocked.**
+    /// - **macOS: this will block if your main thread is blocked.**
     fn make_current<T: SurfaceTypeTrait>(&self, surface: &Self::Surface<T>) -> Result<()>;
 
     /// The same as [`Self::make_current`] but provides a way to set read and
@@ -109,7 +109,7 @@ pub trait PossiblyCurrentGlContext: Sealed {
     ///
     /// # Api-specific:
     ///
-    /// **CGL/WGL:** - not supported.
+    /// - **CGL/WGL:** not supported.
     fn make_current_draw_read<T: SurfaceTypeTrait>(
         &self,
         surface_draw: &Self::Surface<T>,
@@ -152,7 +152,7 @@ impl ContextAttributesBuilder {
     ///
     /// # Platform-specific
     ///
-    /// On Wayland both contexts must use the same Wayland connection.
+    /// - **Wayland:** both contexts must use the same Wayland connection.
     ///
     /// [`Config`]: crate::config::Config
     pub fn with_sharing(mut self, context: &impl AsRawContext) -> Self {
@@ -186,7 +186,7 @@ impl ContextAttributesBuilder {
     ///
     /// # Api-specific
     ///
-    /// **macOS:** - not supported, the latest is picked automatically.
+    /// - **macOS:** not supported, the latest is picked automatically.
     pub fn with_profile(mut self, profile: GlProfile) -> Self {
         self.attributes.profile = Some(profile);
         self
@@ -206,8 +206,8 @@ impl ContextAttributesBuilder {
     ///
     /// # Api-specific
     ///
-    /// **WGL:** - you must pass `raw_window_handle` for if you plan to use it
-    /// with window.
+    /// - **WGL:** you **must** pass a `raw_window_handle` if you plan to use
+    ///   this context with that window.
     pub fn build(mut self, raw_window_handle: Option<RawWindowHandle>) -> ContextAttributes {
         self.attributes.raw_window_handle = raw_window_handle;
         self.attributes
@@ -334,7 +334,7 @@ pub enum ReleaseBehavior {
     ///
     /// # Api-specific
     ///
-    /// **macOS:** - not supported, [`Self::Flush`] is always used.
+    /// - **macOS:** not supported, [`Self::Flush`] is always used.
     None,
 
     /// Flushes the context that was previously current as if `glFlush` was
