@@ -10,6 +10,7 @@
 
 - Fixed EGL dereferencing raw window handles on everything but X11 in legacy `Window` and `Pixmap` surface creation.
 - On GLX, fixed startup failure when passing default `Flush` with `KHR_context_flush_control`.
+- **Behavior change:** the `Config`'s `Api` now has platform specific default instead of being unspecified.
 
 # Version 0.30.7
 
