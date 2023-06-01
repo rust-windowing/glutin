@@ -477,10 +477,10 @@ impl<T: SurfaceTypeTrait> Sealed for Surface<T> {}
 /// # Platform specific
 ///
 /// - **Wayland:** when the window is hidden and [`SwapInterval::Wait`] is used
-///   [`GlSurface::swap_buffers`] and any function functions based on it may
-///   block until the window is visible again. Using this variant is not
-///   recommended on Wayland and instead the throttling should be performed by
-///   [`frame callbacks`].
+///   [`GlSurface::swap_buffers`] and any functions based on it may block until
+///   the window is visible again. Using this variant is not recommended on
+///   Wayland and instead the throttling should be performed by [`frame
+///   callbacks`].
 ///
 /// [`frame callbacks`]: https://wayland.freedesktop.org/docs/html/apa.html#protocol-spec-wl_surface-request-frame
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
