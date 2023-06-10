@@ -105,7 +105,13 @@ impl Display {
         surface_attributes: &SurfaceAttributes<WindowSurface>,
     ) -> Result<Surface<WindowSurface>> {
         let window = match surface_attributes.raw_window_handle.unwrap() {
-            RawWindowHandle::Xlib(window_handle) => window_handle.window,
+            RawWindowHandle::Xlib(window_handle) => {
+                if window_handle.window == 0 {
+                    return Err(ErrorKind::BadMatch.into());
+                }
+
+                window_handle.window
+            },
             _ => {
                 return Err(
                     ErrorKind::NotSupported("provided native window is not supported").into()
