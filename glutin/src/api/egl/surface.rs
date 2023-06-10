@@ -329,7 +329,7 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     }
 
     fn is_single_buffered(&self) -> bool {
-        unsafe { self.raw_attribute(egl::RENDER_BUFFER as EGLint) != egl::SINGLE_BUFFER as i32 }
+        unsafe { self.raw_attribute(egl::RENDER_BUFFER as EGLint) == egl::SINGLE_BUFFER as i32 }
     }
 
     fn swap_buffers(&self, context: &Self::Context) -> Result<()> {
