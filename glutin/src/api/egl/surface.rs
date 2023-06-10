@@ -98,32 +98,50 @@ impl Display {
 
         let config = config.clone();
         let surface = match self.inner.raw {
-            EglDisplay::Khr(display) => unsafe {
-                self.inner.egl.CreatePlatformPixmapSurface(
-                    display,
-                    *config.inner.raw,
-                    native_pixmap.as_platform_pixmap(),
-                    attrs.as_ptr(),
-                )
+            EglDisplay::Khr(display) => {
+                let platform_pixmap = native_pixmap.as_platform_pixmap();
+                if platform_pixmap.is_null() {
+                    return Err(ErrorKind::BadNativePixmap.into());
+                }
+                unsafe {
+                    self.inner.egl.CreatePlatformPixmapSurface(
+                        display,
+                        *config.inner.raw,
+                        platform_pixmap,
+                        attrs.as_ptr(),
+                    )
+                }
             },
-            EglDisplay::Ext(display) => unsafe {
-                let attrs: Vec<EGLint> = attrs.into_iter().map(|attr| attr as EGLint).collect();
-                self.inner.egl.CreatePlatformPixmapSurfaceEXT(
-                    display,
-                    *config.inner.raw,
-                    native_pixmap.as_platform_pixmap(),
-                    attrs.as_ptr(),
-                )
+            EglDisplay::Ext(display) => {
+                let platform_pixmap = native_pixmap.as_platform_pixmap();
+                if platform_pixmap.is_null() {
+                    return Err(ErrorKind::BadNativePixmap.into());
+                }
+                unsafe {
+                    let attrs: Vec<EGLint> = attrs.into_iter().map(|attr| attr as EGLint).collect();
+                    self.inner.egl.CreatePlatformPixmapSurfaceEXT(
+                        display,
+                        *config.inner.raw,
+                        platform_pixmap,
+                        attrs.as_ptr(),
+                    )
+                }
             },
-            EglDisplay::Legacy(display) => unsafe {
-                // This call accepts raw value, instead of pointer.
-                let attrs: Vec<EGLint> = attrs.into_iter().map(|attr| attr as EGLint).collect();
-                self.inner.egl.CreatePixmapSurface(
-                    display,
-                    *config.inner.raw,
-                    native_pixmap.as_native_pixmap(),
-                    attrs.as_ptr(),
-                )
+            EglDisplay::Legacy(display) => {
+                let native_pixmap = native_pixmap.as_native_pixmap();
+                if native_pixmap.is_null() {
+                    return Err(ErrorKind::BadNativePixmap.into());
+                }
+                unsafe {
+                    // This call accepts raw value, instead of pointer.
+                    let attrs: Vec<EGLint> = attrs.into_iter().map(|attr| attr as EGLint).collect();
+                    self.inner.egl.CreatePixmapSurface(
+                        display,
+                        *config.inner.raw,
+                        native_pixmap,
+                        attrs.as_ptr(),
+                    )
+                }
             },
         };
 
@@ -451,7 +469,7 @@ impl NativeWindow {
             #[cfg(wayland_platform)]
             RawWindowHandle::Wayland(window_handle) => unsafe {
                 if window_handle.surface.is_null() {
-                    return Err(ErrorKind::BadMatch.into());
+                    return Err(ErrorKind::BadNativeWindow.into());
                 }
 
                 let ptr = ffi_dispatch!(
@@ -469,7 +487,7 @@ impl NativeWindow {
             #[cfg(x11_platform)]
             RawWindowHandle::Xlib(window_handle) => {
                 if window_handle.window == 0 {
-                    return Err(ErrorKind::BadMatch.into());
+                    return Err(ErrorKind::BadNativeWindow.into());
                 }
 
                 Self::Xlib(window_handle.window as _)
@@ -477,7 +495,7 @@ impl NativeWindow {
             #[cfg(x11_platform)]
             RawWindowHandle::Xcb(window_handle) => {
                 if window_handle.window == 0 {
-                    return Err(ErrorKind::BadMatch.into());
+                    return Err(ErrorKind::BadNativeWindow.into());
                 }
 
                 Self::Xcb(window_handle.window as _)
@@ -485,7 +503,7 @@ impl NativeWindow {
             #[cfg(android_platform)]
             RawWindowHandle::AndroidNdk(window_handle) => {
                 if window_handle.a_native_window.is_null() {
-                    return Err(ErrorKind::BadMatch.into());
+                    return Err(ErrorKind::BadNativeWindow.into());
                 }
 
                 Self::Android(window_handle.a_native_window)
@@ -493,7 +511,7 @@ impl NativeWindow {
             #[cfg(windows)]
             RawWindowHandle::Win32(window_handle) => {
                 if window_handle.hwnd.is_null() {
-                    return Err(ErrorKind::BadMatch.into());
+                    return Err(ErrorKind::BadNativeWindow.into());
                 }
 
                 Self::Win32(window_handle.hwnd as _)
@@ -501,7 +519,7 @@ impl NativeWindow {
             #[cfg(free_unix)]
             RawWindowHandle::Gbm(window_handle) => {
                 if window_handle.gbm_surface.is_null() {
-                    return Err(ErrorKind::BadMatch.into());
+                    return Err(ErrorKind::BadNativeWindow.into());
                 }
 
                 Self::Gbm(window_handle.gbm_surface)

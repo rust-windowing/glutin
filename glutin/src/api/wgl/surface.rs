@@ -50,7 +50,7 @@ impl Display {
         let hwnd = match surface_attributes.raw_window_handle.as_ref().unwrap() {
             handle @ RawWindowHandle::Win32(window_handle) => {
                 if window_handle.hwnd.is_null() {
-                    return Err(ErrorKind::BadMatch.into());
+                    return Err(ErrorKind::BadNativeWindow.into());
                 }
 
                 let _ = unsafe { config.apply_on_native_window(handle) };
