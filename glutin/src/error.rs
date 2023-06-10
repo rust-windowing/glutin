@@ -133,9 +133,6 @@ pub enum ErrorKind {
     /// Bad native window was provided.
     BadNativeWindow,
 
-    /// Bad native display was provided.
-    BadNativeDisplay,
-
     /// The context was lost.
     ContextLost,
 
@@ -166,7 +163,6 @@ impl ErrorKind {
             BadMatch => "arguments are inconsistance",
             BadParameter => "one or more argument values are invalid",
             BadNativePixmap => "argument does not refer to a valid native pixmap",
-            BadNativeDisplay => "argument does not refer to a valid native display",
             BadNativeWindow => "argument does not refer to a valid native window",
             ContextLost => "context loss",
             NotSupported(reason) => reason,
