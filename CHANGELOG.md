@@ -5,6 +5,7 @@
 - **Breaking:** `.*SurfaceAccessor` traits got removed; their methods now on respective `.*GlContext` traits instead.
 - **Breaking:** `GlContext` trait is now a part of the `prelude`.
 - Fixed lock on SwapBuffers with some GLX drivers.
+- Fixed EGL's `Surface::is_single_buffered` being inversed.
 
 # Version 0.30.8
 
