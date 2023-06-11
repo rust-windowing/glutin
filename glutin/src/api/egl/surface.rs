@@ -129,9 +129,17 @@ impl Display {
             },
             EglDisplay::Legacy(display) => {
                 let native_pixmap = native_pixmap.as_native_pixmap();
+
+                #[cfg(not(windows))]
                 if native_pixmap.is_null() {
                     return Err(ErrorKind::BadNativePixmap.into());
                 }
+
+                #[cfg(windows)]
+                if native_pixmap == 0 {
+                    return Err(ErrorKind::BadNativePixmap.into());
+                }
+
                 unsafe {
                     // This call accepts raw value, instead of pointer.
                     let attrs: Vec<EGLint> = attrs.into_iter().map(|attr| attr as EGLint).collect();
