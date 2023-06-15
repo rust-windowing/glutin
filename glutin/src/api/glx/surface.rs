@@ -33,7 +33,13 @@ impl Display {
     ) -> Result<Surface<PixmapSurface>> {
         let native_pixmap = surface_attributes.native_pixmap.as_ref().unwrap();
         let xid = match native_pixmap {
-            NativePixmap::XlibPixmap(xid) => *xid,
+            NativePixmap::XlibPixmap(xid) => {
+                if *xid == 0 {
+                    return Err(ErrorKind::BadNativePixmap.into());
+                }
+
+                *xid
+            },
             _ => {
                 return Err(
                     ErrorKind::NotSupported("provided native pixmap is not supported.").into()
@@ -105,7 +111,13 @@ impl Display {
         surface_attributes: &SurfaceAttributes<WindowSurface>,
     ) -> Result<Surface<WindowSurface>> {
         let window = match surface_attributes.raw_window_handle.unwrap() {
-            RawWindowHandle::Xlib(window_handle) => window_handle.window,
+            RawWindowHandle::Xlib(window_handle) => {
+                if window_handle.window == 0 {
+                    return Err(ErrorKind::BadNativeWindow.into());
+                }
+
+                window_handle.window
+            },
             _ => {
                 return Err(
                     ErrorKind::NotSupported("provided native window is not supported").into()
