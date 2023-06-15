@@ -1,5 +1,7 @@
 # Unreleased
 
+# Version 0.30.9
+
 - Fixed lock on SwapBuffers with some GLX drivers.
 - Fixed EGL's `Surface::is_single_buffered` being inversed.
 
