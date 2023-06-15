@@ -55,6 +55,7 @@ impl Display {
         };
 
         // SAFETY: Validity of the view and window is ensured by caller
+        // This function makes sure the window is non null.
         let ns_view = if let Some(ns_view) = unsafe { Id::retain(native_window.ns_view.cast()) } {
             ns_view
         } else {
