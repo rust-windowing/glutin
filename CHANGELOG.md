@@ -6,6 +6,7 @@
 - **Breaking:** `GlContext` trait is now a part of the `prelude`.
 - Fixed lock on SwapBuffers with some GLX drivers.
 - Fixed EGL's `Surface::is_single_buffered` being inversed.
+- Use `EGL_KHR_display_reference` if available for EGL.
 
 # Version 0.30.8
 

@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 use std::ffi::{self, CStr};
+use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::os::raw::c_char;
 use std::sync::Arc;
@@ -126,6 +127,10 @@ impl Display {
 
         let mut attrs = Vec::<EGLint>::with_capacity(2);
 
+        if extensions.contains("EGL_KHR_display_reference") {
+            attrs.push(egl::TRACK_REFERENCES_KHR as _);
+        }
+
         // TODO: Some extensions exist like EGL_EXT_device_drm which allow specifying
         // which DRM master fd to use under the hood by the implementation. This would
         // mean there would need to be an unsafe equivalent to this function.
@@ -192,7 +197,8 @@ impl Display {
 
         let extensions = NO_DISPLAY_EXTENSIONS.get().unwrap();
 
-        let mut attrs = Vec::<EGLAttrib>::new();
+        // Preallocate space for the terminator and to track references.
+        let mut attrs = Vec::<EGLAttrib>::with_capacity(2);
         let (platform, mut display) = match display {
             #[cfg(wayland_platform)]
             RawDisplayHandle::Wayland(handle)
@@ -219,6 +225,10 @@ impl Display {
             },
         };
 
+        if extensions.contains("EGL_KHR_display_reference") {
+            attrs.push(egl::TRACK_REFERENCES_KHR as _);
+        }
+
         // Be explicit here.
         if display.is_null() {
             display = egl::DEFAULT_DISPLAY as *mut _;
@@ -240,7 +250,8 @@ impl Display {
 
         let extensions = NO_DISPLAY_EXTENSIONS.get().unwrap();
 
-        let mut attrs = Vec::<EGLint>::new();
+        // Preallocate space for the terminator and to track references.
+        let mut attrs = Vec::<EGLint>::with_capacity(2);
         let (platform, mut display) = match display {
             #[cfg(wayland_platform)]
             RawDisplayHandle::Wayland(handle)
@@ -272,6 +283,10 @@ impl Display {
                 )
             },
         };
+
+        if extensions.contains("EGL_KHR_display_reference") {
+            attrs.push(egl::TRACK_REFERENCES_KHR as _);
+        }
 
         // Be explicit here.
         if display.is_null() {
@@ -487,6 +502,26 @@ impl fmt::Debug for DisplayInner {
 
 impl Drop for DisplayInner {
     fn drop(&mut self) {
+        // If the EGL_TRACK_REFERENCES_KHR attribute is true, then EGL will internally
+        // reference count the display. If that is the case, glutin can
+        // terminate the display without worry for the instance being
+        // reused elsewhere.
+        if self.client_extensions.contains("EGL_KHR_display_reference") {
+            let mut track_references = MaybeUninit::<u32>::uninit();
+            unsafe {
+                self.egl.QueryDisplayAttribEXT(
+                    *self.raw,
+                    egl::TRACK_REFERENCES_KHR as _,
+                    track_references.as_mut_ptr().cast(),
+                );
+
+                if track_references.assume_init() == egl::TRUE {
+                    self.egl.Terminate(*self.raw);
+                    return;
+                }
+            }
+        }
+
         // We cannot call safely call `eglTerminate`.
         //
         // This may sound confusing, but this is a result of how EGL works:
@@ -529,14 +564,6 @@ impl Drop for DisplayInner {
         // of not dropping the display is negligible because the display will
         // probably be destroyed on app termination and we can let the
         // operating system deal with tearing down EGL instead.
-        //
-        // # Possible future work:
-        //
-        // For platform displays, we could track the use of individual raw
-        // window handles and display attributes (recall the "with the
-        // same parameters" line) and use that to determine if it is safe to
-        // terminate the display, but that increases maintenance burden and is
-        // possibly flaky to implement.
 
         // unsafe { self.egl.Terminate(self.raw) };
     }
