@@ -32,6 +32,16 @@ pub mod egl {
     pub const PLATFORM_XCB_SCREEN_EXT: super::EGLenum = 0x31DE;
     // EGL_EXT_device_query_name
     pub const RENDERER_EXT: super::EGLenum = 0x335F;
+    // EGL_ANGLE_platform_angle - https://chromium.googlesource.com/angle/angle/+/HEAD/extensions/EGL_ANGLE_platform_angle.txt
+    pub const PLATFORM_ANGLE_ANGLE: super::EGLenum = 0x3202;
+    pub const PLATFORM_ANGLE_TYPE_ANGLE: super::EGLenum = 0x3203;
+    pub const PLATFORM_ANGLE_MAX_VERSION_MAJOR_ANGLE: super::EGLenum = 0x3204;
+    pub const PLATFORM_ANGLE_MAX_VERSION_MINOR_ANGLE: super::EGLenum = 0x3205;
+    pub const PLATFORM_ANGLE_DEBUG_LAYERS_ENABLED: super::EGLenum = 0x3451;
+    pub const PLATFORM_ANGLE_NATIVE_PLATFORM_TYPE_ANGLE: super::EGLenum = 0x348F;
+    pub const PLATFORM_ANGLE_TYPE_DEFAULT_ANGLE: super::EGLenum = 0x3206;
+    pub const PLATFORM_ANGLE_DEVICE_TYPE_HARDWARE_ANGLE: super::EGLenum = 0x320A;
+    pub const PLATFORM_ANGLE_DEVICE_TYPE_NULL_ANGLE: super::EGLenum = 0x345E;
 }
 
 pub use self::egl::types::{EGLContext, EGLDisplay};
