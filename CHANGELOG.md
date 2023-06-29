@@ -1,5 +1,7 @@
 # Unreleased
 
+- Added support for EGL on Windows using Angle. This assumes libEGL.dll/libGLESv2.dll present.
+
 # Version 0.30.9
 
 - Fixed lock on SwapBuffers with some GLX drivers.
