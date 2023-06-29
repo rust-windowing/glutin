@@ -241,6 +241,7 @@ impl Display {
         let extensions = NO_DISPLAY_EXTENSIONS.get().unwrap();
 
         let mut attrs = Vec::<EGLint>::new();
+        let mut legacy = false;
         let (platform, mut display) = match display {
             #[cfg(wayland_platform)]
             RawDisplayHandle::Wayland(handle)
@@ -266,6 +267,11 @@ impl Display {
             RawDisplayHandle::Gbm(handle) if extensions.contains("EGL_MESA_platform_gbm") => {
                 (egl::PLATFORM_GBM_MESA, handle.gbm_device)
             },
+            RawDisplayHandle::Windows(..) if extensions.contains("EGL_ANGLE_platform_angle") => {
+                // Only CreateWindowSurface appears to work with Angle.
+                legacy = true;
+                (egl::PLATFORM_ANGLE_ANGLE, egl::DEFAULT_DISPLAY as *mut _)
+            },
             _ => {
                 return Err(
                     ErrorKind::NotSupported("provided display handle is not supported").into()
@@ -284,7 +290,17 @@ impl Display {
         let display =
             unsafe { egl.GetPlatformDisplayEXT(platform, display as *mut _, attrs.as_ptr()) };
 
-        Self::check_display_error(display).map(EglDisplay::Ext)
+        Self::check_display_error(display).map(|display| {
+            if legacy {
+                // NOTE: For angle we use the Legacy code path, as that uses CreateWindowSurface
+                // instead of CreatePlatformWindowSurface*. The latter somehow
+                // doesn't work, only the former does. But Angle's own example also use the
+                // former: https://github.com/google/angle/blob/main/util/EGLWindow.cpp#L424
+                EglDisplay::Legacy(display)
+            } else {
+                EglDisplay::Ext(display)
+            }
+        })
     }
 
     fn get_display(egl: &Egl, display: RawDisplayHandle) -> Result<EglDisplay> {

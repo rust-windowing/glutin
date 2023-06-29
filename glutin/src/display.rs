@@ -426,6 +426,11 @@ pub enum DisplayApiPreference {
     ///
     /// But despite this issues it should be preferred on at least Linux over
     /// GLX, given that GLX is phasing away.
+    ///
+    /// # Platform-specific
+    ///
+    /// **Windows:** ANGLE can be used if `libEGL.dll` and `libGLESv2.dll` are
+    ///              in the library search path.
     #[cfg(egl_backend)]
     Egl,
 
