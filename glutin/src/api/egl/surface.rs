@@ -47,13 +47,6 @@ impl Display {
         attrs.push(egl::HEIGHT as EGLint);
         attrs.push(height.get() as EGLint);
 
-        // Add information about render buffer.
-        attrs.push(egl::RENDER_BUFFER as EGLint);
-        let buffer =
-            if surface_attributes.single_buffer { egl::SINGLE_BUFFER } else { egl::BACK_BUFFER }
-                as EGLint;
-        attrs.push(buffer);
-
         // Push `egl::NONE` to terminate the list.
         attrs.push(egl::NONE as EGLint);
 
