@@ -7,6 +7,7 @@
 - Fixed lock on SwapBuffers with some GLX drivers.
 - Fixed EGL's `Surface::is_single_buffered` being inversed.
 - Added support for EGL on Windows using Angle. This assumes libEGL.dll/libGLESv2.dll present.
+- EGL's `Display::create_pbuffer_surface()` no longer sets the invalid `RENDER_BUFFER` attribute.
 
 # Version 0.30.8
 
