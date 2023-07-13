@@ -1,6 +1,7 @@
 # Unreleased
 
 - Added support for EGL on Windows using Angle. This assumes libEGL.dll/libGLESv2.dll present.
+- EGL's `Display::create_pbuffer_surface()` no longer sets the invalid `RENDER_BUFFER` attribute.
 
 # Version 0.30.9
 
