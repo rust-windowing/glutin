@@ -2,8 +2,9 @@ use std::error::Error;
 use std::ffi::{CStr, CString};
 use std::num::NonZeroU32;
 use std::ops::Deref;
+use std::rc::Rc;
 
-use raw_window_handle::HasRawWindowHandle;
+use raw_window_handle::HasWindowHandle;
 use winit::event::{Event, KeyEvent, WindowEvent};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::WindowBuilder;
@@ -48,7 +49,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
 
     let display_builder = DisplayBuilder::new().with_window_builder(window_builder);
 
-    let (mut window, gl_config) = display_builder.build(&event_loop, template, |configs| {
+    let (window, gl_config) = display_builder.build(&event_loop, template, |configs| {
         // Find the config with the maximum number of samples, so our triangle will
         // be smooth.
         configs
@@ -67,7 +68,8 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
 
     println!("Picked a config with {} samples", gl_config.num_samples());
 
-    let raw_window_handle = window.as_ref().map(|window| window.raw_window_handle());
+    let raw_window_handle =
+        window.as_ref().map(|window| window.window_handle()).transpose().unwrap();
 
     // XXX The display could be obtained from any object created by it, so we can
     // query it from the config.
@@ -90,7 +92,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
         .with_context_api(ContextApi::OpenGl(Some(Version::new(2, 1))))
         .build(raw_window_handle);
 
-    let mut not_current_gl_context = Some(unsafe {
+    let mut not_current_gl_context = Some({
         gl_display.create_context(&gl_config, &context_attributes).unwrap_or_else(|_| {
             gl_display.create_context(&gl_config, &fallback_context_attributes).unwrap_or_else(
                 |_| {
@@ -102,6 +104,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
         })
     });
 
+    let mut window = window.map(Rc::new);
     let mut state = None;
     let mut renderer = None;
     event_loop.run(move |event, window_target| {
@@ -114,14 +117,15 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
                     let window_builder = WindowBuilder::new()
                         .with_transparent(true)
                         .with_title("Glutin triangle gradient example (press Escape to exit)");
-                    glutin_winit::finalize_window(window_target, window_builder, &gl_config)
-                        .unwrap()
+                    Rc::new(
+                        glutin_winit::finalize_window(window_target, window_builder, &gl_config)
+                            .unwrap(),
+                    )
                 });
 
-                let attrs = window.build_surface_attributes(Default::default());
-                let gl_surface = unsafe {
-                    gl_config.display().create_window_surface(&gl_config, &attrs).unwrap()
-                };
+                let attrs = window.clone().build_surface_attributes(<_>::default());
+                let gl_surface =
+                    { gl_config.display().create_window_surface(&gl_config, attrs).unwrap() };
 
                 // Make it current.
                 let gl_context =
@@ -152,6 +156,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
                 assert!(not_current_gl_context
                     .replace(gl_context.make_not_current().unwrap())
                     .is_none());
+                window = None;
             },
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::Resized(size) => {

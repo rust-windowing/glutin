@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::{fmt, iter};
 
 use glutin_wgl_sys::wgl_extra;
-use raw_window_handle::RawWindowHandle;
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawWindowHandle};
 use windows_sys::Win32::Graphics::Gdi::{self as gdi, HDC};
 use windows_sys::Win32::Graphics::OpenGL::{self as gl, PIXELFORMATDESCRIPTOR};
 
@@ -27,13 +27,18 @@ const MAX_QUERY_CONFIGS: usize = 256;
 const SRGB_ARB: &str = "WGL_ARB_framebuffer_sRGB";
 const SRGB_EXT: &str = "WGL_EXT_framebuffer_sRGB";
 
-impl Display {
-    pub(crate) unsafe fn find_configs(
+impl<D: HasDisplayHandle> Display<D> {
+    pub(crate) fn find_configs<W: HasWindowHandle>(
         &self,
-        template: ConfigTemplate,
-    ) -> Result<Box<dyn Iterator<Item = Config> + '_>> {
-        let hwnd = match template.native_window {
-            Some(RawWindowHandle::Win32(window_handle)) => window_handle.hwnd as _,
+        template: ConfigTemplate<W>,
+    ) -> Result<Box<dyn Iterator<Item = Config<D>> + '_>> {
+        let hwnd = match template
+            ._native_window
+            .as_ref()
+            .map(|w| w.window_handle().map(|w| w.as_raw()))
+            .transpose()?
+        {
+            Some(RawWindowHandle::Win32(window_handle)) => window_handle.hwnd.get() as _,
             _ => 0,
         };
         let hdc = unsafe { gdi::GetDC(hwnd) };
@@ -47,11 +52,11 @@ impl Display {
         }
     }
 
-    fn find_normal_configs(
+    fn find_normal_configs<W: HasWindowHandle>(
         &self,
-        template: ConfigTemplate,
+        template: ConfigTemplate<W>,
         hdc: HDC,
-    ) -> Result<Box<dyn Iterator<Item = Config> + '_>> {
+    ) -> Result<Box<dyn Iterator<Item = Config<D>> + '_>> {
         let (r_size, g_size, b_size) = match template.color_buffer_type {
             ColorBufferType::Rgb { r_size, g_size, b_size } => (r_size, g_size, b_size),
             _ => {
@@ -152,11 +157,11 @@ impl Display {
         }
     }
 
-    fn find_configs_arb(
+    fn find_configs_arb<W: HasWindowHandle>(
         &self,
-        template: ConfigTemplate,
+        template: ConfigTemplate<W>,
         hdc: HDC,
-    ) -> Result<Box<dyn Iterator<Item = Config> + '_>> {
+    ) -> Result<Box<dyn Iterator<Item = Config<D>> + '_>> {
         let wgl_extra = self.inner.wgl_extra.unwrap();
         let mut attrs = Vec::<c_int>::with_capacity(32);
 
@@ -276,20 +281,34 @@ impl Display {
 }
 
 /// A wrapper around `PIXELFORMAT`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Config {
-    pub(crate) inner: Arc<ConfigInner>,
+#[derive(Debug)]
+pub struct Config<D> {
+    pub(crate) inner: Arc<ConfigInner<D>>,
 }
 
-impl Config {
+impl<D> Clone for Config<D> {
+    fn clone(&self) -> Self {
+        Self { inner: self.inner.clone() }
+    }
+}
+
+impl<D> PartialEq for Config<D> {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner
+    }
+}
+
+impl<D> Eq for Config<D> {}
+
+impl<D: HasDisplayHandle> Config<D> {
     /// Set the pixel format on the native window.
     ///
     /// # Safety
     ///
     /// The `raw_window_handle` should point to a valid value.
-    pub unsafe fn apply_on_native_window(&self, raw_window_handle: &RawWindowHandle) -> Result<()> {
-        let hdc = match raw_window_handle {
-            RawWindowHandle::Win32(window) => unsafe { gdi::GetDC(window.hwnd as _) },
+    pub fn apply_on_native_window(&self, raw_window_handle: impl HasWindowHandle) -> Result<()> {
+        let hdc = match raw_window_handle.window_handle()?.as_raw() {
+            RawWindowHandle::Win32(window) => unsafe { gdi::GetDC(window.hwnd.get() as _) },
             _ => return Err(ErrorKind::BadNativeWindow.into()),
         };
 
@@ -332,7 +351,7 @@ impl Config {
     }
 }
 
-impl GlConfig for Config {
+impl<D: HasDisplayHandle> GlConfig for Config<D> {
     fn color_buffer_type(&self) -> Option<ColorBufferType> {
         let (r_size, g_size, b_size) = match self.inner.descriptor.as_ref() {
             Some(descriptor) => (descriptor.cRedBits, descriptor.cGreenBits, descriptor.cBlueBits),
@@ -452,38 +471,38 @@ impl GlConfig for Config {
     }
 }
 
-impl GetGlDisplay for Config {
-    type Target = Display;
+impl<D: HasDisplayHandle> GetGlDisplay for Config<D> {
+    type Target = Display<D>;
 
     fn display(&self) -> Self::Target {
         self.inner.display.clone()
     }
 }
 
-impl AsRawConfig for Config {
+impl<D: HasDisplayHandle> AsRawConfig for Config<D> {
     fn raw_config(&self) -> RawConfig {
         RawConfig::Wgl(self.inner.pixel_format_index)
     }
 }
 
-impl Sealed for Config {}
+impl<D: HasDisplayHandle> Sealed for Config<D> {}
 
-pub(crate) struct ConfigInner {
-    pub(crate) display: Display,
+pub(crate) struct ConfigInner<D> {
+    pub(crate) display: Display<D>,
     pub(crate) hdc: HDC,
     pub(crate) pixel_format_index: i32,
     pub(crate) descriptor: Option<PIXELFORMATDESCRIPTOR>,
 }
 
-impl PartialEq for ConfigInner {
+impl<D> PartialEq for ConfigInner<D> {
     fn eq(&self, other: &Self) -> bool {
         self.pixel_format_index == other.pixel_format_index
     }
 }
 
-impl Eq for ConfigInner {}
+impl<D> Eq for ConfigInner<D> {}
 
-impl fmt::Debug for ConfigInner {
+impl<D> fmt::Debug for ConfigInner<D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Config")
             .field("hdc", &self.hdc)

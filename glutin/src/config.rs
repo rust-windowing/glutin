@@ -4,7 +4,7 @@
 use std::num::NonZeroU32;
 
 use bitflags::bitflags;
-use raw_window_handle::RawWindowHandle;
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
 use crate::display::{Display, GetGlDisplay};
 use crate::private::{gl_api_dispatch, Sealed};
@@ -87,16 +87,98 @@ pub trait AsRawConfig {
 }
 
 /// Builder for the [`ConfigTemplate`].
-#[derive(Debug, Default, Clone)]
-pub struct ConfigTemplateBuilder {
-    template: ConfigTemplate,
+#[derive(Debug, Clone)]
+pub struct ConfigTemplateBuilder<W = super::NoWindow> {
+    template: ConfigTemplate<W>,
 }
 
-impl ConfigTemplateBuilder {
+impl<W> Default for ConfigTemplateBuilder<W> {
+    fn default() -> Self {
+        Self {
+            template: ConfigTemplate {
+                color_buffer_type: ColorBufferType::Rgb { r_size: 8, g_size: 8, b_size: 8 },
+                alpha_size: 8,
+                depth_size: 24,
+                stencil_size: 8,
+                num_samples: None,
+                transparency: false,
+                stereoscopy: None,
+                min_swap_interval: None,
+                max_swap_interval: None,
+                single_buffering: false,
+                float_pixels: false,
+                config_surface_types: ConfigSurfaceTypes::WINDOW,
+                max_pbuffer_width: None,
+                max_pbuffer_height: None,
+                _native_window: None,
+                hardware_accelerated: None,
+                api: None,
+            },
+        }
+    }
+}
+
+impl<W: HasWindowHandle> ConfigTemplateBuilder<W> {
     /// Create a new configuration template builder.
     #[inline]
     pub fn new() -> Self {
         Default::default()
+    }
+
+    /// Request config that can render to a particular native window.
+    ///
+    /// # Platform-specific
+    ///
+    /// This will use native window when matching the config to get the best one
+    /// suitable for rendering into that window.
+    ///
+    /// When using WGL it's the most reliable way to get a working
+    /// configuration. With GLX it'll use the visual passed in
+    /// `native_window` to match the config.
+    pub fn compatible_with_native_window<W2: HasWindowHandle>(
+        self,
+        native_window: W2,
+    ) -> ConfigTemplateBuilder<W2> {
+        let ConfigTemplate {
+            color_buffer_type,
+            alpha_size,
+            depth_size,
+            stencil_size,
+            num_samples,
+            min_swap_interval,
+            max_swap_interval,
+            config_surface_types,
+            api,
+            transparency,
+            single_buffering,
+            stereoscopy,
+            float_pixels,
+            max_pbuffer_width,
+            hardware_accelerated,
+            max_pbuffer_height,
+            ..
+        } = self.template;
+        ConfigTemplateBuilder {
+            template: ConfigTemplate {
+                color_buffer_type,
+                alpha_size,
+                depth_size,
+                stencil_size,
+                num_samples,
+                min_swap_interval,
+                max_swap_interval,
+                config_surface_types,
+                api,
+                transparency,
+                single_buffering,
+                stereoscopy,
+                float_pixels,
+                max_pbuffer_width,
+                hardware_accelerated,
+                max_pbuffer_height,
+                _native_window: Some(native_window),
+            },
+        }
     }
 
     /// Number of alpha bits in the color buffer.
@@ -230,21 +312,6 @@ impl ConfigTemplateBuilder {
         self
     }
 
-    /// Request config that can render to a particular native window.
-    ///
-    /// # Platform-specific
-    ///
-    /// This will use native window when matching the config to get the best one
-    /// suitable for rendering into that window.
-    ///
-    /// When using WGL it's the most reliable way to get a working
-    /// configuration. With GLX it'll use the visual passed in
-    /// `native_window` to match the config.
-    pub fn compatible_with_native_window(mut self, native_window: RawWindowHandle) -> Self {
-        self.template.native_window = Some(native_window);
-        self
-    }
-
     /// With supported swap intervals.
     ///
     /// By default the value isn't specified.
@@ -265,14 +332,14 @@ impl ConfigTemplateBuilder {
 
     /// Build the template to match the configs against.
     #[must_use]
-    pub fn build(self) -> ConfigTemplate {
+    pub fn build(self) -> ConfigTemplate<W> {
         self.template
     }
 }
 
 /// The context configuration template that is used to find desired config.
 #[derive(Debug, Clone)]
-pub struct ConfigTemplate {
+pub struct ConfigTemplate<W = super::NoWindow> {
     /// The type of the backing buffer and ancillary buffers.
     pub(crate) color_buffer_type: ColorBufferType,
 
@@ -322,7 +389,7 @@ pub struct ConfigTemplate {
     pub(crate) max_pbuffer_height: Option<u32>,
 
     /// The native window config should support rendering into.
-    pub(crate) native_window: Option<RawWindowHandle>,
+    pub(crate) _native_window: Option<W>,
 }
 
 impl Default for ConfigTemplate {
@@ -355,7 +422,7 @@ impl Default for ConfigTemplate {
             max_pbuffer_width: None,
             max_pbuffer_height: None,
 
-            native_window: None,
+            _native_window: None,
             hardware_accelerated: None,
 
             api: None,
@@ -421,32 +488,72 @@ pub enum ColorBufferType {
 /// ```no_run
 /// fn test_send<T: Send>() {}
 /// fn test_sync<T: Sync>() {}
-/// test_send::<glutin::config::Config>();
-/// test_sync::<glutin::config::Config>();
+/// test_send::<glutin::config::Config<glutin::NoDisplay>>();
+/// test_sync::<glutin::config::Config<glutin::NoDisplay>>();
 /// ```
 ///
 /// [`Surface`]: crate::surface::Surface
 /// [`Context`]: crate::context::NotCurrentContext
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Config {
+#[derive(Debug)]
+pub enum Config<D> {
     /// The EGL config.
     #[cfg(egl_backend)]
-    Egl(EglConfig),
+    Egl(EglConfig<D>),
 
     /// The GLX config.
     #[cfg(glx_backend)]
-    Glx(GlxConfig),
+    Glx(GlxConfig<D>),
 
     /// The WGL config.
     #[cfg(wgl_backend)]
-    Wgl(WglConfig),
+    Wgl(WglConfig<D>),
 
     /// The CGL config.
     #[cfg(cgl_backend)]
-    Cgl(CglConfig),
+    Cgl(CglConfig<D>),
 }
 
-impl GlConfig for Config {
+impl<D> Clone for Config<D> {
+    fn clone(&self) -> Self {
+        match self {
+            #[cfg(egl_backend)]
+            Self::Egl(config) => Self::Egl(config.clone()),
+
+            #[cfg(glx_backend)]
+            Self::Glx(config) => Self::Glx(config.clone()),
+
+            #[cfg(wgl_backend)]
+            Self::Wgl(config) => Self::Wgl(config.clone()),
+
+            #[cfg(cgl_backend)]
+            Self::Cgl(config) => Self::Cgl(config.clone()),
+        }
+    }
+}
+
+impl<D> PartialEq for Config<D> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            #[cfg(egl_backend)]
+            (Self::Egl(left), Self::Egl(right)) => left == right,
+
+            #[cfg(glx_backend)]
+            (Self::Glx(left), Self::Glx(right)) => left == right,
+
+            #[cfg(wgl_backend)]
+            (Self::Wgl(left), Self::Wgl(right)) => left == right,
+
+            #[cfg(cgl_backend)]
+            (Self::Cgl(left), Self::Cgl(right)) => left == right,
+
+            _ => false,
+        }
+    }
+}
+
+impl<D> Eq for Config<D> {}
+
+impl<D: HasDisplayHandle> GlConfig for Config<D> {
     fn color_buffer_type(&self) -> Option<ColorBufferType> {
         gl_api_dispatch!(self; Self(config) => config.color_buffer_type())
     }
@@ -492,8 +599,8 @@ impl GlConfig for Config {
     }
 }
 
-impl GetGlDisplay for Config {
-    type Target = Display;
+impl<D: HasDisplayHandle> GetGlDisplay for Config<D> {
+    type Target = Display<D>;
 
     fn display(&self) -> Self::Target {
         gl_api_dispatch!(self; Self(config) => config.display(); as Display)
@@ -501,13 +608,13 @@ impl GetGlDisplay for Config {
 }
 
 #[cfg(x11_platform)]
-impl X11GlConfigExt for Config {
+impl<D: HasDisplayHandle> X11GlConfigExt for Config<D> {
     fn x11_visual(&self) -> Option<X11VisualInfo> {
         gl_api_dispatch!(self; Self(config) => config.x11_visual())
     }
 }
 
-impl Sealed for Config {}
+impl<D: HasDisplayHandle> Sealed for Config<D> {}
 
 /// Raw config.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -529,7 +636,7 @@ pub enum RawConfig {
     Cgl(*const std::ffi::c_void),
 }
 
-impl AsRawConfig for Config {
+impl<D: HasDisplayHandle> AsRawConfig for Config<D> {
     fn raw_config(&self) -> RawConfig {
         gl_api_dispatch!(self; Self(config) => config.raw_config())
     }

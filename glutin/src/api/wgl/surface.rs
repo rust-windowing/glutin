@@ -1,11 +1,10 @@
 //! A wrapper around `HWND` used for GL operations.
 
 use std::io::Error as IoError;
-use std::marker::PhantomData;
 use std::num::NonZeroU32;
 use std::{fmt, mem};
 
-use raw_window_handle::RawWindowHandle;
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawWindowHandle};
 use windows_sys::Win32::Foundation::{HWND, RECT};
 use windows_sys::Win32::Graphics::Gdi::HDC;
 use windows_sys::Win32::Graphics::{Gdi as gdi, OpenGL as gl};
@@ -25,36 +24,32 @@ use super::config::Config;
 use super::context::PossiblyCurrentContext;
 use super::display::Display;
 
-impl Display {
+impl<D: HasDisplayHandle> Display<D> {
     pub(crate) unsafe fn create_pixmap_surface(
         &self,
-        _config: &Config,
-        _surface_attributes: &SurfaceAttributes<PixmapSurface>,
-    ) -> Result<Surface<PixmapSurface>> {
+        _config: &Config<D>,
+        _surface_attributes: SurfaceAttributes<PixmapSurface>,
+    ) -> Result<Surface<D, PixmapSurface>> {
         Err(ErrorKind::NotSupported("pixmaps are not implemented with WGL").into())
     }
 
     pub(crate) unsafe fn create_pbuffer_surface(
         &self,
-        _config: &Config,
-        _surface_attributes: &SurfaceAttributes<PbufferSurface>,
-    ) -> Result<Surface<PbufferSurface>> {
+        _config: &Config<D>,
+        _surface_attributes: SurfaceAttributes<PbufferSurface>,
+    ) -> Result<Surface<D, PbufferSurface>> {
         Err(ErrorKind::NotSupported("pbuffers are not implemented with WGL").into())
     }
 
-    pub(crate) unsafe fn create_window_surface(
+    pub(crate) fn create_window_surface<W: HasWindowHandle>(
         &self,
-        config: &Config,
-        surface_attributes: &SurfaceAttributes<WindowSurface>,
-    ) -> Result<Surface<WindowSurface>> {
-        let hwnd = match surface_attributes.raw_window_handle.as_ref().unwrap() {
-            handle @ RawWindowHandle::Win32(window_handle) => {
-                if window_handle.hwnd.is_null() {
-                    return Err(ErrorKind::BadNativeWindow.into());
-                }
-
-                let _ = unsafe { config.apply_on_native_window(handle) };
-                window_handle.hwnd as HWND
+        config: &Config<D>,
+        surface_attributes: SurfaceAttributes<WindowSurface<W>>,
+    ) -> Result<Surface<D, WindowSurface<W>>> {
+        let hwnd = match surface_attributes.ty.0.window_handle()?.as_raw() {
+            RawWindowHandle::Win32(window_handle) => {
+                let _ = config.apply_on_native_window(&surface_attributes.ty.0);
+                window_handle.hwnd.get() as HWND
             },
             _ => {
                 return Err(
@@ -65,23 +60,50 @@ impl Display {
 
         let hdc = unsafe { gdi::GetDC(hwnd) };
 
-        let surface =
-            Surface { display: self.clone(), config: config.clone(), hwnd, hdc, _ty: PhantomData };
+        let surface = Surface {
+            display: self.clone(),
+            config: config.clone(),
+            hwnd,
+            hdc,
+            ty: surface_attributes.ty,
+        };
 
         Ok(surface)
     }
 }
 
 /// A Wrapper around `HWND`.
-pub struct Surface<T: SurfaceTypeTrait> {
-    display: Display,
-    config: Config,
+pub struct Surface<D, T: SurfaceTypeTrait> {
+    display: Display<D>,
+    config: Config<D>,
     pub(crate) hwnd: HWND,
     pub(crate) hdc: HDC,
-    _ty: PhantomData<T>,
+    ty: T,
 }
 
-impl<T: SurfaceTypeTrait> Drop for Surface<T> {
+impl<D, W: HasWindowHandle> Surface<D, WindowSurface<W>> {
+    /// Get a reference to the underlying window.
+    pub fn window(&self) -> &W {
+        &self.ty.0
+    }
+}
+
+impl<D, W: HasWindowHandle> AsRef<W> for Surface<D, WindowSurface<W>> {
+    fn as_ref(&self) -> &W {
+        self.window()
+    }
+}
+
+impl<D, W: HasWindowHandle> HasWindowHandle for Surface<D, WindowSurface<W>> {
+    fn window_handle(
+        &self,
+    ) -> std::result::Result<raw_window_handle::WindowHandle<'_>, raw_window_handle::HandleError>
+    {
+        self.window().window_handle()
+    }
+}
+
+impl<D, T: SurfaceTypeTrait> Drop for Surface<D, T> {
     fn drop(&mut self) {
         unsafe {
             gdi::ReleaseDC(self.hwnd, self.hdc);
@@ -89,8 +111,8 @@ impl<T: SurfaceTypeTrait> Drop for Surface<T> {
     }
 }
 
-impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
-    type Context = PossiblyCurrentContext;
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> GlSurface<T> for Surface<D, T> {
+    type Context = PossiblyCurrentContext<D>;
     type SurfaceType = T;
 
     fn buffer_age(&self) -> u32 {
@@ -170,7 +192,7 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     }
 }
 
-impl<T: SurfaceTypeTrait> fmt::Debug for Surface<T> {
+impl<D, T: SurfaceTypeTrait> fmt::Debug for Surface<D, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Surface")
             .field("config", &self.config.inner.pixel_format_index)
@@ -180,26 +202,26 @@ impl<T: SurfaceTypeTrait> fmt::Debug for Surface<T> {
     }
 }
 
-impl<T: SurfaceTypeTrait> AsRawSurface for Surface<T> {
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> AsRawSurface for Surface<D, T> {
     fn raw_surface(&self) -> RawSurface {
         RawSurface::Wgl(self.hwnd as _)
     }
 }
 
-impl<T: SurfaceTypeTrait> GetGlConfig for Surface<T> {
-    type Target = Config;
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> GetGlConfig for Surface<D, T> {
+    type Target = Config<D>;
 
     fn config(&self) -> Self::Target {
         self.config.clone()
     }
 }
 
-impl<T: SurfaceTypeTrait> GetGlDisplay for Surface<T> {
-    type Target = Display;
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> GetGlDisplay for Surface<D, T> {
+    type Target = Display<D>;
 
     fn display(&self) -> Self::Target {
         self.display.clone()
     }
 }
 
-impl<T: SurfaceTypeTrait> Sealed for Surface<T> {}
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> Sealed for Surface<D, T> {}

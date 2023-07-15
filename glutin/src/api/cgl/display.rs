@@ -1,12 +1,12 @@
 //! A CGL display.
 
 use std::ffi::{self, CStr};
-use std::marker::PhantomData;
+use std::sync::Arc;
 
 use core_foundation::base::TCFType;
 use core_foundation::bundle::{CFBundleGetBundleWithIdentifier, CFBundleGetFunctionPointerForName};
 use core_foundation::string::CFString;
-use raw_window_handle::RawDisplayHandle;
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawDisplayHandle};
 
 use crate::config::ConfigTemplate;
 use crate::display::{AsRawDisplay, DisplayFeatures, RawDisplay};
@@ -20,68 +20,92 @@ use super::context::NotCurrentContext;
 use super::surface::Surface;
 
 /// The CGL display.
-#[derive(Debug, Clone)]
-pub struct Display {
-    // Prevent building of it without constructor.
-    _marker: PhantomData<()>,
+#[derive(Debug)]
+pub struct Display<D> {
+    /// The inner display object to keep alive.
+    display: Arc<D>,
 }
 
-impl Display {
+impl<D> Clone for Display<D> {
+    fn clone(&self) -> Self {
+        Self { display: self.display.clone() }
+    }
+}
+
+impl<D: HasDisplayHandle> AsRef<D> for Display<D> {
+    #[inline]
+    fn as_ref(&self) -> &D {
+        self.display()
+    }
+}
+
+impl<D: HasDisplayHandle> HasDisplayHandle for Display<D> {
+    #[inline]
+    fn display_handle(
+        &self,
+    ) -> std::result::Result<raw_window_handle::DisplayHandle<'_>, raw_window_handle::HandleError>
+    {
+        self.display().display_handle()
+    }
+}
+
+impl<D: HasDisplayHandle> Display<D> {
     /// Create CGL display.
-    ///
-    /// # Safety
-    ///
-    /// The function is unsafe for consistency.
-    pub unsafe fn new(display: RawDisplayHandle) -> Result<Self> {
-        match display {
-            RawDisplayHandle::AppKit(..) => Ok(Display { _marker: PhantomData }),
+    pub fn new(display: D) -> Result<Self> {
+        match display.display_handle()?.as_raw() {
+            RawDisplayHandle::AppKit(..) => Ok(Display { display: Arc::new(display) }),
             _ => Err(ErrorKind::NotSupported("provided native display is not supported").into()),
         }
     }
+
+    /// Get the underlying display implementation
+    pub fn display(&self) -> &D {
+        &self.display
+    }
 }
 
-impl GlDisplay for Display {
-    type Config = Config;
-    type NotCurrentContext = NotCurrentContext;
-    type PbufferSurface = Surface<PbufferSurface>;
-    type PixmapSurface = Surface<PixmapSurface>;
-    type WindowSurface = Surface<WindowSurface>;
+impl<D: HasDisplayHandle> GlDisplay for Display<D> {
+    type Config = Config<D>;
+    type NotCurrentContext = NotCurrentContext<D>;
+    type PbufferSurface = Surface<D, PbufferSurface>;
+    type PixmapSurface = Surface<D, PixmapSurface>;
+    type WindowSurface<W: HasWindowHandle> = Surface<D, WindowSurface<W>>;
 
-    unsafe fn find_configs(
+    fn find_configs<W: HasWindowHandle>(
         &self,
-        template: ConfigTemplate,
+        template: ConfigTemplate<W>,
     ) -> Result<Box<dyn Iterator<Item = Self::Config> + '_>> {
-        unsafe { Self::find_configs(self, template) }
+        Self::find_configs(self, template)
     }
 
-    unsafe fn create_window_surface(
+    fn create_window_surface<W: HasWindowHandle>(
         &self,
         config: &Self::Config,
-        surface_attributes: &SurfaceAttributes<WindowSurface>,
-    ) -> Result<Self::WindowSurface> {
-        unsafe { Self::create_window_surface(self, config, surface_attributes) }
+        surface_attributes: SurfaceAttributes<WindowSurface<W>>,
+    ) -> Result<Self::WindowSurface<W>> {
+        Self::create_window_surface(self, config, surface_attributes)
     }
 
     unsafe fn create_pbuffer_surface(
         &self,
         config: &Self::Config,
-        surface_attributes: &SurfaceAttributes<PbufferSurface>,
+        surface_attributes: SurfaceAttributes<PbufferSurface>,
     ) -> Result<Self::PbufferSurface> {
         unsafe { Self::create_pbuffer_surface(self, config, surface_attributes) }
     }
 
-    unsafe fn create_context(
+    fn create_context<W: HasWindowHandle>(
         &self,
         config: &Self::Config,
-        context_attributes: &crate::context::ContextAttributes,
+        context_attributes: &crate::context::ContextAttributes<W>,
     ) -> Result<Self::NotCurrentContext> {
-        unsafe { Self::create_context(self, config, context_attributes) }
+        Self::create_context(self, config, context_attributes)
     }
 
     unsafe fn create_pixmap_surface(
         &self,
         config: &Self::Config,
-        surface_attributes: &SurfaceAttributes<PixmapSurface>,
+        surface_attributes: SurfaceAttributes<PixmapSurface>,
     ) -> Result<Self::PixmapSurface> {
         unsafe { Self::create_pixmap_surface(self, config, surface_attributes) }
     }
@@ -107,10 +131,10 @@ impl GlDisplay for Display {
     }
 }
 
-impl AsRawDisplay for Display {
+impl<D: HasDisplayHandle> AsRawDisplay for Display<D> {
     fn raw_display(&self) -> RawDisplay {
         RawDisplay::Cgl
     }
 }
 
-impl Sealed for Display {}
+impl<D: HasDisplayHandle> Sealed for Display<D> {}

@@ -1,12 +1,11 @@
 //! Everything related to `EGLSurface`.
 
-use std::marker::PhantomData;
 use std::num::NonZeroU32;
 use std::{ffi, fmt};
 
 use glutin_egl_sys::egl;
 use glutin_egl_sys::egl::types::{EGLAttrib, EGLSurface, EGLint};
-use raw_window_handle::RawWindowHandle;
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawWindowHandle};
 #[cfg(wayland_platform)]
 use wayland_sys::{egl::*, ffi_dispatch};
 
@@ -28,14 +27,14 @@ use super::display::Display;
 /// Hint for the attribute list size.
 const ATTR_SIZE_HINT: usize = 8;
 
-impl Display {
+impl<D: HasDisplayHandle> Display<D> {
     pub(crate) unsafe fn create_pbuffer_surface(
         &self,
-        config: &Config,
-        surface_attributes: &SurfaceAttributes<PbufferSurface>,
-    ) -> Result<Surface<PbufferSurface>> {
-        let width = surface_attributes.width.unwrap();
-        let height = surface_attributes.height.unwrap();
+        config: &Config<D>,
+        surface_attributes: SurfaceAttributes<PbufferSurface>,
+    ) -> Result<Surface<D, PbufferSurface>> {
+        let width = surface_attributes.inner.width.unwrap();
+        let height = surface_attributes.inner.height.unwrap();
 
         // XXX Window surface is using `EGLAttrib` and not `EGLint`.
         let mut attrs = Vec::<EGLint>::with_capacity(ATTR_SIZE_HINT);
@@ -64,22 +63,22 @@ impl Display {
             native_window: None,
             config,
             raw: surface,
-            _ty: PhantomData,
+            ty: surface_attributes.ty,
         })
     }
 
     pub(crate) unsafe fn create_pixmap_surface(
         &self,
-        config: &Config,
-        surface_attributes: &SurfaceAttributes<PixmapSurface>,
-    ) -> Result<Surface<PixmapSurface>> {
-        let native_pixmap = surface_attributes.native_pixmap.as_ref().unwrap();
+        config: &Config<D>,
+        surface_attributes: SurfaceAttributes<PixmapSurface>,
+    ) -> Result<Surface<D, PixmapSurface>> {
+        let native_pixmap = surface_attributes.inner.native_pixmap.as_ref().unwrap();
 
         let mut attrs = Vec::<EGLAttrib>::with_capacity(ATTR_SIZE_HINT);
 
-        if surface_attributes.srgb.is_some() && config.srgb_capable() {
+        if surface_attributes.inner.srgb.is_some() && config.srgb_capable() {
             attrs.push(egl::GL_COLORSPACE as EGLAttrib);
-            let colorspace = match surface_attributes.srgb {
+            let colorspace = match surface_attributes.inner.srgb {
                 Some(true) => egl::GL_COLORSPACE_SRGB as EGLAttrib,
                 _ => egl::GL_COLORSPACE_LINEAR as EGLAttrib,
             };
@@ -153,20 +152,20 @@ impl Display {
             config,
             native_window: None,
             raw: surface,
-            _ty: PhantomData,
+            ty: surface_attributes.ty,
         })
     }
 
-    pub(crate) unsafe fn create_window_surface(
+    pub(crate) fn create_window_surface<W: HasWindowHandle>(
         &self,
-        config: &Config,
-        surface_attributes: &SurfaceAttributes<WindowSurface>,
-    ) -> Result<Surface<WindowSurface>> {
+        config: &Config<D>,
+        surface_attributes: SurfaceAttributes<WindowSurface<W>>,
+    ) -> Result<Surface<D, WindowSurface<W>>> {
         // Create native window.
         let native_window = NativeWindow::new(
-            surface_attributes.width.unwrap(),
-            surface_attributes.height.unwrap(),
-            surface_attributes.raw_window_handle.as_ref().unwrap(),
+            surface_attributes.inner.width.unwrap(),
+            surface_attributes.inner.height.unwrap(),
+            &surface_attributes.ty.0.window_handle()?.as_raw(),
         )?;
 
         // XXX Window surface is using `EGLAttrib` and not `EGLint`.
@@ -174,15 +173,17 @@ impl Display {
 
         // Add information about render buffer.
         attrs.push(egl::RENDER_BUFFER as EGLAttrib);
-        let buffer =
-            if surface_attributes.single_buffer { egl::SINGLE_BUFFER } else { egl::BACK_BUFFER }
-                as EGLAttrib;
+        let buffer = if surface_attributes.inner.single_buffer {
+            egl::SINGLE_BUFFER
+        } else {
+            egl::BACK_BUFFER
+        } as EGLAttrib;
         attrs.push(buffer);
 
         // // Add colorspace if the extension is present.
-        if surface_attributes.srgb.is_some() && config.srgb_capable() {
+        if surface_attributes.inner.srgb.is_some() && config.srgb_capable() {
             attrs.push(egl::GL_COLORSPACE as EGLAttrib);
-            let colorspace = match surface_attributes.srgb {
+            let colorspace = match surface_attributes.inner.srgb {
                 Some(true) => egl::GL_COLORSPACE_SRGB as EGLAttrib,
                 _ => egl::GL_COLORSPACE_LINEAR as EGLAttrib,
             };
@@ -230,7 +231,7 @@ impl Display {
             config,
             native_window: Some(native_window),
             raw: surface,
-            _ty: PhantomData,
+            ty: surface_attributes.ty,
         })
     }
 
@@ -244,15 +245,15 @@ impl Display {
 }
 
 /// A wrapper around `EGLSurface`.
-pub struct Surface<T: SurfaceTypeTrait> {
-    display: Display,
-    config: Config,
+pub struct Surface<D, T: SurfaceTypeTrait> {
+    display: Display<D>,
+    config: Config<D>,
     pub(crate) raw: EGLSurface,
     native_window: Option<NativeWindow>,
-    _ty: PhantomData<T>,
+    ty: T,
 }
 
-impl<T: SurfaceTypeTrait> Surface<T> {
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> Surface<D, T> {
     /// Swaps the underlying back buffers when the surface is not single
     /// buffered and pass the [`Rect`] information to the system
     /// compositor. Providing empty slice will damage the entire surface.
@@ -264,7 +265,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     /// the system compositor.
     pub fn swap_buffers_with_damage(
         &self,
-        context: &PossiblyCurrentContext,
+        context: &PossiblyCurrentContext<D>,
         rects: &[Rect],
     ) -> Result<()> {
         context.inner.bind_api();
@@ -318,7 +319,29 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     }
 }
 
-impl<T: SurfaceTypeTrait> Drop for Surface<T> {
+impl<D, W: HasWindowHandle> Surface<D, WindowSurface<W>> {
+    /// Get a reference to the underlying window.
+    pub fn window(&self) -> &W {
+        &self.ty.0
+    }
+}
+
+impl<D, W: HasWindowHandle> AsRef<W> for Surface<D, WindowSurface<W>> {
+    fn as_ref(&self) -> &W {
+        self.window()
+    }
+}
+
+impl<D, W: HasWindowHandle> HasWindowHandle for Surface<D, WindowSurface<W>> {
+    fn window_handle(
+        &self,
+    ) -> std::result::Result<raw_window_handle::WindowHandle<'_>, raw_window_handle::HandleError>
+    {
+        self.window().window_handle()
+    }
+}
+
+impl<D, T: SurfaceTypeTrait> Drop for Surface<D, T> {
     fn drop(&mut self) {
         unsafe {
             self.display.inner.egl.DestroySurface(*self.display.inner.raw, self.raw);
@@ -326,8 +349,8 @@ impl<T: SurfaceTypeTrait> Drop for Surface<T> {
     }
 }
 
-impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
-    type Context = PossiblyCurrentContext;
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> GlSurface<T> for Surface<D, T> {
+    type Context = PossiblyCurrentContext<D>;
     type SurfaceType = T;
 
     fn buffer_age(&self) -> u32 {
@@ -403,29 +426,29 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     }
 }
 
-impl<T: SurfaceTypeTrait> GetGlConfig for Surface<T> {
-    type Target = Config;
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> GetGlConfig for Surface<D, T> {
+    type Target = Config<D>;
 
     fn config(&self) -> Self::Target {
         self.config.clone()
     }
 }
 
-impl<T: SurfaceTypeTrait> GetGlDisplay for Surface<T> {
-    type Target = Display;
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> GetGlDisplay for Surface<D, T> {
+    type Target = Display<D>;
 
     fn display(&self) -> Self::Target {
         self.display.clone()
     }
 }
 
-impl<T: SurfaceTypeTrait> AsRawSurface for Surface<T> {
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> AsRawSurface for Surface<D, T> {
     fn raw_surface(&self) -> RawSurface {
         RawSurface::Egl(self.raw)
     }
 }
 
-impl<T: SurfaceTypeTrait> fmt::Debug for Surface<T> {
+impl<D, T: SurfaceTypeTrait> fmt::Debug for Surface<D, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Surface")
             .field("display", &self.display.inner.raw)
@@ -437,7 +460,7 @@ impl<T: SurfaceTypeTrait> fmt::Debug for Surface<T> {
     }
 }
 
-impl<T: SurfaceTypeTrait> Sealed for Surface<T> {}
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> Sealed for Surface<D, T> {}
 
 #[derive(Debug)]
 enum NativeWindow {
@@ -469,14 +492,10 @@ impl NativeWindow {
         let native_window = match raw_window_handle {
             #[cfg(wayland_platform)]
             RawWindowHandle::Wayland(window_handle) => unsafe {
-                if window_handle.surface.is_null() {
-                    return Err(ErrorKind::BadNativeWindow.into());
-                }
-
                 let ptr = ffi_dispatch!(
                     wayland_egl_handle(),
                     wl_egl_window_create,
-                    window_handle.surface.cast(),
+                    window_handle.surface.as_ptr().cast(),
                     _width.get() as _,
                     _height.get() as _
                 );
@@ -494,37 +513,15 @@ impl NativeWindow {
                 Self::Xlib(window_handle.window as _)
             },
             #[cfg(x11_platform)]
-            RawWindowHandle::Xcb(window_handle) => {
-                if window_handle.window == 0 {
-                    return Err(ErrorKind::BadNativeWindow.into());
-                }
-
-                Self::Xcb(window_handle.window as _)
-            },
+            RawWindowHandle::Xcb(window_handle) => Self::Xcb(window_handle.window.get() as _),
             #[cfg(android_platform)]
             RawWindowHandle::AndroidNdk(window_handle) => {
-                if window_handle.a_native_window.is_null() {
-                    return Err(ErrorKind::BadNativeWindow.into());
-                }
-
-                Self::Android(window_handle.a_native_window)
+                Self::Android(window_handle.a_native_window.as_ptr())
             },
             #[cfg(windows)]
-            RawWindowHandle::Win32(window_handle) => {
-                if window_handle.hwnd.is_null() {
-                    return Err(ErrorKind::BadNativeWindow.into());
-                }
-
-                Self::Win32(window_handle.hwnd as _)
-            },
+            RawWindowHandle::Win32(window_handle) => Self::Win32(window_handle.hwnd.get() as _),
             #[cfg(free_unix)]
-            RawWindowHandle::Gbm(window_handle) => {
-                if window_handle.gbm_surface.is_null() {
-                    return Err(ErrorKind::BadNativeWindow.into());
-                }
-
-                Self::Gbm(window_handle.gbm_surface)
-            },
+            RawWindowHandle::Gbm(window_handle) => Self::Gbm(window_handle.gbm_surface.as_ptr()),
             _ => {
                 return Err(
                     ErrorKind::NotSupported("provided native window is not supported").into()

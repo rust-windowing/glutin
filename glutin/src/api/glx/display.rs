@@ -9,11 +9,13 @@ use std::sync::Arc;
 
 use glutin_glx_sys::glx;
 use glutin_glx_sys::glx::types::Display as GLXDisplay;
-use raw_window_handle::RawDisplayHandle;
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawDisplayHandle};
 
 use crate::config::ConfigTemplate;
 use crate::context::Version;
-use crate::display::{AsRawDisplay, DisplayFeatures, GetDisplayExtensions, RawDisplay};
+use crate::display::{
+    AsRawDisplay, DisplayFeatures, DisplayResult, GetDisplayExtensions, RawDisplay,
+};
 use crate::error::{ErrorKind, Result};
 use crate::prelude::*;
 use crate::private::Sealed;
@@ -25,42 +27,70 @@ use super::surface::Surface;
 use super::{Glx, GlxExtra, XlibErrorHookRegistrar, GLX, GLX_BASE_ERROR, GLX_EXTRA};
 
 /// A wrapper for the `GLXDisplay`, which is basically an `XDisplay`.
-#[derive(Debug, Clone)]
-pub struct Display {
-    pub(crate) inner: Arc<DisplayInner>,
+#[derive(Debug)]
+pub struct Display<D> {
+    pub(crate) inner: Arc<DisplayInner<D>>,
 }
 
-impl Display {
-    /// Create GLX display.
-    ///
-    /// # Safety
-    ///
-    /// The `display` must point to the valid Xlib display and
-    /// `error_hook_registrar` must be registered in your Xlib error handling
-    /// callback.
-    pub unsafe fn new(
-        display: RawDisplayHandle,
-        error_hook_registrar: XlibErrorHookRegistrar,
-    ) -> Result<Self> {
-        // Don't load GLX when unsupported platform was requested.
-        let (display, screen) = match display {
-            RawDisplayHandle::Xlib(handle) => {
-                if handle.display.is_null() {
-                    return Err(ErrorKind::BadDisplay.into());
-                }
+impl<D> Clone for Display<D> {
+    fn clone(&self) -> Self {
+        Self { inner: self.inner.clone() }
+    }
+}
 
-                (GlxDisplay(handle.display as *mut _), handle.screen as i32)
+impl<D: HasDisplayHandle> AsRef<D> for Display<D> {
+    fn as_ref(&self) -> &D {
+        self.display()
+    }
+}
+
+impl<D: HasDisplayHandle> HasDisplayHandle for Display<D> {
+    fn display_handle(
+        &self,
+    ) -> std::result::Result<raw_window_handle::DisplayHandle<'_>, raw_window_handle::HandleError>
+    {
+        self.display().display_handle()
+    }
+}
+
+impl<D: HasDisplayHandle> Display<D> {
+    /// Create GLX display.
+    pub fn new(display_handle: D, error_hook_registrar: XlibErrorHookRegistrar) -> Result<Self> {
+        Self::new_with_display(display_handle, error_hook_registrar).map_err(Into::into)
+    }
+
+    /// Get a reference to the inner display.
+    pub fn display(&self) -> &D {
+        &self.inner.display
+    }
+
+    pub(crate) fn new_with_display(
+        display_handle: D,
+        error_hook_registrar: XlibErrorHookRegistrar,
+    ) -> DisplayResult<Self, D> {
+        // Don't load GLX when unsupported platform was requested.
+        let (display, screen) = match display_handle.display_handle().map(|w| w.as_raw()) {
+            Ok(RawDisplayHandle::Xlib(handle)) => {
+                let display = match handle.display {
+                    Some(display) => display.as_ptr(),
+                    None => return Err((ErrorKind::BadDisplay, display_handle).into()),
+                };
+
+                (GlxDisplay(display as *mut _), handle.screen as i32)
             },
-            _ => {
-                return Err(
-                    ErrorKind::NotSupported("provided native display isn't supported").into()
+            Ok(_) => {
+                return Err((
+                    ErrorKind::NotSupported("provided native display isn't supported"),
+                    display_handle,
                 )
+                    .into())
             },
+            Err(e) => return Err((crate::error::Error::from(e), display_handle).into()),
         };
 
         let glx = match GLX.as_ref() {
             Some(glx) => glx,
-            None => return Err(ErrorKind::NotFound.into()),
+            None => return Err((ErrorKind::NotFound, display_handle).into()),
         };
 
         // Set the base for errors coming from GLX.
@@ -69,7 +99,7 @@ impl Display {
             let mut event_base = 0;
             if glx.QueryExtension(display.0, &mut error_base, &mut event_base) == 0 {
                 // The glx extension isn't present.
-                return Err(ErrorKind::InitializationFailed.into());
+                return Err((ErrorKind::InitializationFailed, display_handle).into());
             }
             GLX_BASE_ERROR.store(error_base, Ordering::Relaxed);
         }
@@ -85,13 +115,17 @@ impl Display {
         let version = unsafe {
             let (mut major, mut minor) = (0, 0);
             if glx.QueryVersion(display.0, &mut major, &mut minor) == 0 {
-                return Err(ErrorKind::InitializationFailed.into());
+                return Err((ErrorKind::InitializationFailed, display_handle).into());
             }
             Version::new(major as u8, minor as u8)
         };
 
         if version < Version::new(1, 3) {
-            return Err(ErrorKind::NotSupported("the glx below 1.3 isn't supported").into());
+            return Err((
+                ErrorKind::NotSupported("the glx below 1.3 isn't supported"),
+                display_handle,
+            )
+                .into());
         }
 
         // Register the error handling hook.
@@ -108,6 +142,7 @@ impl Display {
             screen,
             features,
             client_extensions,
+            display: display_handle,
         });
 
         Ok(Self { inner })
@@ -167,48 +202,48 @@ impl Display {
     }
 }
 
-impl GlDisplay for Display {
-    type Config = Config;
-    type NotCurrentContext = NotCurrentContext;
-    type PbufferSurface = Surface<PbufferSurface>;
-    type PixmapSurface = Surface<PixmapSurface>;
-    type WindowSurface = Surface<WindowSurface>;
+impl<D: HasDisplayHandle> GlDisplay for Display<D> {
+    type Config = Config<D>;
+    type NotCurrentContext = NotCurrentContext<D>;
+    type PbufferSurface = Surface<D, PbufferSurface>;
+    type PixmapSurface = Surface<D, PixmapSurface>;
+    type WindowSurface<W: HasWindowHandle> = Surface<D, WindowSurface<W>>;
 
-    unsafe fn find_configs(
+    fn find_configs<W: HasWindowHandle>(
         &self,
-        template: ConfigTemplate,
+        template: ConfigTemplate<W>,
     ) -> Result<Box<dyn Iterator<Item = Self::Config> + '_>> {
-        unsafe { Self::find_configs(self, template) }
+        Self::find_configs(self, template)
     }
 
-    unsafe fn create_window_surface(
+    fn create_window_surface<W: HasWindowHandle>(
         &self,
         config: &Self::Config,
-        surface_attributes: &SurfaceAttributes<WindowSurface>,
-    ) -> Result<Self::WindowSurface> {
-        unsafe { Self::create_window_surface(self, config, surface_attributes) }
+        surface_attributes: SurfaceAttributes<WindowSurface<W>>,
+    ) -> Result<Self::WindowSurface<W>> {
+        Self::create_window_surface(self, config, surface_attributes)
     }
 
     unsafe fn create_pbuffer_surface(
         &self,
         config: &Self::Config,
-        surface_attributes: &SurfaceAttributes<PbufferSurface>,
+        surface_attributes: SurfaceAttributes<PbufferSurface>,
     ) -> Result<Self::PbufferSurface> {
         unsafe { Self::create_pbuffer_surface(self, config, surface_attributes) }
     }
 
-    unsafe fn create_context(
+    fn create_context<W: HasWindowHandle>(
         &self,
         config: &Self::Config,
-        context_attributes: &crate::context::ContextAttributes,
+        context_attributes: &crate::context::ContextAttributes<W>,
     ) -> Result<Self::NotCurrentContext> {
-        unsafe { Self::create_context(self, config, context_attributes) }
+        Self::create_context(self, config, context_attributes)
     }
 
     unsafe fn create_pixmap_surface(
         &self,
         config: &Self::Config,
-        surface_attributes: &SurfaceAttributes<PixmapSurface>,
+        surface_attributes: SurfaceAttributes<PixmapSurface>,
     ) -> Result<Self::PixmapSurface> {
         unsafe { Self::create_pixmap_surface(self, config, surface_attributes) }
     }
@@ -226,21 +261,21 @@ impl GlDisplay for Display {
     }
 }
 
-impl GetDisplayExtensions for Display {
+impl<D: HasDisplayHandle> GetDisplayExtensions for Display<D> {
     fn extensions(&self) -> &HashSet<&'static str> {
         &self.inner.client_extensions
     }
 }
 
-impl AsRawDisplay for Display {
+impl<D: HasDisplayHandle> AsRawDisplay for Display<D> {
     fn raw_display(&self) -> RawDisplay {
         RawDisplay::Glx(self.inner.raw.cast())
     }
 }
 
-impl Sealed for Display {}
+impl<D: HasDisplayHandle> Sealed for Display<D> {}
 
-pub(crate) struct DisplayInner {
+pub(crate) struct DisplayInner<D> {
     pub(crate) glx: &'static Glx,
     pub(crate) glx_extra: Option<&'static GlxExtra>,
     pub(crate) raw: GlxDisplay,
@@ -249,9 +284,12 @@ pub(crate) struct DisplayInner {
     pub(crate) features: DisplayFeatures,
     /// Client GLX extensions.
     pub(crate) client_extensions: HashSet<&'static str>,
+
+    /// Keep around a display reference so everything stays valid.
+    display: D,
 }
 
-impl fmt::Debug for DisplayInner {
+impl<D> fmt::Debug for DisplayInner<D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Display")
             .field("raw", &self.raw)

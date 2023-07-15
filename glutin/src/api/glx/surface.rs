@@ -7,7 +7,7 @@ use std::os::raw::{c_int, c_uint};
 
 use glutin_glx_sys::glx::types::GLXWindow;
 use glutin_glx_sys::{glx, glx_extra};
-use raw_window_handle::RawWindowHandle;
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawWindowHandle};
 
 use crate::config::GetGlConfig;
 use crate::display::{DisplayFeatures, GetGlDisplay};
@@ -25,13 +25,13 @@ use super::display::Display;
 /// Hint for the attributes array.
 const ATTR_SIZE_HINT: usize = 8;
 
-impl Display {
+impl<D: HasDisplayHandle> Display<D> {
     pub(crate) unsafe fn create_pixmap_surface(
         &self,
-        config: &Config,
-        surface_attributes: &SurfaceAttributes<PixmapSurface>,
-    ) -> Result<Surface<PixmapSurface>> {
-        let native_pixmap = surface_attributes.native_pixmap.as_ref().unwrap();
+        config: &Config<D>,
+        surface_attributes: SurfaceAttributes<PixmapSurface>,
+    ) -> Result<Surface<D, PixmapSurface>> {
+        let native_pixmap = surface_attributes.inner.native_pixmap.as_ref().unwrap();
         let xid = match native_pixmap {
             NativePixmap::XlibPixmap(xid) => {
                 if *xid == 0 {
@@ -67,17 +67,17 @@ impl Display {
             config,
             raw: surface,
             _nosendsync: PhantomData,
-            _ty: PhantomData,
+            ty: surface_attributes.ty,
         })
     }
 
     pub(crate) unsafe fn create_pbuffer_surface(
         &self,
-        config: &Config,
-        surface_attributes: &SurfaceAttributes<PbufferSurface>,
-    ) -> Result<Surface<PbufferSurface>> {
-        let width = surface_attributes.width.unwrap();
-        let height = surface_attributes.height.unwrap();
+        config: &Config<D>,
+        surface_attributes: SurfaceAttributes<PbufferSurface>,
+    ) -> Result<Surface<D, PbufferSurface>> {
+        let width = surface_attributes.inner.width.unwrap();
+        let height = surface_attributes.inner.height.unwrap();
 
         let mut attrs = Vec::<c_int>::with_capacity(ATTR_SIZE_HINT);
 
@@ -86,7 +86,7 @@ impl Display {
         attrs.push(glx::PBUFFER_HEIGHT as c_int);
         attrs.push(height.get() as c_int);
         attrs.push(glx::LARGEST_PBUFFER as c_int);
-        attrs.push(surface_attributes.largest_pbuffer as c_int);
+        attrs.push(surface_attributes.inner.largest_pbuffer as c_int);
 
         // Push X11 `None` to terminate the list.
         attrs.push(0);
@@ -101,16 +101,16 @@ impl Display {
             config,
             raw: surface,
             _nosendsync: PhantomData,
-            _ty: PhantomData,
+            ty: surface_attributes.ty,
         })
     }
 
-    pub(crate) unsafe fn create_window_surface(
+    pub(crate) fn create_window_surface<W: HasWindowHandle>(
         &self,
-        config: &Config,
-        surface_attributes: &SurfaceAttributes<WindowSurface>,
-    ) -> Result<Surface<WindowSurface>> {
-        let window = match surface_attributes.raw_window_handle.unwrap() {
+        config: &Config<D>,
+        surface_attributes: SurfaceAttributes<WindowSurface<W>>,
+    ) -> Result<Surface<D, WindowSurface<W>>> {
+        let window = match surface_attributes.ty.0.window_handle()?.as_raw() {
             RawWindowHandle::Xlib(window_handle) => {
                 if window_handle.window == 0 {
                     return Err(ErrorKind::BadNativeWindow.into());
@@ -145,21 +145,21 @@ impl Display {
             config,
             raw: surface,
             _nosendsync: PhantomData,
-            _ty: PhantomData,
+            ty: surface_attributes.ty,
         })
     }
 }
 
 /// A wrapper around the `GLXWindow`.
-pub struct Surface<T: SurfaceTypeTrait> {
-    display: Display,
-    config: Config,
+pub struct Surface<D, T: SurfaceTypeTrait> {
+    display: Display<D>,
+    config: Config<D>,
     pub(crate) raw: GLXWindow,
     _nosendsync: PhantomData<*const std::ffi::c_void>,
-    _ty: PhantomData<T>,
+    ty: T,
 }
 
-impl<T: SurfaceTypeTrait> Surface<T> {
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> Surface<D, T> {
     /// # Safety
     ///
     /// The caller must ensure that the attribute could be present.
@@ -179,7 +179,29 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     }
 }
 
-impl<T: SurfaceTypeTrait> Drop for Surface<T> {
+impl<D, W: HasWindowHandle> Surface<D, WindowSurface<W>> {
+    /// Get a reference to the underlying window.
+    pub fn window(&self) -> &W {
+        &self.ty.0
+    }
+}
+
+impl<D, W: HasWindowHandle> AsRef<W> for Surface<D, WindowSurface<W>> {
+    fn as_ref(&self) -> &W {
+        self.window()
+    }
+}
+
+impl<D, W: HasWindowHandle> HasWindowHandle for Surface<D, WindowSurface<W>> {
+    fn window_handle(
+        &self,
+    ) -> std::result::Result<raw_window_handle::WindowHandle<'_>, raw_window_handle::HandleError>
+    {
+        self.window().window_handle()
+    }
+}
+
+impl<D, T: SurfaceTypeTrait> Drop for Surface<D, T> {
     fn drop(&mut self) {
         let _ = super::last_glx_error(|| unsafe {
             match T::surface_type() {
@@ -197,8 +219,8 @@ impl<T: SurfaceTypeTrait> Drop for Surface<T> {
     }
 }
 
-impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
-    type Context = PossiblyCurrentContext;
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> GlSurface<T> for Surface<D, T> {
+    type Context = PossiblyCurrentContext<D>;
     type SurfaceType = T;
 
     fn buffer_age(&self) -> u32 {
@@ -292,23 +314,23 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     }
 }
 
-impl<T: SurfaceTypeTrait> GetGlConfig for Surface<T> {
-    type Target = Config;
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> GetGlConfig for Surface<D, T> {
+    type Target = Config<D>;
 
     fn config(&self) -> Self::Target {
         self.config.clone()
     }
 }
 
-impl<T: SurfaceTypeTrait> GetGlDisplay for Surface<T> {
-    type Target = Display;
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> GetGlDisplay for Surface<D, T> {
+    type Target = Display<D>;
 
     fn display(&self) -> Self::Target {
         self.display.clone()
     }
 }
 
-impl<T: SurfaceTypeTrait> fmt::Debug for Surface<T> {
+impl<D, T: SurfaceTypeTrait> fmt::Debug for Surface<D, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Surface")
             .field("display", &self.display.inner.raw)
@@ -319,10 +341,10 @@ impl<T: SurfaceTypeTrait> fmt::Debug for Surface<T> {
     }
 }
 
-impl<T: SurfaceTypeTrait> AsRawSurface for Surface<T> {
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> AsRawSurface for Surface<D, T> {
     fn raw_surface(&self) -> RawSurface {
         RawSurface::Glx(self.raw as u64)
     }
 }
 
-impl<T: SurfaceTypeTrait> Sealed for Surface<T> {}
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> Sealed for Surface<D, T> {}

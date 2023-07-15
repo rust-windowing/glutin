@@ -4,7 +4,7 @@
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
 
-use raw_window_handle::RawWindowHandle;
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
 use crate::context::{PossiblyCurrentContext, PossiblyCurrentGlContext};
 use crate::display::{Display, GetGlDisplay};
@@ -108,9 +108,26 @@ pub trait AsRawSurface {
 }
 
 /// Builder to get the required set of attributes initialized before hand.
-#[derive(Default, Debug, Clone)]
-pub struct SurfaceAttributesBuilder<T: SurfaceTypeTrait + Default> {
-    attributes: SurfaceAttributes<T>,
+#[derive(Debug, Clone)]
+pub struct SurfaceAttributesBuilder<T: SurfaceTypeTrait> {
+    inner: AttributesInner,
+    _ty: PhantomData<T>,
+}
+
+impl<T: SurfaceTypeTrait> Default for SurfaceAttributesBuilder<T> {
+    fn default() -> Self {
+        Self {
+            inner: AttributesInner {
+                srgb: None,
+                single_buffer: false,
+                width: None,
+                height: None,
+                largest_pbuffer: false,
+                native_pixmap: None,
+            },
+            _ty: PhantomData,
+        }
+    }
 }
 
 impl<T: SurfaceTypeTrait + Default> SurfaceAttributesBuilder<T> {
@@ -127,12 +144,12 @@ impl<T: SurfaceTypeTrait + Default> SurfaceAttributesBuilder<T> {
     /// This only controls EGL surfaces, other platforms use the context for
     /// that.
     pub fn with_srgb(mut self, srgb: Option<bool>) -> Self {
-        self.attributes.srgb = srgb;
+        self.inner.srgb = srgb;
         self
     }
 }
 
-impl SurfaceAttributesBuilder<WindowSurface> {
+impl<W: HasWindowHandle> SurfaceAttributesBuilder<WindowSurface<W>> {
     /// Specify whether the single buffer should be used instead of double
     /// buffering. This doesn't guarantee that the resulted buffer will have
     /// only single buffer, to know that the single buffer is actually used
@@ -144,35 +161,34 @@ impl SurfaceAttributesBuilder<WindowSurface> {
     ///
     /// This is EGL specific, other platforms use the context for that.
     pub fn with_single_buffer(mut self, single_buffer: bool) -> Self {
-        self.attributes.single_buffer = single_buffer;
+        self.inner.single_buffer = single_buffer;
         self
     }
 
     /// Build the surface attributes suitable to create a window surface.
     pub fn build(
         mut self,
-        raw_window_handle: RawWindowHandle,
+        window: W,
         width: NonZeroU32,
         height: NonZeroU32,
-    ) -> SurfaceAttributes<WindowSurface> {
-        self.attributes.raw_window_handle = Some(raw_window_handle);
-        self.attributes.width = Some(width);
-        self.attributes.height = Some(height);
-        self.attributes
+    ) -> SurfaceAttributes<WindowSurface<W>> {
+        self.inner.width = Some(width);
+        self.inner.height = Some(height);
+        SurfaceAttributes { inner: self.inner, ty: WindowSurface(window) }
     }
 }
 
 impl SurfaceAttributesBuilder<PbufferSurface> {
     /// Request the largest pbuffer.
     pub fn with_largest_pbuffer(mut self, largest_pbuffer: bool) -> Self {
-        self.attributes.largest_pbuffer = largest_pbuffer;
+        self.inner.largest_pbuffer = largest_pbuffer;
         self
     }
 
     /// The same as in
     /// [`SurfaceAttributesBuilder::<WindowSurface>::with_single_buffer`].
     pub fn with_single_buffer(mut self, single_buffer: bool) -> Self {
-        self.attributes.single_buffer = single_buffer;
+        self.inner.single_buffer = single_buffer;
         self
     }
 
@@ -182,46 +198,52 @@ impl SurfaceAttributesBuilder<PbufferSurface> {
         width: NonZeroU32,
         height: NonZeroU32,
     ) -> SurfaceAttributes<PbufferSurface> {
-        self.attributes.width = Some(width);
-        self.attributes.height = Some(height);
-        self.attributes
+        self.inner.width = Some(width);
+        self.inner.height = Some(height);
+        SurfaceAttributes { inner: self.inner, ty: PbufferSurface }
     }
 }
 
 impl SurfaceAttributesBuilder<PixmapSurface> {
     /// Build the surface attributes suitable to create a pixmap surface.
     pub fn build(mut self, native_pixmap: NativePixmap) -> SurfaceAttributes<PixmapSurface> {
-        self.attributes.native_pixmap = Some(native_pixmap);
-        self.attributes
+        self.inner.native_pixmap = Some(native_pixmap);
+        SurfaceAttributes { inner: self.inner, ty: PixmapSurface }
     }
 }
 
 /// Attributes which are used for creating a particular surface.
 #[derive(Default, Debug, Clone)]
 pub struct SurfaceAttributes<T: SurfaceTypeTrait> {
+    #[cfg_attr(any(cgl_backend, all(wgl_backend, not(egl_backend))), allow(dead_code))]
+    pub(crate) inner: AttributesInner,
+    pub(crate) ty: T,
+}
+
+/// Inner unassociated attributes.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct AttributesInner {
     pub(crate) srgb: Option<bool>,
     pub(crate) single_buffer: bool,
     pub(crate) width: Option<NonZeroU32>,
     pub(crate) height: Option<NonZeroU32>,
     pub(crate) largest_pbuffer: bool,
-    pub(crate) raw_window_handle: Option<RawWindowHandle>,
     pub(crate) native_pixmap: Option<NativePixmap>,
-    _ty: PhantomData<T>,
 }
 
 /// Marker that used to type-gate methods for window.
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
-pub struct WindowSurface;
+pub struct WindowSurface<W>(pub(crate) W);
 
-impl SurfaceTypeTrait for WindowSurface {
+impl<W: HasWindowHandle> SurfaceTypeTrait for WindowSurface<W> {
     fn surface_type() -> SurfaceType {
         SurfaceType::Window
     }
 }
 
-impl ResizeableSurface for WindowSurface {}
+impl<W: HasWindowHandle> ResizeableSurface for WindowSurface<W> {}
 
-impl Sealed for WindowSurface {}
+impl<W: HasWindowHandle> Sealed for WindowSurface<W> {}
 
 /// Marker that used to type-gate methods for pbuffer.
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
@@ -274,26 +296,48 @@ pub enum SurfaceType {
 /// test_sync::<glutin::surface::Surface<glutin::surface::WindowSurface>>();
 /// ```
 #[derive(Debug)]
-pub enum Surface<T: SurfaceTypeTrait> {
+pub enum Surface<D, T: SurfaceTypeTrait> {
     /// The EGL surface.
     #[cfg(egl_backend)]
-    Egl(EglSurface<T>),
+    Egl(EglSurface<D, T>),
 
     /// The GLX surface.
     #[cfg(glx_backend)]
-    Glx(GlxSurface<T>),
+    Glx(GlxSurface<D, T>),
 
     /// The WGL surface.
     #[cfg(wgl_backend)]
-    Wgl(WglSurface<T>),
+    Wgl(WglSurface<D, T>),
 
     /// The CGL surface.
     #[cfg(cgl_backend)]
-    Cgl(CglSurface<T>),
+    Cgl(CglSurface<D, T>),
 }
 
-impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
-    type Context = PossiblyCurrentContext;
+impl<D, W: HasWindowHandle> Surface<D, WindowSurface<W>> {
+    /// Get the underlying window.
+    pub fn window(&self) -> &W {
+        gl_api_dispatch!(self; Self(surface) => surface.window())
+    }
+}
+
+impl<D, W: HasWindowHandle> AsRef<W> for Surface<D, WindowSurface<W>> {
+    fn as_ref(&self) -> &W {
+        self.window()
+    }
+}
+
+impl<D, W: HasWindowHandle> HasWindowHandle for Surface<D, WindowSurface<W>> {
+    fn window_handle(
+        &self,
+    ) -> std::result::Result<raw_window_handle::WindowHandle<'_>, raw_window_handle::HandleError>
+    {
+        self.window().window_handle()
+    }
+}
+
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> GlSurface<T> for Surface<D, T> {
+    type Context = PossiblyCurrentContext<D>;
     type SurfaceType = T;
 
     fn buffer_age(&self) -> u32 {
@@ -448,21 +492,21 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     }
 }
 
-impl<T: SurfaceTypeTrait> GetGlDisplay for Surface<T> {
-    type Target = Display;
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> GetGlDisplay for Surface<D, T> {
+    type Target = Display<D>;
 
     fn display(&self) -> Self::Target {
         gl_api_dispatch!(self; Self(surface) => surface.display(); as Display)
     }
 }
 
-impl<T: SurfaceTypeTrait> AsRawSurface for Surface<T> {
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> AsRawSurface for Surface<D, T> {
     fn raw_surface(&self) -> RawSurface {
         gl_api_dispatch!(self; Self(surface) => surface.raw_surface())
     }
 }
 
-impl<T: SurfaceTypeTrait> Sealed for Surface<T> {}
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> Sealed for Surface<D, T> {}
 
 /// A swap interval.
 ///

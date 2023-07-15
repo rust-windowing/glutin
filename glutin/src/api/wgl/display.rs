@@ -7,13 +7,15 @@ use std::os::windows::ffi::OsStrExt;
 use std::sync::Arc;
 
 use glutin_wgl_sys::wgl;
-use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawDisplayHandle, RawWindowHandle};
 use windows_sys::Win32::Foundation::HMODULE;
 use windows_sys::Win32::Graphics::Gdi::HDC;
 use windows_sys::Win32::System::LibraryLoader as dll_loader;
 
 use crate::config::ConfigTemplate;
-use crate::display::{AsRawDisplay, DisplayFeatures, GetDisplayExtensions, RawDisplay};
+use crate::display::{
+    AsRawDisplay, DisplayFeatures, DisplayResult, GetDisplayExtensions, RawDisplay,
+};
 use crate::error::{ErrorKind, Result};
 use crate::prelude::*;
 use crate::private::Sealed;
@@ -25,52 +27,106 @@ use super::surface::Surface;
 use super::WglExtra;
 
 /// A WGL display.
-#[derive(Debug, Clone)]
-pub struct Display {
-    pub(crate) inner: Arc<DisplayInner>,
+#[derive(Debug)]
+pub struct Display<D> {
+    pub(crate) inner: Arc<DisplayInner<D>>,
 }
 
-impl Display {
+impl<D> Clone for Display<D> {
+    fn clone(&self) -> Self {
+        Self { inner: self.inner.clone() }
+    }
+}
+
+impl<D: HasDisplayHandle> AsRef<D> for Display<D> {
+    fn as_ref(&self) -> &D {
+        self.display()
+    }
+}
+
+impl<D: HasDisplayHandle> HasDisplayHandle for Display<D> {
+    #[inline]
+    fn display_handle(
+        &self,
+    ) -> std::result::Result<raw_window_handle::DisplayHandle<'_>, raw_window_handle::HandleError>
+    {
+        self.display().display_handle()
+    }
+}
+
+impl<D: HasDisplayHandle> Display<D> {
     /// Create WGL display.
     ///
     /// The `native_window` is used to perform extension loading. If it's not
     /// passed the OpenGL will be limited to what it can do, though, basic
     /// operations could still be performed.
-    ///
-    /// # Safety
-    ///
-    /// The `native_window` must point to the valid platform window and have
-    /// valid `hinstance`.
-    pub unsafe fn new(
-        display: RawDisplayHandle,
-        native_window: Option<RawWindowHandle>,
-    ) -> Result<Self> {
-        if !matches!(display, RawDisplayHandle::Windows(..)) {
-            return Err(ErrorKind::NotSupported("provided native display is not supported").into());
+    pub fn new<W: HasWindowHandle>(display: D, native_window: Option<W>) -> Result<Self> {
+        Self::new_with_display(display, native_window).map_err(Into::into)
+    }
+
+    /// Get the underlying display.
+    pub fn display(&self) -> &D {
+        &self.inner.display
+    }
+
+    pub(crate) fn new_with_display<W: HasWindowHandle>(
+        display: D,
+        native_window: Option<W>,
+    ) -> DisplayResult<Self, D> {
+        macro_rules! leap {
+            ($res:expr) => {{
+                match ($res) {
+                    Ok(x) => x,
+                    Err(e) => {
+                        let error = crate::error::Error::from(e);
+                        return Err((error, display).into());
+                    },
+                }
+            }};
         }
 
-        let name =
-            OsStr::new("opengl32.dll").encode_wide().chain(Some(0).into_iter()).collect::<Vec<_>>();
+        match leap!(display.display_handle().and_then(|r| r.display_handle().map(|r| r.as_raw()))) {
+            RawDisplayHandle::Windows(..) => {},
+            _ => {
+                return Err((
+                    ErrorKind::NotSupported("provided native display is not supported"),
+                    display,
+                )
+                    .into())
+            },
+        };
+
+        let name = OsStr::new("opengl32.dll").encode_wide().chain(Some(0)).collect::<Vec<_>>();
         let lib_opengl32 = unsafe { dll_loader::LoadLibraryW(name.as_ptr()) };
         if lib_opengl32 == 0 {
-            return Err(ErrorKind::NotFound.into());
+            return Err((ErrorKind::NotFound, display).into());
         }
 
         // In case native window was provided init extra functions.
         let (wgl_extra, client_extensions) =
-            if let Some(RawWindowHandle::Win32(window)) = native_window {
-                unsafe {
-                    let (wgl_extra, client_extensions) =
-                        super::load_extra_functions(window.hinstance as _, window.hwnd as _)?;
+            match leap!(native_window.map(|w| w.window_handle().map(|w| w.as_raw())).transpose()) {
+                Some(RawWindowHandle::Win32(window)) => unsafe {
+                    let (wgl_extra, client_extensions) = match super::load_extra_functions(
+                        window.hinstance.map_or(0, |i| i.get()),
+                        window.hwnd.get() as _,
+                    ) {
+                        Ok(x) => x,
+                        Err(e) => return Err((e, display).into()),
+                    };
                     (Some(wgl_extra), client_extensions)
-                }
-            } else {
-                (None, HashSet::new())
+                },
+                _ => (None, HashSet::new()),
             };
 
         let features = Self::extract_display_features(&client_extensions);
 
-        let inner = Arc::new(DisplayInner { lib_opengl32, wgl_extra, features, client_extensions });
+        let inner = Arc::new(DisplayInner {
+            lib_opengl32,
+            wgl_extra,
+            features,
+            client_extensions,
+            display,
+        });
 
         Ok(Display { inner })
     }
@@ -122,48 +178,48 @@ impl Display {
     }
 }
 
-impl GlDisplay for Display {
-    type Config = Config;
-    type NotCurrentContext = NotCurrentContext;
-    type PbufferSurface = Surface<PbufferSurface>;
-    type PixmapSurface = Surface<PixmapSurface>;
-    type WindowSurface = Surface<WindowSurface>;
+impl<D: HasDisplayHandle> GlDisplay for Display<D> {
+    type Config = Config<D>;
+    type NotCurrentContext = NotCurrentContext<D>;
+    type PbufferSurface = Surface<D, PbufferSurface>;
+    type PixmapSurface = Surface<D, PixmapSurface>;
+    type WindowSurface<W: HasWindowHandle> = Surface<D, WindowSurface<W>>;
 
-    unsafe fn find_configs(
+    fn find_configs<W: HasWindowHandle>(
         &self,
-        template: ConfigTemplate,
+        template: ConfigTemplate<W>,
     ) -> Result<Box<dyn Iterator<Item = Self::Config> + '_>> {
-        unsafe { Self::find_configs(self, template) }
+        Self::find_configs(self, template)
     }
 
-    unsafe fn create_window_surface(
+    fn create_window_surface<W: HasWindowHandle>(
         &self,
         config: &Self::Config,
-        surface_attributes: &SurfaceAttributes<WindowSurface>,
-    ) -> Result<Self::WindowSurface> {
-        unsafe { Self::create_window_surface(self, config, surface_attributes) }
+        surface_attributes: SurfaceAttributes<WindowSurface<W>>,
+    ) -> Result<Self::WindowSurface<W>> {
+        Self::create_window_surface(self, config, surface_attributes)
     }
 
     unsafe fn create_pbuffer_surface(
         &self,
         config: &Self::Config,
-        surface_attributes: &SurfaceAttributes<PbufferSurface>,
+        surface_attributes: SurfaceAttributes<PbufferSurface>,
     ) -> Result<Self::PbufferSurface> {
         unsafe { Self::create_pbuffer_surface(self, config, surface_attributes) }
     }
 
-    unsafe fn create_context(
+    fn create_context<W: HasWindowHandle>(
         &self,
         config: &Self::Config,
-        context_attributes: &crate::context::ContextAttributes,
+        context_attributes: &crate::context::ContextAttributes<W>,
     ) -> Result<Self::NotCurrentContext> {
-        unsafe { Self::create_context(self, config, context_attributes) }
+        Self::create_context(self, config, context_attributes)
     }
 
     unsafe fn create_pixmap_surface(
         &self,
         config: &Self::Config,
-        surface_attributes: &SurfaceAttributes<PixmapSurface>,
+        surface_attributes: SurfaceAttributes<PixmapSurface>,
     ) -> Result<Self::PixmapSurface> {
         unsafe { Self::create_pixmap_surface(self, config, surface_attributes) }
     }
@@ -190,21 +246,21 @@ impl GlDisplay for Display {
     }
 }
 
-impl GetDisplayExtensions for Display {
+impl<D: HasDisplayHandle> GetDisplayExtensions for Display<D> {
     fn extensions(&self) -> &HashSet<&'static str> {
         &self.inner.client_extensions
     }
 }
 
-impl AsRawDisplay for Display {
+impl<D: HasDisplayHandle> AsRawDisplay for Display<D> {
     fn raw_display(&self) -> RawDisplay {
         RawDisplay::Wgl
     }
 }
 
-impl Sealed for Display {}
+impl<D: HasDisplayHandle> Sealed for Display<D> {}
 
-pub(crate) struct DisplayInner {
+pub(crate) struct DisplayInner<D> {
     /// Client WGL extensions.
     pub(crate) lib_opengl32: HMODULE,
 
@@ -214,9 +270,12 @@ pub(crate) struct DisplayInner {
     pub(crate) features: DisplayFeatures,
 
     pub(crate) client_extensions: HashSet<&'static str>,
+
+    /// Hold onto the display reference to keep it valid.
+    pub(crate) display: D,
 }
 
-impl fmt::Debug for DisplayInner {
+impl<D> fmt::Debug for DisplayInner<D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Display")
             .field("features", &self.features)

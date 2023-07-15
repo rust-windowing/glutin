@@ -32,11 +32,12 @@ mod example {
         let device = devices.first().expect("No available devices");
 
         // Create a display using the device.
-        let display =
-            unsafe { Display::with_device(device, None) }.expect("Failed to create display");
+        let display = unsafe { Display::<glutin::NoDisplay>::with_device(device, None) }
+            .expect("Failed to create display");
 
         let template = config_template();
-        let config = unsafe { display.find_configs(template) }
+        let config = display
+            .find_configs(template)
             .unwrap()
             .reduce(
                 |config, acc| {
@@ -55,14 +56,15 @@ mod example {
         //
         // In particular, since we are doing offscreen rendering we have no raw window
         // handle to provide.
-        let context_attributes = ContextAttributesBuilder::new().build(None);
+        let context_attributes = ContextAttributesBuilder::new().build::<glutin::NoWindow>(None);
 
         // Since glutin by default tries to create OpenGL core context, which may not be
         // present we should try gles.
-        let fallback_context_attributes =
-            ContextAttributesBuilder::new().with_context_api(ContextApi::Gles(None)).build(None);
+        let fallback_context_attributes = ContextAttributesBuilder::new()
+            .with_context_api(ContextApi::Gles(None))
+            .build::<glutin::NoWindow>(None);
 
-        let not_current = unsafe {
+        let not_current = {
             display.create_context(&config, &context_attributes).unwrap_or_else(|_| {
                 display
                     .create_context(&config, &fallback_context_attributes)

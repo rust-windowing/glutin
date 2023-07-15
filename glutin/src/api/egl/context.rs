@@ -7,6 +7,8 @@ use std::ops::Deref;
 use glutin_egl_sys::egl::types::{EGLenum, EGLint};
 use glutin_egl_sys::{egl, EGLContext};
 
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
+
 use crate::config::{Api, GetGlConfig};
 use crate::context::{
     self, AsRawContext, ContextApi, ContextAttributes, GlProfile, RawContext, Robustness, Version,
@@ -21,18 +23,18 @@ use super::config::Config;
 use super::display::Display;
 use super::surface::Surface;
 
-impl Display {
-    pub(crate) unsafe fn create_context(
+impl<D: HasDisplayHandle> Display<D> {
+    pub(crate) fn create_context<W: HasWindowHandle>(
         &self,
-        config: &Config,
-        context_attributes: &ContextAttributes,
-    ) -> Result<NotCurrentContext> {
+        config: &Config<D>,
+        context_attributes: &ContextAttributes<W>,
+    ) -> Result<NotCurrentContext<D>> {
         let mut attrs = Vec::<EGLint>::new();
 
         let supports_opengl = self.inner.version > Version::new(1, 3);
         let config_api = config.api();
 
-        let (api, mut version) = match context_attributes.api {
+        let (api, mut version) = match context_attributes.inner.api {
             api @ Some(ContextApi::OpenGl(_)) | api @ None
                 if supports_opengl && config_api.contains(Api::OPENGL) =>
             {
@@ -61,7 +63,7 @@ impl Display {
             // Add profile for the OpenGL Api.
             if api == egl::OPENGL_API {
                 let (profile, new_version) =
-                    context::pick_profile(context_attributes.profile, version);
+                    context::pick_profile(context_attributes.inner.profile, version);
                 version = Some(new_version);
                 let profile = match profile {
                     GlProfile::Core => egl::CONTEXT_OPENGL_CORE_PROFILE_BIT,
@@ -82,7 +84,7 @@ impl Display {
             let has_robustsess = self.inner.features.contains(DisplayFeatures::CONTEXT_ROBUSTNESS);
 
             let mut requested_no_error = false;
-            match context_attributes.robustness {
+            match context_attributes.inner.robustness {
                 Robustness::NotRobust => (),
                 Robustness::NoError
                     if self.inner.features.contains(DisplayFeatures::CONTEXT_NO_ERROR) =>
@@ -108,7 +110,7 @@ impl Display {
                 },
             }
 
-            if context_attributes.debug && is_one_five && !requested_no_error {
+            if context_attributes.inner.debug && is_one_five && !requested_no_error {
                 attrs.push(egl::CONTEXT_OPENGL_DEBUG as EGLint);
                 attrs.push(egl::TRUE as EGLint);
             }
@@ -129,7 +131,7 @@ impl Display {
         attrs.push(egl::NONE as EGLint);
 
         let shared_context = if let Some(shared_context) =
-            context_attributes.shared_context.as_ref()
+            context_attributes.inner.shared_context.as_ref()
         {
             match shared_context {
                 RawContext::Egl(shared_context) => *shared_context,
@@ -167,26 +169,26 @@ impl Display {
 
 /// A wrapper around `EGLContext` that is known to be not current.
 #[derive(Debug)]
-pub struct NotCurrentContext {
-    inner: ContextInner,
+pub struct NotCurrentContext<D> {
+    inner: ContextInner<D>,
 }
 
-impl NotCurrentContext {
+impl<D: HasDisplayHandle> NotCurrentContext<D> {
     /// Make a [`Self::PossiblyCurrentContext`] indicating that the context
     /// could be current on the thread.
-    pub fn make_current_surfaceless(self) -> Result<PossiblyCurrentContext> {
+    pub fn make_current_surfaceless(self) -> Result<PossiblyCurrentContext<D>> {
         self.inner.make_current_surfaceless()?;
         Ok(PossiblyCurrentContext { inner: self.inner, _nosendsync: PhantomData })
     }
 
-    fn new(inner: ContextInner) -> Self {
+    fn new(inner: ContextInner<D>) -> Self {
         Self { inner }
     }
 }
 
-impl NotCurrentGlContext for NotCurrentContext {
-    type PossiblyCurrentContext = PossiblyCurrentContext;
-    type Surface<T: SurfaceTypeTrait> = Surface<T>;
+impl<D: HasDisplayHandle> NotCurrentGlContext for NotCurrentContext<D> {
+    type PossiblyCurrentContext = PossiblyCurrentContext<D>;
+    type Surface<T: SurfaceTypeTrait> = Surface<D, T>;
 
     fn treat_as_possibly_current(self) -> Self::PossiblyCurrentContext {
         PossiblyCurrentContext { inner: self.inner, _nosendsync: PhantomData }
@@ -194,69 +196,69 @@ impl NotCurrentGlContext for NotCurrentContext {
 
     fn make_current<T: SurfaceTypeTrait>(
         self,
-        surface: &Surface<T>,
-    ) -> Result<PossiblyCurrentContext> {
+        surface: &Surface<D, T>,
+    ) -> Result<PossiblyCurrentContext<D>> {
         self.inner.make_current_draw_read(surface, surface)?;
         Ok(PossiblyCurrentContext { inner: self.inner, _nosendsync: PhantomData })
     }
 
     fn make_current_draw_read<T: SurfaceTypeTrait>(
         self,
-        surface_draw: &Surface<T>,
-        surface_read: &Surface<T>,
-    ) -> Result<PossiblyCurrentContext> {
+        surface_draw: &Surface<D, T>,
+        surface_read: &Surface<D, T>,
+    ) -> Result<PossiblyCurrentContext<D>> {
         self.inner.make_current_draw_read(surface_draw, surface_read)?;
         Ok(PossiblyCurrentContext { inner: self.inner, _nosendsync: PhantomData })
     }
 }
 
-impl GlContext for NotCurrentContext {
+impl<D: HasDisplayHandle> GlContext for NotCurrentContext<D> {
     fn context_api(&self) -> ContextApi {
         self.inner.context_api()
     }
 }
 
-impl GetGlConfig for NotCurrentContext {
-    type Target = Config;
+impl<D: HasDisplayHandle> GetGlConfig for NotCurrentContext<D> {
+    type Target = Config<D>;
 
     fn config(&self) -> Self::Target {
         self.inner.config.clone()
     }
 }
 
-impl GetGlDisplay for NotCurrentContext {
-    type Target = Display;
+impl<D: HasDisplayHandle> GetGlDisplay for NotCurrentContext<D> {
+    type Target = Display<D>;
 
     fn display(&self) -> Self::Target {
         self.inner.display.clone()
     }
 }
 
-impl AsRawContext for NotCurrentContext {
+impl<D: HasDisplayHandle> AsRawContext for NotCurrentContext<D> {
     fn raw_context(&self) -> RawContext {
         RawContext::Egl(*self.inner.raw)
     }
 }
 
-impl Sealed for NotCurrentContext {}
+impl<D: HasDisplayHandle> Sealed for NotCurrentContext<D> {}
 
 /// A wrapper around `EGLContext` that could be current for the current thread.
 #[derive(Debug)]
-pub struct PossiblyCurrentContext {
-    pub(crate) inner: ContextInner,
+pub struct PossiblyCurrentContext<D> {
+    pub(crate) inner: ContextInner<D>,
     _nosendsync: PhantomData<EGLContext>,
 }
 
-impl PossiblyCurrentContext {
+impl<D: HasDisplayHandle> PossiblyCurrentContext<D> {
     /// Make this context current on the calling thread.
     pub fn make_current_surfaceless(&self) -> Result<()> {
         self.inner.make_current_surfaceless()
     }
 }
 
-impl PossiblyCurrentGlContext for PossiblyCurrentContext {
-    type NotCurrentContext = NotCurrentContext;
-    type Surface<T: SurfaceTypeTrait> = Surface<T>;
+impl<D: HasDisplayHandle> PossiblyCurrentGlContext for PossiblyCurrentContext<D> {
+    type NotCurrentContext = NotCurrentContext<D>;
+    type Surface<T: SurfaceTypeTrait> = Surface<D, T>;
 
     fn make_not_current(self) -> Result<Self::NotCurrentContext> {
         self.inner.make_not_current()?;
@@ -283,44 +285,44 @@ impl PossiblyCurrentGlContext for PossiblyCurrentContext {
     }
 }
 
-impl GlContext for PossiblyCurrentContext {
+impl<D: HasDisplayHandle> GlContext for PossiblyCurrentContext<D> {
     fn context_api(&self) -> ContextApi {
         self.inner.context_api()
     }
 }
 
-impl GetGlConfig for PossiblyCurrentContext {
-    type Target = Config;
+impl<D: HasDisplayHandle> GetGlConfig for PossiblyCurrentContext<D> {
+    type Target = Config<D>;
 
     fn config(&self) -> Self::Target {
         self.inner.config.clone()
     }
 }
 
-impl GetGlDisplay for PossiblyCurrentContext {
-    type Target = Display;
+impl<D: HasDisplayHandle> GetGlDisplay for PossiblyCurrentContext<D> {
+    type Target = Display<D>;
 
     fn display(&self) -> Self::Target {
         self.inner.display.clone()
     }
 }
 
-impl AsRawContext for PossiblyCurrentContext {
+impl<D: HasDisplayHandle> AsRawContext for PossiblyCurrentContext<D> {
     fn raw_context(&self) -> RawContext {
         RawContext::Egl(*self.inner.raw)
     }
 }
 
-impl Sealed for PossiblyCurrentContext {}
+impl<D: HasDisplayHandle> Sealed for PossiblyCurrentContext<D> {}
 
-pub(crate) struct ContextInner {
-    display: Display,
-    config: Config,
+pub(crate) struct ContextInner<D> {
+    display: Display<D>,
+    config: Config<D>,
     raw: EglContext,
     api: egl::types::EGLenum,
 }
 
-impl ContextInner {
+impl<D: HasDisplayHandle> ContextInner<D> {
     fn make_current_surfaceless(&self) -> Result<()> {
         unsafe {
             if self.display.inner.egl.MakeCurrent(
@@ -339,8 +341,8 @@ impl ContextInner {
 
     fn make_current_draw_read<T: SurfaceTypeTrait>(
         &self,
-        surface_draw: &Surface<T>,
-        surface_read: &Surface<T>,
+        surface_draw: &Surface<D, T>,
+        surface_read: &Surface<D, T>,
     ) -> Result<()> {
         unsafe {
             let draw = surface_draw.raw;
@@ -418,7 +420,7 @@ impl ContextInner {
     }
 }
 
-impl Drop for ContextInner {
+impl<D> Drop for ContextInner<D> {
     fn drop(&mut self) {
         unsafe {
             self.display.inner.egl.DestroyContext(*self.display.inner.raw, *self.raw);
@@ -426,7 +428,7 @@ impl Drop for ContextInner {
     }
 }
 
-impl fmt::Debug for ContextInner {
+impl<D> fmt::Debug for ContextInner<D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Context")
             .field("display", &self.display.inner.raw)

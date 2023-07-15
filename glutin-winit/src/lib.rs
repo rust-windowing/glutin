@@ -21,9 +21,9 @@ use glutin::platform::x11::X11GlConfigExt;
 use glutin::prelude::*;
 
 #[cfg(wgl_backend)]
-use raw_window_handle::HasRawWindowHandle;
+use raw_window_handle::HasWindowHandle;
+use raw_window_handle::{DisplayHandle, HasDisplayHandle, WindowHandle};
 
-use raw_window_handle::{HasRawDisplayHandle, RawWindowHandle};
 use winit::error::OsError;
 use winit::event_loop::EventLoopWindowTarget;
 use winit::window::{Window, WindowBuilder};
@@ -86,14 +86,20 @@ impl DisplayBuilder {
     /// **WGL:** - [`WindowBuilder`] **must** be passed in
     /// [`Self::with_window_builder`] if modern OpenGL(ES) is desired,
     /// otherwise only builtin functions like `glClear` will be available.
+    ///
+    /// # Safety
+    ///
+    /// The `Config` must not outlive the `EventLoop`.
     pub fn build<T, Picker>(
         mut self,
         window_target: &EventLoopWindowTarget<T>,
-        template_builder: ConfigTemplateBuilder,
+        template_builder: ConfigTemplateBuilder<WindowHandle<'_>>,
         config_picker: Picker,
-    ) -> Result<(Option<Window>, Config), Box<dyn Error>>
+    ) -> Result<(Option<Window>, Config<DisplayHandle<'static>>), Box<dyn Error>>
     where
-        Picker: FnOnce(Box<dyn Iterator<Item = Config> + '_>) -> Config,
+        Picker: FnOnce(
+            Box<dyn Iterator<Item = Config<DisplayHandle<'static>>> + '_>,
+        ) -> Config<DisplayHandle<'static>>,
     {
         // XXX with WGL backend window should be created first.
         #[cfg(wgl_backend)]
@@ -104,11 +110,13 @@ impl DisplayBuilder {
         };
 
         #[cfg(wgl_backend)]
-        let raw_window_handle = window.as_ref().map(|window| window.raw_window_handle());
+        let raw_window_handle = window.as_ref().map(|w| w.window_handle()).transpose()?;
         #[cfg(not(wgl_backend))]
         let raw_window_handle = None;
 
-        let gl_display = create_display(window_target, self.preference, raw_window_handle)?;
+        // SAFETY: Will not outlive the event loop.
+        let gl_display =
+            unsafe { create_display(window_target, self.preference, raw_window_handle)? };
 
         // XXX the native window must be passed to config picker when WGL is used
         // otherwise very limited OpenGL features will be supported.
@@ -121,7 +129,7 @@ impl DisplayBuilder {
 
         let template = template_builder.build();
 
-        let gl_config = unsafe {
+        let gl_config = {
             let configs = gl_display.find_configs(template)?;
             config_picker(configs)
         };
@@ -137,11 +145,16 @@ impl DisplayBuilder {
     }
 }
 
-fn create_display<T>(
+/// Create the actual display.
+///
+/// # Safety
+///
+/// The `Display` must not outlive the `EventLoop`.
+unsafe fn create_display<T>(
     window_target: &EventLoopWindowTarget<T>,
     _api_preference: ApiPreference,
-    _raw_window_handle: Option<RawWindowHandle>,
-) -> Result<Display, Box<dyn Error>> {
+    _raw_window_handle: Option<WindowHandle<'_>>,
+) -> Result<Display<DisplayHandle<'static>>, Box<dyn Error>> {
     #[cfg(egl_backend)]
     let _preference = DisplayApiPreference::Egl;
 
@@ -170,7 +183,10 @@ fn create_display<T>(
         ApiPreference::FallbackEgl => DisplayApiPreference::WglThenEgl(_raw_window_handle),
     };
 
-    unsafe { Ok(Display::new(window_target.raw_display_handle(), _preference)?) }
+    // SAFETY: Does not outlive the event loop.
+    let display_handle =
+        unsafe { DisplayHandle::borrow_raw(window_target.display_handle()?.as_raw()) };
+    Ok(Display::new(display_handle, _preference)?)
 }
 
 /// Finalize [`Window`] creation by applying the options from the [`Config`], be
@@ -179,10 +195,10 @@ fn create_display<T>(
 ///
 /// [`Window`]: winit::window::Window
 /// [`Config`]: glutin::config::Config
-pub fn finalize_window<T>(
+pub fn finalize_window<D: HasDisplayHandle, T>(
     window_target: &EventLoopWindowTarget<T>,
     mut builder: WindowBuilder,
-    gl_config: &Config,
+    gl_config: &Config<D>,
 ) -> Result<Window, OsError> {
     // Disable transparency if the end config doesn't support it.
     if gl_config.supports_transparency() == Some(false) {

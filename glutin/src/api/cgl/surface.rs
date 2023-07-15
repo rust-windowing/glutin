@@ -7,7 +7,7 @@ use std::num::NonZeroU32;
 use icrate::AppKit::{NSView, NSWindow};
 use icrate::Foundation::{MainThreadBound, MainThreadMarker};
 use objc2::rc::Id;
-use raw_window_handle::RawWindowHandle;
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawWindowHandle};
 
 use crate::config::GetGlConfig;
 use crate::display::GetGlDisplay;
@@ -22,29 +22,29 @@ use super::config::Config;
 use super::context::PossiblyCurrentContext;
 use super::display::Display;
 
-impl Display {
+impl<D: HasDisplayHandle> Display<D> {
     pub(crate) unsafe fn create_pixmap_surface(
         &self,
-        _config: &Config,
-        _surface_attributes: &SurfaceAttributes<PixmapSurface>,
-    ) -> Result<Surface<PixmapSurface>> {
+        _config: &Config<D>,
+        _surface_attributes: SurfaceAttributes<PixmapSurface>,
+    ) -> Result<Surface<D, PixmapSurface>> {
         Err(ErrorKind::NotSupported("pixmaps are not supported with CGL").into())
     }
 
     pub(crate) unsafe fn create_pbuffer_surface(
         &self,
-        _config: &Config,
-        _surface_attributes: &SurfaceAttributes<PbufferSurface>,
-    ) -> Result<Surface<PbufferSurface>> {
+        _config: &Config<D>,
+        _surface_attributes: SurfaceAttributes<PbufferSurface>,
+    ) -> Result<Surface<D, PbufferSurface>> {
         Err(ErrorKind::NotSupported("pbuffers are not supported with CGL").into())
     }
 
-    pub(crate) unsafe fn create_window_surface(
+    pub(crate) fn create_window_surface<W: HasWindowHandle>(
         &self,
-        config: &Config,
-        surface_attributes: &SurfaceAttributes<WindowSurface>,
-    ) -> Result<Surface<WindowSurface>> {
-        let native_window = match surface_attributes.raw_window_handle.unwrap() {
+        config: &Config<D>,
+        surface_attributes: SurfaceAttributes<WindowSurface<W>>,
+    ) -> Result<Surface<D, WindowSurface<W>>> {
+        let native_window = match surface_attributes.ty.0.window_handle()?.as_raw() {
             RawWindowHandle::AppKit(window) => window,
             _ => {
                 return Err(
@@ -59,21 +59,23 @@ impl Display {
 
         // SAFETY: Validity of the view and window is ensured by caller
         // This function makes sure the window is non null.
-        let ns_view = if let Some(ns_view) = unsafe { Id::retain(native_window.ns_view.cast()) } {
+        let ns_view: Id<NSView> = if let Some(ns_view) =
+            unsafe { Id::retain(native_window.ns_view.as_ptr().cast()) }
+        {
             ns_view
         } else {
             return Err(ErrorKind::NotSupported("ns_view of provided native window is nil").into());
         };
-        let ns_view = MainThreadBound::new(ns_view, mtm);
-
-        let ns_window =
-            if let Some(ns_window) = unsafe { Id::retain(native_window.ns_window.cast()) } {
-                ns_window
-            } else {
+        let ns_window = match unsafe { ns_view.window() } {
+            Some(window) => window,
+            None => {
                 return Err(
                     ErrorKind::NotSupported("ns_window of provided native window is nil").into()
-                );
-            };
+                )
+            },
+        };
+
+        let ns_view = MainThreadBound::new(ns_view, mtm);
         let ns_window = MainThreadBound::new(ns_window, mtm);
 
         let surface = Surface {
@@ -82,24 +84,46 @@ impl Display {
             ns_view,
             ns_window,
             _nosendsync: PhantomData,
-            _ty: PhantomData,
+            ty: surface_attributes.ty,
         };
         Ok(surface)
     }
 }
 
 /// A wrapper aroud `NSView`.
-pub struct Surface<T: SurfaceTypeTrait> {
-    display: Display,
-    config: Config,
+pub struct Surface<D, T: SurfaceTypeTrait> {
+    display: Display<D>,
+    config: Config<D>,
     pub(crate) ns_view: MainThreadBound<Id<NSView>>,
     ns_window: MainThreadBound<Id<NSWindow>>,
     _nosendsync: PhantomData<*const std::ffi::c_void>,
-    _ty: PhantomData<T>,
+    ty: T,
 }
 
-impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
-    type Context = PossiblyCurrentContext;
+impl<D, W: HasWindowHandle> Surface<D, WindowSurface<W>> {
+    /// Get a reference to the underlying window.
+    pub fn window(&self) -> &W {
+        &self.ty.0
+    }
+}
+
+impl<D, W: HasWindowHandle> AsRef<W> for Surface<D, WindowSurface<W>> {
+    fn as_ref(&self) -> &W {
+        self.window()
+    }
+}
+
+impl<D, W: HasWindowHandle> HasWindowHandle for Surface<D, WindowSurface<W>> {
+    fn window_handle(
+        &self,
+    ) -> std::result::Result<raw_window_handle::WindowHandle<'_>, raw_window_handle::HandleError>
+    {
+        self.window().window_handle()
+    }
+}
+
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> GlSurface<T> for Surface<D, T> {
+    type Context = PossiblyCurrentContext<D>;
     type SurfaceType = T;
 
     fn buffer_age(&self) -> u32 {
@@ -156,23 +180,23 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     }
 }
 
-impl<T: SurfaceTypeTrait> GetGlConfig for Surface<T> {
-    type Target = Config;
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> GetGlConfig for Surface<D, T> {
+    type Target = Config<D>;
 
     fn config(&self) -> Self::Target {
         self.config.clone()
     }
 }
 
-impl<T: SurfaceTypeTrait> GetGlDisplay for Surface<T> {
-    type Target = Display;
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> GetGlDisplay for Surface<D, T> {
+    type Target = Display<D>;
 
     fn display(&self) -> Self::Target {
         self.display.clone()
     }
 }
 
-impl<T: SurfaceTypeTrait> AsRawSurface for Surface<T> {
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> AsRawSurface for Surface<D, T> {
     fn raw_surface(&self) -> RawSurface {
         // SAFETY: We only use the thread marker to get the pointer value of the view
         let mtm = unsafe { MainThreadMarker::new_unchecked() };
@@ -180,7 +204,7 @@ impl<T: SurfaceTypeTrait> AsRawSurface for Surface<T> {
     }
 }
 
-impl<T: SurfaceTypeTrait> fmt::Debug for Surface<T> {
+impl<D, T: SurfaceTypeTrait> fmt::Debug for Surface<D, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Surface")
             .field("config", &self.config.inner.raw)
@@ -190,4 +214,4 @@ impl<T: SurfaceTypeTrait> fmt::Debug for Surface<T> {
     }
 }
 
-impl<T: SurfaceTypeTrait> Sealed for Surface<T> {}
+impl<D: HasDisplayHandle, T: SurfaceTypeTrait> Sealed for Surface<D, T> {}

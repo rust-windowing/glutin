@@ -1,5 +1,8 @@
 # Unreleased
 
+- **Breaking:** Bump `raw-window-handle` to v0.6.
+- **Breaking:** Make `glutin` types generic over the window/display they are wrapping.
+
 # Version 0.31.2
 
 - Fixed EGL not setting context version with EGL versions before 1.5 and missing context ext.

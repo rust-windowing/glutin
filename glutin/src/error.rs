@@ -1,5 +1,6 @@
 //! Glutin error handling.
 
+use raw_window_handle::HandleError;
 use std::fmt;
 
 /// A specialized [`Result`] type for graphics operations.
@@ -139,6 +140,12 @@ pub enum ErrorKind {
     /// The operation is not supported by the platform.
     NotSupported(&'static str),
 
+    /// The display/window handle is unavailable at this time.
+    HandleUnavailable,
+
+    /// The display/window handle is incompatible with the requested operation.
+    HandleNotSupported,
+
     /// The misc error that can't be classified occurred.
     Misc,
 }
@@ -166,6 +173,8 @@ impl ErrorKind {
             BadNativeWindow => "argument does not refer to a valid native window",
             ContextLost => "context loss",
             NotSupported(reason) => reason,
+            HandleUnavailable => "handle unavailable",
+            HandleNotSupported => "handle not supported",
             Misc => "misc platform error",
         }
     }
@@ -174,5 +183,21 @@ impl ErrorKind {
 impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_str())
+    }
+}
+
+impl From<HandleError> for ErrorKind {
+    fn from(err: HandleError) -> Self {
+        match err {
+            HandleError::NotSupported => ErrorKind::HandleNotSupported,
+            HandleError::Unavailable => ErrorKind::HandleUnavailable,
+            _ => ErrorKind::BadDisplay,
+        }
+    }
+}
+
+impl From<HandleError> for Error {
+    fn from(err: HandleError) -> Self {
+        ErrorKind::from(err).into()
     }
 }

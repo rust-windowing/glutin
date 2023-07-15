@@ -8,6 +8,7 @@ use icrate::AppKit::{NSOpenGLCPSwapInterval, NSView};
 use icrate::Foundation::{MainThreadBound, MainThreadMarker};
 use objc2::rc::{autoreleasepool, Id};
 use objc2::ClassType;
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
 use crate::config::GetGlConfig;
 use crate::context::{AsRawContext, ContextApi, ContextAttributes, RawContext, Robustness};
@@ -22,24 +23,24 @@ use super::config::Config;
 use super::display::Display;
 use super::surface::Surface;
 
-impl Display {
-    pub(crate) unsafe fn create_context(
+impl<D: HasDisplayHandle> Display<D> {
+    pub(crate) fn create_context<W: HasWindowHandle>(
         &self,
-        config: &Config,
-        context_attributes: &ContextAttributes,
-    ) -> Result<NotCurrentContext> {
-        let share_context = match context_attributes.shared_context.as_ref() {
+        config: &Config<D>,
+        context_attributes: &ContextAttributes<W>,
+    ) -> Result<NotCurrentContext<D>> {
+        let share_context = match context_attributes.inner.shared_context.as_ref() {
             Some(RawContext::Cgl(share_context)) => unsafe {
                 share_context.cast::<NSOpenGLContext>().as_ref()
             },
             _ => None,
         };
 
-        if matches!(context_attributes.api, Some(ContextApi::Gles(_))) {
+        if matches!(context_attributes.inner.api, Some(ContextApi::Gles(_))) {
             return Err(ErrorKind::NotSupported("gles is not supported with CGL").into());
         }
 
-        if context_attributes.robustness != Robustness::NotRobust {
+        if context_attributes.inner.robustness != Robustness::NotRobust {
             return Err(ErrorKind::NotSupported("robustness is not supported with CGL").into());
         }
 
@@ -68,22 +69,22 @@ impl Display {
 /// A wrapper arounh `NSOpenGLContext` that is known to be not current on the
 /// current thread.
 #[derive(Debug)]
-pub struct NotCurrentContext {
-    pub(crate) inner: ContextInner,
+pub struct NotCurrentContext<D> {
+    pub(crate) inner: ContextInner<D>,
     _nosync: PhantomData<std::cell::UnsafeCell<()>>,
 }
 
-impl NotCurrentContext {
-    fn new(inner: ContextInner) -> Self {
+impl<D> NotCurrentContext<D> {
+    fn new(inner: ContextInner<D>) -> Self {
         Self { inner, _nosync: PhantomData }
     }
 }
 
-impl NotCurrentGlContext for NotCurrentContext {
-    type PossiblyCurrentContext = PossiblyCurrentContext;
-    type Surface<T: SurfaceTypeTrait> = Surface<T>;
+impl<D: HasDisplayHandle> NotCurrentGlContext for NotCurrentContext<D> {
+    type PossiblyCurrentContext = PossiblyCurrentContext<D>;
+    type Surface<T: SurfaceTypeTrait> = Surface<D, T>;
 
-    fn treat_as_possibly_current(self) -> PossiblyCurrentContext {
+    fn treat_as_possibly_current(self) -> PossiblyCurrentContext<D> {
         PossiblyCurrentContext { inner: self.inner, _nosendsync: PhantomData }
     }
 
@@ -104,48 +105,48 @@ impl NotCurrentGlContext for NotCurrentContext {
     }
 }
 
-impl GlContext for NotCurrentContext {
+impl<D: HasDisplayHandle> GlContext for NotCurrentContext<D> {
     fn context_api(&self) -> ContextApi {
         self.inner.context_api()
     }
 }
 
-impl GetGlConfig for NotCurrentContext {
-    type Target = Config;
+impl<D: HasDisplayHandle> GetGlConfig for NotCurrentContext<D> {
+    type Target = Config<D>;
 
     fn config(&self) -> Self::Target {
         self.inner.config.clone()
     }
 }
 
-impl GetGlDisplay for NotCurrentContext {
-    type Target = Display;
+impl<D: HasDisplayHandle> GetGlDisplay for NotCurrentContext<D> {
+    type Target = Display<D>;
 
     fn display(&self) -> Self::Target {
         self.inner.display.clone()
     }
 }
 
-impl AsRawContext for NotCurrentContext {
+impl<D: HasDisplayHandle> AsRawContext for NotCurrentContext<D> {
     fn raw_context(&self) -> RawContext {
         RawContext::Cgl(Id::as_ptr(&self.inner.raw).cast())
     }
 }
 
-impl Sealed for NotCurrentContext {}
+impl<D: HasDisplayHandle> Sealed for NotCurrentContext<D> {}
 
 /// A wrapper around `NSOpenGLContext` that could be curront on the current
 /// thread.
 #[derive(Debug)]
-pub struct PossiblyCurrentContext {
-    pub(crate) inner: ContextInner,
+pub struct PossiblyCurrentContext<D> {
+    pub(crate) inner: ContextInner<D>,
     // The context could be current only on the one thread.
     _nosendsync: PhantomData<*mut ()>,
 }
 
-impl PossiblyCurrentGlContext for PossiblyCurrentContext {
-    type NotCurrentContext = NotCurrentContext;
-    type Surface<T: SurfaceTypeTrait> = Surface<T>;
+impl<D: HasDisplayHandle> PossiblyCurrentGlContext for PossiblyCurrentContext<D> {
+    type NotCurrentContext = NotCurrentContext<D>;
+    type Surface<T: SurfaceTypeTrait> = Surface<D, T>;
 
     fn make_not_current(self) -> Result<Self::NotCurrentContext> {
         self.inner.make_not_current()?;
@@ -173,59 +174,60 @@ impl PossiblyCurrentGlContext for PossiblyCurrentContext {
     }
 }
 
-impl GlContext for PossiblyCurrentContext {
+impl<D: HasDisplayHandle> GlContext for PossiblyCurrentContext<D> {
     fn context_api(&self) -> ContextApi {
         self.inner.context_api()
     }
 }
 
-impl GetGlConfig for PossiblyCurrentContext {
-    type Target = Config;
+impl<D: HasDisplayHandle> GetGlConfig for PossiblyCurrentContext<D> {
+    type Target = Config<D>;
 
     fn config(&self) -> Self::Target {
         self.inner.config.clone()
     }
 }
 
-impl GetGlDisplay for PossiblyCurrentContext {
-    type Target = Display;
+impl<D: HasDisplayHandle> GetGlDisplay for PossiblyCurrentContext<D> {
+    type Target = Display<D>;
 
     fn display(&self) -> Self::Target {
         self.inner.display.clone()
     }
 }
 
-impl AsRawContext for PossiblyCurrentContext {
+impl<D: HasDisplayHandle> AsRawContext for PossiblyCurrentContext<D> {
     fn raw_context(&self) -> RawContext {
         RawContext::Cgl(Id::as_ptr(&self.inner.raw).cast())
     }
 }
 
-impl Sealed for PossiblyCurrentContext {}
+impl<D: HasDisplayHandle> Sealed for PossiblyCurrentContext<D> {}
 
-pub(crate) struct ContextInner {
-    display: Display,
-    config: Config,
+pub(crate) struct ContextInner<D> {
+    display: Display<D>,
+    config: Config<D>,
     pub(crate) raw: Id<NSOpenGLContext>,
 }
 
-impl ContextInner {
+impl<D: HasDisplayHandle> ContextInner<D> {
     fn make_current_draw_read<T: SurfaceTypeTrait>(
         &self,
-        _surface_draw: &Surface<T>,
-        _surface_read: &Surface<T>,
+        _surface_draw: &Surface<D, T>,
+        _surface_read: &Surface<D, T>,
     ) -> ErrorKind {
         ErrorKind::NotSupported("make current draw read isn't supported with CGL")
     }
 
-    fn make_current<T: SurfaceTypeTrait>(&self, surface: &Surface<T>) -> Result<()> {
+    fn make_current<T: SurfaceTypeTrait>(&self, surface: &Surface<D, T>) -> Result<()> {
         autoreleasepool(|_| {
             self.update();
             self.raw.makeCurrentContext();
 
             let view = &surface.ns_view;
+            let raw = &self.raw;
             MainThreadMarker::run_on_main(|mtm| unsafe {
-                self.raw.setView(Some(view.get(mtm)));
+                raw.setView(Some(view.get(mtm)));
             });
 
             Ok(())
@@ -248,7 +250,8 @@ impl ContextInner {
     }
 
     pub(crate) fn update(&self) {
-        MainThreadMarker::run_on_main(|_| self.raw.update());
+        let raw = &self.raw;
+        MainThreadMarker::run_on_main(|_| raw.update());
     }
 
     pub(crate) fn flush_buffer(&self) -> Result<()> {
@@ -259,8 +262,9 @@ impl ContextInner {
     }
 
     pub(crate) fn is_view_current(&self, view: &MainThreadBound<Id<NSView>>) -> bool {
+        let raw = &self.raw;
         MainThreadMarker::run_on_main(|mtm| {
-            self.raw.view(mtm).expect("context to have a current view") == *view.get(mtm)
+            raw.view(mtm).expect("context to have a current view") == *view.get(mtm)
         })
     }
 
@@ -271,7 +275,7 @@ impl ContextInner {
     }
 }
 
-impl fmt::Debug for ContextInner {
+impl<D> fmt::Debug for ContextInner<D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Context")
             .field("config", &self.config.inner.raw)

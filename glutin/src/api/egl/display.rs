@@ -13,11 +13,13 @@ use glutin_egl_sys::egl::types::{EGLAttrib, EGLDisplay, EGLint};
 
 use once_cell::sync::OnceCell;
 
-use raw_window_handle::RawDisplayHandle;
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawDisplayHandle};
 
 use crate::config::ConfigTemplate;
 use crate::context::Version;
-use crate::display::{AsRawDisplay, DisplayFeatures, GetDisplayExtensions, RawDisplay};
+use crate::display::{
+    AsRawDisplay, DisplayFeatures, DisplayResult, GetDisplayExtensions, RawDisplay,
+};
 use crate::error::{ErrorKind, Result};
 use crate::prelude::*;
 use crate::private::Sealed;
@@ -34,13 +36,35 @@ use super::{Egl, EGL};
 pub(crate) static CLIENT_EXTENSIONS: OnceCell<HashSet<&'static str>> = OnceCell::new();
 
 /// A wrapper for the `EGLDisplay` and its supported extensions.
-#[derive(Debug, Clone)]
-pub struct Display {
+#[derive(Debug)]
+pub struct Display<D> {
     // Inner display to simplify passing it around.
-    pub(crate) inner: Arc<DisplayInner>,
+    pub(crate) inner: Arc<DisplayInner<D>>,
 }
 
-impl Display {
+impl<D> Clone for Display<D> {
+    fn clone(&self) -> Self {
+        Self { inner: self.inner.clone() }
+    }
+}
+
+impl<D: HasDisplayHandle> AsRef<D> for Display<D> {
+    #[inline]
+    fn as_ref(&self) -> &D {
+        self.display()
+    }
+}
+
+impl<D: HasDisplayHandle> HasDisplayHandle for Display<D> {
+    fn display_handle(
+        &self,
+    ) -> std::result::Result<raw_window_handle::DisplayHandle<'_>, raw_window_handle::HandleError>
+    {
+        self.display().display_handle()
+    }
+}
+
+impl<D: HasDisplayHandle> Display<D> {
     /// Create EGL display with the native display.
     ///
     /// # Safety
@@ -49,33 +73,45 @@ impl Display {
     /// [`std::ptr::null()`] for the display will result in using
     /// `EGL_DEFAULT_DISPLAY`, which is not recommended or will
     /// work on a platform with a concept of native display, like Wayland.
-    pub unsafe fn new(raw_display: RawDisplayHandle) -> Result<Self> {
+    pub fn new(raw_display: D) -> Result<Self> {
+        Self::new_with_display(raw_display).map_err(Into::into)
+    }
+
+    /// Get the handle to the underlying raw display.
+    pub fn display(&self) -> &D {
+        self.inner.native_display.as_ref().unwrap()
+    }
+
+    pub(crate) fn new_with_display(raw_display: D) -> DisplayResult<Self, D> {
         let egl = match EGL.as_ref() {
             Some(egl) => egl,
-            None => return Err(ErrorKind::NotFound.into()),
+            None => return Err((ErrorKind::NotFound, raw_display).into()),
         };
 
         CLIENT_EXTENSIONS.get_or_init(|| get_extensions(egl, egl::NO_DISPLAY));
 
         // Create a EGL display by chaining all display creation functions aborting on
         // `EGL_BAD_ATTRIBUTE`.
-        let display = Self::get_platform_display(egl, raw_display)
+        let display = match Self::get_platform_display(egl, &raw_display)
             .or_else(|err| {
                 if err.error_kind() == ErrorKind::BadAttribute {
                     Err(err)
                 } else {
-                    Self::get_platform_display_ext(egl, raw_display)
+                    Self::get_platform_display_ext(egl, &raw_display)
                 }
             })
             .or_else(|err| {
                 if err.error_kind() == ErrorKind::BadAttribute {
                     Err(err)
                 } else {
-                    Self::get_display(egl, raw_display)
+                    Self::get_display(egl, &raw_display)
                 }
-            })?;
+            }) {
+            Ok(display) => display,
+            Err(err) => return Err((err, raw_display).into()),
+        };
 
-        Self::initialize_display(egl, display, Some(raw_display))
+        Self::initialize_display(egl, display, Some(raw_display)).map_err(|e| e.unwrap())
     }
 
     /// Create an EGL display using the specified device.
@@ -91,10 +127,7 @@ impl Display {
     ///
     /// If `raw_display` is [`Some`], `raw_display` must point to a valid system
     /// display.
-    pub unsafe fn with_device(
-        device: &Device,
-        raw_display: Option<RawDisplayHandle>,
-    ) -> Result<Self> {
+    pub unsafe fn with_device(device: &Device, raw_display: Option<D>) -> Result<Self> {
         let egl = match EGL.as_ref() {
             Some(egl) => egl,
             None => return Err(ErrorKind::NotFound.into()),
@@ -169,7 +202,7 @@ impl Display {
         }
         .map(EglDisplay::Ext)?;
 
-        Self::initialize_display(egl, platform_display, None)
+        Self::initialize_display(egl, platform_display, None).map_err(Into::into)
     }
 
     /// Get the [`Device`] the display is using.
@@ -231,7 +264,7 @@ impl Display {
         }
     }
 
-    fn get_platform_display(egl: &Egl, display: RawDisplayHandle) -> Result<EglDisplay> {
+    fn get_platform_display(egl: &Egl, display: &D) -> Result<EglDisplay> {
         if !egl.GetPlatformDisplay.is_loaded() {
             return Err(ErrorKind::NotSupported("eglGetPlatformDisplay is not supported").into());
         }
@@ -239,12 +272,12 @@ impl Display {
         let extensions = CLIENT_EXTENSIONS.get().unwrap();
 
         let mut attrs = Vec::<EGLAttrib>::with_capacity(5);
-        let (platform, mut display) = match display {
+        let (platform, display) = match display.display_handle()?.as_raw() {
             #[cfg(wayland_platform)]
             RawDisplayHandle::Wayland(handle)
                 if extensions.contains("EGL_KHR_platform_wayland") =>
             {
-                (egl::PLATFORM_WAYLAND_KHR, handle.display)
+                (egl::PLATFORM_WAYLAND_KHR, Some(handle.display))
             },
             #[cfg(x11_platform)]
             RawDisplayHandle::Xlib(handle) if extensions.contains("EGL_KHR_platform_x11") => {
@@ -253,10 +286,10 @@ impl Display {
                 (egl::PLATFORM_X11_KHR, handle.display)
             },
             RawDisplayHandle::Gbm(handle) if extensions.contains("EGL_KHR_platform_gbm") => {
-                (egl::PLATFORM_GBM_KHR, handle.gbm_device)
+                (egl::PLATFORM_GBM_KHR, Some(handle.gbm_device))
             },
             RawDisplayHandle::Android(_) if extensions.contains("EGL_KHR_platform_android") => {
-                (egl::PLATFORM_ANDROID_KHR, egl::DEFAULT_DISPLAY as *mut _)
+                (egl::PLATFORM_ANDROID_KHR, None)
             },
             _ => {
                 return Err(
@@ -266,9 +299,7 @@ impl Display {
         };
 
         // Be explicit here.
-        if display.is_null() {
-            display = egl::DEFAULT_DISPLAY as *mut _;
-        }
+        let display = display.map_or(egl::DEFAULT_DISPLAY as *mut _, |x| x.as_ptr());
 
         // Push at the end so we can pop it on failure
         let mut has_display_reference = extensions.contains("EGL_KHR_display_reference");
@@ -306,7 +337,7 @@ impl Display {
         platform_display.map(EglDisplay::Khr)
     }
 
-    fn get_platform_display_ext(egl: &Egl, display: RawDisplayHandle) -> Result<EglDisplay> {
+    fn get_platform_display_ext(egl: &Egl, display: &D) -> Result<EglDisplay> {
         if !egl.GetPlatformDisplayEXT.is_loaded() {
             return Err(ErrorKind::NotSupported("eglGetPlatformDisplayEXT is not supported").into());
         }
@@ -315,12 +346,12 @@ impl Display {
 
         let mut attrs = Vec::<EGLint>::with_capacity(5);
         let mut legacy = false;
-        let (platform, mut display) = match display {
+        let (platform, display) = match display.display_handle()?.as_raw() {
             #[cfg(wayland_platform)]
             RawDisplayHandle::Wayland(handle)
                 if extensions.contains("EGL_EXT_platform_wayland") =>
             {
-                (egl::PLATFORM_WAYLAND_EXT, handle.display)
+                (egl::PLATFORM_WAYLAND_EXT, Some(handle.display))
             },
             #[cfg(x11_platform)]
             RawDisplayHandle::Xlib(handle) if extensions.contains("EGL_EXT_platform_x11") => {
@@ -338,12 +369,12 @@ impl Display {
                 (egl::PLATFORM_XCB_EXT, handle.connection)
             },
             RawDisplayHandle::Gbm(handle) if extensions.contains("EGL_MESA_platform_gbm") => {
-                (egl::PLATFORM_GBM_MESA, handle.gbm_device)
+                (egl::PLATFORM_GBM_MESA, Some(handle.gbm_device))
             },
             RawDisplayHandle::Windows(..) if extensions.contains("EGL_ANGLE_platform_angle") => {
                 // Only CreateWindowSurface appears to work with Angle.
                 legacy = true;
-                (egl::PLATFORM_ANGLE_ANGLE, egl::DEFAULT_DISPLAY as *mut _)
+                (egl::PLATFORM_ANGLE_ANGLE, None)
             },
             _ => {
                 return Err(
@@ -353,9 +384,7 @@ impl Display {
         };
 
         // Be explicit here.
-        if display.is_null() {
-            display = egl::DEFAULT_DISPLAY as *mut _;
-        }
+        let display = display.map_or(egl::DEFAULT_DISPLAY as *mut _, |x| x.as_ptr());
 
         // Push at the end so we can pop it on failure
         let mut has_display_reference = extensions.contains("EGL_KHR_display_reference");
@@ -403,11 +432,13 @@ impl Display {
         })
     }
 
-    fn get_display(egl: &Egl, display: RawDisplayHandle) -> Result<EglDisplay> {
-        let mut display = match display {
-            RawDisplayHandle::Gbm(handle) => handle.gbm_device,
+    fn get_display(egl: &Egl, display: &D) -> Result<EglDisplay> {
+        let mut display = match display.display_handle()?.as_raw() {
+            RawDisplayHandle::Gbm(handle) => handle.gbm_device.as_ptr(),
             #[cfg(x11_platform)]
-            RawDisplayHandle::Xlib(handle) => handle.display,
+            RawDisplayHandle::Xlib(handle) => {
+                handle.display.map_or(egl::DEFAULT_DISPLAY as *mut _, |x| x.as_ptr())
+            },
             RawDisplayHandle::Android(_) => egl::DEFAULT_DISPLAY as *mut _,
             _ => {
                 return Err(
@@ -470,12 +501,16 @@ impl Display {
     fn initialize_display(
         egl: &'static Egl,
         display: EglDisplay,
-        raw_display_handle: Option<RawDisplayHandle>,
-    ) -> Result<Self> {
+        handle: Option<D>,
+    ) -> DisplayResult<Self, Option<D>> {
         let version = unsafe {
             let (mut major, mut minor) = (0, 0);
             if egl.Initialize(*display, &mut major, &mut minor) == egl::FALSE {
-                return Err(super::check_error().expect_err("eglInit failed without a reason"));
+                return Err((
+                    super::check_error().expect_err("eglInit failed without a reason"),
+                    handle,
+                )
+                    .into());
             }
 
             Version::new(major as u8, minor as u8)
@@ -488,7 +523,7 @@ impl Display {
         let inner = Arc::new(DisplayInner {
             egl,
             raw: display,
-            _native_display: raw_display_handle.map(NativeDisplay),
+            native_display: handle,
             version,
             display_extensions,
             features,
@@ -497,48 +532,48 @@ impl Display {
     }
 }
 
-impl GlDisplay for Display {
-    type Config = Config;
-    type NotCurrentContext = NotCurrentContext;
-    type PbufferSurface = Surface<PbufferSurface>;
-    type PixmapSurface = Surface<PixmapSurface>;
-    type WindowSurface = Surface<WindowSurface>;
+impl<D: HasDisplayHandle> GlDisplay for Display<D> {
+    type Config = Config<D>;
+    type NotCurrentContext = NotCurrentContext<D>;
+    type PbufferSurface = Surface<D, PbufferSurface>;
+    type PixmapSurface = Surface<D, PixmapSurface>;
+    type WindowSurface<W: HasWindowHandle> = Surface<D, WindowSurface<W>>;
 
-    unsafe fn find_configs(
+    fn find_configs<W: HasWindowHandle>(
         &self,
-        template: ConfigTemplate,
+        template: ConfigTemplate<W>,
     ) -> Result<Box<dyn Iterator<Item = Self::Config> + '_>> {
-        unsafe { Self::find_configs(self, template) }
+        Self::find_configs(self, template)
     }
 
-    unsafe fn create_window_surface(
+    fn create_window_surface<W: HasWindowHandle>(
         &self,
         config: &Self::Config,
-        surface_attributes: &SurfaceAttributes<WindowSurface>,
-    ) -> Result<Self::WindowSurface> {
-        unsafe { Self::create_window_surface(self, config, surface_attributes) }
+        surface_attributes: SurfaceAttributes<WindowSurface<W>>,
+    ) -> Result<Self::WindowSurface<W>> {
+        Self::create_window_surface(self, config, surface_attributes)
     }
 
     unsafe fn create_pbuffer_surface(
         &self,
         config: &Self::Config,
-        surface_attributes: &SurfaceAttributes<PbufferSurface>,
+        surface_attributes: SurfaceAttributes<PbufferSurface>,
     ) -> Result<Self::PbufferSurface> {
         unsafe { Self::create_pbuffer_surface(self, config, surface_attributes) }
     }
 
-    unsafe fn create_context(
+    fn create_context<W: HasWindowHandle>(
         &self,
         config: &Self::Config,
-        context_attributes: &crate::context::ContextAttributes,
+        context_attributes: &crate::context::ContextAttributes<W>,
     ) -> Result<Self::NotCurrentContext> {
-        unsafe { Self::create_context(self, config, context_attributes) }
+        Self::create_context(self, config, context_attributes)
     }
 
     unsafe fn create_pixmap_surface(
         &self,
         config: &Self::Config,
-        surface_attributes: &SurfaceAttributes<PixmapSurface>,
+        surface_attributes: SurfaceAttributes<PixmapSurface>,
     ) -> Result<Self::PixmapSurface> {
         unsafe { Self::create_pixmap_surface(self, config, surface_attributes) }
     }
@@ -556,21 +591,21 @@ impl GlDisplay for Display {
     }
 }
 
-impl GetDisplayExtensions for Display {
+impl<D: HasDisplayHandle> GetDisplayExtensions for Display<D> {
     fn extensions(&self) -> &HashSet<&'static str> {
         &self.inner.display_extensions
     }
 }
 
-impl AsRawDisplay for Display {
+impl<D: HasDisplayHandle> AsRawDisplay for Display<D> {
     fn raw_display(&self) -> RawDisplay {
         RawDisplay::Egl(*self.inner.raw)
     }
 }
 
-impl Sealed for Display {}
+impl<D: HasDisplayHandle> Sealed for Display<D> {}
 
-pub(crate) struct DisplayInner {
+pub(crate) struct DisplayInner<D> {
     /// Pointer to the EGL handler to simplify API calls.
     pub(crate) egl: &'static Egl,
 
@@ -587,10 +622,10 @@ pub(crate) struct DisplayInner {
     pub(crate) features: DisplayFeatures,
 
     /// The raw display used to create EGL display.
-    pub(crate) _native_display: Option<NativeDisplay>,
+    pub(crate) native_display: Option<D>,
 }
 
-impl DisplayInner {
+impl<D> DisplayInner<D> {
     fn uses_display_reference(&self) -> bool {
         if !CLIENT_EXTENSIONS.get().unwrap().contains("EGL_KHR_display_reference") {
             return false;
@@ -621,7 +656,7 @@ impl DisplayInner {
     }
 }
 
-impl fmt::Debug for DisplayInner {
+impl<D> fmt::Debug for DisplayInner<D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Display")
             .field("raw", &self.raw)
@@ -632,7 +667,7 @@ impl fmt::Debug for DisplayInner {
     }
 }
 
-impl Drop for DisplayInner {
+impl<D> Drop for DisplayInner<D> {
     fn drop(&mut self) {
         if self.uses_display_reference() {
             unsafe {

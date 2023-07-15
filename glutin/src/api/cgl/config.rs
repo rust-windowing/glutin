@@ -13,6 +13,7 @@ use icrate::AppKit::{
     NSOpenGLProfileVersion4_1Core, NSOpenGLProfileVersionLegacy,
 };
 use objc2::rc::Id;
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
 use crate::config::{
     Api, AsRawConfig, ColorBufferType, ConfigSurfaceTypes, ConfigTemplate, GlConfig, RawConfig,
@@ -24,12 +25,12 @@ use crate::private::Sealed;
 use super::appkit::NSOpenGLPixelFormat;
 use super::display::Display;
 
-impl Display {
+impl<D: HasDisplayHandle> Display<D> {
     #[allow(deprecated)]
-    pub(crate) unsafe fn find_configs(
+    pub(crate) fn find_configs<W: HasWindowHandle>(
         &self,
-        template: ConfigTemplate,
-    ) -> Result<Box<dyn Iterator<Item = Config> + '_>> {
+        template: ConfigTemplate<W>,
+    ) -> Result<Box<dyn Iterator<Item = Config<D>> + '_>> {
         let mut attrs = Vec::<NSOpenGLPixelFormatAttribute>::with_capacity(32);
 
         // We use minimum to follow behavior of other platforms here.
@@ -129,12 +130,26 @@ impl Display {
 }
 
 /// A wrapper around NSOpenGLPixelFormat.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Config {
-    pub(crate) inner: Arc<ConfigInner>,
+#[derive(Debug)]
+pub struct Config<D> {
+    pub(crate) inner: Arc<ConfigInner<D>>,
 }
 
-impl Config {
+impl<D> Clone for Config<D> {
+    fn clone(&self) -> Self {
+        Self { inner: self.inner.clone() }
+    }
+}
+
+impl<D> PartialEq for Config<D> {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner
+    }
+}
+
+impl<D> Eq for Config<D> {}
+
+impl<D: HasDisplayHandle> Config<D> {
     fn raw_attribute(&self, attrib: NSOpenGLPixelFormatAttribute) -> i32 {
         unsafe {
             let mut value = 0;
@@ -156,7 +171,7 @@ impl Config {
 }
 
 #[allow(deprecated)]
-impl GlConfig for Config {
+impl<D: HasDisplayHandle> GlConfig for Config<D> {
     fn color_buffer_type(&self) -> Option<ColorBufferType> {
         // On macos all color formats divide by 3 without reminder, except for the RGB
         // 565. So we can convert it in a hopefully reliable way. Also we should remove
@@ -209,37 +224,37 @@ impl GlConfig for Config {
     }
 }
 
-impl GetGlDisplay for Config {
-    type Target = Display;
+impl<D: HasDisplayHandle> GetGlDisplay for Config<D> {
+    type Target = Display<D>;
 
     fn display(&self) -> Self::Target {
         self.inner.display.clone()
     }
 }
 
-impl AsRawConfig for Config {
+impl<D: HasDisplayHandle> AsRawConfig for Config<D> {
     fn raw_config(&self) -> RawConfig {
         RawConfig::Cgl(Id::as_ptr(&self.inner.raw).cast())
     }
 }
 
-impl Sealed for Config {}
+impl<D: HasDisplayHandle> Sealed for Config<D> {}
 
-pub(crate) struct ConfigInner {
-    display: Display,
+pub(crate) struct ConfigInner<D> {
+    display: Display<D>,
     pub(crate) transparency: bool,
     pub(crate) raw: Id<NSOpenGLPixelFormat>,
 }
 
-impl PartialEq for ConfigInner {
+impl<D> PartialEq for ConfigInner<D> {
     fn eq(&self, other: &Self) -> bool {
         self.raw == other.raw
     }
 }
 
-impl Eq for ConfigInner {}
+impl<D> Eq for ConfigInner<D> {}
 
-impl fmt::Debug for ConfigInner {
+impl<D> fmt::Debug for ConfigInner<D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Config").field("id", &self.raw).finish()
     }

@@ -8,7 +8,7 @@ use std::os::raw::c_int;
 
 use glutin_wgl_sys::wgl::types::HGLRC;
 use glutin_wgl_sys::{wgl, wgl_extra};
-use raw_window_handle::RawWindowHandle;
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawWindowHandle};
 use windows_sys::Win32::Graphics::Gdi::{self as gdi, HDC};
 
 use crate::config::GetGlConfig;
@@ -26,21 +26,26 @@ use super::config::Config;
 use super::display::Display;
 use super::surface::Surface;
 
-impl Display {
-    pub(crate) unsafe fn create_context(
+impl<D: HasDisplayHandle> Display<D> {
+    pub(crate) fn create_context<W: HasWindowHandle>(
         &self,
-        config: &Config,
-        context_attributes: &ContextAttributes,
-    ) -> Result<NotCurrentContext> {
-        let hdc = match context_attributes.raw_window_handle.as_ref() {
-            handle @ Some(RawWindowHandle::Win32(window)) => unsafe {
-                let _ = config.apply_on_native_window(handle.unwrap());
-                gdi::GetDC(window.hwnd as _)
+        config: &Config<D>,
+        context_attributes: &ContextAttributes<W>,
+    ) -> Result<NotCurrentContext<D>> {
+        let hdc = match context_attributes
+            ._window
+            .as_ref()
+            .map(|w| w.window_handle().map(|w| w.as_raw()))
+            .transpose()?
+        {
+            Some(RawWindowHandle::Win32(window)) => unsafe {
+                let _ = config.apply_on_native_window(context_attributes._window.as_ref().unwrap());
+                gdi::GetDC(window.hwnd.get() as _)
             },
             _ => config.inner.hdc,
         };
 
-        let share_ctx = match context_attributes.shared_context {
+        let share_ctx = match context_attributes.inner.shared_context {
             Some(RawContext::Wgl(share)) => share,
             _ => std::ptr::null(),
         };
@@ -64,16 +69,16 @@ impl Display {
         };
 
         let config = config.clone();
-        let is_gles = matches!(context_attributes.api, Some(ContextApi::Gles(_)));
+        let is_gles = matches!(context_attributes.inner.api, Some(ContextApi::Gles(_)));
         let inner = ContextInner { display: self.clone(), config, raw: context, is_gles };
         Ok(NotCurrentContext { inner })
     }
 
-    fn create_context_arb(
+    fn create_context_arb<W: HasWindowHandle>(
         &self,
         hdc: HDC,
         share_context: HGLRC,
-        context_attributes: &ContextAttributes,
+        context_attributes: &ContextAttributes<W>,
     ) -> Result<WglContext> {
         let extra = self.inner.wgl_extra.as_ref().unwrap();
         let mut attrs = Vec::<c_int>::with_capacity(16);
@@ -81,10 +86,11 @@ impl Display {
         // Check whether the ES context creation is supported.
         let supports_es = self.inner.features.contains(DisplayFeatures::CREATE_ES_CONTEXT);
 
-        let (profile, version) = match context_attributes.api {
+        let (profile, version) = match context_attributes.inner.api {
             api @ Some(ContextApi::OpenGl(_)) | api @ None => {
                 let version = api.and_then(|api| api.version());
-                let (profile, version) = context::pick_profile(context_attributes.profile, version);
+                let (profile, version) =
+                    context::pick_profile(context_attributes.inner.profile, version);
                 let profile = match profile {
                     GlProfile::Core => wgl_extra::CONTEXT_CORE_PROFILE_BIT_ARB,
                     GlProfile::Compatibility => wgl_extra::CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
@@ -118,7 +124,7 @@ impl Display {
             attrs.push(version.minor as c_int);
         }
 
-        if let Some(profile) = context_attributes.profile {
+        if let Some(profile) = context_attributes.inner.profile {
             let profile = match profile {
                 GlProfile::Core => wgl_extra::CONTEXT_CORE_PROFILE_BIT_ARB,
                 GlProfile::Compatibility => wgl_extra::CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
@@ -131,7 +137,7 @@ impl Display {
         let mut flags: c_int = 0;
         let mut requested_no_error = false;
         if self.inner.features.contains(DisplayFeatures::CONTEXT_ROBUSTNESS) {
-            match context_attributes.robustness {
+            match context_attributes.inner.robustness {
                 Robustness::NotRobust => (),
                 Robustness::RobustNoResetNotification => {
                     attrs.push(wgl_extra::CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB as c_int);
@@ -156,7 +162,7 @@ impl Display {
                     requested_no_error = true;
                 },
             }
-        } else if context_attributes.robustness != Robustness::NotRobust {
+        } else if context_attributes.inner.robustness != Robustness::NotRobust {
             return Err(ErrorKind::NotSupported(
                 "WGL_ARB_create_context_robustness is not supported",
             )
@@ -164,7 +170,7 @@ impl Display {
         }
 
         // Debug flag.
-        if context_attributes.debug && !requested_no_error {
+        if context_attributes.inner.debug && !requested_no_error {
             flags |= wgl_extra::CONTEXT_DEBUG_BIT_ARB as c_int;
         }
 
@@ -175,7 +181,7 @@ impl Display {
 
         // Flush control.
         if self.inner.features.contains(DisplayFeatures::CONTEXT_RELEASE_BEHAVIOR) {
-            match context_attributes.release_behavior {
+            match context_attributes.inner.release_behavior {
                 // This is the default behavior in specification.
                 //
                 // XXX even though we check for extensions don't pass it because it could cause
@@ -186,7 +192,7 @@ impl Display {
                     attrs.push(wgl_extra::CONTEXT_RELEASE_BEHAVIOR_NONE_ARB as c_int);
                 },
             }
-        } else if context_attributes.release_behavior != ReleaseBehavior::Flush {
+        } else if context_attributes.inner.release_behavior != ReleaseBehavior::Flush {
             return Err(ErrorKind::NotSupported(
                 "flush control behavior WGL_ARB_context_flush_control",
             )
@@ -210,23 +216,23 @@ impl Display {
 /// A wrapper around the WGL context that is known to be not current to the
 /// calling thread.
 #[derive(Debug)]
-pub struct NotCurrentContext {
-    inner: ContextInner,
+pub struct NotCurrentContext<D> {
+    inner: ContextInner<D>,
 }
 
-impl Sealed for NotCurrentContext {}
+impl<D: HasDisplayHandle> Sealed for NotCurrentContext<D> {}
 
-impl NotCurrentContext {
-    fn new(inner: ContextInner) -> Self {
+impl<D> NotCurrentContext<D> {
+    fn new(inner: ContextInner<D>) -> Self {
         Self { inner }
     }
 }
 
-impl NotCurrentGlContext for NotCurrentContext {
-    type PossiblyCurrentContext = PossiblyCurrentContext;
-    type Surface<T: SurfaceTypeTrait> = Surface<T>;
+impl<D: HasDisplayHandle> NotCurrentGlContext for NotCurrentContext<D> {
+    type PossiblyCurrentContext = PossiblyCurrentContext<D>;
+    type Surface<T: SurfaceTypeTrait> = Surface<D, T>;
 
-    fn treat_as_possibly_current(self) -> PossiblyCurrentContext {
+    fn treat_as_possibly_current(self) -> PossiblyCurrentContext<D> {
         PossiblyCurrentContext { inner: self.inner, _nosendsync: PhantomData }
     }
 
@@ -247,29 +253,29 @@ impl NotCurrentGlContext for NotCurrentContext {
     }
 }
 
-impl GlContext for NotCurrentContext {
+impl<D: HasDisplayHandle> GlContext for NotCurrentContext<D> {
     fn context_api(&self) -> ContextApi {
         self.inner.context_api()
     }
 }
 
-impl GetGlDisplay for NotCurrentContext {
-    type Target = Display;
+impl<D: HasDisplayHandle> GetGlDisplay for NotCurrentContext<D> {
+    type Target = Display<D>;
 
     fn display(&self) -> Self::Target {
         self.inner.display.clone()
     }
 }
 
-impl GetGlConfig for NotCurrentContext {
-    type Target = Config;
+impl<D: HasDisplayHandle> GetGlConfig for NotCurrentContext<D> {
+    type Target = Config<D>;
 
     fn config(&self) -> Self::Target {
         self.inner.config.clone()
     }
 }
 
-impl AsRawContext for NotCurrentContext {
+impl<D: HasDisplayHandle> AsRawContext for NotCurrentContext<D> {
     fn raw_context(&self) -> RawContext {
         RawContext::Wgl(*self.inner.raw)
     }
@@ -277,15 +283,15 @@ impl AsRawContext for NotCurrentContext {
 
 /// A wrapper around WGL context that could be current to the calling thread.
 #[derive(Debug)]
-pub struct PossiblyCurrentContext {
-    inner: ContextInner,
+pub struct PossiblyCurrentContext<D> {
+    inner: ContextInner<D>,
     // The context could be current only on the one thread.
     _nosendsync: PhantomData<HGLRC>,
 }
 
-impl PossiblyCurrentGlContext for PossiblyCurrentContext {
-    type NotCurrentContext = NotCurrentContext;
-    type Surface<T: SurfaceTypeTrait> = Surface<T>;
+impl<D: HasDisplayHandle> PossiblyCurrentGlContext for PossiblyCurrentContext<D> {
+    type NotCurrentContext = NotCurrentContext<D>;
+    type Surface<T: SurfaceTypeTrait> = Surface<D, T>;
 
     fn make_not_current(self) -> Result<Self::NotCurrentContext> {
         unsafe {
@@ -317,44 +323,44 @@ impl PossiblyCurrentGlContext for PossiblyCurrentContext {
     }
 }
 
-impl Sealed for PossiblyCurrentContext {}
+impl<D: HasDisplayHandle> Sealed for PossiblyCurrentContext<D> {}
 
-impl GetGlDisplay for PossiblyCurrentContext {
-    type Target = Display;
+impl<D: HasDisplayHandle> GetGlDisplay for PossiblyCurrentContext<D> {
+    type Target = Display<D>;
 
     fn display(&self) -> Self::Target {
         self.inner.display.clone()
     }
 }
 
-impl GetGlConfig for PossiblyCurrentContext {
-    type Target = Config;
+impl<D: HasDisplayHandle> GetGlConfig for PossiblyCurrentContext<D> {
+    type Target = Config<D>;
 
     fn config(&self) -> Self::Target {
         self.inner.config.clone()
     }
 }
 
-impl GlContext for PossiblyCurrentContext {
+impl<D: HasDisplayHandle> GlContext for PossiblyCurrentContext<D> {
     fn context_api(&self) -> ContextApi {
         self.inner.context_api()
     }
 }
 
-impl AsRawContext for PossiblyCurrentContext {
+impl<D: HasDisplayHandle> AsRawContext for PossiblyCurrentContext<D> {
     fn raw_context(&self) -> RawContext {
         RawContext::Wgl(*self.inner.raw)
     }
 }
 
-struct ContextInner {
-    display: Display,
-    config: Config,
+struct ContextInner<D> {
+    display: Display<D>,
+    config: Config<D>,
     raw: WglContext,
     is_gles: bool,
 }
 
-impl fmt::Debug for ContextInner {
+impl<D> fmt::Debug for ContextInner<D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Context")
             .field("config", &self.config.inner.pixel_format_index)
@@ -376,16 +382,16 @@ impl Deref for WglContext {
 
 unsafe impl Send for WglContext {}
 
-impl ContextInner {
+impl<D: HasDisplayHandle> ContextInner<D> {
     fn make_current_draw_read<T: SurfaceTypeTrait>(
         &self,
-        _surface_draw: &Surface<T>,
-        _surface_read: &Surface<T>,
+        _surface_draw: &Surface<D, T>,
+        _surface_read: &Surface<D, T>,
     ) -> ErrorKind {
         ErrorKind::NotSupported("make_current_draw_read is not supported by WGL")
     }
 
-    fn make_current<T: SurfaceTypeTrait>(&self, surface: &Surface<T>) -> Result<()> {
+    fn make_current<T: SurfaceTypeTrait>(&self, surface: &Surface<D, T>) -> Result<()> {
         unsafe {
             if wgl::MakeCurrent(surface.hdc as _, self.raw.cast()) == 0 {
                 Err(IoError::last_os_error().into())
@@ -404,7 +410,7 @@ impl ContextInner {
     }
 }
 
-impl Drop for ContextInner {
+impl<D> Drop for ContextInner<D> {
     fn drop(&mut self) {
         unsafe {
             wgl::DeleteContext(*self.raw);

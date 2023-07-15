@@ -81,3 +81,29 @@ pub(crate) mod private {
 
     pub(crate) use gl_api_dispatch;
 }
+
+/// The absence of a display handle.
+#[derive(Debug, Clone, Copy)]
+pub struct NoDisplay(core::convert::Infallible);
+
+impl raw_window_handle::HasDisplayHandle for NoDisplay {
+    fn display_handle(
+        &self,
+    ) -> std::result::Result<raw_window_handle::DisplayHandle<'_>, raw_window_handle::HandleError>
+    {
+        match self.0 {}
+    }
+}
+
+/// The absence of a window handle.
+#[derive(Debug, Clone, Copy)]
+pub struct NoWindow(core::convert::Infallible);
+
+impl raw_window_handle::HasWindowHandle for NoWindow {
+    fn window_handle(
+        &self,
+    ) -> std::result::Result<raw_window_handle::WindowHandle<'_>, raw_window_handle::HandleError>
+    {
+        match self.0 {}
+    }
+}

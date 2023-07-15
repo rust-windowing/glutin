@@ -3,7 +3,7 @@
 #![allow(unreachable_patterns)]
 use std::ffi;
 
-use raw_window_handle::RawWindowHandle;
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
 use crate::config::{Config, GetGlConfig};
 use crate::display::{Display, GetGlDisplay};
@@ -126,7 +126,7 @@ pub trait AsRawContext {
 /// The builder to help customizing context
 #[derive(Default, Debug, Clone)]
 pub struct ContextAttributesBuilder {
-    attributes: ContextAttributes,
+    attributes: AttributesInner,
 }
 
 impl ContextAttributesBuilder {
@@ -203,21 +203,27 @@ impl ContextAttributesBuilder {
 
     /// Build the context attributes.
     ///
-    /// The `raw_window_handle` isn't required and here for WGL compatibility.
+    /// This adds the window handle to the attributes.
     ///
     /// # Api-specific
     ///
     /// - **WGL:** you **must** pass a `raw_window_handle` if you plan to use
     ///   this context with that window.
-    pub fn build(mut self, raw_window_handle: Option<RawWindowHandle>) -> ContextAttributes {
-        self.attributes.raw_window_handle = raw_window_handle;
-        self.attributes
+    pub fn build<W: HasWindowHandle>(self, window_handle: Option<W>) -> ContextAttributes<W> {
+        ContextAttributes { inner: self.attributes, _window: window_handle }
     }
 }
 
 /// The attributes that are used to create a graphics context.
 #[derive(Default, Debug, Clone)]
-pub struct ContextAttributes {
+pub struct ContextAttributes<W> {
+    pub(crate) inner: AttributesInner,
+    pub(crate) _window: Option<W>,
+}
+
+/// The inner context attributes.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct AttributesInner {
     pub(crate) release_behavior: ReleaseBehavior,
 
     pub(crate) debug: bool,
@@ -229,8 +235,6 @@ pub struct ContextAttributes {
     pub(crate) api: Option<ContextApi>,
 
     pub(crate) shared_context: Option<RawContext>,
-
-    pub(crate) raw_window_handle: Option<RawWindowHandle>,
 }
 
 /// Specifies the tolerance of the OpenGL context to faults. If you accept
@@ -352,35 +356,35 @@ pub enum ReleaseBehavior {
 ///
 /// ```no_run
 /// fn test_send<T: Send>() {}
-/// test_send::<glutin::context::NotCurrentContext>();
+/// test_send::<glutin::context::NotCurrentContext<glutin::NoDisplay>>();
 /// ```
 /// However it's not `Sync`.
 /// ```compile_fail
 /// fn test_sync<T: Sync>() {}
-/// test_sync::<glutin::context::NotCurrentContext>();
+/// test_sync::<glutin::context::NotCurrentContext<glutin::NoDisplay>>();
 /// ```
 #[derive(Debug)]
-pub enum NotCurrentContext {
+pub enum NotCurrentContext<D> {
     /// The EGL context.
     #[cfg(egl_backend)]
-    Egl(NotCurrentEglContext),
+    Egl(NotCurrentEglContext<D>),
 
     /// The GLX context.
     #[cfg(glx_backend)]
-    Glx(NotCurrentGlxContext),
+    Glx(NotCurrentGlxContext<D>),
 
     /// The WGL context.
     #[cfg(wgl_backend)]
-    Wgl(NotCurrentWglContext),
+    Wgl(NotCurrentWglContext<D>),
 
     /// The CGL context.
     #[cfg(cgl_backend)]
-    Cgl(NotCurrentCglContext),
+    Cgl(NotCurrentCglContext<D>),
 }
 
-impl NotCurrentGlContext for NotCurrentContext {
-    type PossiblyCurrentContext = PossiblyCurrentContext;
-    type Surface<T: SurfaceTypeTrait> = Surface<T>;
+impl<D: HasDisplayHandle> NotCurrentGlContext for NotCurrentContext<D> {
+    type PossiblyCurrentContext = PossiblyCurrentContext<D>;
+    type Surface<T: SurfaceTypeTrait> = Surface<D, T>;
 
     fn treat_as_possibly_current(self) -> Self::PossiblyCurrentContext {
         gl_api_dispatch!(self; Self(context) => context.treat_as_possibly_current(); as PossiblyCurrentContext)
@@ -438,35 +442,35 @@ impl NotCurrentGlContext for NotCurrentContext {
     }
 }
 
-impl GlContext for NotCurrentContext {
+impl<D: HasDisplayHandle> GlContext for NotCurrentContext<D> {
     fn context_api(&self) -> ContextApi {
         gl_api_dispatch!(self; Self(context) => context.context_api())
     }
 }
 
-impl GetGlConfig for NotCurrentContext {
-    type Target = Config;
+impl<D: HasDisplayHandle> GetGlConfig for NotCurrentContext<D> {
+    type Target = Config<D>;
 
     fn config(&self) -> Self::Target {
         gl_api_dispatch!(self; Self(context) => context.config(); as Config)
     }
 }
 
-impl GetGlDisplay for NotCurrentContext {
-    type Target = Display;
+impl<D: HasDisplayHandle> GetGlDisplay for NotCurrentContext<D> {
+    type Target = Display<D>;
 
     fn display(&self) -> Self::Target {
         gl_api_dispatch!(self; Self(context) => context.display(); as Display)
     }
 }
 
-impl AsRawContext for NotCurrentContext {
+impl<D: HasDisplayHandle> AsRawContext for NotCurrentContext<D> {
     fn raw_context(&self) -> RawContext {
         gl_api_dispatch!(self; Self(context) => context.raw_context())
     }
 }
 
-impl Sealed for NotCurrentContext {}
+impl<D: HasDisplayHandle> Sealed for NotCurrentContext<D> {}
 
 /// A context that is possibly current on the current thread.
 ///
@@ -485,27 +489,27 @@ impl Sealed for NotCurrentContext {}
 ///
 /// [make it not current]: crate::context::PossiblyCurrentGlContext::make_not_current
 #[derive(Debug)]
-pub enum PossiblyCurrentContext {
+pub enum PossiblyCurrentContext<D> {
     /// The EGL context.
     #[cfg(egl_backend)]
-    Egl(PossiblyCurrentEglContext),
+    Egl(PossiblyCurrentEglContext<D>),
 
     /// The GLX context.
     #[cfg(glx_backend)]
-    Glx(PossiblyCurrentGlxContext),
+    Glx(PossiblyCurrentGlxContext<D>),
 
     /// The WGL context.
     #[cfg(wgl_backend)]
-    Wgl(PossiblyCurrentWglContext),
+    Wgl(PossiblyCurrentWglContext<D>),
 
     /// The CGL context.
     #[cfg(cgl_backend)]
-    Cgl(PossiblyCurrentCglContext),
+    Cgl(PossiblyCurrentCglContext<D>),
 }
 
-impl PossiblyCurrentGlContext for PossiblyCurrentContext {
-    type NotCurrentContext = NotCurrentContext;
-    type Surface<T: SurfaceTypeTrait> = Surface<T>;
+impl<D: HasDisplayHandle> PossiblyCurrentGlContext for PossiblyCurrentContext<D> {
+    type NotCurrentContext = NotCurrentContext<D>;
+    type Surface<T: SurfaceTypeTrait> = Surface<D, T>;
 
     fn is_current(&self) -> bool {
         gl_api_dispatch!(self; Self(context) => context.is_current())
@@ -558,35 +562,35 @@ impl PossiblyCurrentGlContext for PossiblyCurrentContext {
     }
 }
 
-impl GlContext for PossiblyCurrentContext {
+impl<D: HasDisplayHandle> GlContext for PossiblyCurrentContext<D> {
     fn context_api(&self) -> ContextApi {
         gl_api_dispatch!(self; Self(context) => context.context_api())
     }
 }
 
-impl GetGlConfig for PossiblyCurrentContext {
-    type Target = Config;
+impl<D: HasDisplayHandle> GetGlConfig for PossiblyCurrentContext<D> {
+    type Target = Config<D>;
 
     fn config(&self) -> Self::Target {
         gl_api_dispatch!(self; Self(context) => context.config(); as Config)
     }
 }
 
-impl GetGlDisplay for PossiblyCurrentContext {
-    type Target = Display;
+impl<D: HasDisplayHandle> GetGlDisplay for PossiblyCurrentContext<D> {
+    type Target = Display<D>;
 
     fn display(&self) -> Self::Target {
         gl_api_dispatch!(self; Self(context) => context.display(); as Display)
     }
 }
 
-impl AsRawContext for PossiblyCurrentContext {
+impl<D: HasDisplayHandle> AsRawContext for PossiblyCurrentContext<D> {
     fn raw_context(&self) -> RawContext {
         gl_api_dispatch!(self; Self(context) => context.raw_context())
     }
 }
 
-impl Sealed for PossiblyCurrentContext {}
+impl<D: HasDisplayHandle> Sealed for PossiblyCurrentContext<D> {}
 
 /// Raw context.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

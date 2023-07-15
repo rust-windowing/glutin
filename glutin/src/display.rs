@@ -6,7 +6,7 @@ use std::ffi::{self, CStr};
 use std::fmt;
 
 use bitflags::bitflags;
-use raw_window_handle::RawDisplayHandle;
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
 use crate::config::{Config, ConfigTemplate, GlConfig};
 use crate::context::{ContextAttributes, NotCurrentContext, NotCurrentGlContext};
@@ -30,7 +30,7 @@ use crate::api::wgl::display::Display as WglDisplay;
 /// A trait to group common display operations.
 pub trait GlDisplay: Sealed {
     /// A window surface created by the display.
-    type WindowSurface: GlSurface<WindowSurface>;
+    type WindowSurface<W: HasWindowHandle>: GlSurface<WindowSurface<W>>;
     /// A pixmap surface created by the display.
     type PixmapSurface: GlSurface<PixmapSurface>;
     /// A pbuffer surface created by the display.
@@ -41,25 +41,12 @@ pub trait GlDisplay: Sealed {
     type NotCurrentContext: NotCurrentGlContext;
 
     /// Find configurations matching the given `template`.
-    ///
-    /// # Safety
-    ///
-    /// Some platforms use [`RawWindowHandle`] to pick configs, so it
-    /// must point to a valid object if it was passed on
-    /// [`crate::config::ConfigTemplate`].
-    ///
-    /// [`RawWindowHandle`]: raw_window_handle::RawWindowHandle
-    unsafe fn find_configs(
+    fn find_configs<W: HasWindowHandle>(
         &self,
-        template: ConfigTemplate,
+        template: ConfigTemplate<W>,
     ) -> Result<Box<dyn Iterator<Item = Self::Config> + '_>>;
 
     /// Create the graphics platform context.
-    ///
-    /// # Safety
-    ///
-    /// Some platforms use [`RawWindowHandle`] for context creation, so it must
-    /// point to a valid object.
     ///
     /// # Platform-specific
     ///
@@ -69,26 +56,19 @@ pub trait GlDisplay: Sealed {
     ///   [`GlSurface::swap_buffers`]. To workaround this behavior the current
     ///   context should be made [`not current`].
     ///
-    /// [`RawWindowHandle`]: raw_window_handle::RawWindowHandle
     /// [`not current`]: crate::context::PossiblyCurrentGlContext::make_not_current
-    unsafe fn create_context(
+    fn create_context<W: HasWindowHandle>(
         &self,
         config: &Self::Config,
-        context_attributes: &ContextAttributes,
+        context_attributes: &ContextAttributes<W>,
     ) -> Result<Self::NotCurrentContext>;
 
     /// Create the surface that can be used to render into native window.
-    ///
-    /// # Safety
-    ///
-    /// The [`RawWindowHandle`] must point to a valid object.
-    ///
-    /// [`RawWindowHandle`]: raw_window_handle::RawWindowHandle
-    unsafe fn create_window_surface(
+    fn create_window_surface<W: HasWindowHandle>(
         &self,
         config: &Self::Config,
-        surface_attributes: &SurfaceAttributes<WindowSurface>,
-    ) -> Result<Self::WindowSurface>;
+        surface_attributes: SurfaceAttributes<WindowSurface<W>>,
+    ) -> Result<Self::WindowSurface<W>>;
 
     /// Create the surface that can be used to render into pbuffer.
     ///
@@ -99,7 +79,7 @@ pub trait GlDisplay: Sealed {
     unsafe fn create_pbuffer_surface(
         &self,
         config: &Self::Config,
-        surface_attributes: &SurfaceAttributes<PbufferSurface>,
+        surface_attributes: SurfaceAttributes<PbufferSurface>,
     ) -> Result<Self::PbufferSurface>;
 
     /// Create the surface that can be used to render into pixmap.
@@ -112,7 +92,7 @@ pub trait GlDisplay: Sealed {
     unsafe fn create_pixmap_surface(
         &self,
         config: &Self::Config,
-        surface_attributes: &SurfaceAttributes<PixmapSurface>,
+        surface_attributes: SurfaceAttributes<PixmapSurface>,
     ) -> Result<Self::PixmapSurface>;
 
     /// Return the address of an OpenGL function.
@@ -171,169 +151,200 @@ pub trait AsRawDisplay {
 /// ```no_run
 /// fn test_send<T: Send>() {}
 /// fn test_sync<T: Sync>() {}
-/// test_send::<glutin::display::Display>();
-/// test_sync::<glutin::display::Display>();
+/// test_send::<glutin::display::Display<glutin::NoDisplay>>();
+/// test_sync::<glutin::display::Display<glutin::NoDisplay>>();
 /// ```
-#[derive(Debug, Clone)]
-pub enum Display {
+#[derive(Debug)]
+pub enum Display<D> {
     /// The EGL display.
     #[cfg(egl_backend)]
-    Egl(EglDisplay),
+    Egl(EglDisplay<D>),
 
     /// The GLX display.
     #[cfg(glx_backend)]
-    Glx(GlxDisplay),
+    Glx(GlxDisplay<D>),
 
     /// The WGL display.
     #[cfg(wgl_backend)]
-    Wgl(WglDisplay),
+    Wgl(WglDisplay<D>),
 
     /// The CGL display.
     #[cfg(cgl_backend)]
-    Cgl(CglDisplay),
+    Cgl(CglDisplay<D>),
 }
 
-impl Display {
+impl<D> Clone for Display<D> {
+    fn clone(&self) -> Self {
+        match self {
+            #[cfg(egl_backend)]
+            Self::Egl(display) => Self::Egl(display.clone()),
+            #[cfg(glx_backend)]
+            Self::Glx(display) => Self::Glx(display.clone()),
+            #[cfg(wgl_backend)]
+            Self::Wgl(display) => Self::Wgl(display.clone()),
+            #[cfg(cgl_backend)]
+            Self::Cgl(display) => Self::Cgl(display.clone()),
+        }
+    }
+}
+
+impl<D: HasDisplayHandle> Display<D> {
     /// Create a graphics platform display from the given raw display handle.
     ///
     /// The display mixing isn't supported, so if you created EGL display you
     /// can't use it with the GLX display objects. Interaction between those
     /// will result in a runtime panic.
-    ///
-    /// # Safety
-    ///
-    /// The `display` must point to the valid platform display and be valid for
-    /// the entire lifetime of all Objects created with that display.
-    ///
-    /// The `preference` must contain pointers to the valid values if GLX or WGL
-    /// specific options were used.
-    pub unsafe fn new(display: RawDisplayHandle, preference: DisplayApiPreference) -> Result<Self> {
+    pub fn new(display: D, preference: DisplayApiPreference<'_>) -> Result<Self> {
         match preference {
             #[cfg(egl_backend)]
-            DisplayApiPreference::Egl => unsafe { Ok(Self::Egl(EglDisplay::new(display)?)) },
+            DisplayApiPreference::Egl => Ok(Self::Egl(EglDisplay::new(display)?)),
             #[cfg(glx_backend)]
-            DisplayApiPreference::Glx(registrar) => unsafe {
+            DisplayApiPreference::Glx(registrar) => {
                 Ok(Self::Glx(GlxDisplay::new(display, registrar)?))
             },
             #[cfg(all(egl_backend, glx_backend))]
-            DisplayApiPreference::GlxThenEgl(registrar) => unsafe {
-                if let Ok(display) = GlxDisplay::new(display, registrar) {
-                    Ok(Self::Glx(display))
-                } else {
-                    Ok(Self::Egl(EglDisplay::new(display)?))
+            DisplayApiPreference::GlxThenEgl(registrar) => {
+                match GlxDisplay::new_with_display(display, registrar) {
+                    Ok(display) => Ok(Self::Glx(display)),
+                    Err(err) => Ok(Self::Egl(EglDisplay::new_with_display(err.display)?)),
                 }
             },
             #[cfg(all(egl_backend, glx_backend))]
-            DisplayApiPreference::EglThenGlx(registrar) => unsafe {
-                if let Ok(display) = EglDisplay::new(display) {
-                    Ok(Self::Egl(display))
-                } else {
-                    Ok(Self::Glx(GlxDisplay::new(display, registrar)?))
+            DisplayApiPreference::EglThenGlx(registrar) => {
+                match EglDisplay::new_with_display(display) {
+                    Ok(display) => Ok(Self::Egl(display)),
+                    Err(err) => {
+                        Ok(Self::Glx(GlxDisplay::new_with_display(err.display, registrar)?))
+                    },
                 }
             },
             #[cfg(wgl_backend)]
-            DisplayApiPreference::Wgl(window_handle) => unsafe {
+            DisplayApiPreference::Wgl(window_handle) => {
                 Ok(Self::Wgl(WglDisplay::new(display, window_handle)?))
             },
             #[cfg(all(egl_backend, wgl_backend))]
-            DisplayApiPreference::EglThenWgl(window_handle) => unsafe {
-                if let Ok(display) = EglDisplay::new(display) {
-                    Ok(Self::Egl(display))
-                } else {
-                    Ok(Self::Wgl(WglDisplay::new(display, window_handle)?))
+            DisplayApiPreference::EglThenWgl(window_handle) => {
+                match EglDisplay::new_with_display(display) {
+                    Ok(display) => Ok(Self::Egl(display)),
+                    Err(err) => {
+                        Ok(Self::Wgl(WglDisplay::new_with_display(err.display, window_handle)?))
+                    },
                 }
             },
             #[cfg(all(egl_backend, wgl_backend))]
-            DisplayApiPreference::WglThenEgl(window_handle) => unsafe {
-                if let Ok(display) = WglDisplay::new(display, window_handle) {
-                    Ok(Self::Wgl(display))
-                } else {
-                    Ok(Self::Egl(EglDisplay::new(display)?))
+            DisplayApiPreference::WglThenEgl(window_handle) => {
+                match WglDisplay::new_with_display(display, window_handle) {
+                    Ok(display) => Ok(Self::Wgl(display)),
+                    Err(err) => Ok(Self::Egl(EglDisplay::new_with_display(err.display)?)),
                 }
             },
             #[cfg(cgl_backend)]
-            DisplayApiPreference::Cgl => unsafe { Ok(Self::Cgl(CglDisplay::new(display)?)) },
+            DisplayApiPreference::Cgl => Ok(Self::Cgl(CglDisplay::new(display)?)),
+            DisplayApiPreference::__CaptureLifetime(_) => unreachable!(),
+        }
+    }
+
+    /// Get the display underpinning this type.
+    pub fn display(&self) -> &D {
+        match self {
+            #[cfg(egl_backend)]
+            Self::Egl(display) => display.display(),
+            #[cfg(glx_backend)]
+            Self::Glx(display) => display.display(),
+            #[cfg(wgl_backend)]
+            Self::Wgl(display) => display.display(),
+            #[cfg(cgl_backend)]
+            Self::Cgl(display) => display.display(),
         }
     }
 }
 
-impl GlDisplay for Display {
-    type Config = Config;
-    type NotCurrentContext = NotCurrentContext;
-    type PbufferSurface = Surface<PbufferSurface>;
-    type PixmapSurface = Surface<PixmapSurface>;
-    type WindowSurface = Surface<WindowSurface>;
+impl<D: HasDisplayHandle> AsRef<D> for Display<D> {
+    #[inline]
+    fn as_ref(&self) -> &D {
+        self.display()
+    }
+}
 
-    unsafe fn find_configs(
+impl<D: HasDisplayHandle> HasDisplayHandle for Display<D> {
+    #[inline]
+    fn display_handle(
         &self,
-        template: ConfigTemplate,
+    ) -> std::result::Result<raw_window_handle::DisplayHandle<'_>, raw_window_handle::HandleError>
+    {
+        self.display().display_handle()
+    }
+}
+
+impl<D: HasDisplayHandle> GlDisplay for Display<D> {
+    type Config = Config<D>;
+    type NotCurrentContext = NotCurrentContext<D>;
+    type PbufferSurface = Surface<D, PbufferSurface>;
+    type PixmapSurface = Surface<D, PixmapSurface>;
+    type WindowSurface<W: HasWindowHandle> = Surface<D, WindowSurface<W>>;
+
+    fn find_configs<W: HasWindowHandle>(
+        &self,
+        template: ConfigTemplate<W>,
     ) -> Result<Box<dyn Iterator<Item = Self::Config> + '_>> {
         match self {
             #[cfg(egl_backend)]
-            Self::Egl(display) => unsafe {
-                Ok(Box::new(display.find_configs(template)?.map(Config::Egl)))
-            },
+            Self::Egl(display) => Ok(Box::new(display.find_configs(template)?.map(Config::Egl))),
             #[cfg(glx_backend)]
-            Self::Glx(display) => unsafe {
-                Ok(Box::new(display.find_configs(template)?.map(Config::Glx)))
-            },
+            Self::Glx(display) => Ok(Box::new(display.find_configs(template)?.map(Config::Glx))),
             #[cfg(wgl_backend)]
-            Self::Wgl(display) => unsafe {
-                Ok(Box::new(display.find_configs(template)?.map(Config::Wgl)))
-            },
+            Self::Wgl(display) => Ok(Box::new(display.find_configs(template)?.map(Config::Wgl))),
             #[cfg(cgl_backend)]
-            Self::Cgl(display) => unsafe {
-                Ok(Box::new(display.find_configs(template)?.map(Config::Cgl)))
-            },
+            Self::Cgl(display) => Ok(Box::new(display.find_configs(template)?.map(Config::Cgl))),
         }
     }
 
-    unsafe fn create_context(
+    fn create_context<W: HasWindowHandle>(
         &self,
         config: &Self::Config,
-        context_attributes: &ContextAttributes,
+        context_attributes: &ContextAttributes<W>,
     ) -> Result<Self::NotCurrentContext> {
         match (self, config) {
             #[cfg(egl_backend)]
-            (Self::Egl(display), Config::Egl(config)) => unsafe {
+            (Self::Egl(display), Config::Egl(config)) => {
                 Ok(NotCurrentContext::Egl(display.create_context(config, context_attributes)?))
             },
             #[cfg(glx_backend)]
-            (Self::Glx(display), Config::Glx(config)) => unsafe {
+            (Self::Glx(display), Config::Glx(config)) => {
                 Ok(NotCurrentContext::Glx(display.create_context(config, context_attributes)?))
             },
             #[cfg(wgl_backend)]
-            (Self::Wgl(display), Config::Wgl(config)) => unsafe {
+            (Self::Wgl(display), Config::Wgl(config)) => {
                 Ok(NotCurrentContext::Wgl(display.create_context(config, context_attributes)?))
             },
             #[cfg(cgl_backend)]
-            (Self::Cgl(display), Config::Cgl(config)) => unsafe {
+            (Self::Cgl(display), Config::Cgl(config)) => {
                 Ok(NotCurrentContext::Cgl(display.create_context(config, context_attributes)?))
             },
             _ => unreachable!(),
         }
     }
 
-    unsafe fn create_window_surface(
+    fn create_window_surface<W: HasWindowHandle>(
         &self,
         config: &Self::Config,
-        surface_attributes: &SurfaceAttributes<WindowSurface>,
-    ) -> Result<Self::WindowSurface> {
+        surface_attributes: SurfaceAttributes<WindowSurface<W>>,
+    ) -> Result<Self::WindowSurface<W>> {
         match (self, config) {
             #[cfg(egl_backend)]
-            (Self::Egl(display), Config::Egl(config)) => unsafe {
+            (Self::Egl(display), Config::Egl(config)) => {
                 Ok(Surface::Egl(display.create_window_surface(config, surface_attributes)?))
             },
             #[cfg(glx_backend)]
-            (Self::Glx(display), Config::Glx(config)) => unsafe {
+            (Self::Glx(display), Config::Glx(config)) => {
                 Ok(Surface::Glx(display.create_window_surface(config, surface_attributes)?))
             },
             #[cfg(wgl_backend)]
-            (Self::Wgl(display), Config::Wgl(config)) => unsafe {
+            (Self::Wgl(display), Config::Wgl(config)) => {
                 Ok(Surface::Wgl(display.create_window_surface(config, surface_attributes)?))
             },
             #[cfg(cgl_backend)]
-            (Self::Cgl(display), Config::Cgl(config)) => unsafe {
+            (Self::Cgl(display), Config::Cgl(config)) => {
                 Ok(Surface::Cgl(display.create_window_surface(config, surface_attributes)?))
             },
             _ => unreachable!(),
@@ -343,7 +354,7 @@ impl GlDisplay for Display {
     unsafe fn create_pbuffer_surface(
         &self,
         config: &Self::Config,
-        surface_attributes: &SurfaceAttributes<PbufferSurface>,
+        surface_attributes: SurfaceAttributes<PbufferSurface>,
     ) -> Result<Self::PbufferSurface> {
         match (self, config) {
             #[cfg(egl_backend)]
@@ -369,7 +380,7 @@ impl GlDisplay for Display {
     unsafe fn create_pixmap_surface(
         &self,
         config: &Self::Config,
-        surface_attributes: &SurfaceAttributes<PixmapSurface>,
+        surface_attributes: SurfaceAttributes<PixmapSurface>,
     ) -> Result<Self::PixmapSurface> {
         match (self, config) {
             #[cfg(egl_backend)]
@@ -405,16 +416,16 @@ impl GlDisplay for Display {
     }
 }
 
-impl AsRawDisplay for Display {
+impl<D: HasDisplayHandle> AsRawDisplay for Display<D> {
     fn raw_display(&self) -> RawDisplay {
         gl_api_dispatch!(self; Self(display) => display.raw_display())
     }
 }
 
-impl Sealed for Display {}
+impl<D: HasDisplayHandle> Sealed for Display<D> {}
 
 /// Preference of the display that should be used.
-pub enum DisplayApiPreference {
+pub enum DisplayApiPreference<'a> {
     /// Use only EGL.
     ///
     /// The EGL is a cross platform recent OpenGL platform. That being said
@@ -455,7 +466,7 @@ pub enum DisplayApiPreference {
     /// When raw window handle isn't provided the display will lack extensions
     /// support and most features will be lacking.
     #[cfg(wgl_backend)]
-    Wgl(Option<raw_window_handle::RawWindowHandle>),
+    Wgl(Option<raw_window_handle::WindowHandle<'a>>),
 
     /// Use only CGL.
     ///
@@ -488,7 +499,7 @@ pub enum DisplayApiPreference {
     /// [`Egl`]: Self::Egl
     /// [`Wgl`]: Self::Wgl
     #[cfg(all(egl_backend, wgl_backend))]
-    EglThenWgl(Option<raw_window_handle::RawWindowHandle>),
+    EglThenWgl(Option<raw_window_handle::WindowHandle<'a>>),
 
     /// Prefer WGL and fallback to EGL.
     ///
@@ -497,10 +508,14 @@ pub enum DisplayApiPreference {
     /// [`Egl`]: Self::Egl
     /// [`Wgl`]: Self::Wgl
     #[cfg(all(egl_backend, wgl_backend))]
-    WglThenEgl(Option<raw_window_handle::RawWindowHandle>),
+    WglThenEgl(Option<raw_window_handle::WindowHandle<'a>>),
+
+    /// Hidden option to capture the lifetime.
+    #[doc(hidden)]
+    __CaptureLifetime(std::marker::PhantomData<&'a ()>),
 }
 
-impl fmt::Debug for DisplayApiPreference {
+impl fmt::Debug for DisplayApiPreference<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let api = match self {
             #[cfg(egl_backend)]
@@ -519,6 +534,7 @@ impl fmt::Debug for DisplayApiPreference {
             DisplayApiPreference::WglThenEgl(_) => "WglThenEgl",
             #[cfg(cgl_backend)]
             DisplayApiPreference::Cgl => "Cgl",
+            DisplayApiPreference::__CaptureLifetime(_) => unreachable!(),
         };
 
         f.write_fmt(format_args!("DisplayApiPreference::{api}"))
@@ -590,3 +606,40 @@ pub enum RawDisplay {
     #[cfg(cgl_backend)]
     Cgl,
 }
+
+#[cfg_attr(cgl_backend, allow(dead_code))]
+pub(crate) struct DisplayError<D> {
+    /// The error that occurred.
+    pub(crate) error: crate::error::Error,
+
+    /// The display that caused the error.
+    pub(crate) display: D,
+}
+
+impl<D> DisplayError<Option<D>> {
+    #[allow(unused)]
+    pub(crate) fn unwrap(self) -> DisplayError<D> {
+        DisplayError { error: self.error, display: self.display.unwrap() }
+    }
+}
+
+impl<D> From<DisplayError<D>> for crate::error::Error {
+    fn from(value: DisplayError<D>) -> Self {
+        value.error
+    }
+}
+
+impl<D> From<(crate::error::Error, D)> for DisplayError<D> {
+    fn from(value: (crate::error::Error, D)) -> Self {
+        Self { error: value.0, display: value.1 }
+    }
+}
+
+impl<D> From<(crate::error::ErrorKind, D)> for DisplayError<D> {
+    fn from(value: (crate::error::ErrorKind, D)) -> Self {
+        Self { error: value.0.into(), display: value.1 }
+    }
+}
+
+#[cfg_attr(cgl_backend, allow(dead_code))]
+pub(crate) type DisplayResult<T, D> = std::result::Result<T, DisplayError<D>>;

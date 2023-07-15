@@ -5,7 +5,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 use std::{fmt, mem};
 
-use raw_window_handle::RawWindowHandle;
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawWindowHandle};
 
 use glutin_egl_sys::egl;
 use glutin_egl_sys::egl::types::{EGLConfig, EGLint};
@@ -23,11 +23,13 @@ use crate::platform::x11::{X11GlConfigExt, X11VisualInfo};
 
 use super::display::Display;
 
-impl Display {
-    pub(crate) unsafe fn find_configs(
+impl<D: HasDisplayHandle> Display<D> {
+    pub(crate) fn find_configs<W: HasWindowHandle>(
         &self,
-        template: ConfigTemplate,
-    ) -> Result<Box<dyn Iterator<Item = Config> + '_>> {
+        template: ConfigTemplate<W>,
+    ) -> Result<Box<dyn Iterator<Item = Config<D>> + '_>> {
+        use raw_window_handle::{XcbWindowHandle, XlibWindowHandle};
+
         let mut config_attributes = Vec::<EGLint>::new();
 
         // Add color buffer type.
@@ -183,6 +185,8 @@ impl Display {
             found_configs.set_len(configs_number as usize);
         }
 
+        let raw_handle =
+            template._native_window.map(|w| w.window_handle().map(|w| w.as_raw())).transpose()?;
         let configs = found_configs
             .into_iter()
             .map(move |raw| {
@@ -195,12 +199,15 @@ impl Display {
                 //
                 // XXX This can't be done by passing visual in the EGL attributes
                 // when calling `eglChooseConfig` since the visual is ignored.
-                match template.native_window {
-                    Some(RawWindowHandle::Xcb(xcb)) if xcb.visual_id > 0 => {
-                        xcb.visual_id as u32 == config.native_visual()
-                    },
-                    Some(RawWindowHandle::Xlib(xlib)) if xlib.visual_id > 0 => {
-                        xlib.visual_id as u32 == config.native_visual()
+                match raw_handle {
+                    Some(RawWindowHandle::Xcb(XcbWindowHandle {
+                        visual_id: Some(visual_id),
+                        ..
+                    })) => visual_id.get() == config.native_visual(),
+                    Some(RawWindowHandle::Xlib(XlibWindowHandle { visual_id, .. }))
+                        if visual_id > 0 =>
+                    {
+                        visual_id as u32 == config.native_visual()
                     },
                     _ => true,
                 }
@@ -223,12 +230,26 @@ impl Display {
 
 /// A simple wrapper around `EGLConfig` that could be used with `EGLContext`
 /// and `EGLSurface`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Config {
-    pub(crate) inner: Arc<ConfigInner>,
+#[derive(Debug)]
+pub struct Config<D> {
+    pub(crate) inner: Arc<ConfigInner<D>>,
 }
 
-impl Config {
+impl<D> Clone for Config<D> {
+    fn clone(&self) -> Self {
+        Self { inner: self.inner.clone() }
+    }
+}
+
+impl<D> PartialEq for Config<D> {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner
+    }
+}
+
+impl<D> Eq for Config<D> {}
+
+impl<D: HasDisplayHandle> Config<D> {
     /// The native visual identifier.
     ///
     /// The interpretation of this value is platform dependant. Consult
@@ -254,7 +275,7 @@ impl Config {
     }
 }
 
-impl GlConfig for Config {
+impl<D: HasDisplayHandle> GlConfig for Config<D> {
     fn color_buffer_type(&self) -> Option<ColorBufferType> {
         unsafe {
             match self.raw_attribute(egl::COLOR_BUFFER_TYPE as EGLint) as _ {
@@ -335,7 +356,7 @@ impl GlConfig for Config {
     #[cfg(any(wayland_platform, x11_platform))]
     fn supports_transparency(&self) -> Option<bool> {
         use raw_window_handle::RawDisplayHandle;
-        match *self.inner.display.inner._native_display? {
+        match self.inner.display.inner.native_display.as_ref()?.display_handle().ok()?.as_raw() {
             #[cfg(x11_platform)]
             RawDisplayHandle::Xlib(_) | RawDisplayHandle::Xcb(_) => {
                 self.x11_visual().map(|visual| visual.supports_transparency())
@@ -366,49 +387,52 @@ impl GlConfig for Config {
     }
 }
 
-impl GetGlDisplay for Config {
-    type Target = Display;
+impl<D: HasDisplayHandle> GetGlDisplay for Config<D> {
+    type Target = Display<D>;
 
     fn display(&self) -> Self::Target {
         self.inner.display.clone()
     }
 }
 
-impl AsRawConfig for Config {
+impl<D: HasDisplayHandle> AsRawConfig for Config<D> {
     fn raw_config(&self) -> RawConfig {
         RawConfig::Egl(*self.inner.raw)
     }
 }
 
 #[cfg(x11_platform)]
-impl X11GlConfigExt for Config {
+impl<D: HasDisplayHandle> X11GlConfigExt for Config<D> {
     fn x11_visual(&self) -> Option<X11VisualInfo> {
-        match *self.inner.display.inner._native_display? {
+        match self.inner.display.inner.native_display.as_ref()?.display_handle().ok()?.as_raw() {
             raw_window_handle::RawDisplayHandle::Xlib(display_handle) => unsafe {
                 let xid = self.native_visual();
-                X11VisualInfo::from_xid(display_handle.display as *mut _, xid as _)
+                X11VisualInfo::from_xid(
+                    display_handle.display.map_or(std::ptr::null_mut(), |d| d.as_ptr() as *mut _),
+                    xid as _,
+                )
             },
             _ => None,
         }
     }
 }
 
-impl Sealed for Config {}
+impl<D: HasDisplayHandle> Sealed for Config<D> {}
 
-pub(crate) struct ConfigInner {
-    display: Display,
+pub(crate) struct ConfigInner<D> {
+    display: Display<D>,
     pub(crate) raw: EglConfig,
 }
 
-impl PartialEq for ConfigInner {
+impl<D> PartialEq for ConfigInner<D> {
     fn eq(&self, other: &Self) -> bool {
         self.raw == other.raw
     }
 }
 
-impl Eq for ConfigInner {}
+impl<D> Eq for ConfigInner<D> {}
 
-impl fmt::Debug for ConfigInner {
+impl<D> fmt::Debug for ConfigInner<D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Config")
             .field("raw", &self.raw)

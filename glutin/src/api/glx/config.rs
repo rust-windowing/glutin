@@ -7,7 +7,7 @@ use std::{fmt, slice};
 
 use glutin_glx_sys::glx::types::GLXFBConfig;
 use glutin_glx_sys::{glx, glx_extra};
-use raw_window_handle::RawWindowHandle;
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawWindowHandle};
 
 use crate::config::{
     Api, AsRawConfig, ColorBufferType, ConfigSurfaceTypes, ConfigTemplate, GlConfig, RawConfig,
@@ -19,11 +19,11 @@ use crate::private::Sealed;
 
 use super::display::Display;
 
-impl Display {
-    pub(crate) unsafe fn find_configs(
+impl<D: HasDisplayHandle> Display<D> {
+    pub(crate) fn find_configs<W: HasWindowHandle>(
         &self,
-        template: ConfigTemplate,
-    ) -> Result<Box<dyn Iterator<Item = Config> + '_>> {
+        template: ConfigTemplate<W>,
+    ) -> Result<Box<dyn Iterator<Item = Config<D>> + '_>> {
         let mut config_attributes = Vec::<c_int>::new();
 
         // Add color buffer type.
@@ -96,7 +96,9 @@ impl Display {
         config_attributes.push(template.stencil_size as c_int);
 
         // Add visual if was provided.
-        if let Some(RawWindowHandle::Xlib(window)) = template.native_window {
+        if let Some(RawWindowHandle::Xlib(window)) =
+            template._native_window.map(|w| w.window_handle().map(|w| w.as_raw())).transpose()?
+        {
             if window.visual_id > 0 {
                 config_attributes.push(glx::VISUAL_ID as c_int);
                 config_attributes.push(window.visual_id as c_int);
@@ -183,12 +185,26 @@ impl Display {
 }
 
 /// A wrapper around `GLXFBConfig`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Config {
-    pub(crate) inner: Arc<ConfigInner>,
+#[derive(Debug)]
+pub struct Config<D> {
+    pub(crate) inner: Arc<ConfigInner<D>>,
 }
 
-impl Config {
+impl<D> Clone for Config<D> {
+    fn clone(&self) -> Self {
+        Self { inner: self.inner.clone() }
+    }
+}
+
+impl<D> PartialEq for Config<D> {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner
+    }
+}
+
+impl<D> Eq for Config<D> {}
+
+impl<D: HasDisplayHandle> Config<D> {
     /// # Safety
     ///
     /// The caller must ensure that the attribute could be present.
@@ -210,7 +226,7 @@ impl Config {
     }
 }
 
-impl GlConfig for Config {
+impl<D: HasDisplayHandle> GlConfig for Config<D> {
     fn color_buffer_type(&self) -> Option<ColorBufferType> {
         unsafe {
             match self.raw_attribute(glx::X_VISUAL_TYPE as c_int) as _ {
@@ -300,7 +316,7 @@ impl GlConfig for Config {
     }
 }
 
-impl X11GlConfigExt for Config {
+impl<D: HasDisplayHandle> X11GlConfigExt for Config<D> {
     fn x11_visual(&self) -> Option<X11VisualInfo> {
         unsafe {
             let raw_visual = self
@@ -321,36 +337,36 @@ impl X11GlConfigExt for Config {
     }
 }
 
-impl GetGlDisplay for Config {
-    type Target = Display;
+impl<D: HasDisplayHandle> GetGlDisplay for Config<D> {
+    type Target = Display<D>;
 
     fn display(&self) -> Self::Target {
         self.inner.display.clone()
     }
 }
 
-impl AsRawConfig for Config {
+impl<D: HasDisplayHandle> AsRawConfig for Config<D> {
     fn raw_config(&self) -> RawConfig {
         RawConfig::Glx(*self.inner.raw)
     }
 }
 
-impl Sealed for Config {}
+impl<D: HasDisplayHandle> Sealed for Config<D> {}
 
-pub(crate) struct ConfigInner {
-    display: Display,
+pub(crate) struct ConfigInner<D> {
+    display: Display<D>,
     pub(crate) raw: GlxConfig,
 }
 
-impl PartialEq for ConfigInner {
+impl<D> PartialEq for ConfigInner<D> {
     fn eq(&self, other: &Self) -> bool {
         self.raw == other.raw
     }
 }
 
-impl Eq for ConfigInner {}
+impl<D> Eq for ConfigInner<D> {}
 
-impl fmt::Debug for ConfigInner {
+impl<D> fmt::Debug for ConfigInner<D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Config")
             .field("raw", &self.raw)
