@@ -225,7 +225,7 @@ impl ContextInner {
 
             let view = &surface.ns_view;
             MainThreadMarker::run_on_main(|mtm| unsafe {
-                self.raw.setView(Some(&view.get(mtm)));
+                self.raw.setView(Some(view.get(mtm)));
             });
 
             Ok(())

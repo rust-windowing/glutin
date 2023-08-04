@@ -175,7 +175,7 @@ impl<T: SurfaceTypeTrait> AsRawSurface for Surface<T> {
     fn raw_surface(&self) -> RawSurface {
         // SAFETY: We only use the thread marker to get the pointer value of the view
         let mtm = unsafe { MainThreadMarker::new_unchecked() };
-        RawSurface::Cgl(Id::as_ptr(&self.ns_view.get(mtm)).cast())
+        RawSurface::Cgl(Id::as_ptr(self.ns_view.get(mtm)).cast())
     }
 }
 
