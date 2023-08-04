@@ -24,6 +24,8 @@ extern_class!(
     #[derive(Debug, PartialEq, Eq, Hash)]
     pub(crate) struct NSOpenGLContext;
 
+    // Strict order required by macro, tracked in https://github.com/madsmtm/objc2/issues/479
+    #[rustfmt::skip]
     unsafe impl ClassType for NSOpenGLContext {
         type Super = NSObject;
         type Mutability = mutability::InteriorMutable;
@@ -80,6 +82,8 @@ extern_class!(
     #[derive(Debug, PartialEq, Eq, Hash)]
     pub(crate) struct NSOpenGLPixelFormat;
 
+    // Strict order required by macro, tracked in https://github.com/madsmtm/objc2/issues/479
+    #[rustfmt::skip]
     unsafe impl ClassType for NSOpenGLPixelFormat {
         type Super = NSObject;
         type Mutability = mutability::Immutable;
