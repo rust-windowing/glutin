@@ -67,6 +67,11 @@ impl X11VisualInfo {
         self.transparency
     }
 
+    /// Get XID of for this visual.
+    pub fn visual_id(&self) -> std::ffi::c_ulong {
+        unsafe { (*self.raw).visualid }
+    }
+
     /// Convert the visual to the raw pointer.
     ///
     /// You must clear it with `XFree` after the use.
