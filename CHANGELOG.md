@@ -1,10 +1,13 @@
 # Unreleased
 
-- Add `X11VisualInfo::visual_id` to get `XID` of the visual.
 - Bump MSRV from `1.60` to `1.65`.
 - **Breaking:** `bitflags` which is used as a part of public API was updated to `2.0`.
 - **Breaking:** `.*SurfaceAccessor` traits got removed; their methods now on respective `.*GlContext` traits instead.
 - **Breaking:** `GlContext` trait is now a part of the `prelude`.
+
+# Version 0.30.10
+
+- Add `X11VisualInfo::visual_id` to get `XID` of the visual.
 - Added support for EGL on Windows using Angle. This assumes libEGL.dll/libGLESv2.dll present.
 - EGL's `Display::create_pbuffer_surface()` no longer sets the invalid `RENDER_BUFFER` attribute.
 
