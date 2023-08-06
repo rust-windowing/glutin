@@ -1,5 +1,6 @@
 # Unreleased
 
+- Add `X11VisualInfo::visual_id` to get `XID` of the visual.
 - Added support for EGL on Windows using Angle. This assumes libEGL.dll/libGLESv2.dll present.
 - EGL's `Display::create_pbuffer_surface()` no longer sets the invalid `RENDER_BUFFER` attribute.
 
