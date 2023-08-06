@@ -1,5 +1,6 @@
 # Unreleased
 
+- Add `X11VisualInfo::visual_id` to get `XID` of the visual.
 - Bump MSRV from `1.60` to `1.65`.
 - **Breaking:** `bitflags` which is used as a part of public API was updated to `2.0`.
 - **Breaking:** `.*SurfaceAccessor` traits got removed; their methods now on respective `.*GlContext` traits instead.
