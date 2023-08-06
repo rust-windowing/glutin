@@ -3,7 +3,16 @@
 use std::sync::Arc;
 use std::{fmt, iter};
 
-use objc2::rc::{Id, Shared};
+#[allow(deprecated)]
+use icrate::AppKit::{
+    NSOpenGLPFAAccelerated, NSOpenGLPFAAllowOfflineRenderers, NSOpenGLPFAAlphaSize,
+    NSOpenGLPFAColorFloat, NSOpenGLPFAColorSize, NSOpenGLPFADepthSize, NSOpenGLPFADoubleBuffer,
+    NSOpenGLPFAMinimumPolicy, NSOpenGLPFAMultisample, NSOpenGLPFAOpenGLProfile,
+    NSOpenGLPFASampleBuffers, NSOpenGLPFASamples, NSOpenGLPFAStencilSize, NSOpenGLPFAStereo,
+    NSOpenGLPFATripleBuffer, NSOpenGLPixelFormatAttribute, NSOpenGLProfileVersion3_2Core,
+    NSOpenGLProfileVersion4_1Core, NSOpenGLProfileVersionLegacy,
+};
+use objc2::rc::Id;
 
 use crate::config::{
     Api, AsRawConfig, ColorBufferType, ConfigSurfaceTypes, ConfigTemplate, GlConfig, RawConfig,
@@ -12,17 +21,11 @@ use crate::display::GetGlDisplay;
 use crate::error::{ErrorKind, Result};
 use crate::private::Sealed;
 
-use super::appkit::{
-    NSOpenGLPFAAccelerated, NSOpenGLPFAAllowOfflineRenderers, NSOpenGLPFAAlphaSize,
-    NSOpenGLPFAColorFloat, NSOpenGLPFAColorSize, NSOpenGLPFADepthSize, NSOpenGLPFADoubleBuffer,
-    NSOpenGLPFAMinimumPolicy, NSOpenGLPFAMultisample, NSOpenGLPFAOpenGLProfile,
-    NSOpenGLPFASampleBuffers, NSOpenGLPFASamples, NSOpenGLPFAStencilSize, NSOpenGLPFAStereo,
-    NSOpenGLPFATripleBuffer, NSOpenGLPixelFormat, NSOpenGLPixelFormatAttribute,
-    NSOpenGLProfileVersion3_2Core, NSOpenGLProfileVersion4_1Core, NSOpenGLProfileVersionLegacy,
-};
+use super::appkit::NSOpenGLPixelFormat;
 use super::display::Display;
 
 impl Display {
+    #[allow(deprecated)]
     pub(crate) unsafe fn find_configs(
         &self,
         template: ConfigTemplate,
@@ -145,12 +148,14 @@ impl Config {
         }
     }
 
+    #[allow(deprecated)]
     pub(crate) fn is_single_buffered(&self) -> bool {
         self.raw_attribute(NSOpenGLPFATripleBuffer) == 0
             && self.raw_attribute(NSOpenGLPFADoubleBuffer) == 0
     }
 }
 
+#[allow(deprecated)]
 impl GlConfig for Config {
     fn color_buffer_type(&self) -> Option<ColorBufferType> {
         // On macos all color formats divide by 3 without reminder, except for the RGB
@@ -223,7 +228,7 @@ impl Sealed for Config {}
 pub(crate) struct ConfigInner {
     display: Display,
     pub(crate) transparency: bool,
-    pub(crate) raw: Id<NSOpenGLPixelFormat, Shared>,
+    pub(crate) raw: Id<NSOpenGLPixelFormat>,
 }
 
 impl PartialEq for ConfigInner {

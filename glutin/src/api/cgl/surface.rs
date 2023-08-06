@@ -4,9 +4,9 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
 
-use objc2::foundation::{CGFloat, NSObject, NSRect};
-use objc2::msg_send;
-use objc2::rc::{Id, Shared};
+use icrate::AppKit::{NSView, NSWindow};
+use icrate::Foundation::{MainThreadBound, MainThreadMarker};
+use objc2::rc::Id;
 use raw_window_handle::RawWindowHandle;
 
 use crate::config::GetGlConfig;
@@ -18,7 +18,6 @@ use crate::surface::{
     SurfaceTypeTrait, SwapInterval, WindowSurface,
 };
 
-use super::appkit::{run_on_main, MainThreadSafe};
 use super::config::Config;
 use super::context::PossiblyCurrentContext;
 use super::display::Display;
@@ -54,6 +53,10 @@ impl Display {
             },
         };
 
+        // SAFETY: The objects below must have been created on the main thread
+        // in the first place, so we can safely "move" them back to that thread.
+        let mtm = unsafe { MainThreadMarker::new_unchecked() };
+
         // SAFETY: Validity of the view and window is ensured by caller
         // This function makes sure the window is non null.
         let ns_view = if let Some(ns_view) = unsafe { Id::retain(native_window.ns_view.cast()) } {
@@ -61,6 +64,7 @@ impl Display {
         } else {
             return Err(ErrorKind::NotSupported("ns_view of provided native window is nil").into());
         };
+        let ns_view = MainThreadBound::new(ns_view, mtm);
 
         let ns_window = if let Some(ns_window) =
             unsafe { Id::retain(native_window.ns_window.cast()) }
@@ -69,12 +73,14 @@ impl Display {
         } else {
             return Err(ErrorKind::NotSupported("ns_view of provided native window is nil").into());
         };
+        let ns_window = MainThreadBound::new(ns_window, mtm);
 
         let surface = Surface {
             display: self.clone(),
             config: config.clone(),
             ns_view,
             ns_window,
+            _nosendsync: PhantomData,
             _ty: PhantomData,
         };
         Ok(surface)
@@ -85,8 +91,9 @@ impl Display {
 pub struct Surface<T: SurfaceTypeTrait> {
     display: Display,
     config: Config,
-    pub(crate) ns_view: Id<NSObject, Shared>,
-    ns_window: Id<NSObject, Shared>,
+    pub(crate) ns_view: MainThreadBound<Id<NSView>>,
+    ns_window: MainThreadBound<Id<NSWindow>>,
+    _nosendsync: PhantomData<*const std::ffi::c_void>,
     _ty: PhantomData<T>,
 }
 
@@ -99,21 +106,21 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     }
 
     fn width(&self) -> Option<u32> {
-        let ns_window = MainThreadSafe(&self.ns_window);
-        let ns_view = MainThreadSafe(&self.ns_view);
-        run_on_main(move || unsafe {
-            let scale_factor: CGFloat = msg_send![*ns_window, backingScaleFactor];
-            let frame: NSRect = msg_send![*ns_view, frame];
+        let window = &self.ns_window;
+        let view = &self.ns_view;
+        MainThreadMarker::run_on_main(|mtm| unsafe {
+            let scale_factor = window.get(mtm).backingScaleFactor();
+            let frame = view.get(mtm).frame();
             Some((frame.size.width * scale_factor) as u32)
         })
     }
 
     fn height(&self) -> Option<u32> {
-        let ns_window = MainThreadSafe(&self.ns_window);
-        let ns_view = MainThreadSafe(&self.ns_view);
-        run_on_main(move || unsafe {
-            let scale_factor: CGFloat = msg_send![*ns_window, backingScaleFactor];
-            let frame: NSRect = msg_send![*ns_view, frame];
+        let window = &self.ns_window;
+        let view = &self.ns_view;
+        MainThreadMarker::run_on_main(|mtm| unsafe {
+            let scale_factor = window.get(mtm).backingScaleFactor();
+            let frame = view.get(mtm).frame();
             Some((frame.size.height * scale_factor) as u32)
         })
     }
@@ -132,7 +139,7 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     }
 
     fn is_current(&self, context: &Self::Context) -> bool {
-        self.ns_view == context.inner.current_view()
+        context.inner.is_view_current(&self.ns_view)
     }
 
     fn is_current_draw(&self, context: &Self::Context) -> bool {
@@ -166,7 +173,9 @@ impl<T: SurfaceTypeTrait> GetGlDisplay for Surface<T> {
 
 impl<T: SurfaceTypeTrait> AsRawSurface for Surface<T> {
     fn raw_surface(&self) -> RawSurface {
-        RawSurface::Cgl(Id::as_ptr(&self.ns_view).cast())
+        // SAFETY: We only use the thread marker to get the pointer value of the view
+        let mtm = unsafe { MainThreadMarker::new_unchecked() };
+        RawSurface::Cgl(Id::as_ptr(self.ns_view.get(mtm)).cast())
     }
 }
 

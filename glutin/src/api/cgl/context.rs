@@ -4,8 +4,10 @@ use std::fmt;
 use std::marker::PhantomData;
 
 use cgl::CGLSetParameter;
-use objc2::foundation::NSObject;
-use objc2::rc::{autoreleasepool, Id, Shared};
+use icrate::AppKit::{NSOpenGLCPSwapInterval, NSView};
+use icrate::Foundation::{MainThreadBound, MainThreadMarker};
+use objc2::rc::{autoreleasepool, Id};
+use objc2::ClassType;
 
 use crate::config::GetGlConfig;
 use crate::context::{AsRawContext, ContextApi, ContextAttributes, RawContext, Robustness};
@@ -15,7 +17,7 @@ use crate::prelude::*;
 use crate::private::Sealed;
 use crate::surface::{SurfaceTypeTrait, SwapInterval};
 
-use super::appkit::{run_on_main, MainThreadSafe, NSOpenGLCPSwapInterval, NSOpenGLContext};
+use super::appkit::NSOpenGLContext;
 use super::config::Config;
 use super::display::Display;
 use super::surface::Surface;
@@ -42,8 +44,12 @@ impl Display {
         }
 
         let config = config.clone();
-        let raw = NSOpenGLContext::newWithFormat_shareContext(&config.inner.raw, share_context)
-            .ok_or(ErrorKind::BadConfig)?;
+        let raw = NSOpenGLContext::initWithFormat_shareContext(
+            NSOpenGLContext::alloc(),
+            &config.inner.raw,
+            share_context,
+        )
+        .ok_or(ErrorKind::BadConfig)?;
 
         if config.inner.transparency {
             let opacity = 0;
@@ -200,7 +206,7 @@ impl Sealed for PossiblyCurrentContext {}
 pub(crate) struct ContextInner {
     display: Display,
     config: Config,
-    pub(crate) raw: Id<NSOpenGLContext, Shared>,
+    pub(crate) raw: Id<NSOpenGLContext>,
 }
 
 impl ContextInner {
@@ -216,11 +222,10 @@ impl ContextInner {
         autoreleasepool(|_| {
             self.update();
             self.raw.makeCurrentContext();
-            let raw = MainThreadSafe(&self.raw);
-            let ns_view = MainThreadSafe(&surface.ns_view);
 
-            run_on_main(move || unsafe {
-                raw.setView(Some(*ns_view));
+            let view = &surface.ns_view;
+            MainThreadMarker::run_on_main(|mtm| unsafe {
+                self.raw.setView(Some(view.get(mtm)));
             });
 
             Ok(())
@@ -243,10 +248,7 @@ impl ContextInner {
     }
 
     pub(crate) fn update(&self) {
-        let raw = MainThreadSafe(&self.raw);
-        run_on_main(move || {
-            raw.update();
-        });
+        MainThreadMarker::run_on_main(|_| self.raw.update());
     }
 
     pub(crate) fn flush_buffer(&self) -> Result<()> {
@@ -256,8 +258,10 @@ impl ContextInner {
         })
     }
 
-    pub(crate) fn current_view(&self) -> Id<NSObject, Shared> {
-        self.raw.view().expect("context to have a current view")
+    pub(crate) fn is_view_current(&self, view: &MainThreadBound<Id<NSView>>) -> bool {
+        MainThreadMarker::run_on_main(|mtm| {
+            self.raw.view(mtm).expect("context to have a current view") == *view.get(mtm)
+        })
     }
 
     fn make_not_current(&self) -> Result<()> {

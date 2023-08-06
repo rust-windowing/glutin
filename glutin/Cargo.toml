@@ -52,8 +52,20 @@ x11-dl = { version = "2.20.0", optional = true }
 [target.'cfg(any(target_os = "macos"))'.dependencies]
 cgl = "0.3.2"
 core-foundation = "0.9.3"
-objc2 = ">=0.3.0-beta.3, <0.3.0-beta.4"
+objc2 = "0.4.1"
 dispatch = "0.2.0"
+
+[target.'cfg(any(target_os = "macos"))'.dependencies.icrate]
+version = "0.0.4"
+features = [
+    "dispatch",
+    "Foundation",
+    "Foundation_NSArray",
+    "Foundation_NSThread",
+    "AppKit",
+    "AppKit_NSView",
+    "AppKit_NSWindow",
+]
 
 [build-dependencies]
 cfg_aliases = "0.1.1"
