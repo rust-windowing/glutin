@@ -1,5 +1,7 @@
 # Unreleased
 
+- **Breaking:** Update _winit_ to `0.29.1-beta`. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/releases/tag/v0.29.1-beta) for more info.
+
 # Version 0.4.0-beta.0
 
 - **Breaking:** Update _winit_ to `0.29.0-beta.0`. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/releases/tag/v0.29.0-beta.0) for more info.

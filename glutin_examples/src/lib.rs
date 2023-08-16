@@ -1,11 +1,11 @@
+use std::error::Error;
 use std::ffi::{CStr, CString};
 use std::num::NonZeroU32;
 use std::ops::Deref;
 
 use winit::event::{Event, WindowEvent};
+use winit::window::raw_window_handle::HasRawWindowHandle;
 use winit::window::WindowBuilder;
-
-use raw_window_handle::HasRawWindowHandle;
 
 use glutin::config::ConfigTemplateBuilder;
 use glutin::context::{ContextApi, ContextAttributesBuilder, Version};
@@ -22,7 +22,7 @@ pub mod gl {
     pub use Gles2 as Gl;
 }
 
-pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
+pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn Error>> {
     // Only windows requires the window to be present before creating the display.
     // Other platforms don't really need one.
     //
@@ -44,24 +44,22 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
 
     let display_builder = DisplayBuilder::new().with_window_builder(window_builder);
 
-    let (mut window, gl_config) = display_builder
-        .build(&event_loop, template, |configs| {
-            // Find the config with the maximum number of samples, so our triangle will
-            // be smooth.
-            configs
-                .reduce(|accum, config| {
-                    let transparency_check = config.supports_transparency().unwrap_or(false)
-                        & !accum.supports_transparency().unwrap_or(false);
+    let (mut window, gl_config) = display_builder.build(&event_loop, template, |configs| {
+        // Find the config with the maximum number of samples, so our triangle will
+        // be smooth.
+        configs
+            .reduce(|accum, config| {
+                let transparency_check = config.supports_transparency().unwrap_or(false)
+                    & !accum.supports_transparency().unwrap_or(false);
 
-                    if transparency_check || config.num_samples() > accum.num_samples() {
-                        config
-                    } else {
-                        accum
-                    }
-                })
-                .unwrap()
-        })
-        .unwrap();
+                if transparency_check || config.num_samples() > accum.num_samples() {
+                    config
+                } else {
+                    accum
+                }
+            })
+            .unwrap()
+    })?;
 
     println!("Picked a config with {} samples", gl_config.num_samples());
 
@@ -173,7 +171,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
                 },
                 _ => (),
             },
-            Event::RedrawEventsCleared => {
+            Event::AboutToWait => {
                 if let Some((gl_context, gl_surface, window)) = &state {
                     let renderer = renderer.as_ref().unwrap();
                     renderer.draw();
@@ -184,7 +182,9 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) {
             },
             _ => (),
         }
-    })
+    })?;
+
+    Ok(())
 }
 
 pub struct Renderer {

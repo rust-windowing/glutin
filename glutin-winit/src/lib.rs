@@ -20,13 +20,12 @@ use glutin::display::{Display, DisplayApiPreference};
 use glutin::platform::x11::X11GlConfigExt;
 use glutin::prelude::*;
 
-use raw_window_handle::{HasRawDisplayHandle, RawWindowHandle};
-
 #[cfg(wgl_backend)]
-use raw_window_handle::HasRawWindowHandle;
+use winit::window::raw_window_handle::HasRawWindowHandle;
 
 use winit::error::OsError;
 use winit::event_loop::EventLoopWindowTarget;
+use winit::window::raw_window_handle::{HasRawDisplayHandle, RawWindowHandle};
 use winit::window::{Window, WindowBuilder};
 
 #[cfg(glx_backend)]
@@ -192,7 +191,7 @@ pub fn finalize_window<T>(
 
     #[cfg(x11_platform)]
     let builder = if let Some(x11_visual) = gl_config.x11_visual() {
-        builder.with_x11_visual(x11_visual.into_raw())
+        builder.with_x11_visual(x11_visual.visual_id() as _)
     } else {
         builder
     };
