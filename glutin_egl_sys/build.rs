@@ -37,6 +37,7 @@ fn main() {
             "EGL_EXT_swap_buffers_with_damage",
             "EGL_KHR_create_context",
             "EGL_KHR_create_context_no_error",
+            "EGL_KHR_display_reference",
             "EGL_KHR_fence_sync",
             "EGL_KHR_platform_android",
             "EGL_KHR_platform_gbm",
