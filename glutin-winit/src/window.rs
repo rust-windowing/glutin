@@ -1,10 +1,11 @@
+use std::num::NonZeroU32;
+
 use glutin::context::PossiblyCurrentContext;
 use glutin::surface::{
     GlSurface, ResizeableSurface, Surface, SurfaceAttributes, SurfaceAttributesBuilder,
     SurfaceTypeTrait, WindowSurface,
 };
-use raw_window_handle::HasRawWindowHandle;
-use std::num::NonZeroU32;
+use winit::window::raw_window_handle::HasRawWindowHandle;
 use winit::window::Window;
 
 /// [`Window`] extensions for working with [`glutin`] surfaces.
