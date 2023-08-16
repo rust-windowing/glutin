@@ -9,7 +9,7 @@ use std::os::windows::ffi::OsStrExt;
 
 use glutin_wgl_sys::{wgl, wgl_extra};
 use once_cell::sync::OnceCell;
-use windows_sys::Win32::Foundation::{HINSTANCE, HWND};
+use windows_sys::Win32::Foundation::{HMODULE, HWND};
 use windows_sys::Win32::Graphics::{Gdi as gdi, OpenGL as gl};
 use windows_sys::Win32::UI::WindowsAndMessaging::{self as wm, WINDOWPLACEMENT, WNDCLASSEXW};
 
@@ -46,7 +46,7 @@ impl Deref for WglExtra {
 }
 
 unsafe fn load_extra_functions(
-    instance: HINSTANCE,
+    instance: HMODULE,
     win: HWND,
 ) -> Result<(&'static WglExtra, HashSet<&'static str>)> {
     let rect = unsafe {

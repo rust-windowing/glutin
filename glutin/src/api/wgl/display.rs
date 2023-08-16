@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use glutin_wgl_sys::wgl;
 use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
-use windows_sys::Win32::Foundation::HINSTANCE;
+use windows_sys::Win32::Foundation::HMODULE;
 use windows_sys::Win32::Graphics::Gdi::HDC;
 use windows_sys::Win32::System::LibraryLoader as dll_loader;
 
@@ -206,7 +206,7 @@ impl Sealed for Display {}
 
 pub(crate) struct DisplayInner {
     /// Client WGL extensions.
-    pub(crate) lib_opengl32: HINSTANCE,
+    pub(crate) lib_opengl32: HMODULE,
 
     /// Extra functions used by the impl.
     pub(crate) wgl_extra: Option<&'static WglExtra>,
