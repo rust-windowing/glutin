@@ -474,7 +474,7 @@ impl NativeWindow {
                 }
 
                 let ptr = ffi_dispatch!(
-                    WAYLAND_EGL_HANDLE,
+                    wayland_egl_handle(),
                     wl_egl_window_create,
                     window_handle.surface.cast(),
                     _width.get() as _,
@@ -540,7 +540,7 @@ impl NativeWindow {
         if let Self::Wayland(wl_egl_surface) = self {
             unsafe {
                 ffi_dispatch!(
-                    WAYLAND_EGL_HANDLE,
+                    wayland_egl_handle(),
                     wl_egl_window_resize,
                     *wl_egl_surface as _,
                     _width.get() as _,
@@ -607,7 +607,7 @@ impl Drop for NativeWindow {
     fn drop(&mut self) {
         unsafe {
             if let Self::Wayland(wl_egl_window) = self {
-                ffi_dispatch!(WAYLAND_EGL_HANDLE, wl_egl_window_destroy, wl_egl_window.cast());
+                ffi_dispatch!(wayland_egl_handle(), wl_egl_window_destroy, wl_egl_window.cast());
             }
         }
     }
