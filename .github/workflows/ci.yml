@@ -47,9 +47,14 @@ jobs:
           - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest, options: --no-default-features, features: glx }
           - { target: aarch64-linux-android,    os: ubuntu-latest, cmd: 'apk --'   }
           - { target: x86_64-apple-darwin,      os: macos-latest,    }
-          # We don't support ios for now.
-          # - { target: x86_64-apple-ios,         os: macos-latest,    }
-          # - { target: aarch64-apple-ios,        os: macos-latest,    }
+        exclude:
+          # Android is tested on stable-3
+          - rust_version: '1.65.0'
+            platform: { target: aarch64-linux-android,    os: ubuntu-latest, cmd: 'apk --'   }
+        include:
+          - rust_version: '1.69.0'
+            platform: { target: aarch64-linux-android,    os: ubuntu-latest, cmd: 'apk --'   }
+
 
     env:
       RUST_BACKTRACE: 1
