@@ -66,13 +66,14 @@ impl Display {
         };
         let ns_view = MainThreadBound::new(ns_view, mtm);
 
-        let ns_window = if let Some(ns_window) =
-            unsafe { Id::retain(native_window.ns_window.cast()) }
-        {
-            ns_window
-        } else {
-            return Err(ErrorKind::NotSupported("ns_view of provided native window is nil").into());
-        };
+        let ns_window =
+            if let Some(ns_window) = unsafe { Id::retain(native_window.ns_window.cast()) } {
+                ns_window
+            } else {
+                return Err(
+                    ErrorKind::NotSupported("ns_window of provided native window is nil").into()
+                );
+            };
         let ns_window = MainThreadBound::new(ns_window, mtm);
 
         let surface = Surface {
