@@ -46,7 +46,7 @@ Note that glutin aims at being a low-level brick in your rendering
 infrastructure. You are encouraged to write another layer of abstraction
 between glutin and your application.
 
-The minimum Rust version target by glutin is `1.65.0`.
+Glutin follows winit's [MSRV policy](https://github.com/rust-windowing/winit/blob/master/README.md#msrv-policy).
 
 ## Platform-specific notes
 
