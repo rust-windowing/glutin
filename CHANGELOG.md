@@ -4,6 +4,8 @@
 - **Breaking:** `bitflags` which is used as a part of public API was updated to `2.0`.
 - **Breaking:** `.*SurfaceAccessor` traits got removed; their methods now on respective `.*GlContext` traits instead.
 - **Breaking:** `GlContext` trait is now a part of the `prelude`.
+- Automatically cleanup the `EGLDisplay` when `EGL_KHR_display_reference` is present.
+- Add `api::egl::Display::terminate` to terminate the display when glutin doesn't manage it.
 
 # Version 0.30.10
 
