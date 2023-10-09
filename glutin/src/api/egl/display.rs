@@ -30,7 +30,7 @@ use super::surface::Surface;
 use super::{Egl, EGL};
 
 /// Extensions that don't require any display.
-pub(crate) static NO_DISPLAY_EXTENSIONS: OnceCell<HashSet<&'static str>> = OnceCell::new();
+pub(crate) static CLIENT_EXTENSIONS: OnceCell<HashSet<&'static str>> = OnceCell::new();
 
 /// A wrapper for the `EGLDisplay` and its supported extensions.
 #[derive(Debug, Clone)]
@@ -54,7 +54,7 @@ impl Display {
             None => return Err(ErrorKind::NotFound.into()),
         };
 
-        NO_DISPLAY_EXTENSIONS.get_or_init(|| get_extensions(egl, egl::NO_DISPLAY));
+        CLIENT_EXTENSIONS.get_or_init(|| get_extensions(egl, egl::NO_DISPLAY));
 
         // Create a EGL display by chaining all display creation functions aborting on
         // `EGL_BAD_ATTRIBUTE`.
@@ -113,7 +113,7 @@ impl Display {
         // Okay to unwrap here because the client extensions must have been enumerated
         // while querying the available devices or the device was gotten from an
         // existing display.
-        let extensions = NO_DISPLAY_EXTENSIONS.get().unwrap();
+        let extensions = CLIENT_EXTENSIONS.get().unwrap();
 
         if !extensions.contains("EGL_EXT_platform_base")
             && !extensions.contains("EGL_EXT_platform_device")
@@ -150,7 +150,7 @@ impl Display {
     /// This function returns [`Err`] if the `EGL_EXT_device_query` or
     /// `EGL_EXT_device_base` extensions are not available.
     pub fn device(&self) -> Result<Device> {
-        let no_display_extensions = NO_DISPLAY_EXTENSIONS.get().unwrap();
+        let no_display_extensions = CLIENT_EXTENSIONS.get().unwrap();
 
         // Querying the device of a display only requires EGL_EXT_device_query, but we
         // also check if EGL_EXT_device_base is available since
@@ -190,7 +190,7 @@ impl Display {
             return Err(ErrorKind::NotSupported("eglGetPlatformDisplay is not supported").into());
         }
 
-        let extensions = NO_DISPLAY_EXTENSIONS.get().unwrap();
+        let extensions = CLIENT_EXTENSIONS.get().unwrap();
 
         let mut attrs = Vec::<EGLAttrib>::new();
         let (platform, mut display) = match display {
@@ -238,7 +238,7 @@ impl Display {
             return Err(ErrorKind::NotSupported("eglGetPlatformDisplayEXT is not supported").into());
         }
 
-        let extensions = NO_DISPLAY_EXTENSIONS.get().unwrap();
+        let extensions = CLIENT_EXTENSIONS.get().unwrap();
 
         let mut attrs = Vec::<EGLint>::new();
         let mut legacy = false;
@@ -382,15 +382,15 @@ impl Display {
         };
 
         // Load extensions.
-        let client_extensions = get_extensions(egl, *display);
-        let features = Self::extract_display_features(&client_extensions, version);
+        let display_extensions = get_extensions(egl, *display);
+        let features = Self::extract_display_features(&display_extensions, version);
 
         let inner = Arc::new(DisplayInner {
             egl,
             raw: display,
             _native_display: raw_display_handle.map(NativeDisplay),
             version,
-            client_extensions,
+            display_extensions,
             features,
         });
         Ok(Self { inner })
@@ -458,7 +458,7 @@ impl GlDisplay for Display {
 
 impl GetDisplayExtensions for Display {
     fn extensions(&self) -> &HashSet<&'static str> {
-        &self.inner.client_extensions
+        &self.inner.display_extensions
     }
 }
 
@@ -480,8 +480,8 @@ pub(crate) struct DisplayInner {
     /// The version of the egl library.
     pub(crate) version: Version,
 
-    /// Client EGL extensions.
-    pub(crate) client_extensions: HashSet<&'static str>,
+    /// Display EGL extensions.
+    pub(crate) display_extensions: HashSet<&'static str>,
 
     /// The features supported by the display.
     pub(crate) features: DisplayFeatures,
@@ -496,7 +496,7 @@ impl fmt::Debug for DisplayInner {
             .field("raw", &self.raw)
             .field("version", &self.version)
             .field("features", &self.features)
-            .field("extensions", &self.client_extensions)
+            .field("extensions", &self.display_extensions)
             .finish()
     }
 }

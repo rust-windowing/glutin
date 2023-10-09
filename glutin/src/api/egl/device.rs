@@ -9,7 +9,7 @@ use glutin_egl_sys::egl::types::EGLDeviceEXT;
 
 use crate::error::{ErrorKind, Result};
 
-use super::display::{extensions_from_ptr, get_extensions, NO_DISPLAY_EXTENSIONS};
+use super::display::{extensions_from_ptr, get_extensions, CLIENT_EXTENSIONS};
 use super::{Egl, EGL};
 
 /// Wrapper for `EGLDevice`.
@@ -34,7 +34,7 @@ impl Device {
         };
 
         let no_display_extensions =
-            NO_DISPLAY_EXTENSIONS.get_or_init(|| get_extensions(egl, egl::NO_DISPLAY));
+            CLIENT_EXTENSIONS.get_or_init(|| get_extensions(egl, egl::NO_DISPLAY));
 
         // Querying devices requires EGL_EXT_device_enumeration and
         // EGL_EXT_device_query.

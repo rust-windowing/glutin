@@ -270,7 +270,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
         context.inner.bind_api();
 
         let res = unsafe {
-            if self.display.inner.client_extensions.contains("EGL_KHR_swap_buffers_with_damage") {
+            if self.display.inner.display_extensions.contains("EGL_KHR_swap_buffers_with_damage") {
                 self.display.inner.egl.SwapBuffersWithDamageKHR(
                     *self.display.inner.raw,
                     self.raw,
@@ -280,7 +280,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
             } else if self
                 .display
                 .inner
-                .client_extensions
+                .display_extensions
                 .contains("EGL_EXT_swap_buffers_with_damage")
             {
                 self.display.inner.egl.SwapBuffersWithDamageEXT(
@@ -333,7 +333,7 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     fn buffer_age(&self) -> u32 {
         self.display
             .inner
-            .client_extensions
+            .display_extensions
             .contains("EGL_EXT_buffer_age")
             .then(|| unsafe { self.raw_attribute(egl::BUFFER_AGE_EXT as EGLint) })
             .unwrap_or(0) as u32

@@ -55,7 +55,7 @@ impl Display {
         };
 
         let is_one_five = self.inner.version >= Version::new(1, 5);
-        if is_one_five || self.inner.client_extensions.contains("EGL_KHR_create_context") {
+        if is_one_five || self.inner.display_extensions.contains("EGL_KHR_create_context") {
             let mut flags = 0;
 
             // Add profile for the OpenGL Api.
