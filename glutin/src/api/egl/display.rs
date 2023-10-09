@@ -127,28 +127,49 @@ impl Display {
 
         let mut attrs = Vec::<EGLint>::with_capacity(3);
 
-        if extensions.contains("EGL_KHR_display_reference") {
-            attrs.push(egl::TRACK_REFERENCES_KHR as _);
-            attrs.push(egl::TRUE as _);
-        }
-
         // TODO: Some extensions exist like EGL_EXT_device_drm which allow specifying
         // which DRM master fd to use under the hood by the implementation. This would
         // mean there would need to be an unsafe equivalent to this function.
 
+        // Push at the end so we can pop it on failure
+        let mut has_display_reference = extensions.contains("EGL_KHR_display_reference");
+        if has_display_reference {
+            attrs.push(egl::TRACK_REFERENCES_KHR as _);
+            attrs.push(egl::TRUE as _);
+        }
+
         // Push `egl::NONE` to terminate the list.
         attrs.push(egl::NONE as EGLint);
 
-        let display = Self::check_display_error(unsafe {
-            egl.GetPlatformDisplayEXT(
-                egl::PLATFORM_DEVICE_EXT,
-                device.raw_device() as *mut _,
-                attrs.as_ptr(),
-            )
-        })
+        // NOTE: This fallback is needed because libglvnd advertises client extensions
+        // if at least one vendor library supports them. This leads to creation
+        // failures for the vendor libraries not supporting
+        // EGL_KHR_display_reference. Also according to the spec creation is allowed
+        // to fail with EGL_KHR_display_reference set to EGL_TRUE even if
+        // EGL_KHR_display_reference is advertised in the client extension
+        // string, so just always try creation without EGL_KHR_display_reference
+        // if it failed using it.
+        let platform_display = loop {
+            match Self::check_display_error(unsafe {
+                egl.GetPlatformDisplayEXT(
+                    egl::PLATFORM_DEVICE_EXT,
+                    device.raw_device() as *mut _,
+                    attrs.as_ptr(),
+                )
+            }) {
+                Err(_) if has_display_reference => {
+                    attrs.pop();
+                    attrs.pop();
+                    attrs.pop();
+                    attrs.push(egl::NONE as EGLint);
+                    has_display_reference = false;
+                },
+                platform_display => break platform_display,
+            }
+        }
         .map(EglDisplay::Ext)?;
 
-        Self::initialize_display(egl, display, None)
+        Self::initialize_display(egl, platform_display, None)
     }
 
     /// Get the [`Device`] the display is using.
@@ -244,23 +265,45 @@ impl Display {
             },
         };
 
-        if extensions.contains("EGL_KHR_display_reference") {
-            attrs.push(egl::TRACK_REFERENCES_KHR as _);
-            attrs.push(egl::TRUE as _);
-        }
-
         // Be explicit here.
         if display.is_null() {
             display = egl::DEFAULT_DISPLAY as *mut _;
         }
 
+        // Push at the end so we can pop it on failure
+        let mut has_display_reference = extensions.contains("EGL_KHR_display_reference");
+        if has_display_reference {
+            attrs.push(egl::TRACK_REFERENCES_KHR as _);
+            attrs.push(egl::TRUE as _);
+        }
+
         // Push `egl::NONE` to terminate the list.
         attrs.push(egl::NONE as EGLAttrib);
 
-        let display =
-            unsafe { egl.GetPlatformDisplay(platform, display as *mut _, attrs.as_ptr()) };
+        // NOTE: This fallback is needed because libglvnd advertises client extensions
+        // if at least one vendor library supports them. This leads to creation
+        // failures for the vendor libraries not supporting
+        // EGL_KHR_display_reference. Also according to the spec creation is allowed
+        // to fail with EGL_KHR_display_reference set to EGL_TRUE even if
+        // EGL_KHR_display_reference is advertised in the client extension
+        // string, so just always try creation without EGL_KHR_display_reference
+        // if it failed using it.
+        let platform_display = loop {
+            match Self::check_display_error(unsafe {
+                egl.GetPlatformDisplay(platform, display as *mut _, attrs.as_ptr())
+            }) {
+                Err(_) if has_display_reference => {
+                    attrs.pop();
+                    attrs.pop();
+                    attrs.pop();
+                    attrs.push(egl::NONE as EGLAttrib);
+                    has_display_reference = false;
+                },
+                platform_display => break platform_display,
+            }
+        };
 
-        Self::check_display_error(display).map(EglDisplay::Khr)
+        platform_display.map(EglDisplay::Khr)
     }
 
     fn get_platform_display_ext(egl: &Egl, display: RawDisplayHandle) -> Result<EglDisplay> {
@@ -309,23 +352,45 @@ impl Display {
             },
         };
 
-        if extensions.contains("EGL_KHR_display_reference") {
-            attrs.push(egl::TRACK_REFERENCES_KHR as _);
-            attrs.push(egl::TRUE as _);
-        }
-
         // Be explicit here.
         if display.is_null() {
             display = egl::DEFAULT_DISPLAY as *mut _;
         }
 
+        // Push at the end so we can pop it on failure
+        let mut has_display_reference = extensions.contains("EGL_KHR_display_reference");
+        if has_display_reference {
+            attrs.push(egl::TRACK_REFERENCES_KHR as _);
+            attrs.push(egl::TRUE as _);
+        }
+
         // Push `egl::NONE` to terminate the list.
         attrs.push(egl::NONE as EGLint);
 
-        let display =
-            unsafe { egl.GetPlatformDisplayEXT(platform, display as *mut _, attrs.as_ptr()) };
+        // NOTE: This fallback is needed because libglvnd advertises client extensions
+        // if at least one vendor library supports them. This leads to creation
+        // failures for the vendor libraries not supporting
+        // EGL_KHR_display_reference. Also according to the spec creation is allowed
+        // to fail with EGL_KHR_display_reference set to EGL_TRUE even if
+        // EGL_KHR_display_reference is advertised in the client extension
+        // string, so just always try creation without EGL_KHR_display_reference
+        // if it failed using it.
+        let platform_display = loop {
+            match Self::check_display_error(unsafe {
+                egl.GetPlatformDisplayEXT(platform, display as *mut _, attrs.as_ptr())
+            }) {
+                Err(_) if has_display_reference => {
+                    attrs.pop();
+                    attrs.pop();
+                    attrs.pop();
+                    attrs.push(egl::NONE as EGLint);
+                    has_display_reference = false;
+                },
+                platform_display => break platform_display,
+            }
+        };
 
-        Self::check_display_error(display).map(|display| {
+        platform_display.map(|display| {
             if legacy {
                 // NOTE: For angle we use the Legacy code path, as that uses CreateWindowSurface
                 // instead of CreatePlatformWindowSurface*. The latter somehow
@@ -536,21 +601,23 @@ impl DisplayInner {
         // terminate the display without worry for the instance being
         // reused elsewhere.
         let mut track_references = MaybeUninit::<EGLAttrib>::uninit();
-        unsafe {
-            (match self.raw {
-                EglDisplay::Khr(khr) => self.egl.QueryDisplayAttribKHR(
+        (match self.raw {
+            EglDisplay::Khr(khr) => unsafe {
+                self.egl.QueryDisplayAttribKHR(
                     khr,
                     egl::TRACK_REFERENCES_KHR as _,
                     track_references.as_mut_ptr(),
-                ),
-                EglDisplay::Ext(ext) => self.egl.QueryDisplayAttribEXT(
+                )
+            },
+            EglDisplay::Ext(ext) => unsafe {
+                self.egl.QueryDisplayAttribEXT(
                     ext,
                     egl::TRACK_REFERENCES_KHR as _,
                     track_references.as_mut_ptr(),
-                ),
-                EglDisplay::Legacy(_) => egl::FALSE,
-            } == egl::TRUE)
-        }
+                )
+            },
+            EglDisplay::Legacy(_) => egl::FALSE,
+        } == egl::TRUE)
     }
 }
 
