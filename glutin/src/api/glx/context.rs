@@ -122,6 +122,7 @@ impl Display {
         }
 
         let mut flags: c_int = 0;
+        let mut requested_no_error = false;
         if self.inner.features.contains(DisplayFeatures::CONTEXT_ROBUSTNESS) {
             match context_attributes.robustness {
                 Robustness::NotRobust => (),
@@ -144,6 +145,8 @@ impl Display {
                     }
 
                     attrs.push(glx_extra::CONTEXT_OPENGL_NO_ERROR_ARB as c_int);
+                    attrs.push(1);
+                    requested_no_error = true;
                 },
             }
         } else if context_attributes.robustness != Robustness::NotRobust {
@@ -154,7 +157,7 @@ impl Display {
         }
 
         // Debug flag.
-        if context_attributes.debug {
+        if context_attributes.debug && !requested_no_error {
             flags |= glx_extra::CONTEXT_DEBUG_BIT_ARB as c_int;
         }
 

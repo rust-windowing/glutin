@@ -6,6 +6,8 @@
 - **Breaking:** `GlContext` trait is now a part of the `prelude`.
 - Automatically cleanup the `EGLDisplay` when `EGL_KHR_display_reference` is present.
 - Add `api::egl::Display::terminate` to terminate the display when glutin doesn't manage it.
+- Fixed handling of `Robustness::NoError` and `debug` attribute when building context.
+- `Robustness::NoError` not being properly enabled with GLX/WGL.
 
 # Version 0.30.10
 
