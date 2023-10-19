@@ -138,6 +138,7 @@ impl ContextAttributesBuilder {
     /// Sets the *debug* flag for the OpenGL context.
     ///
     /// Debug contexts are usually slower, but give better error reporting.
+    /// This option is ignored when using [`Robustness::NoError`].
     ///
     /// The default value for this flag is `false`.
     pub fn with_debug(mut self, debug: bool) -> Self {

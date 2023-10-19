@@ -80,13 +80,16 @@ impl Display {
             }
 
             let has_robustsess = self.inner.features.contains(DisplayFeatures::CONTEXT_ROBUSTNESS);
-            let has_no_error = self.inner.features.contains(DisplayFeatures::CONTEXT_NO_ERROR);
 
+            let mut requested_no_error = false;
             match context_attributes.robustness {
                 Robustness::NotRobust => (),
-                Robustness::NoError if has_no_error => {
+                Robustness::NoError
+                    if self.inner.features.contains(DisplayFeatures::CONTEXT_NO_ERROR) =>
+                {
                     attrs.push(egl::CONTEXT_OPENGL_NO_ERROR_KHR as EGLint);
                     attrs.push(egl::TRUE as EGLint);
+                    requested_no_error = true;
                 },
                 Robustness::RobustLoseContextOnReset if has_robustsess => {
                     attrs.push(egl::CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY as EGLint);
@@ -105,7 +108,7 @@ impl Display {
                 },
             }
 
-            if context_attributes.debug && is_one_five && !has_no_error {
+            if context_attributes.debug && is_one_five && !requested_no_error {
                 attrs.push(egl::CONTEXT_OPENGL_DEBUG as EGLint);
                 attrs.push(egl::TRUE as EGLint);
             }
