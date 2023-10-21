@@ -3,8 +3,8 @@ use std::ffi::{CStr, CString};
 use std::num::NonZeroU32;
 use std::ops::Deref;
 
+use raw_window_handle::HasRawWindowHandle;
 use winit::event::{Event, WindowEvent};
-use winit::window::raw_window_handle::HasRawWindowHandle;
 use winit::window::WindowBuilder;
 
 use glutin::config::ConfigTemplateBuilder;
@@ -100,8 +100,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
 
     let mut state = None;
     let mut renderer = None;
-    event_loop.run(move |event, window_target, control_flow| {
-        control_flow.set_wait();
+    event_loop.run(move |event, window_target| {
         match event {
             Event::Resumed => {
                 #[cfg(android_platform)]
@@ -166,9 +165,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
                         }
                     }
                 },
-                WindowEvent::CloseRequested => {
-                    control_flow.set_exit();
-                },
+                WindowEvent::CloseRequested => window_target.exit(),
                 _ => (),
             },
             Event::AboutToWait => {
