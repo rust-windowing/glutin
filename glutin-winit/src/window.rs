@@ -5,7 +5,7 @@ use glutin::surface::{
     GlSurface, ResizeableSurface, Surface, SurfaceAttributes, SurfaceAttributesBuilder,
     SurfaceTypeTrait, WindowSurface,
 };
-use winit::window::raw_window_handle::HasRawWindowHandle;
+use raw_window_handle::HasRawWindowHandle;
 use winit::window::Window;
 
 /// [`Window`] extensions for working with [`glutin`] surfaces.

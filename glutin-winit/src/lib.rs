@@ -21,11 +21,11 @@ use glutin::platform::x11::X11GlConfigExt;
 use glutin::prelude::*;
 
 #[cfg(wgl_backend)]
-use winit::window::raw_window_handle::HasRawWindowHandle;
+use raw_window_handle::HasRawWindowHandle;
 
+use raw_window_handle::{HasRawDisplayHandle, RawWindowHandle};
 use winit::error::OsError;
 use winit::event_loop::EventLoopWindowTarget;
-use winit::window::raw_window_handle::{HasRawDisplayHandle, RawWindowHandle};
 use winit::window::{Window, WindowBuilder};
 
 #[cfg(glx_backend)]
