@@ -1,5 +1,7 @@
 # Unreleased
 
+- Fixed `CGLContextObj` having an invalid encoding on newer macOS versions.
+
 # Version 0.31.0
 
 - Bump MSRV from `1.60` to `1.65`.
