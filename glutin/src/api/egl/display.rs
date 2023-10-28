@@ -46,7 +46,7 @@ impl Display {
     /// # Safety
     ///
     /// `raw_display` must point to a valid system display. Using zero or
-    /// `[std::ptr::null]` for the display will result in using
+    /// [`std::ptr::null()`] for the display will result in using
     /// `EGL_DEFAULT_DISPLAY`, which is not recommended or will
     /// work on a platform with a concept of native display, like Wayland.
     pub unsafe fn new(raw_display: RawDisplayHandle) -> Result<Self> {
@@ -80,7 +80,7 @@ impl Display {
 
     /// Create an EGL display using the specified device.
     ///
-    /// In most cases, prefer [`Display::new`] unless you need to render
+    /// In most cases, prefer [`Display::new()`] unless you need to render
     /// off screen or use other extensions like EGLStreams.
     ///
     /// This function may take an optional [`RawDisplayHandle`] argument. At the

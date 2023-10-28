@@ -23,10 +23,10 @@ pub mod gl {
 }
 
 pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn Error>> {
-    // Only windows requires the window to be present before creating the display.
+    // Only Windows requires the window to be present before creating the display.
     // Other platforms don't really need one.
     //
-    // XXX if you don't care about running on android or so you can safely remove
+    // XXX if you don't care about running on Android or so you can safely remove
     // this condition and always pass the window builder.
     let window_builder =
         if cfg!(wgl_backend) { Some(WindowBuilder::new().with_transparent(true)) } else { None };
@@ -65,8 +65,8 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
 
     let raw_window_handle = window.as_ref().map(|window| window.raw_window_handle());
 
-    // XXX The display could be obtained from the any object created by it, so we
-    // can query it from the config.
+    // XXX The display could be obtained from any object created by it, so we can
+    // query it from the config.
     let gl_display = gl_config.display();
 
     // The context creation part. It can be created before surface and that's how
@@ -112,7 +112,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
                         .unwrap()
                 });
 
-                let attrs = window.build_surface_attributes(<_>::default());
+                let attrs = window.build_surface_attributes(Default::default());
                 let gl_surface = unsafe {
                     gl_config.display().create_window_surface(&gl_config, &attrs).unwrap()
                 };

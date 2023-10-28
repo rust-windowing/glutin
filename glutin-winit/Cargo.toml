@@ -12,7 +12,7 @@ edition = "2021"
 [features]
 default = ["egl", "glx", "x11", "wayland", "wgl"]
 egl = ["glutin/egl"]
-glx = ["glutin/glx", "glutin/x11", "winit/x11", "x11"]
+glx = ["glutin/glx", "x11"]
 wgl = ["glutin/wgl"]
 x11 = ["glutin/x11", "winit/x11"]
 wayland = ["glutin/wayland", "winit/wayland"]
