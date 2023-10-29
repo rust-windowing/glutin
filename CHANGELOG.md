@@ -1,5 +1,7 @@
 # Unreleased
 
+# Version 0.31.1
+
 - Fixed `CGLContextObj` having an invalid encoding on newer macOS versions.
 
 # Version 0.31.0
