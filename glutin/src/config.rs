@@ -45,9 +45,14 @@ pub trait GlConfig: Sealed {
     /// Zero would mean that there're no samples.
     fn num_samples(&self) -> u8;
 
-    /// Whether the config supports creating srgb capable [`Surface`].
+    /// Whether the config supports creating an sRGB-capable [`Surface`].
     ///
     /// [`Surface`]: crate::surface::Surface
+    ///
+    /// # Platform specific
+    /// - **EGL:** this only returns whether the `EGLDisplay` supports the sRGB
+    ///   framebuffer extension globally, and will be the same value for every
+    ///   [`GlConfig`].
     fn srgb_capable(&self) -> bool;
 
     /// Whether the config supports creating transparent surfaces.
@@ -95,9 +100,14 @@ pub struct ConfigTemplateBuilder {
 impl ConfigTemplateBuilder {
     /// Create a new configuration template builder.
     #[inline]
+    // TODO: Can we rename this to rgba8?
     pub fn new() -> Self {
         Default::default()
     }
+
+    // TODO: Can we add some common formats?
+    // pub fn r10g10b10a2() -> Self {}
+    // pub fn r16g16b16a16() -> Self {}
 
     /// Number of alpha bits in the color buffer.
     ///

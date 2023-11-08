@@ -34,6 +34,8 @@ pub const PLATFORM_ANGLE_NATIVE_PLATFORM_TYPE_ANGLE: super::EGLenum = 0x348F;
 pub const PLATFORM_ANGLE_TYPE_DEFAULT_ANGLE: super::EGLenum = 0x3206;
 pub const PLATFORM_ANGLE_DEVICE_TYPE_HARDWARE_ANGLE: super::EGLenum = 0x320A;
 pub const PLATFORM_ANGLE_DEVICE_TYPE_NULL_ANGLE: super::EGLenum = 0x345E;
+// EGL_EXT_device_drm_render_node
+pub const DRM_RENDER_NODE_FILE_EXT: super::EGLenum = 0x3377;
 
 mod wayland_storage {
     use super::FnPtr;

@@ -91,9 +91,9 @@ impl DisplayBuilder {
     ///
     /// # Api-specific
     ///
-    /// **WGL:** - [`WindowAttributes`] **must** be passed in
-    /// [`Self::with_window_attributes()`] if modern OpenGL(ES) is desired,
-    /// otherwise only builtin functions like `glClear` will be available.
+    /// - **WGL:** [`WindowAttributes`] **must** be passed in
+    ///   [`Self::with_window_attributes()`] if modern OpenGL(ES) is desired,
+    ///   otherwise only builtin functions like `glClear()` will be available.
     pub fn build<Picker>(
         mut self,
         event_loop: &impl GlutinEventLoop,
