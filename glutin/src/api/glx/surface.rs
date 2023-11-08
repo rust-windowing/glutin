@@ -164,18 +164,18 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     ///
     /// The caller must ensure that the attribute could be present.
     unsafe fn raw_attribute(&self, attr: c_int) -> c_uint {
+        let mut value = 0;
+        // This shouldn't generate any errors given that we know that the surface is
+        // valid.
         unsafe {
-            let mut value = 0;
-            // This shouldn't generate any errors given that we know that the surface is
-            // valid.
             self.display.inner.glx.QueryDrawable(
                 self.display.inner.raw.cast(),
                 self.raw,
                 attr,
                 &mut value,
-            );
-            value
-        }
+            )
+        };
+        value
     }
 }
 
@@ -235,7 +235,7 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
             },
             _ => {
                 return Err(
-                    ErrorKind::NotSupported("swap contol extrensions are not supported").into()
+                    ErrorKind::NotSupported("swap control extensions are not supported").into()
                 );
             },
         };

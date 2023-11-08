@@ -241,16 +241,19 @@ impl Config {
     ///
     /// The caller must ensure that the attribute could be present.
     unsafe fn raw_attribute(&self, attr: EGLint) -> EGLint {
-        unsafe {
-            let mut val = 0;
+        let mut val = 0;
+        let success = unsafe {
             self.inner.display.inner.egl.GetConfigAttrib(
                 *self.inner.display.inner.raw,
                 *self.inner.raw,
                 attr,
                 &mut val,
-            );
-            val as EGLint
+            )
+        };
+        if success != 1 {
+            eprintln!("Could not read Attrib {attr:#0x} from {:?}", self)
         }
+        val as EGLint
     }
 }
 

@@ -26,6 +26,8 @@ use crate::surface::{PbufferSurface, PixmapSurface, SurfaceAttributes, WindowSur
 use super::config::Config;
 use super::context::NotCurrentContext;
 use super::device::Device;
+#[cfg(doc)]
+use super::surface::ColorSpace;
 use super::surface::Surface;
 
 use super::{Egl, EGL};
@@ -511,12 +513,15 @@ impl GlDisplay for Display {
         unsafe { Self::find_configs(self, template) }
     }
 
+    /// Creates a window surface without [`ColorSpace`].  Use
+    /// [`Self::create_window_surface()`] if you wish to specify a color
+    /// space.
     unsafe fn create_window_surface(
         &self,
         config: &Self::Config,
         surface_attributes: &SurfaceAttributes<WindowSurface>,
     ) -> Result<Self::WindowSurface> {
-        unsafe { Self::create_window_surface(self, config, surface_attributes) }
+        unsafe { Self::create_window_surface(self, config, &surface_attributes.clone().into()) }
     }
 
     unsafe fn create_pbuffer_surface(
@@ -535,12 +540,15 @@ impl GlDisplay for Display {
         unsafe { Self::create_context(self, config, context_attributes) }
     }
 
+    /// Creates a pixmap surface without [`ColorSpace`].  Use
+    /// [`Self::create_pixmap_surface()`] if you wish to specify a color
+    /// space.
     unsafe fn create_pixmap_surface(
         &self,
         config: &Self::Config,
         surface_attributes: &SurfaceAttributes<PixmapSurface>,
     ) -> Result<Self::PixmapSurface> {
-        unsafe { Self::create_pixmap_surface(self, config, surface_attributes) }
+        unsafe { Self::create_pixmap_surface(self, config, &surface_attributes.clone().into()) }
     }
 
     fn get_proc_address(&self, addr: &CStr) -> *const ffi::c_void {

@@ -136,16 +136,16 @@ pub struct Config {
 
 impl Config {
     fn raw_attribute(&self, attrib: NSOpenGLPixelFormatAttribute) -> i32 {
+        let mut value = 0;
         unsafe {
-            let mut value = 0;
             self.inner.raw.getValues_forAttribute_forVirtualScreen(
                 &mut value, attrib,
                 // They do differ per monitor and require context. Which is kind of insane, but
                 // whatever. Zero is a primary monitor.
                 0,
-            );
-            value
-        }
+            )
+        };
+        value
     }
 
     #[allow(deprecated)]

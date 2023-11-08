@@ -67,7 +67,7 @@ pub trait NotCurrentGlContext: Sealed {
     /// The same as [`Self::make_current`], but provides a way to set read and
     /// draw surfaces.
     ///
-    /// # Api-specific:
+    /// # Api-specific
     ///
     /// - **WGL/CGL:** not supported.
     fn make_current_draw_read<T: SurfaceTypeTrait>(
@@ -107,7 +107,7 @@ pub trait PossiblyCurrentGlContext: Sealed {
     /// The same as [`Self::make_current`] but provides a way to set read and
     /// draw surfaces explicitly.
     ///
-    /// # Api-specific:
+    /// # Api-specific
     ///
     /// - **CGL/WGL:** not supported.
     fn make_current_draw_read<T: SurfaceTypeTrait>(

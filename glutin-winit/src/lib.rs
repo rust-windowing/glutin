@@ -83,9 +83,9 @@ impl DisplayBuilder {
     ///
     /// # Api-specific
     ///
-    /// **WGL:** - [`WindowBuilder`] **must** be passed in
-    /// [`Self::with_window_builder`] if modern OpenGL(ES) is desired,
-    /// otherwise only builtin functions like `glClear` will be available.
+    /// - **WGL:** [`WindowBuilder`] **must** be passed in
+    ///   [`Self::with_window_builder`] if modern OpenGL(ES) is desired,
+    ///   otherwise only builtin functions like `glClear` will be available.
     pub fn build<T, Picker>(
         mut self,
         window_target: &EventLoopWindowTarget<T>,

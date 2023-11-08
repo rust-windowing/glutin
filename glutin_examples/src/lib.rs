@@ -8,11 +8,11 @@ use winit::event::{Event, KeyEvent, WindowEvent};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::WindowBuilder;
 
-use glutin::config::ConfigTemplateBuilder;
+use glutin::config::{ColorBufferType, ConfigTemplateBuilder};
 use glutin::context::{ContextApi, ContextAttributesBuilder, Version};
-use glutin::display::GetGlDisplay;
+use glutin::display::GetGlDisplay as _;
 use glutin::prelude::*;
-use glutin::surface::SwapInterval;
+use glutin::surface::{SurfaceAttributesBuilder, SwapInterval};
 
 use glutin_winit::{self, DisplayBuilder, GlWindow};
 
@@ -43,8 +43,13 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
     // that, because we can query only one config at a time on it, but all
     // normal platforms will return multiple configs, so we can find the config
     // with transparency ourselves inside the `reduce`.
-    let template =
-        ConfigTemplateBuilder::new().with_alpha_size(8).with_transparency(cfg!(cgl_backend));
+    let template = ConfigTemplateBuilder::new()
+        // The default is 8, but then we miss out on R10G10B10A2 formats.  Requesting at least 2
+        // bits for alpha allows us to find it. Note that the default ConfigTemplate still requests
+        // at least 8 bits for RGB.
+        .with_alpha_size(2)
+        // .with_float_pixels(false)
+        .with_transparency(cfg!(cgl_backend));
 
     let display_builder = DisplayBuilder::new().with_window_builder(window_builder);
 
@@ -53,10 +58,25 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
         // be smooth.
         configs
             .reduce(|accum, config| {
+                let mut higher_bit_depth = false;
+                if let Some(ColorBufferType::Rgb { r_size, g_size, b_size }) =
+                    accum.color_buffer_type()
+                {
+                    if let Some(ColorBufferType::Rgb { r_size: r, g_size: g, b_size: b }) =
+                        config.color_buffer_type()
+                    {
+                        higher_bit_depth = r > r_size || g > g_size || b > b_size;
+                    }
+                }
                 let transparency_check = config.supports_transparency().unwrap_or(false)
                     & !accum.supports_transparency().unwrap_or(false);
 
-                if transparency_check || config.num_samples() > accum.num_samples() {
+                // TODO: Note that there's no preference order here. We accept the new config
+                // based on any of these changes
+                if transparency_check
+                    || config.num_samples() > accum.num_samples()
+                    || higher_bit_depth
+                {
                     config
                 } else {
                     accum
@@ -65,7 +85,13 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
             .unwrap()
     })?;
 
-    println!("Picked a config with {} samples", gl_config.num_samples());
+    println!(
+        "Picked a config with {} samples, transparency {:?}, pixel layout {:?}, alpha {}",
+        gl_config.num_samples(),
+        gl_config.supports_transparency(),
+        gl_config.color_buffer_type(),
+        gl_config.alpha_size(),
+    );
 
     let raw_window_handle = window.as_ref().map(|window| window.raw_window_handle());
 
@@ -118,10 +144,62 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
                         .unwrap()
                 });
 
-                let attrs = window.build_surface_attributes(Default::default());
-                let gl_surface = unsafe {
-                    gl_config.display().create_window_surface(&gl_config, &attrs).unwrap()
+                // sRGB sufaces should serve no purpose unless we call
+                // gl.Enable(gl::FRAMEBUFFER_SRGB);
+                let surface_attribs = SurfaceAttributesBuilder::new(); //.with_srgb(Some(false));
+                let attrs = window.build_surface_attributes(surface_attribs);
+
+                #[cfg(egl_backend)]
+                let gl_surface = if let glutin::config::Config::Egl(egl_config) = &gl_config {
+                    use glutin::api::egl::surface::{ColorSpace, EglSurfaceAttributes};
+                    use glutin::display::GetDisplayExtensions;
+
+                    let egl_display = egl_config.display();
+                    let exts = egl_display.extensions();
+
+                    // Test color space availability. Note that this creates "ugly" output as our
+                    // shader still writes linear color values
+                    let s = [
+                        Some(ColorSpace::Bt2020Hlg),
+                        Some(ColorSpace::Bt2020Pq),
+                        Some(ColorSpace::Bt2020Linear),
+                        Some(ColorSpace::DisplayP3),
+                        Some(ColorSpace::DisplayP3Linear),
+                        Some(ColorSpace::Linear),
+                        None,
+                    ]
+                    .into_iter()
+                    .find_map(|color_space| {
+                        // Skip color spaces for which the extension is not available, to prevent
+                        // receiving EGL_BAD_ATTRIBUTE
+                        if let Some(color_space) = color_space {
+                            if !exts.contains(color_space.egl_extension_name()) {
+                                return None;
+                            }
+                        }
+                        let egl_attrs =
+                            EglSurfaceAttributes { attributes: attrs.clone(), color_space };
+                        // TODO: Careful here that it uses the EGL function, or deref will pass
+                        // non-EGL surface attributes to the non-EGL trait function!
+                        // Should we use a different name and/or remove deref?
+                        match unsafe { egl_display.create_window_surface(egl_config, &egl_attrs) } {
+                            Err(e) => {
+                                eprintln!("Color space {color_space:?} not supported: {e:?}");
+                                None
+                            },
+                            Ok(s) => Some(s),
+                        }
+                    })
+                    .expect("Could not create surface");
+                    println!("Picked surface with color space {:?}", s.color_space());
+                    glutin::surface::Surface::Egl(s)
+                } else {
+                    unsafe { gl_display.create_window_surface(&gl_config, &attrs) }.unwrap()
                 };
+
+                #[cfg(not(egl_backend))]
+                let gl_surface =
+                    unsafe { gl_display.create_window_surface(&gl_config, &attrs) }.unwrap();
 
                 // Make it current.
                 let gl_context =
@@ -281,7 +359,7 @@ impl Renderer {
             self.gl.BindVertexArray(self.vao);
             self.gl.BindBuffer(gl::ARRAY_BUFFER, self.vbo);
 
-            self.gl.ClearColor(0.1, 0.1, 0.1, 0.9);
+            self.gl.ClearColor(0.1, 0.1, 0.1, 0.7);
             self.gl.Clear(gl::COLOR_BUFFER_BIT);
             self.gl.DrawArrays(gl::TRIANGLES, 0, 3);
         }
@@ -314,12 +392,26 @@ impl Drop for Renderer {
 
 unsafe fn create_shader(
     gl: &gl::Gl,
-    shader: gl::types::GLenum,
+    shader_type: gl::types::GLenum,
     source: &[u8],
 ) -> gl::types::GLuint {
-    let shader = gl.CreateShader(shader);
+    let shader = gl.CreateShader(shader_type);
     gl.ShaderSource(shader, 1, [source.as_ptr().cast()].as_ptr(), std::ptr::null());
     gl.CompileShader(shader);
+    let mut len = 0;
+    gl.GetShaderiv(shader, gl::INFO_LOG_LENGTH, &mut len);
+    if len > 0 {
+        let mut log = Vec::<u8>::with_capacity(len as usize);
+        gl.GetShaderInfoLog(shader, len, &mut len, log.as_mut_ptr().cast());
+        log.set_len(len as usize);
+        log.push(0);
+        let log = CString::from_vec_with_nul(log).unwrap();
+        eprintln!("Shader {shader_type:?} log");
+        eprintln!("{}", log.to_string_lossy());
+    }
+    let mut status = 0;
+    gl.GetShaderiv(shader, gl::COMPILE_STATUS, &mut status);
+    assert_eq!(status, 1, "Shader {shader_type:?} compilation failed");
     shader
 }
 
