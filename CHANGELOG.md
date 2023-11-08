@@ -1,5 +1,8 @@
 # Unreleased
 
+- Add `api::egl::sync::Sync` to wrap `EGLSync`
+- Add ability to import and export an a sync fd from a `api::egl::sync::Sync`
+
 # Version 0.31.1
 
 - Fixed `CGLContextObj` having an invalid encoding on newer macOS versions.

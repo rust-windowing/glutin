@@ -19,6 +19,7 @@ use libloading::os::unix as libloading_os;
 #[cfg(windows)]
 use libloading::os::windows as libloading_os;
 
+use crate::context::Version;
 use crate::error::{Error, ErrorKind, Result};
 use crate::lib_loading::{SymLoading, SymWrapper};
 
@@ -27,6 +28,7 @@ pub mod context;
 pub mod device;
 pub mod display;
 pub mod surface;
+pub mod sync;
 
 pub(crate) static EGL: Lazy<Option<Egl>> = Lazy::new(|| {
     #[cfg(windows)]
@@ -40,6 +42,8 @@ pub(crate) static EGL: Lazy<Option<Egl>> = Lazy::new(|| {
 
 type EglGetProcAddress = unsafe extern "C" fn(*const ffi::c_void) -> *const ffi::c_void;
 static EGL_GET_PROC_ADDRESS: OnceCell<libloading_os::Symbol<EglGetProcAddress>> = OnceCell::new();
+
+const VERSION_1_5: Version = Version { major: 1, minor: 5 };
 
 pub(crate) struct Egl(pub SymWrapper<egl::Egl>);
 

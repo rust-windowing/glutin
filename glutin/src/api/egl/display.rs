@@ -231,6 +231,91 @@ impl Display {
         }
     }
 
+    /// Create a sync.
+    ///
+    /// Creating a sync fence requires that an EGL context is currently bound.
+    /// Otherwise [`ErrorKind::BadMatch`] is returned.
+    ///
+    /// This function returns [`Err`] if the EGL version is not at least 1.5
+    /// or `EGL_KHR_fence_sync` is not available. An error is also returned if
+    /// native fences are not supported.
+    pub fn create_sync(&self, native: bool) -> Result<super::sync::Sync> {
+        if self.inner.version < super::VERSION_1_5
+            && !self.inner.display_extensions.contains("EGL_KHR_fence_sync")
+        {
+            return Err(ErrorKind::NotSupported("Sync objects are not supported").into());
+        }
+
+        if native && !self.inner.display_extensions.contains("EGL_ANDROID_native_fence_sync") {
+            return Err(ErrorKind::NotSupported("Native fences are not supported").into());
+        }
+
+        let ty = if native { egl::SYNC_NATIVE_FENCE_ANDROID } else { egl::SYNC_FENCE_KHR };
+        let sync = unsafe { self.inner.egl.CreateSyncKHR(*self.inner.raw, ty, ptr::null()) };
+
+        if sync == egl::NO_SYNC {
+            return Err(super::check_error().err().unwrap());
+        }
+
+        Ok(super::sync::Sync(Arc::new(super::sync::Inner {
+            inner: sync,
+            display: self.inner.clone(),
+        })))
+    }
+
+    /// Import a sync fd into EGL.
+    ///
+    /// Glutin will duplicate the sync fd being imported since EGL assumes
+    /// ownership of the file descriptor. If the file descriptor could not
+    /// be cloned, then [`ErrorKind::BadParameter`] is returned.
+    ///
+    /// This function returns [`ErrorKind::NotSupported`] if the
+    /// `EGL_ANDROID_native_fence_sync` extension is not available.
+    #[cfg(unix)]
+    pub fn import_sync(
+        &self,
+        fd: std::os::unix::prelude::BorrowedFd<'_>,
+    ) -> Result<super::sync::Sync> {
+        use std::mem;
+        use std::os::unix::prelude::AsRawFd;
+
+        // The specification states that EGL_KHR_fence_sync must be available,
+        // and therefore does not need to be tested.
+        if !self.inner.display_extensions.contains("EGL_ANDROID_native_fence_sync") {
+            return Err(ErrorKind::NotSupported("Importing a sync fd is not supported").into());
+        }
+
+        let import = fd.try_clone_to_owned().map_err(|_| ErrorKind::BadParameter)?;
+
+        let attrs: [EGLint; 3] =
+            [egl::SYNC_NATIVE_FENCE_FD_ANDROID as EGLint, import.as_raw_fd(), egl::NONE as EGLint];
+
+        // SAFETY:
+        // - The EGL implementation advertised EGL_ANDROID_native_fence_sync
+        // - The fd being imported is an OwnedFd, meaning ownership is transfered to
+        //   EGL.
+        let sync = unsafe {
+            self.inner.egl.CreateSyncKHR(
+                *self.inner.raw,
+                egl::SYNC_NATIVE_FENCE_ANDROID,
+                attrs.as_ptr(),
+            )
+        };
+
+        if sync == egl::NO_SYNC {
+            // Drop will implicitly close the duplicated file descriptor.
+            return Err(super::check_error().err().unwrap());
+        }
+
+        // Successful import means EGL assumes ownership of the file descriptor.
+        mem::forget(import);
+
+        Ok(super::sync::Sync(Arc::new(super::sync::Inner {
+            inner: sync,
+            display: self.inner.clone(),
+        })))
+    }
+
     fn get_platform_display(egl: &Egl, display: RawDisplayHandle) -> Result<EglDisplay> {
         if !egl.GetPlatformDisplay.is_loaded() {
             return Err(ErrorKind::NotSupported("eglGetPlatformDisplay is not supported").into());
