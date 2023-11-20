@@ -119,6 +119,16 @@ impl Display {
             }
         }
 
+        // Workaround for fallback to GLES1 on supported GLES2 platforms
+        // Reference: https://github.com/rust-windowing/glutin/issues/1647
+        // Setting the EGL context client version to the specified major version
+        if let Some(version) = version {
+            if version.major == 2 {
+                attrs.push(egl::CONTEXT_CLIENT_VERSION as EGLint);
+                attrs.push(version.major as EGLint);
+            }
+        }
+
         attrs.push(egl::NONE as EGLint);
 
         let shared_context = if let Some(shared_context) =
