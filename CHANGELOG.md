@@ -1,5 +1,7 @@
 # Unreleased
 
+- Added workaround for fallback to GLES1 on supported GLES2 platforms (See https://github.com/rust-windowing/glutin/issues/1647).
+
 # Version 0.31.1
 
 - Fixed `CGLContextObj` having an invalid encoding on newer macOS versions.
