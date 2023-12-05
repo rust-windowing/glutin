@@ -109,7 +109,7 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     fn width(&self) -> Option<u32> {
         let window = &self.ns_window;
         let view = &self.ns_view;
-        MainThreadMarker::run_on_main(|mtm| unsafe {
+        MainThreadMarker::run_on_main(|mtm| {
             let scale_factor = window.get(mtm).backingScaleFactor();
             let frame = view.get(mtm).frame();
             Some((frame.size.width * scale_factor) as u32)
@@ -119,7 +119,7 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     fn height(&self) -> Option<u32> {
         let window = &self.ns_window;
         let view = &self.ns_view;
-        MainThreadMarker::run_on_main(|mtm| unsafe {
+        MainThreadMarker::run_on_main(|mtm| {
             let scale_factor = window.get(mtm).backingScaleFactor();
             let frame = view.get(mtm).frame();
             Some((frame.size.height * scale_factor) as u32)
