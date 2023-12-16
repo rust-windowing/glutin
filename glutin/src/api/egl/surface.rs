@@ -493,20 +493,10 @@ impl NativeWindow {
             RawWindowHandle::Xcb(window_handle) => Self::Xcb(window_handle.window.get()),
             #[cfg(android_platform)]
             RawWindowHandle::AndroidNdk(window_handle) => {
-                if window_handle.a_native_window.is_null() {
-                    return Err(ErrorKind::BadNativeWindow.into());
-                }
-
-                Self::Android(window_handle.a_native_window)
+                Self::Android(window_handle.a_native_window.as_ptr())
             },
             #[cfg(windows)]
-            RawWindowHandle::Win32(window_handle) => {
-                if window_handle.hwnd.is_null() {
-                    return Err(ErrorKind::BadNativeWindow.into());
-                }
-
-                Self::Win32(window_handle.hwnd as _)
-            },
+            RawWindowHandle::Win32(window_handle) => Self::Win32(window_handle.hwnd.get()),
             #[cfg(free_unix)]
             RawWindowHandle::Gbm(window_handle) => {
                 Self::Gbm(window_handle.gbm_surface.as_ptr() as _)
