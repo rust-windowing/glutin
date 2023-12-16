@@ -5,6 +5,7 @@ use std::ffi::{self, CStr};
 use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::os::raw::c_char;
+use std::ptr::NonNull;
 use std::sync::Arc;
 use std::{fmt, ptr};
 
@@ -239,7 +240,7 @@ impl Display {
         let extensions = CLIENT_EXTENSIONS.get().unwrap();
 
         let mut attrs = Vec::<EGLAttrib>::with_capacity(5);
-        let (platform, mut display) = match display {
+        let (platform, display) = match display {
             #[cfg(wayland_platform)]
             RawDisplayHandle::Wayland(handle)
                 if extensions.contains("EGL_KHR_platform_wayland") =>
@@ -250,13 +251,17 @@ impl Display {
             RawDisplayHandle::Xlib(handle) if extensions.contains("EGL_KHR_platform_x11") => {
                 attrs.push(egl::PLATFORM_X11_SCREEN_KHR as EGLAttrib);
                 attrs.push(handle.screen as EGLAttrib);
-                (egl::PLATFORM_X11_KHR, handle.display)
+                let display = handle.display.unwrap_or_else(|| unsafe {
+                    NonNull::new_unchecked(egl::DEFAULT_DISPLAY as *mut _)
+                });
+                (egl::PLATFORM_X11_KHR, display)
             },
             RawDisplayHandle::Gbm(handle) if extensions.contains("EGL_KHR_platform_gbm") => {
                 (egl::PLATFORM_GBM_KHR, handle.gbm_device)
             },
             RawDisplayHandle::Android(_) if extensions.contains("EGL_KHR_platform_android") => {
-                (egl::PLATFORM_ANDROID_KHR, egl::DEFAULT_DISPLAY as *mut _)
+                let display = unsafe { NonNull::new_unchecked(egl::DEFAULT_DISPLAY as *mut _) };
+                (egl::PLATFORM_ANDROID_KHR, display)
             },
             _ => {
                 return Err(
@@ -264,11 +269,6 @@ impl Display {
                 )
             },
         };
-
-        // Be explicit here.
-        if display.is_null() {
-            display = egl::DEFAULT_DISPLAY as *mut _;
-        }
 
         // Push at the end so we can pop it on failure
         let mut has_display_reference = extensions.contains("EGL_KHR_display_reference");
@@ -290,7 +290,7 @@ impl Display {
         // if it failed using it.
         let platform_display = loop {
             match Self::check_display_error(unsafe {
-                egl.GetPlatformDisplay(platform, display as *mut _, attrs.as_ptr())
+                egl.GetPlatformDisplay(platform, display.as_ptr(), attrs.as_ptr())
             }) {
                 Err(_) if has_display_reference => {
                     attrs.pop();
@@ -315,7 +315,7 @@ impl Display {
 
         let mut attrs = Vec::<EGLint>::with_capacity(5);
         let mut legacy = false;
-        let (platform, mut display) = match display {
+        let (platform, display) = match display {
             #[cfg(wayland_platform)]
             RawDisplayHandle::Wayland(handle)
                 if extensions.contains("EGL_EXT_platform_wayland") =>
@@ -326,7 +326,10 @@ impl Display {
             RawDisplayHandle::Xlib(handle) if extensions.contains("EGL_EXT_platform_x11") => {
                 attrs.push(egl::PLATFORM_X11_SCREEN_EXT as EGLint);
                 attrs.push(handle.screen as EGLint);
-                (egl::PLATFORM_X11_EXT, handle.display)
+                let display = handle.display.unwrap_or_else(|| unsafe {
+                    NonNull::new_unchecked(egl::DEFAULT_DISPLAY as *mut _)
+                });
+                (egl::PLATFORM_X11_EXT, display)
             },
             #[cfg(x11_platform)]
             RawDisplayHandle::Xcb(handle)
@@ -335,7 +338,10 @@ impl Display {
             {
                 attrs.push(egl::PLATFORM_XCB_SCREEN_EXT as EGLint);
                 attrs.push(handle.screen as EGLint);
-                (egl::PLATFORM_XCB_EXT, handle.connection)
+                let display = handle.connection.unwrap_or_else(|| unsafe {
+                    NonNull::new_unchecked(egl::DEFAULT_DISPLAY as *mut _)
+                });
+                (egl::PLATFORM_XCB_EXT, display)
             },
             RawDisplayHandle::Gbm(handle) if extensions.contains("EGL_MESA_platform_gbm") => {
                 (egl::PLATFORM_GBM_MESA, handle.gbm_device)
@@ -343,7 +349,8 @@ impl Display {
             RawDisplayHandle::Windows(..) if extensions.contains("EGL_ANGLE_platform_angle") => {
                 // Only CreateWindowSurface appears to work with Angle.
                 legacy = true;
-                (egl::PLATFORM_ANGLE_ANGLE, egl::DEFAULT_DISPLAY as *mut _)
+                let display = unsafe { NonNull::new_unchecked(egl::DEFAULT_DISPLAY as *mut _) };
+                (egl::PLATFORM_ANGLE_ANGLE, display)
             },
             _ => {
                 return Err(
@@ -351,11 +358,6 @@ impl Display {
                 )
             },
         };
-
-        // Be explicit here.
-        if display.is_null() {
-            display = egl::DEFAULT_DISPLAY as *mut _;
-        }
 
         // Push at the end so we can pop it on failure
         let mut has_display_reference = extensions.contains("EGL_KHR_display_reference");
@@ -377,7 +379,7 @@ impl Display {
         // if it failed using it.
         let platform_display = loop {
             match Self::check_display_error(unsafe {
-                egl.GetPlatformDisplayEXT(platform, display as *mut _, attrs.as_ptr())
+                egl.GetPlatformDisplayEXT(platform, display.as_ptr(), attrs.as_ptr())
             }) {
                 Err(_) if has_display_reference => {
                     attrs.pop();
@@ -404,11 +406,15 @@ impl Display {
     }
 
     fn get_display(egl: &Egl, display: RawDisplayHandle) -> Result<EglDisplay> {
-        let mut display = match display {
+        let display = match display {
             RawDisplayHandle::Gbm(handle) => handle.gbm_device,
             #[cfg(x11_platform)]
-            RawDisplayHandle::Xlib(handle) => handle.display,
-            RawDisplayHandle::Android(_) => egl::DEFAULT_DISPLAY as *mut _,
+            RawDisplayHandle::Xlib(handle) => handle.display.unwrap_or_else(|| unsafe {
+                NonNull::new_unchecked(egl::DEFAULT_DISPLAY as *mut _)
+            }),
+            RawDisplayHandle::Android(_) => unsafe {
+                NonNull::new_unchecked(egl::DEFAULT_DISPLAY as *mut _)
+            },
             _ => {
                 return Err(
                     ErrorKind::NotSupported("provided display handle is not supported").into()
@@ -416,11 +422,7 @@ impl Display {
             },
         };
 
-        if display.is_null() {
-            display = egl::DEFAULT_DISPLAY as *mut _;
-        }
-
-        let display = unsafe { egl.GetDisplay(display) };
+        let display = unsafe { egl.GetDisplay(display.as_ptr()) };
         Self::check_display_error(display).map(EglDisplay::Legacy)
     }
 

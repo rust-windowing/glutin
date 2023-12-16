@@ -23,7 +23,7 @@ use glutin::prelude::*;
 #[cfg(wgl_backend)]
 use raw_window_handle::HasRawWindowHandle;
 
-use raw_window_handle::{HasRawDisplayHandle, RawWindowHandle};
+use raw_window_handle::{HasDisplayHandle, RawWindowHandle};
 use winit::error::OsError;
 use winit::event_loop::EventLoopWindowTarget;
 use winit::window::{Window, WindowBuilder};
@@ -170,7 +170,7 @@ fn create_display<T>(
         ApiPreference::FallbackEgl => DisplayApiPreference::WglThenEgl(_raw_window_handle),
     };
 
-    unsafe { Ok(Display::new(window_target.raw_display_handle(), _preference)?) }
+    unsafe { Ok(Display::new(window_target.display_handle()?.into(), _preference)?) }
 }
 
 /// Finalize [`Window`] creation by applying the options from the [`Config`], be

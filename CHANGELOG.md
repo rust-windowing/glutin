@@ -1,5 +1,7 @@
 # Unreleased
 
+- **Breaking:** Bump `raw-window-handle` to version `0.6.0`
+
 # Version 0.31.1
 
 - Fixed `CGLContextObj` having an invalid encoding on newer macOS versions.

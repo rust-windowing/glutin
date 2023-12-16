@@ -469,14 +469,10 @@ impl NativeWindow {
         let native_window = match raw_window_handle {
             #[cfg(wayland_platform)]
             RawWindowHandle::Wayland(window_handle) => unsafe {
-                if window_handle.surface.is_null() {
-                    return Err(ErrorKind::BadNativeWindow.into());
-                }
-
                 let ptr = ffi_dispatch!(
                     wayland_egl_handle(),
                     wl_egl_window_create,
-                    window_handle.surface.cast(),
+                    window_handle.surface.as_ptr() as _,
                     _width.get() as _,
                     _height.get() as _
                 );
@@ -494,13 +490,7 @@ impl NativeWindow {
                 Self::Xlib(window_handle.window as _)
             },
             #[cfg(x11_platform)]
-            RawWindowHandle::Xcb(window_handle) => {
-                if window_handle.window == 0 {
-                    return Err(ErrorKind::BadNativeWindow.into());
-                }
-
-                Self::Xcb(window_handle.window as _)
-            },
+            RawWindowHandle::Xcb(window_handle) => Self::Xcb(window_handle.window.get()),
             #[cfg(android_platform)]
             RawWindowHandle::AndroidNdk(window_handle) => {
                 if window_handle.a_native_window.is_null() {
@@ -519,11 +509,7 @@ impl NativeWindow {
             },
             #[cfg(free_unix)]
             RawWindowHandle::Gbm(window_handle) => {
-                if window_handle.gbm_surface.is_null() {
-                    return Err(ErrorKind::BadNativeWindow.into());
-                }
-
-                Self::Gbm(window_handle.gbm_surface)
+                Self::Gbm(window_handle.gbm_surface.as_ptr() as _)
             },
             _ => {
                 return Err(

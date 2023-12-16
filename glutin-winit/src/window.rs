@@ -5,7 +5,7 @@ use glutin::surface::{
     GlSurface, ResizeableSurface, Surface, SurfaceAttributes, SurfaceAttributesBuilder,
     SurfaceTypeTrait, WindowSurface,
 };
-use raw_window_handle::HasRawWindowHandle;
+use raw_window_handle::HasWindowHandle;
 use winit::window::Window;
 
 /// [`Window`] extensions for working with [`glutin`] surfaces.
@@ -53,7 +53,8 @@ impl GlWindow for Window {
         builder: SurfaceAttributesBuilder<WindowSurface>,
     ) -> SurfaceAttributes<WindowSurface> {
         let (w, h) = self.inner_size().non_zero().expect("invalid zero inner size");
-        builder.build(self.raw_window_handle(), w, h)
+        let raw_window_handle = self.window_handle().expect("invalid window handle").as_raw();
+        builder.build(raw_window_handle, w, h)
     }
 
     fn resize_surface(
