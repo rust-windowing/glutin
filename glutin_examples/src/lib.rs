@@ -4,7 +4,8 @@ use std::num::NonZeroU32;
 use std::ops::Deref;
 
 use raw_window_handle::HasRawWindowHandle;
-use winit::event::{Event, WindowEvent};
+use winit::event::{Event, KeyEvent, WindowEvent};
+use winit::keyboard::{Key, NamedKey};
 use winit::window::WindowBuilder;
 
 use glutin::config::ConfigTemplateBuilder;
@@ -28,8 +29,11 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
     //
     // XXX if you don't care about running on Android or so you can safely remove
     // this condition and always pass the window builder.
-    let window_builder =
-        if cfg!(wgl_backend) { Some(WindowBuilder::new().with_transparent(true)) } else { None };
+    let window_builder = cfg!(wgl_backend).then(|| {
+        WindowBuilder::new()
+            .with_transparent(true)
+            .with_title("Glutin triangle gradient example (press Escape to exit)")
+    });
 
     // The template will match only the configurations supporting rendering
     // to windows.
@@ -107,7 +111,9 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
                 println!("Android window available");
 
                 let window = window.take().unwrap_or_else(|| {
-                    let window_builder = WindowBuilder::new().with_transparent(true);
+                    let window_builder = WindowBuilder::new()
+                        .with_transparent(true)
+                        .with_title("Glutin triangle gradient example (press Escape to exit)");
                     glutin_winit::finalize_window(window_target, window_builder, &gl_config)
                         .unwrap()
                 });
@@ -165,7 +171,11 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
                         }
                     }
                 },
-                WindowEvent::CloseRequested => window_target.exit(),
+                WindowEvent::CloseRequested
+                | WindowEvent::KeyboardInput {
+                    event: KeyEvent { logical_key: Key::Named(NamedKey::Escape), .. },
+                    ..
+                } => window_target.exit(),
                 _ => (),
             },
             Event::AboutToWait => {
