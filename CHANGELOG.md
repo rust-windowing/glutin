@@ -1,5 +1,7 @@
 # Unreleased
 
+- Fixed EGL not setting context version with EGL versions before 1.5 and missing context ext.
+
 # Version 0.31.1
 
 - Fixed `CGLContextObj` having an invalid encoding on newer macOS versions.

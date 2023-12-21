@@ -117,6 +117,13 @@ impl Display {
                 attrs.push(egl::CONTEXT_FLAGS_KHR as EGLint);
                 attrs.push(flags as EGLint);
             }
+        } else if self.inner.version >= Version::new(1, 3) {
+            // EGL 1.3 uses that to indicate client version instead of major/minor. The
+            // constant is the same as `CONTEXT_MAJOR_VERSION`.
+            if let Some(version) = version {
+                attrs.push(egl::CONTEXT_CLIENT_VERSION as EGLint);
+                attrs.push(version.major as EGLint);
+            }
         }
 
         attrs.push(egl::NONE as EGLint);
