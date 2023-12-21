@@ -81,6 +81,9 @@ pub struct Surface<T: SurfaceTypeTrait> {
     _ty: PhantomData<T>,
 }
 
+// Impl only `Send` for Surface.
+unsafe impl<T: SurfaceTypeTrait> Send for Surface<T> {}
+
 impl<T: SurfaceTypeTrait> Drop for Surface<T> {
     fn drop(&mut self) {
         unsafe {

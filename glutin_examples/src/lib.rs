@@ -69,9 +69,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
     // query it from the config.
     let gl_display = gl_config.display();
 
-    // The context creation part. It can be created before surface and that's how
-    // it's expected in multithreaded + multiwindow operation mode, since you
-    // can send NotCurrentContext, but not Surface.
+    // The context creation part.
     let context_attributes = ContextAttributesBuilder::new().build(raw_window_handle);
 
     // Since glutin by default tries to create OpenGL core context, which may not be
