@@ -14,10 +14,10 @@ edition = "2021"
 [features]
 default = ["egl", "glx", "x11", "wayland", "wgl"]
 egl = ["glutin_egl_sys", "libloading"]
-glx = ["x11", "x11-dl", "glutin_glx_sys", "libloading"]
+glx = ["x11", "glutin_glx_sys", "libloading"]
 wgl = ["glutin_wgl_sys", "windows-sys"]
 x11 = ["x11-dl"]
-wayland = ["wayland-sys"]
+wayland = ["wayland-sys", "egl"]
 
 [dependencies]
 bitflags = "2.2.1"

@@ -108,7 +108,7 @@ impl ConfigTemplateBuilder {
         self
     }
 
-    /// Wether the floating pixel formats should be used.
+    /// Whether the floating pixel formats should be used.
     ///
     /// By default `false` is requested.
     #[inline]
@@ -181,7 +181,7 @@ impl ConfigTemplateBuilder {
         self
     }
 
-    /// Wether the stereo pairs should be present.
+    /// Whether the stereo pairs should be present.
     ///
     /// By default it isn't specified.
     #[inline]
@@ -190,7 +190,7 @@ impl ConfigTemplateBuilder {
         self
     }
 
-    /// Wether the single buffer should be used.
+    /// Whether the single buffer should be used.
     ///
     /// By default `false` is requested.
     #[inline]
@@ -199,7 +199,7 @@ impl ConfigTemplateBuilder {
         self
     }
 
-    /// Wether the configuration should support transparency.
+    /// Whether the configuration should support transparency.
     ///
     /// The default is `false`.
     ///
@@ -221,7 +221,7 @@ impl ConfigTemplateBuilder {
         self
     }
 
-    /// Wether the configuration should prefer hardware accelerated formats or
+    /// Whether the configuration should prefer hardware accelerated formats or
     /// not.
     ///
     /// By default hardware acceleration or its absence is not requested.

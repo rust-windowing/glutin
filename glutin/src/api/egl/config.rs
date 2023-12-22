@@ -370,7 +370,7 @@ impl GetGlDisplay for Config {
     type Target = Display;
 
     fn display(&self) -> Self::Target {
-        Display { inner: self.inner.display.inner.clone() }
+        self.inner.display.clone()
     }
 }
 

@@ -486,7 +486,7 @@ impl<T: SurfaceTypeTrait> Sealed for Surface<T> {}
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SwapInterval {
     /// When this variant is used calling
-    /// `[crate::surface::GlSurface::swap_buffers]` will not block.
+    /// [`crate::surface::GlSurface::swap_buffers()`] will not block.
     DontWait,
 
     /// The swap is synchronized to the `n`'th video frame. This is typically
