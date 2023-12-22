@@ -7,7 +7,7 @@ A low-level library for OpenGL context creation.
 
 ```toml
 [dependencies]
-glutin = "0.31.1"
+glutin = "0.31.2"
 ```
 
 ## [Documentation](https://docs.rs/glutin)
