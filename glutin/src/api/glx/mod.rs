@@ -29,8 +29,8 @@ pub mod surface;
 /// The hook registrar must call to the function inside xlib error
 /// [`handler`].
 ///
-/// The `bool` value returned by that hook tells wether the error was handled by
-/// it or not. So when it returns `true` it means that your error handling
+/// The `bool` value returned by that hook tells whether the error was handled
+/// by it or not. So when it returns `true` it means that your error handling
 /// routine shouldn't handle the error as it was handled by the hook already.
 ///
 /// [`handler`]: https://tronche.com/gui/x/xlib/event-handling/protocol-errors/XSetErrorHandler.html
