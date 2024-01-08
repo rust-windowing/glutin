@@ -17,7 +17,7 @@ pub struct CGLContextObj {
 }
 
 unsafe impl RefEncode for CGLContextObj {
-    const ENCODING_REF: Encoding = Encoding::Pointer(&Encoding::Void);
+    const ENCODING_REF: Encoding = Encoding::Pointer(&Encoding::Struct("_CGLContextObject", &[]));
 }
 
 extern_class!(
@@ -42,7 +42,7 @@ extern_methods!(
 
         #[method_id(initWithFormat:shareContext:)]
         pub(crate) fn initWithFormat_shareContext(
-            this: Option<Allocated<Self>>,
+            this: Allocated<Self>,
             format: &NSOpenGLPixelFormat,
             share: Option<&NSOpenGLContext>,
         ) -> Option<Id<Self>>;
@@ -97,7 +97,7 @@ extern_methods!(
     unsafe impl NSOpenGLPixelFormat {
         #[method_id(initWithAttributes:)]
         unsafe fn initWithAttributes(
-            this: Option<Allocated<Self>>,
+            this: Allocated<Self>,
             attrs: *const NSOpenGLPixelFormatAttribute,
         ) -> Option<Id<Self>>;
 
