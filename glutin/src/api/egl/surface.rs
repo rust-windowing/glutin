@@ -2,16 +2,20 @@
 
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
+use std::ops::Deref;
 use std::{ffi, fmt};
 
-use glutin_egl_sys::egl;
-use glutin_egl_sys::egl::types::{EGLAttrib, EGLSurface, EGLint};
+use glutin_egl_sys::egl::types::{EGLAttrib, EGLSurface};
+use glutin_egl_sys::egl::{self};
+use glutin_egl_sys::{EGLenum, EGLint};
 use raw_window_handle::RawWindowHandle;
 #[cfg(wayland_platform)]
 use wayland_sys::{egl::*, ffi_dispatch};
 
 use crate::api::egl::display::EglDisplay;
 use crate::config::GetGlConfig;
+#[cfg(doc)]
+use crate::display::GetDisplayExtensions;
 use crate::display::GetGlDisplay;
 use crate::error::{ErrorKind, Result};
 use crate::prelude::*;
@@ -28,6 +32,124 @@ use super::display::Display;
 /// Hint for the attribute list size.
 const ATTR_SIZE_HINT: usize = 8;
 
+/// Missing `EGL_EXT_gl_colorspace_bt2020_hlg` constant defined at <https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_gl_colorspace_bt2020_linear.txt>
+pub const EGL_GL_COLORSPACE_BT2020_HLG_EXT: EGLenum = 0x3540;
+/// Missing `EXT_gl_colorspace_display_p3_passthrough` constant defined at <https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_gl_colorspace_display_p3_passthrough.txt>
+pub const EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT: EGLenum = 0x3490;
+
+/// Possible color spaces for [`egl::GL_COLORSPACE`].
+///
+/// It is impossible to query whether a [`Config`] or [`Surface`] supports a
+/// certain color space, only whether the [`Display`] might have it available
+/// globally.  Compare [`ColorSpace::egl_extension_name()`] against
+/// [`GetDisplayExtensions::extensions()`] to get a hint of whether there will
+/// be any support for it.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+pub enum ColorSpace {
+    /// Use [`egl::GL_COLORSPACE_LINEAR`] from [`EGL_KHR_gl_colorspace`](https://registry.khronos.org/EGL/extensions/KHR/EGL_KHR_gl_colorspace.txt).
+    Linear,
+    /// Use [`egl::GL_COLORSPACE_SRGB`] from [`EGL_KHR_gl_colorspace`](https://registry.khronos.org/EGL/extensions/KHR/EGL_KHR_gl_colorspace.txt).
+    Srgb,
+    /// Use [`egl::GL_COLORSPACE_SCRGB_EXT`] from [`EGL_EXT_gl_colorspace_scrgb`](https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_gl_colorspace_scrgb.txt).
+    Scrgb,
+    /// Use [`egl::GL_COLORSPACE_SCRGB_LINEAR_EXT`] from [`EGL_EXT_gl_colorspace_scrgb_linear`](https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_gl_colorspace_scrgb_linear.txt).
+    ScrgbLinear,
+    /// Use [`egl::GL_COLORSPACE_DISPLAY_P3_EXT`] from [`EGL_EXT_gl_colorspace_display_p3`](https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_gl_colorspace_display_p3.txt).
+    DisplayP3,
+    /// Use [`egl::GL_COLORSPACE_DISPLAY_P3_LINEAR_EXT`] from [`EGL_EXT_gl_colorspace_display_p3_linear`](https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_gl_colorspace_display_p3.txt).
+    DisplayP3Linear,
+    /// Use [`EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT`] from [`EGL_EXT_gl_colorspace_display_p3_passthrough`](https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_gl_colorspace_display_p3_passthrough.txt).
+    DisplayP3Passthrough,
+    /// Use [`EGL_GL_COLORSPACE_BT2020_HLG_EXT`] from [`EGL_EXT_gl_colorspace_bt2020_hlg`](https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_gl_colorspace_bt2020_linear.txt).
+    Bt2020Hlg,
+    /// Use [`egl::GL_COLORSPACE_BT2020_LINEAR_EXT`] from [`EGL_EXT_gl_colorspace_bt2020_linear`](https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_gl_colorspace_bt2020_linear.txt).
+    Bt2020Linear,
+    /// Use [`egl::GL_COLORSPACE_BT2020_PQ_EXT`] from [`EGL_EXT_gl_colorspace_bt2020_pq`](https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_gl_colorspace_bt2020_linear.txt).
+    Bt2020Pq,
+}
+
+impl ColorSpace {
+    fn egl_colorspace(self) -> EGLenum {
+        match self {
+            ColorSpace::Linear => egl::GL_COLORSPACE_LINEAR,
+            ColorSpace::Srgb => egl::GL_COLORSPACE_SRGB,
+            ColorSpace::Scrgb => egl::GL_COLORSPACE_SCRGB_EXT,
+            ColorSpace::ScrgbLinear => egl::GL_COLORSPACE_SCRGB_LINEAR_EXT,
+            ColorSpace::DisplayP3 => egl::GL_COLORSPACE_DISPLAY_P3_EXT,
+            ColorSpace::DisplayP3Linear => egl::GL_COLORSPACE_DISPLAY_P3_LINEAR_EXT,
+            ColorSpace::DisplayP3Passthrough => EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT,
+            ColorSpace::Bt2020Hlg => EGL_GL_COLORSPACE_BT2020_HLG_EXT,
+            ColorSpace::Bt2020Linear => egl::GL_COLORSPACE_BT2020_LINEAR_EXT,
+            ColorSpace::Bt2020Pq => egl::GL_COLORSPACE_BT2020_PQ_EXT,
+        }
+    }
+
+    fn from_egl_colorspace(attrib: EGLenum) -> Option<Self> {
+        Some(match attrib {
+            egl::GL_COLORSPACE_LINEAR => Self::Linear,
+            egl::GL_COLORSPACE_SRGB => Self::Srgb,
+            egl::GL_COLORSPACE_SCRGB_EXT => Self::Scrgb,
+            egl::GL_COLORSPACE_SCRGB_LINEAR_EXT => Self::ScrgbLinear,
+            egl::GL_COLORSPACE_DISPLAY_P3_EXT => Self::DisplayP3,
+            egl::GL_COLORSPACE_DISPLAY_P3_LINEAR_EXT => Self::DisplayP3Linear,
+            EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT => Self::DisplayP3Passthrough,
+            EGL_GL_COLORSPACE_BT2020_HLG_EXT => Self::Bt2020Hlg,
+            egl::GL_COLORSPACE_BT2020_LINEAR_EXT => Self::Bt2020Linear,
+            egl::GL_COLORSPACE_BT2020_PQ_EXT => Self::Bt2020Pq,
+            _ => return None,
+        })
+    }
+
+    /// Returns the EGL extension name that provides this constant
+    pub const fn egl_extension_name(self) -> &'static str {
+        match self {
+            ColorSpace::Linear => "EGL_KHR_gl_colorspace",
+            ColorSpace::Srgb => "EGL_KHR_gl_colorspace",
+            ColorSpace::Scrgb => "EGL_EXT_gl_colorspace_scrgb",
+            ColorSpace::ScrgbLinear => "EGL_EXT_gl_colorspace_scrgb_linear",
+            ColorSpace::DisplayP3 => "EGL_EXT_gl_colorspace_display_p3",
+            ColorSpace::DisplayP3Linear => "EGL_EXT_gl_colorspace_display_p3_linear",
+            ColorSpace::DisplayP3Passthrough => "EGL_EXT_gl_colorspace_display_p3_passthrough",
+            ColorSpace::Bt2020Hlg => "EGL_EXT_gl_colorspace_bt2020_hlg",
+            ColorSpace::Bt2020Linear => "EGL_EXT_gl_colorspace_bt2020_linear",
+            ColorSpace::Bt2020Pq => "EGL_EXT_gl_colorspace_bt2020_pq",
+        }
+    }
+}
+
+/// Attributes which are used for creating a particular surface in EGL.
+// TODO: Do we need a builder here?
+#[derive(Default, Debug, Clone)]
+pub struct EglSurfaceAttributes<T: SurfaceTypeTrait> {
+    /// Backend-agnostic [`Surface`] attributes
+    pub attributes: SurfaceAttributes<T>,
+    /// If [`None`], no [`egl::GL_COLORSPACE`] is selected.
+    pub color_space: Option<ColorSpace>,
+}
+
+impl<T: SurfaceTypeTrait> Deref for EglSurfaceAttributes<T> {
+    type Target = SurfaceAttributes<T>;
+
+    /// WARNING! This deref might also get used when passing
+    /// `EglSurfaceAttributes` into the generic `create_window_surface()`,
+    /// and you'll loose the `color_space` field!
+    fn deref(&self) -> &Self::Target {
+        &self.attributes
+    }
+}
+
+impl<T: SurfaceTypeTrait> From<SurfaceAttributes<T>> for EglSurfaceAttributes<T> {
+    fn from(attributes: SurfaceAttributes<T>) -> Self {
+        Self {
+            color_space: attributes.srgb.map(|b| match b {
+                false => ColorSpace::Linear,
+                true => ColorSpace::Srgb,
+            }),
+            attributes,
+        }
+    }
+}
+
 impl Display {
     pub(crate) unsafe fn create_pbuffer_surface(
         &self,
@@ -39,6 +161,8 @@ impl Display {
 
         // XXX Window surface is using `EGLAttrib` and not `EGLint`.
         let mut attrs = Vec::<EGLint>::with_capacity(ATTR_SIZE_HINT);
+
+        // TODO: Do pbuffers support HDR formats?
 
         // Add dimensions.
         attrs.push(egl::WIDTH as EGLint);
@@ -68,22 +192,31 @@ impl Display {
         })
     }
 
-    pub(crate) unsafe fn create_pixmap_surface(
+    /// # Safety
+    /// Raw calls
+    pub unsafe fn create_pixmap_surface(
         &self,
         config: &Config,
-        surface_attributes: &SurfaceAttributes<PixmapSurface>,
+        surface_attributes: &EglSurfaceAttributes<PixmapSurface>,
     ) -> Result<Surface<PixmapSurface>> {
         let native_pixmap = surface_attributes.native_pixmap.as_ref().unwrap();
 
         let mut attrs = Vec::<EGLAttrib>::with_capacity(ATTR_SIZE_HINT);
 
-        if surface_attributes.srgb.is_some() && config.srgb_capable() {
+        // Add colorspace if the extension is present.
+        if let Some(color_space) = surface_attributes.color_space {
+            if !self.inner.display_extensions.contains("EGL_KHR_gl_colorspace") {
+                return Err(ErrorKind::NotSupported(
+                    "Setting a color space requires EGL_KHR_gl_colorspace",
+                )
+                .into());
+            }
+            if !self.inner.display_extensions.contains(color_space.egl_extension_name()) {
+                return Err(ErrorKind::NotSupported(color_space.egl_extension_name()).into());
+            }
+            let color_attr = color_space.egl_colorspace();
             attrs.push(egl::GL_COLORSPACE as EGLAttrib);
-            let colorspace = match surface_attributes.srgb {
-                Some(true) => egl::GL_COLORSPACE_SRGB as EGLAttrib,
-                _ => egl::GL_COLORSPACE_LINEAR as EGLAttrib,
-            };
-            attrs.push(colorspace);
+            attrs.push(color_attr as EGLAttrib);
         }
 
         // Push `egl::NONE` to terminate the list.
@@ -157,10 +290,12 @@ impl Display {
         })
     }
 
-    pub(crate) unsafe fn create_window_surface(
+    /// # Safety
+    /// Raw calls
+    pub unsafe fn create_window_surface(
         &self,
         config: &Config,
-        surface_attributes: &SurfaceAttributes<WindowSurface>,
+        surface_attributes: &EglSurfaceAttributes<WindowSurface>,
     ) -> Result<Surface<WindowSurface>> {
         // Create native window.
         let native_window = NativeWindow::new(
@@ -179,14 +314,17 @@ impl Display {
                 as EGLAttrib;
         attrs.push(buffer);
 
-        // // Add colorspace if the extension is present.
-        if surface_attributes.srgb.is_some() && config.srgb_capable() {
-            attrs.push(egl::GL_COLORSPACE as EGLAttrib);
-            let colorspace = match surface_attributes.srgb {
-                Some(true) => egl::GL_COLORSPACE_SRGB as EGLAttrib,
-                _ => egl::GL_COLORSPACE_LINEAR as EGLAttrib,
-            };
-            attrs.push(colorspace);
+        // Add colorspace if the extension is present.
+        if let Some(color_space) = surface_attributes.color_space {
+            if !self.inner.display_extensions.contains("EGL_KHR_gl_colorspace") {
+                return Err(ErrorKind::NotSupported(
+                    "Setting a color space requires EGL_KHR_gl_colorspace",
+                )
+                .into());
+            }
+            if !self.inner.display_extensions.contains(color_space.egl_extension_name()) {
+                return Err(ErrorKind::NotSupported(color_space.egl_extension_name()).into());
+            }
         }
 
         // Push `egl::NONE` to terminate the list.
@@ -304,17 +442,26 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     /// # Safety
     ///
     /// The caller must ensure that the attribute could be present.
-    unsafe fn raw_attribute(&self, attr: EGLint) -> EGLint {
-        unsafe {
-            let mut value = 0;
-            self.display.inner.egl.QuerySurface(
-                *self.display.inner.raw,
-                self.raw,
-                attr,
-                &mut value,
-            );
-            value
+    pub unsafe fn raw_attribute(&self, attr: EGLint) -> EGLint {
+        let mut value = 0;
+        let success = unsafe {
+            self.display.inner.egl.QuerySurface(*self.display.inner.raw, self.raw, attr, &mut value)
+        };
+        if success != 1 {
+            eprintln!("Could not read Attrib {attr:#0x} from {:?}", self)
         }
+        value
+    }
+
+    /// Returns the [`ColorSpace`] of the [`Surface`], or [`None`] if
+    /// `EGL_KHR_gl_colorspace` is not supported or the returned value is
+    /// not recognized by [`ColorSpace`].
+    pub fn color_space(&self) -> Option<ColorSpace> {
+        if !self.display.inner.display_extensions.contains("EGL_KHR_gl_colorspace") {
+            return None;
+        }
+        let color_space = unsafe { self.raw_attribute(egl::GL_COLORSPACE as EGLint) };
+        ColorSpace::from_egl_colorspace(color_space as EGLenum)
     }
 }
 

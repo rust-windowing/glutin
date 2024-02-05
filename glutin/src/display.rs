@@ -322,7 +322,9 @@ impl GlDisplay for Display {
         match (self, config) {
             #[cfg(egl_backend)]
             (Self::Egl(display), Config::Egl(config)) => unsafe {
-                Ok(Surface::Egl(display.create_window_surface(config, surface_attributes)?))
+                Ok(Surface::Egl(
+                    display.create_window_surface(config, &surface_attributes.clone().into())?,
+                ))
             },
             #[cfg(glx_backend)]
             (Self::Glx(display), Config::Glx(config)) => unsafe {
@@ -374,7 +376,9 @@ impl GlDisplay for Display {
         match (self, config) {
             #[cfg(egl_backend)]
             (Self::Egl(display), Config::Egl(config)) => unsafe {
-                Ok(Surface::Egl(display.create_pixmap_surface(config, surface_attributes)?))
+                Ok(Surface::Egl(
+                    display.create_pixmap_surface(config, &surface_attributes.clone().into())?,
+                ))
             },
             #[cfg(glx_backend)]
             (Self::Glx(display), Config::Glx(config)) => unsafe {
@@ -429,8 +433,8 @@ pub enum DisplayApiPreference {
     ///
     /// # Platform-specific
     ///
-    /// **Windows:** ANGLE can be used if `libEGL.dll` and `libGLESv2.dll` are
-    ///              in the library search path.
+    /// - **Windows:** ANGLE can be used if `libEGL.dll` and `libGLESv2.dll` are
+    ///   in the library search path.
     #[cfg(egl_backend)]
     Egl,
 
@@ -552,7 +556,7 @@ bitflags! {
         /// The display supports creating context with explicit [`release behavior`].
         ///
         /// [`release behavior`]: crate::context::ReleaseBehavior
-        const CONTEXT_RELEASE_BEHAVIOR   = 0b0001_0000;
+        const CONTEXT_RELEASE_BEHAVIOR    = 0b0001_0000;
 
         /// The display supports creating OpenGL ES [`context`].
         ///

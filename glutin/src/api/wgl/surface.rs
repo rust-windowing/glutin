@@ -141,7 +141,7 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
             },
             _ => {
                 return Err(
-                    ErrorKind::NotSupported("swap contol extrensions are not supported").into()
+                    ErrorKind::NotSupported("swap control extensions are not supported").into()
                 )
             },
         };
