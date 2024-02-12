@@ -3,12 +3,13 @@ use std::ffi::{CStr, CString};
 use std::num::NonZeroU32;
 use std::ops::Deref;
 
+use gl::types::GLfloat;
 use raw_window_handle::HasRawWindowHandle;
 use winit::event::{Event, KeyEvent, WindowEvent};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::WindowBuilder;
 
-use glutin::config::ConfigTemplateBuilder;
+use glutin::config::{Config, ConfigTemplateBuilder};
 use glutin::context::{ContextApi, ContextAttributesBuilder, Version};
 use glutin::display::GetGlDisplay;
 use glutin::prelude::*;
@@ -48,22 +49,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
 
     let display_builder = DisplayBuilder::new().with_window_builder(window_builder);
 
-    let (mut window, gl_config) = display_builder.build(&event_loop, template, |configs| {
-        // Find the config with the maximum number of samples, so our triangle will
-        // be smooth.
-        configs
-            .reduce(|accum, config| {
-                let transparency_check = config.supports_transparency().unwrap_or(false)
-                    & !accum.supports_transparency().unwrap_or(false);
-
-                if transparency_check || config.num_samples() > accum.num_samples() {
-                    config
-                } else {
-                    accum
-                }
-            })
-            .unwrap()
-    })?;
+    let (mut window, gl_config) = display_builder.build(&event_loop, template, gl_config_picker)?;
 
     println!("Picked a config with {} samples", gl_config.num_samples());
 
@@ -73,9 +59,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
     // query it from the config.
     let gl_display = gl_config.display();
 
-    // The context creation part. It can be created before surface and that's how
-    // it's expected in multithreaded + multiwindow operation mode, since you
-    // can send NotCurrentContext, but not Surface.
+    // The context creation part.
     let context_attributes = ContextAttributesBuilder::new().build(raw_window_handle);
 
     // Since glutin by default tries to create OpenGL core context, which may not be
@@ -194,6 +178,23 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
     Ok(())
 }
 
+// Find the config with the maximum number of samples, so our triangle will be
+// smooth.
+pub fn gl_config_picker(configs: Box<dyn Iterator<Item = Config> + '_>) -> Config {
+    configs
+        .reduce(|accum, config| {
+            let transparency_check = config.supports_transparency().unwrap_or(false)
+                & !accum.supports_transparency().unwrap_or(false);
+
+            if transparency_check || config.num_samples() > accum.num_samples() {
+                config
+            } else {
+                accum
+            }
+        })
+        .unwrap()
+}
+
 pub struct Renderer {
     program: gl::types::GLuint,
     vao: gl::types::GLuint,
@@ -275,13 +276,23 @@ impl Renderer {
     }
 
     pub fn draw(&self) {
+        self.draw_with_clear_color(0.1, 0.1, 0.1, 0.9)
+    }
+
+    pub fn draw_with_clear_color(
+        &self,
+        red: GLfloat,
+        green: GLfloat,
+        blue: GLfloat,
+        alpha: GLfloat,
+    ) {
         unsafe {
             self.gl.UseProgram(self.program);
 
             self.gl.BindVertexArray(self.vao);
             self.gl.BindBuffer(gl::ARRAY_BUFFER, self.vbo);
 
-            self.gl.ClearColor(0.1, 0.1, 0.1, 0.9);
+            self.gl.ClearColor(red, green, blue, alpha);
             self.gl.Clear(gl::COLOR_BUFFER_BIT);
             self.gl.DrawArrays(gl::TRIANGLES, 0, 3);
         }

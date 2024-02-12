@@ -81,7 +81,7 @@ impl Display {
             config: config.clone(),
             ns_view,
             ns_window,
-            _nosendsync: PhantomData,
+            _nosync: PhantomData,
             _ty: PhantomData,
         };
         Ok(surface)
@@ -94,9 +94,12 @@ pub struct Surface<T: SurfaceTypeTrait> {
     config: Config,
     pub(crate) ns_view: MainThreadBound<Id<NSView>>,
     ns_window: MainThreadBound<Id<NSWindow>>,
-    _nosendsync: PhantomData<*const std::ffi::c_void>,
+    _nosync: PhantomData<*const std::ffi::c_void>,
     _ty: PhantomData<T>,
 }
+
+// Impl only `Send` for Surface.
+unsafe impl<T: SurfaceTypeTrait> Send for Surface<T> {}
 
 impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     type Context = PossiblyCurrentContext;
