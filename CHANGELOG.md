@@ -1,5 +1,7 @@
 # Unreleased
 
+# Version 0.31.3
+
 - Change `Surface` to be `Send`. This makes it consistent with the context, so now they are both `Send` but not `Sync`.
 
 # Version 0.31.2
