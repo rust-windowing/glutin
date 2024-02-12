@@ -252,6 +252,9 @@ pub struct Surface<T: SurfaceTypeTrait> {
     _ty: PhantomData<T>,
 }
 
+// Impl only `Send` for Surface.
+unsafe impl<T: SurfaceTypeTrait> Send for Surface<T> {}
+
 impl<T: SurfaceTypeTrait> Surface<T> {
     /// Swaps the underlying back buffers when the surface is not single
     /// buffered and pass the [`Rect`] information to the system

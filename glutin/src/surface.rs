@@ -262,10 +262,11 @@ pub enum SurfaceType {
 
 /// The GL surface that is used for rendering.
 ///
-/// The GL surface is not thread safe, it can neither be [`Send`] nor [`Sync`],
-/// so it should be created on the thread it'll be used to render.
+/// Similar to the context, the GL surface is [`Send`] but not [`Sync`]. This
+/// means it could be sent to a different thread as long as it is not current on
+/// another thread.
 ///
-/// ```compile_fail
+/// ```no_run
 /// fn test_send<T: Send>() {}
 /// test_send::<glutin::surface::Surface<glutin::surface::WindowSurface>>();
 /// ```
