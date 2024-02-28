@@ -17,7 +17,7 @@
 #![deny(clippy::all)]
 #![deny(missing_debug_implementations)]
 #![deny(missing_docs)]
-#![cfg_attr(feature = "cargo-clippy", deny(warnings))]
+#![cfg_attr(clippy, deny(warnings))]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 #[cfg(all(not(egl_backend), not(glx_backend), not(wgl_backend), not(cgl_backend)))]
