@@ -6,7 +6,7 @@
 #![deny(clippy::all)]
 #![deny(missing_debug_implementations)]
 #![deny(missing_docs)]
-#![cfg_attr(feature = "cargo-clippy", deny(warnings))]
+#![cfg_attr(clippy, deny(warnings))]
 
 mod window;
 
