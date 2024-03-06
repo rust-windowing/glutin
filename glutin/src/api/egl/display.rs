@@ -214,6 +214,11 @@ impl Display {
         Device::from_ptr(self.inner.egl, device)
     }
 
+    /// Get a reference to the initialized EGL API.
+    pub fn egl(&self) -> &'static Egl {
+        self.inner.egl
+    }
+
     /// Terminate the EGL display.
     ///
     /// When the display is managed by glutin with the

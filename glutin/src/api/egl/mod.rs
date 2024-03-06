@@ -41,7 +41,9 @@ pub(crate) static EGL: Lazy<Option<Egl>> = Lazy::new(|| {
 type EglGetProcAddress = unsafe extern "C" fn(*const ffi::c_void) -> *const ffi::c_void;
 static EGL_GET_PROC_ADDRESS: OnceCell<libloading_os::Symbol<EglGetProcAddress>> = OnceCell::new();
 
-pub(crate) struct Egl(pub SymWrapper<egl::Egl>);
+/// EGL interface.
+#[allow(missing_debug_implementations)]
+pub struct Egl(SymWrapper<egl::Egl>);
 
 unsafe impl Sync for Egl {}
 unsafe impl Send for Egl {}
@@ -67,6 +69,11 @@ impl SymLoading for egl::Egl {
                 (egl_proc_address)(sym_name.as_bytes_with_nul().as_ptr() as *const ffi::c_void)
             }
         };
+
+        egl::BindWaylandDisplayWL::load_with(loader);
+        egl::UnbindWaylandDisplayWL::load_with(loader);
+        egl::QueryWaylandBufferWL::load_with(loader);
+        egl::CreateWaylandBufferFromImageWL::load_with(loader);
 
         Self::load_with(loader)
     }

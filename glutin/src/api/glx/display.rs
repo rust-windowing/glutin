@@ -110,6 +110,11 @@ impl Display {
         Ok(Self { inner })
     }
 
+    /// Get a reference to the initialized GLX API.
+    pub fn glx(&self) -> &'static Glx {
+        self.inner.glx
+    }
+
     fn extract_display_features(
         extensions: &HashSet<&'static str>,
         version: Version,

@@ -39,6 +39,7 @@ fn main() {
             "EGL_KHR_create_context_no_error",
             "EGL_KHR_display_reference",
             "EGL_KHR_fence_sync",
+            "EGL_KHR_image_base",
             "EGL_KHR_platform_android",
             "EGL_KHR_platform_gbm",
             "EGL_KHR_platform_wayland",
