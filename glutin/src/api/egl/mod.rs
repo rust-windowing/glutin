@@ -28,7 +28,7 @@ pub mod device;
 pub mod display;
 pub mod surface;
 
-pub(crate) static EGL: Lazy<Option<Egl>> = Lazy::new(|| {
+pub static EGL: Lazy<Option<Egl>> = Lazy::new(|| {
     #[cfg(windows)]
     let paths = ["libEGL.dll", "atioglxx.dll"];
 
@@ -67,6 +67,11 @@ impl SymLoading for egl::Egl {
                 (egl_proc_address)(sym_name.as_bytes_with_nul().as_ptr() as *const ffi::c_void)
             }
         };
+
+        egl::BindWaylandDisplayWL::load_with(loader);
+        egl::UnbindWaylandDisplayWL::load_with(loader);
+        egl::QueryWaylandBufferWL::load_with(loader);
+        egl::CreateWaylandBufferFromImageWL::load_with(loader);
 
         Self::load_with(loader)
     }
