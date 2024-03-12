@@ -16,7 +16,7 @@ static XRENDER: Lazy<Option<Xrender>> = Lazy::new(|| Xrender::open().ok());
 
 /// The GlConfig extension trait to get X11 specific properties from a config.
 pub trait X11GlConfigExt {
-    /// The `X11VisualInfo` that must be used to inititalize the Xlib window.
+    /// The `X11VisualInfo` that must be used to initialize the Xlib window.
     fn x11_visual(&self) -> Option<X11VisualInfo>;
 }
 
