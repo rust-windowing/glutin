@@ -28,8 +28,6 @@ jobs:
         tool: typos-cli
     - name: Check Formatting
       run: cargo +nightly fmt --all -- --check
-    - name: Check Formatting
-      run: cargo fmt --all -- --check
     - name: Run Typos
       run: typos
 
