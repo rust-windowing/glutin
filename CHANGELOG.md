@@ -68,7 +68,7 @@
 
 # Version 0.30.3
 
-- Fixed wrong amount of rects commited in `Surface::swap_buffers_with_damage` with EGL.
+- Fixed wrong amount of rects committed in `Surface::swap_buffers_with_damage` with EGL.
 - Added missing `Eq`, `PartialEq`, and `Hash` impls for `surface::Rect`.
 
 # Version 0.30.2
@@ -92,9 +92,9 @@
 - **This version of `glutin` has been rewritten from the ground and no longer depends on `winit`, the `raw-window-handle` is now used instead of it.**
 - The Api is now built around `Display`, `Surface`, `Config`, and `Surface`. For more info see crate documentation and examples.
 - **Breaking:** Bump MSRV from `1.57` to `1.60`.
-- The ios support was removed for the lack of maintainance for now. In case there's a need for it, contributions are welcome.
+- The ios support was removed for the lack of maintenance for now. In case there's a need for it, contributions are welcome.
 - The context creation is no longer limited to winit's supported platforms.
-- The underlying Api providers are publically exposed now, so glutin could be used with just e.g. `EGL`.
+- The underlying Api providers are publicly exposed now, so glutin could be used with just e.g. `EGL`.
 - Fixed soundness issues with `Surface` MT safety, since before `EGLSurface` could be sent to a different thread, which is not safe.
 - Fallback to `Surface::swap_buffers` when `Surface::swap_buffers_with_damage` is not supported on `EGL`.
 

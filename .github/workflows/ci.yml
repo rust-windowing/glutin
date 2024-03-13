@@ -23,8 +23,13 @@ jobs:
       with:
         rust-version: nightly
         components: rustfmt
+    - uses: taiki-e/install-action@v2
+      with:
+        tool: typos-cli
     - name: Check Formatting
       run: cargo +nightly fmt --all -- --check
+    - name: Run Typos
+      run: typos
 
   tests:
     name: Tests

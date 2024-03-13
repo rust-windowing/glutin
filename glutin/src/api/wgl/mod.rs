@@ -87,7 +87,7 @@ unsafe fn load_extra_functions(
     // setups).
     unsafe { wm::RegisterClassExW(&class) };
 
-    // This dummy wnidow should match the real one enough to get the same OpenGL
+    // This dummy window should match the real one enough to get the same OpenGL
     // driver.
     let title =
         OsStr::new("dummy window").encode_wide().chain(Some(0).into_iter()).collect::<Vec<_>>();

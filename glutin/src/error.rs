@@ -14,7 +14,7 @@ pub struct Error {
     /// The raw message from the os in case it could be obtained.
     raw_os_message: Option<String>,
 
-    /// The simplified error kind to handle mathing.
+    /// The simplified error kind to handle matching.
     kind: ErrorKind,
 }
 
@@ -151,7 +151,7 @@ impl ErrorKind {
             InitializationFailed => "initialization failed",
             BadAccess => "access to the resource failed",
             OutOfMemory => "out of memory",
-            BadAttribute => "an anrecougnized attribute or attribute value was passed",
+            BadAttribute => "an unrecognized attribute or attribute value was passed",
             BadContext => "argument does not name a valid context",
             BadContextState => "the context is in a bad state",
             BadConfig => "argument does not name a valid config",
@@ -160,7 +160,7 @@ impl ErrorKind {
             BadSurface => "argument does not name a valid surface",
             BadPbuffer => "argument does not name a valid pbuffer",
             BadPixmap => "argument does not name a valid pixmap",
-            BadMatch => "arguments are inconsistance",
+            BadMatch => "arguments are inconsistent",
             BadParameter => "one or more argument values are invalid",
             BadNativePixmap => "argument does not refer to a valid native pixmap",
             BadNativeWindow => "argument does not refer to a valid native window",

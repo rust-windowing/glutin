@@ -51,7 +51,7 @@ pub trait NotCurrentGlContext: Sealed {
 
     /// Make [`Self::Surface`] on the calling thread producing the
     /// [`Self::PossiblyCurrentContext`] indicating that the context could
-    /// be current on the theard.
+    /// be current on the thread.
     ///
     /// # Platform specific
     ///

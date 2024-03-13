@@ -88,7 +88,7 @@ impl Display {
     }
 }
 
-/// A wrapper aroud `NSView`.
+/// A wrapper around `NSView`.
 pub struct Surface<T: SurfaceTypeTrait> {
     display: Display,
     config: Config,
