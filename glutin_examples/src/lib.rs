@@ -4,7 +4,7 @@ use std::num::NonZeroU32;
 use std::ops::Deref;
 
 use gl::types::GLfloat;
-use raw_window_handle::HasRawWindowHandle;
+use raw_window_handle::HasWindowHandle;
 use winit::event::{Event, KeyEvent, WindowEvent};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::WindowBuilder;
@@ -53,7 +53,10 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
 
     println!("Picked a config with {} samples", gl_config.num_samples());
 
-    let raw_window_handle = window.as_ref().map(|window| window.raw_window_handle());
+    let raw_window_handle = window
+        .as_ref()
+        .and_then(|window| window.window_handle().ok())
+        .map(|handle| handle.as_raw());
 
     // XXX The display could be obtained from any object created by it, so we can
     // query it from the config.
@@ -102,7 +105,9 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
                         .unwrap()
                 });
 
-                let attrs = window.build_surface_attributes(Default::default());
+                let attrs = window
+                    .build_surface_attributes(Default::default())
+                    .expect("Failed to build surface attributes");
                 let gl_surface = unsafe {
                     gl_config.display().create_window_surface(&gl_config, &attrs).unwrap()
                 };

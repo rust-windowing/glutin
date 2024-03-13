@@ -13,7 +13,7 @@ use glutin::surface::{GlSurface, Surface, WindowSurface};
 use glutin_examples::gl::types::GLfloat;
 use glutin_examples::{gl_config_picker, Renderer};
 use glutin_winit::{self, DisplayBuilder, GlWindow};
-use raw_window_handle::HasRawWindowHandle;
+use raw_window_handle::HasWindowHandle;
 use winit::dpi::PhysicalSize;
 use winit::event::{ElementState, Event, WindowEvent};
 use winit::event_loop::{EventLoopBuilder, EventLoopProxy};
@@ -177,7 +177,9 @@ fn create_window_with_render_context(
 
     println!("Picked a config with {} samples", gl_config.num_samples());
 
-    let raw_window_handle = window.as_ref().map(|window| window.raw_window_handle());
+    let raw_window_handle = window
+        .as_ref()
+        .and_then(|window| window.window_handle().map(|handle| handle.as_raw()).ok());
 
     let window = window.take().unwrap();
 
@@ -191,7 +193,9 @@ fn create_window_with_render_context(
             .expect("failed to create context")
     };
 
-    let attrs = window.build_surface_attributes(<_>::default());
+    let attrs = window
+        .build_surface_attributes(<_>::default())
+        .expect("Failed to build surface attributes");
     let gl_surface =
         unsafe { gl_config.display().create_window_surface(&gl_config, &attrs).unwrap() };
 

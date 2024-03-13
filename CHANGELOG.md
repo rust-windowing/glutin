@@ -1,5 +1,6 @@
 # Unreleased
 
+- **Breaking:** updated `raw-window-handle` dependency to `0.6`.
 - Bump MSRV from `1.65` to `1.70`.
 
 # Version 0.31.3
