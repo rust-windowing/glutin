@@ -196,8 +196,8 @@ impl Display {
                 // XXX This can't be done by passing visual in the EGL attributes
                 // when calling `eglChooseConfig` since the visual is ignored.
                 match template.native_window {
-                    Some(RawWindowHandle::Xcb(xcb)) if xcb.visual_id > 0 => {
-                        xcb.visual_id as u32 == config.native_visual()
+                    Some(RawWindowHandle::Xcb(xcb)) => {
+                        xcb.visual_id.map_or(false, |id| id.get() == config.native_visual())
                     },
                     Some(RawWindowHandle::Xlib(xlib)) if xlib.visual_id > 0 => {
                         xlib.visual_id as u32 == config.native_visual()
@@ -386,7 +386,7 @@ impl X11GlConfigExt for Config {
         match *self.inner.display.inner._native_display? {
             raw_window_handle::RawDisplayHandle::Xlib(display_handle) => unsafe {
                 let xid = self.native_visual();
-                X11VisualInfo::from_xid(display_handle.display as *mut _, xid as _)
+                X11VisualInfo::from_xid(display_handle.display?.as_ptr() as *mut _, xid as _)
             },
             _ => None,
         }

@@ -1,4 +1,5 @@
 # Unreleased
+- **Breaking:** updated `raw-window-handle` dependency to `0.6`.
 
 # Version 0.31.3
 

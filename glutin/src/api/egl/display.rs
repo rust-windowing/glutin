@@ -14,6 +14,8 @@ use glutin_egl_sys::egl::types::{EGLAttrib, EGLDisplay, EGLint};
 use once_cell::sync::OnceCell;
 
 use raw_window_handle::RawDisplayHandle;
+#[cfg(x11_platform)]
+use raw_window_handle::XlibDisplayHandle;
 
 use crate::config::ConfigTemplate;
 use crate::context::Version;
@@ -244,16 +246,16 @@ impl Display {
             RawDisplayHandle::Wayland(handle)
                 if extensions.contains("EGL_KHR_platform_wayland") =>
             {
-                (egl::PLATFORM_WAYLAND_KHR, handle.display)
+                (egl::PLATFORM_WAYLAND_KHR, handle.display.as_ptr())
             },
             #[cfg(x11_platform)]
             RawDisplayHandle::Xlib(handle) if extensions.contains("EGL_KHR_platform_x11") => {
                 attrs.push(egl::PLATFORM_X11_SCREEN_KHR as EGLAttrib);
                 attrs.push(handle.screen as EGLAttrib);
-                (egl::PLATFORM_X11_KHR, handle.display)
+                (egl::PLATFORM_X11_KHR, handle.display.map_or(ptr::null_mut(), |d| d.as_ptr()))
             },
             RawDisplayHandle::Gbm(handle) if extensions.contains("EGL_KHR_platform_gbm") => {
-                (egl::PLATFORM_GBM_KHR, handle.gbm_device)
+                (egl::PLATFORM_GBM_KHR, handle.gbm_device.as_ptr())
             },
             RawDisplayHandle::Android(_) if extensions.contains("EGL_KHR_platform_android") => {
                 (egl::PLATFORM_ANDROID_KHR, egl::DEFAULT_DISPLAY as *mut _)
@@ -320,13 +322,13 @@ impl Display {
             RawDisplayHandle::Wayland(handle)
                 if extensions.contains("EGL_EXT_platform_wayland") =>
             {
-                (egl::PLATFORM_WAYLAND_EXT, handle.display)
+                (egl::PLATFORM_WAYLAND_EXT, handle.display.as_ptr())
             },
             #[cfg(x11_platform)]
             RawDisplayHandle::Xlib(handle) if extensions.contains("EGL_EXT_platform_x11") => {
                 attrs.push(egl::PLATFORM_X11_SCREEN_EXT as EGLint);
                 attrs.push(handle.screen as EGLint);
-                (egl::PLATFORM_X11_EXT, handle.display)
+                (egl::PLATFORM_X11_EXT, handle.display.map_or(ptr::null_mut(), |d| d.as_ptr()))
             },
             #[cfg(x11_platform)]
             RawDisplayHandle::Xcb(handle)
@@ -335,10 +337,10 @@ impl Display {
             {
                 attrs.push(egl::PLATFORM_XCB_SCREEN_EXT as EGLint);
                 attrs.push(handle.screen as EGLint);
-                (egl::PLATFORM_XCB_EXT, handle.connection)
+                (egl::PLATFORM_XCB_EXT, handle.connection.map_or(ptr::null_mut(), |c| c.as_ptr()))
             },
             RawDisplayHandle::Gbm(handle) if extensions.contains("EGL_MESA_platform_gbm") => {
-                (egl::PLATFORM_GBM_MESA, handle.gbm_device)
+                (egl::PLATFORM_GBM_MESA, handle.gbm_device.as_ptr())
             },
             RawDisplayHandle::Windows(..) if extensions.contains("EGL_ANGLE_platform_angle") => {
                 // Only CreateWindowSurface appears to work with Angle.
@@ -405,9 +407,9 @@ impl Display {
 
     fn get_display(egl: &Egl, display: RawDisplayHandle) -> Result<EglDisplay> {
         let mut display = match display {
-            RawDisplayHandle::Gbm(handle) => handle.gbm_device,
+            RawDisplayHandle::Gbm(handle) => handle.gbm_device.as_ptr(),
             #[cfg(x11_platform)]
-            RawDisplayHandle::Xlib(handle) => handle.display,
+            RawDisplayHandle::Xlib(XlibDisplayHandle { display: Some(d), .. }) => d.as_ptr(),
             RawDisplayHandle::Android(_) => egl::DEFAULT_DISPLAY as *mut _,
             _ => {
                 return Err(
