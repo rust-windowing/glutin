@@ -3,8 +3,9 @@
 use std::sync::Arc;
 use std::{fmt, iter};
 
+use objc2::rc::Id;
 #[allow(deprecated)]
-use icrate::AppKit::{
+use objc2_app_kit::{
     NSOpenGLPFAAccelerated, NSOpenGLPFAAllowOfflineRenderers, NSOpenGLPFAAlphaSize,
     NSOpenGLPFAColorFloat, NSOpenGLPFAColorSize, NSOpenGLPFADepthSize, NSOpenGLPFADoubleBuffer,
     NSOpenGLPFAMinimumPolicy, NSOpenGLPFAMultisample, NSOpenGLPFAOpenGLProfile,
@@ -12,7 +13,6 @@ use icrate::AppKit::{
     NSOpenGLPFATripleBuffer, NSOpenGLPixelFormatAttribute, NSOpenGLProfileVersion3_2Core,
     NSOpenGLProfileVersion4_1Core, NSOpenGLProfileVersionLegacy,
 };
-use objc2::rc::Id;
 
 use crate::config::{
     Api, AsRawConfig, ColorBufferType, ConfigSurfaceTypes, ConfigTemplate, GlConfig, RawConfig,

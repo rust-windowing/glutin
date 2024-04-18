@@ -53,19 +53,24 @@ x11-dl = { version = "2.20.0", optional = true }
 cgl = "0.3.2"
 core-foundation = "0.9.3"
 # Enable `relax-void-encoding` until https://github.com/madsmtm/objc2/pull/526 is resolved
-objc2 = { version = "0.4.1", features = ["relax-void-encoding"] }
+objc2 = { version = "0.5.1", features = ["relax-void-encoding"] }
 dispatch = "0.2.0"
 
-[target.'cfg(any(target_os = "macos"))'.dependencies.icrate]
-version = "0.0.4"
+[target.'cfg(any(target_os = "macos"))'.dependencies.objc2-foundation]
+version = "0.2.0"
 features = [
     "dispatch",
-    "Foundation",
-    "Foundation_NSArray",
-    "Foundation_NSThread",
-    "AppKit",
-    "AppKit_NSView",
-    "AppKit_NSWindow",
+    "NSArray",
+    "NSThread",
+]
+
+[target.'cfg(any(target_os = "macos"))'.dependencies.objc2-app-kit]
+version = "0.2.0"
+features = [
+    "NSResponder",
+    "NSView",
+    "NSWindow",
+    "NSOpenGL",
 ]
 
 [build-dependencies]
