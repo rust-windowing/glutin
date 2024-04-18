@@ -17,7 +17,7 @@ pub struct CGLContextObj {
 }
 
 unsafe impl RefEncode for CGLContextObj {
-    const ENCODING_REF: Encoding = Encoding::Pointer(&Encoding::Void);
+    const ENCODING_REF: Encoding = Encoding::Pointer(&Encoding::Struct("_CGLContextObject", &[]));
 }
 
 extern_class!(
