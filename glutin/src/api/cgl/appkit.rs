@@ -1,13 +1,13 @@
-//! Parts of AppKit related to OpenGL that is not yet in `icrate`.
+//! Parts of AppKit related to OpenGL that is not yet in `objc2-app-kit`.
 #![allow(dead_code)]
 #![allow(non_snake_case)]
 
-#[allow(deprecated)]
-use icrate::AppKit::{NSOpenGLContextParameter, NSOpenGLPixelFormatAttribute, NSView};
-use icrate::Foundation::{MainThreadMarker, NSObject};
 use objc2::encode::{Encoding, RefEncode};
 use objc2::rc::{Allocated, Id};
 use objc2::{extern_class, extern_methods, mutability, ClassType};
+#[allow(deprecated)]
+use objc2_app_kit::{NSOpenGLContextParameter, NSOpenGLPixelFormatAttribute, NSView};
+use objc2_foundation::{MainThreadMarker, NSObject};
 
 pub type GLint = i32;
 
@@ -17,7 +17,7 @@ pub struct CGLContextObj {
 }
 
 unsafe impl RefEncode for CGLContextObj {
-    const ENCODING_REF: Encoding = Encoding::Pointer(&Encoding::Void);
+    const ENCODING_REF: Encoding = Encoding::Pointer(&Encoding::Struct("_CGLContextObject", &[]));
 }
 
 extern_class!(
@@ -42,7 +42,7 @@ extern_methods!(
 
         #[method_id(initWithFormat:shareContext:)]
         pub(crate) fn initWithFormat_shareContext(
-            this: Option<Allocated<Self>>,
+            this: Allocated<Self>,
             format: &NSOpenGLPixelFormat,
             share: Option<&NSOpenGLContext>,
         ) -> Option<Id<Self>>;
@@ -97,7 +97,7 @@ extern_methods!(
     unsafe impl NSOpenGLPixelFormat {
         #[method_id(initWithAttributes:)]
         unsafe fn initWithAttributes(
-            this: Option<Allocated<Self>>,
+            this: Allocated<Self>,
             attrs: *const NSOpenGLPixelFormatAttribute,
         ) -> Option<Id<Self>>;
 

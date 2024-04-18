@@ -4,10 +4,10 @@ use std::fmt;
 use std::marker::PhantomData;
 
 use cgl::CGLSetParameter;
-use icrate::AppKit::{NSOpenGLCPSwapInterval, NSView};
-use icrate::Foundation::{MainThreadBound, MainThreadMarker};
 use objc2::rc::{autoreleasepool, Id};
 use objc2::ClassType;
+use objc2_app_kit::{NSOpenGLCPSwapInterval, NSView};
+use objc2_foundation::{run_on_main, MainThreadBound};
 
 use crate::config::GetGlConfig;
 use crate::context::{AsRawContext, ContextApi, ContextAttributes, RawContext, Robustness};
@@ -224,7 +224,7 @@ impl ContextInner {
             self.raw.makeCurrentContext();
 
             let view = &surface.ns_view;
-            MainThreadMarker::run_on_main(|mtm| unsafe {
+            run_on_main(|mtm| unsafe {
                 self.raw.setView(Some(view.get(mtm)));
             });
 
@@ -248,7 +248,7 @@ impl ContextInner {
     }
 
     pub(crate) fn update(&self) {
-        MainThreadMarker::run_on_main(|_| self.raw.update());
+        run_on_main(|_| self.raw.update());
     }
 
     pub(crate) fn flush_buffer(&self) -> Result<()> {
@@ -259,7 +259,7 @@ impl ContextInner {
     }
 
     pub(crate) fn is_view_current(&self, view: &MainThreadBound<Id<NSView>>) -> bool {
-        MainThreadMarker::run_on_main(|mtm| {
+        run_on_main(|mtm| {
             self.raw.view(mtm).expect("context to have a current view") == *view.get(mtm)
         })
     }

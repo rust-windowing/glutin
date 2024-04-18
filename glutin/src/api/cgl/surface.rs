@@ -4,9 +4,9 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
 
-use icrate::AppKit::{NSView, NSWindow};
-use icrate::Foundation::{MainThreadBound, MainThreadMarker};
 use objc2::rc::Id;
+use objc2_app_kit::{NSView, NSWindow};
+use objc2_foundation::{run_on_main, MainThreadBound, MainThreadMarker};
 use raw_window_handle::RawWindowHandle;
 
 use crate::config::GetGlConfig;
@@ -112,7 +112,7 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     fn width(&self) -> Option<u32> {
         let window = &self.ns_window;
         let view = &self.ns_view;
-        MainThreadMarker::run_on_main(|mtm| unsafe {
+        run_on_main(|mtm| {
             let scale_factor = window.get(mtm).backingScaleFactor();
             let frame = view.get(mtm).frame();
             Some((frame.size.width * scale_factor) as u32)
@@ -122,7 +122,7 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     fn height(&self) -> Option<u32> {
         let window = &self.ns_window;
         let view = &self.ns_view;
-        MainThreadMarker::run_on_main(|mtm| unsafe {
+        run_on_main(|mtm| {
             let scale_factor = window.get(mtm).backingScaleFactor();
             let frame = view.get(mtm).frame();
             Some((frame.size.height * scale_factor) as u32)
