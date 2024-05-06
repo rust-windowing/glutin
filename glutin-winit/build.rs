@@ -23,4 +23,19 @@ fn main() {
         wgl_backend: { all(feature = "wgl", windows, not(wasm_platform)) },
         cgl_backend: { all(macos_platform, not(wasm_platform)) },
     }
+
+    println!("cargo:rustc-check-cfg=cfg(android_platform)");
+    println!("cargo:rustc-check-cfg=cfg(wasm_platform)");
+    println!("cargo:rustc-check-cfg=cfg(macos_platform)");
+    println!("cargo:rustc-check-cfg=cfg(ios_platform)");
+    println!("cargo:rustc-check-cfg=cfg(apple)");
+    println!("cargo:rustc-check-cfg=cfg(free_unix)");
+
+    println!("cargo:rustc-check-cfg=cfg(x11_platform)");
+    println!("cargo:rustc-check-cfg=cfg(wayland_platform)");
+
+    println!("cargo:rustc-check-cfg=cfg(egl_backend)");
+    println!("cargo:rustc-check-cfg=cfg(glx_backend)");
+    println!("cargo:rustc-check-cfg=cfg(wgl_backend)");
+    println!("cargo:rustc-check-cfg=cfg(cgl_backend)");
 }
