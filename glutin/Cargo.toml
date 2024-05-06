@@ -8,7 +8,7 @@ license = "Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/rust-windowing/glutin"
 documentation = "https://docs.rs/glutin"
-rust-version = "1.65.0"
+rust-version = "1.70.0"
 edition = "2021"
 
 [features]
