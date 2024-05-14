@@ -10,10 +10,10 @@ use winit::keyboard::{Key, NamedKey};
 use winit::window::Window;
 
 use glutin::config::{Config, ConfigTemplateBuilder};
-use glutin::context::{ContextApi, ContextAttributesBuilder, Version};
+use glutin::context::{ContextApi, ContextAttributesBuilder, PossiblyCurrentContext, Version};
 use glutin::display::GetGlDisplay;
 use glutin::prelude::*;
-use glutin::surface::SwapInterval;
+use glutin::surface::{Surface, SwapInterval, WindowSurface};
 
 use glutin_winit::{self, DisplayBuilder, GlWindow};
 
@@ -121,7 +121,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
                     eprintln!("Error setting vsync: {res:?}");
                 }
 
-                assert!(state.replace((gl_context, gl_surface, window)).is_none());
+                assert!(state.replace(AppState { gl_context, gl_surface, window }).is_none());
             },
             Event::Suspended => {
                 // This event is only raised on Android, where the backing NativeWindow for a GL
@@ -130,7 +130,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
 
                 // Destroy the GL Surface and un-current the GL Context before ndk-glue releases
                 // the window back to the system.
-                let (gl_context, ..) = state.take().unwrap();
+                let gl_context = state.take().unwrap().gl_context;
                 assert!(not_current_gl_context
                     .replace(gl_context.make_not_current().unwrap())
                     .is_none());
@@ -142,7 +142,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
                         // Notable platforms here are Wayland and macOS, other don't require it
                         // and the function is no-op, but it's wise to resize it for portability
                         // reasons.
-                        if let Some((gl_context, gl_surface, _)) = &state {
+                        if let Some(AppState { gl_context, gl_surface, window: _ }) = &state {
                             gl_surface.resize(
                                 gl_context,
                                 NonZeroU32::new(size.width).unwrap(),
@@ -161,7 +161,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
                 _ => (),
             },
             Event::AboutToWait => {
-                if let Some((gl_context, gl_surface, window)) = &state {
+                if let Some(AppState { gl_context, gl_surface, window }) = &state {
                     let renderer = renderer.as_ref().unwrap();
                     renderer.draw();
                     window.request_redraw();
@@ -174,6 +174,12 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
     })?;
 
     Ok(())
+}
+
+struct AppState {
+    gl_context: PossiblyCurrentContext,
+    gl_surface: Surface<WindowSurface>,
+    window: Window,
 }
 
 // Find the config with the maximum number of samples, so our triangle will be
