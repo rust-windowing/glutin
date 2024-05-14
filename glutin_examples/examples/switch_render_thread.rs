@@ -14,8 +14,9 @@ use glutin_examples::gl::types::GLfloat;
 use glutin_examples::{gl_config_picker, Renderer};
 use glutin_winit::{self, DisplayBuilder, GlWindow};
 use raw_window_handle::HasWindowHandle;
+use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
-use winit::event::{ElementState, Event, WindowEvent};
+use winit::event::{ElementState, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy};
 use winit::window::Window;
 
@@ -28,7 +29,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut app = App::new(event_loop_proxy);
 
-    event_loop.run(|event, event_loop| app.handle_event(event, event_loop))?;
+    event_loop.run_app(&mut app)?;
 
     app.exit_state
 }
@@ -45,18 +46,7 @@ impl App {
     }
 }
 
-impl App {
-    fn handle_event(&mut self, event: Event<PlatformThreadEvent>, event_loop: &ActiveEventLoop) {
-        match event {
-            Event::Resumed => self.resumed(event_loop),
-            Event::WindowEvent { event, window_id } => {
-                self.window_event(event_loop, window_id, event)
-            },
-            Event::UserEvent(event) => self.user_event(event_loop, event),
-            _ => (),
-        }
-    }
-
+impl ApplicationHandler<PlatformThreadEvent> for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.state.is_some() {
             return;
