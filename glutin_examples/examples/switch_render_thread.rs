@@ -16,7 +16,7 @@ use glutin_winit::{self, DisplayBuilder, GlWindow};
 use raw_window_handle::HasWindowHandle;
 use winit::dpi::PhysicalSize;
 use winit::event::{ElementState, Event, WindowEvent};
-use winit::event_loop::{EventLoop, EventLoopProxy};
+use winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy};
 use winit::window::Window;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -41,43 +41,49 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut app = App { state: Some(app_state) };
 
-    event_loop.run(move |event, event_loop| match event {
-        Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => event_loop.exit(),
-        Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
-            if size.width != 0 && size.height != 0 {
-                app.state.as_ref().unwrap().send_event_to_current_render_thread(
-                    RenderThreadEvent::Resize(PhysicalSize {
-                        width: NonZeroU32::new(size.width).unwrap(),
-                        height: NonZeroU32::new(size.height).unwrap(),
-                    }),
-                );
-            }
-        },
-        Event::WindowEvent { event: WindowEvent::RedrawRequested, .. } => {
-            app.state
-                .as_ref()
-                .unwrap()
-                .send_event_to_current_render_thread(RenderThreadEvent::Draw);
-        },
-        Event::WindowEvent {
-            event: WindowEvent::MouseInput { state: ElementState::Pressed, .. },
-            ..
-        } => {
-            app.state.as_mut().unwrap().start_render_thread_switch();
-        },
-        Event::UserEvent(event) => match event {
-            PlatformThreadEvent::ContextNotCurrent => {
-                app.state.as_mut().unwrap().complete_render_thread_switch();
-            },
-        },
-        _ => (),
-    })?;
+    event_loop.run(move |event, event_loop| app.handle_event(event, event_loop))?;
 
     Ok(())
 }
 
 struct App {
     state: Option<AppState>,
+}
+
+impl App {
+    fn handle_event(&mut self, event: Event<PlatformThreadEvent>, event_loop: &ActiveEventLoop) {
+        match event {
+            Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => event_loop.exit(),
+            Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
+                if size.width != 0 && size.height != 0 {
+                    self.state.as_ref().unwrap().send_event_to_current_render_thread(
+                        RenderThreadEvent::Resize(PhysicalSize {
+                            width: NonZeroU32::new(size.width).unwrap(),
+                            height: NonZeroU32::new(size.height).unwrap(),
+                        }),
+                    );
+                }
+            },
+            Event::WindowEvent { event: WindowEvent::RedrawRequested, .. } => {
+                self.state
+                    .as_ref()
+                    .unwrap()
+                    .send_event_to_current_render_thread(RenderThreadEvent::Draw);
+            },
+            Event::WindowEvent {
+                event: WindowEvent::MouseInput { state: ElementState::Pressed, .. },
+                ..
+            } => {
+                self.state.as_mut().unwrap().start_render_thread_switch();
+            },
+            Event::UserEvent(event) => match event {
+                PlatformThreadEvent::ContextNotCurrent => {
+                    self.state.as_mut().unwrap().complete_render_thread_switch();
+                },
+            },
+            _ => (),
+        }
+    }
 }
 
 struct AppState {
