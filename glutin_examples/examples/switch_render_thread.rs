@@ -30,45 +30,54 @@ fn main() -> Result<(), Box<dyn Error>> {
     let render_context = Arc::new(Mutex::new(render_context));
 
     let (_render_threads, render_thread_senders) =
-        spawn_render_threads(render_context, event_loop_proxy);
+        spawn_render_threads(render_context, event_loop_proxy.clone());
 
-    let mut app_state = AppState {
+    let app_state = AppState {
         render_thread_senders,
         render_thread_index: 0,
         thread_switch_in_progress: false,
     };
     app_state.send_event_to_current_render_thread(RenderThreadEvent::MakeCurrent);
 
+    let mut app = App { state: Some(app_state) };
+
     event_loop.run(move |event, event_loop| match event {
         Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => event_loop.exit(),
         Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
             if size.width != 0 && size.height != 0 {
-                app_state.send_event_to_current_render_thread(RenderThreadEvent::Resize(
-                    PhysicalSize {
+                app.state.as_ref().unwrap().send_event_to_current_render_thread(
+                    RenderThreadEvent::Resize(PhysicalSize {
                         width: NonZeroU32::new(size.width).unwrap(),
                         height: NonZeroU32::new(size.height).unwrap(),
-                    },
-                ));
+                    }),
+                );
             }
         },
         Event::WindowEvent { event: WindowEvent::RedrawRequested, .. } => {
-            app_state.send_event_to_current_render_thread(RenderThreadEvent::Draw);
+            app.state
+                .as_ref()
+                .unwrap()
+                .send_event_to_current_render_thread(RenderThreadEvent::Draw);
         },
         Event::WindowEvent {
             event: WindowEvent::MouseInput { state: ElementState::Pressed, .. },
             ..
         } => {
-            app_state.start_render_thread_switch();
+            app.state.as_mut().unwrap().start_render_thread_switch();
         },
         Event::UserEvent(event) => match event {
             PlatformThreadEvent::ContextNotCurrent => {
-                app_state.complete_render_thread_switch();
+                app.state.as_mut().unwrap().complete_render_thread_switch();
             },
         },
         _ => (),
     })?;
 
     Ok(())
+}
+
+struct App {
+    state: Option<AppState>,
 }
 
 struct AppState {
