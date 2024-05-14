@@ -53,8 +53,23 @@ struct App {
 impl App {
     fn handle_event(&mut self, event: Event<PlatformThreadEvent>, event_loop: &ActiveEventLoop) {
         match event {
-            Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => event_loop.exit(),
-            Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
+            Event::WindowEvent { event, window_id } => {
+                self.window_event(event_loop, window_id, event)
+            },
+            Event::UserEvent(event) => self.user_event(event_loop, event),
+            _ => (),
+        }
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        _window_id: winit::window::WindowId,
+        event: WindowEvent,
+    ) {
+        match event {
+            WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::Resized(size) => {
                 if size.width != 0 && size.height != 0 {
                     self.state.as_ref().unwrap().send_event_to_current_render_thread(
                         RenderThreadEvent::Resize(PhysicalSize {
@@ -64,24 +79,24 @@ impl App {
                     );
                 }
             },
-            Event::WindowEvent { event: WindowEvent::RedrawRequested, .. } => {
+            WindowEvent::RedrawRequested => {
                 self.state
                     .as_ref()
                     .unwrap()
                     .send_event_to_current_render_thread(RenderThreadEvent::Draw);
             },
-            Event::WindowEvent {
-                event: WindowEvent::MouseInput { state: ElementState::Pressed, .. },
-                ..
-            } => {
+            WindowEvent::MouseInput { state: ElementState::Pressed, .. } => {
                 self.state.as_mut().unwrap().start_render_thread_switch();
             },
-            Event::UserEvent(event) => match event {
-                PlatformThreadEvent::ContextNotCurrent => {
-                    self.state.as_mut().unwrap().complete_render_thread_switch();
-                },
-            },
             _ => (),
+        }
+    }
+
+    fn user_event(&mut self, _event_loop: &ActiveEventLoop, event: PlatformThreadEvent) {
+        match event {
+            PlatformThreadEvent::ContextNotCurrent => {
+                self.state.as_mut().unwrap().complete_render_thread_switch()
+            },
         }
     }
 }
