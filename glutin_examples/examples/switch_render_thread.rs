@@ -22,12 +22,12 @@ use winit::window::Window;
 fn main() -> Result<(), Box<dyn Error>> {
     let event_loop = EventLoop::<PlatformThreadEvent>::with_user_event().build().unwrap();
 
-    let (_window, render_context) = create_window_with_render_context(&event_loop)?;
-    let render_context = Arc::new(Mutex::new(render_context));
-
     // `EventLoopProxy` allows you to dispatch custom events to the main Winit event
     // loop from any thread.
     let event_loop_proxy = event_loop.create_proxy();
+
+    let (_window, render_context) = create_window_with_render_context(&event_loop)?;
+    let render_context = Arc::new(Mutex::new(render_context));
 
     let (_render_threads, render_thread_senders) =
         spawn_render_threads(render_context, event_loop_proxy);
