@@ -16,11 +16,11 @@ use glutin_winit::{self, DisplayBuilder, GlWindow};
 use raw_window_handle::HasWindowHandle;
 use winit::dpi::PhysicalSize;
 use winit::event::{ElementState, Event, WindowEvent};
-use winit::event_loop::{EventLoopBuilder, EventLoopProxy};
-use winit::window::{Window, WindowBuilder};
+use winit::event_loop::{EventLoop, EventLoopProxy};
+use winit::window::Window;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let event_loop = EventLoopBuilder::<PlatformThreadEvent>::with_user_event().build().unwrap();
+    let event_loop = EventLoop::<PlatformThreadEvent>::with_user_event().build().unwrap();
 
     let (_window, render_context) = create_window_with_render_context(&event_loop)?;
     let render_context = Arc::new(Mutex::new(render_context));
@@ -39,8 +39,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     app_state.send_event_to_current_render_thread(RenderThreadEvent::MakeCurrent);
 
-    event_loop.run(move |event, elwt| match event {
-        Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => elwt.exit(),
+    event_loop.run(move |event, event_loop| match event {
+        Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => event_loop.exit(),
         Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
             if size.width != 0 && size.height != 0 {
                 app_state.send_event_to_current_render_thread(RenderThreadEvent::Resize(
@@ -167,11 +167,11 @@ impl RenderContext {
 fn create_window_with_render_context(
     event_loop: &winit::event_loop::EventLoop<PlatformThreadEvent>,
 ) -> Result<(Window, RenderContext), Box<dyn Error>> {
-    let window_builder = WindowBuilder::new().with_transparent(true);
+    let window_attributes = Window::default_attributes().with_transparent(true);
 
     let template = ConfigTemplateBuilder::new().with_alpha_size(8);
 
-    let display_builder = DisplayBuilder::new().with_window_builder(Some(window_builder));
+    let display_builder = DisplayBuilder::new().with_window_attributes(Some(window_attributes));
 
     let (mut window, gl_config) = display_builder.build(event_loop, template, gl_config_picker)?;
 

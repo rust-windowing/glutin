@@ -1,5 +1,8 @@
 # Unreleased
 
+- **Breaking:** Update _winit_ to `0.30`. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/releases/tag/v0.30.0) for more info.
+- Update `DisplayBuilder` to use `WindowAttributes` instead of `WindowBuilder`.
+
 # Version 0.4.2
 
 - **Breaking:** Update _glutin_ to `0.31.0`. See [glutin's CHANGELOG](https://github.com/rust-windowing/glutin/releases/tag/v0.31.0) for more info.

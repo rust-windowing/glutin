@@ -7,7 +7,7 @@ use gl::types::GLfloat;
 use raw_window_handle::HasWindowHandle;
 use winit::event::{Event, KeyEvent, WindowEvent};
 use winit::keyboard::{Key, NamedKey};
-use winit::window::WindowBuilder;
+use winit::window::Window;
 
 use glutin::config::{Config, ConfigTemplateBuilder};
 use glutin::context::{ContextApi, ContextAttributesBuilder, Version};
@@ -25,16 +25,9 @@ pub mod gl {
 }
 
 pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn Error>> {
-    // Only Windows requires the window to be present before creating the display.
-    // Other platforms don't really need one.
-    //
-    // XXX if you don't care about running on Android or so you can safely remove
-    // this condition and always pass the window builder.
-    let window_builder = cfg!(wgl_backend).then(|| {
-        WindowBuilder::new()
-            .with_transparent(true)
-            .with_title("Glutin triangle gradient example (press Escape to exit)")
-    });
+    let window_attributes = Window::default_attributes()
+        .with_transparent(true)
+        .with_title("Glutin triangle gradient example (press Escape to exit)");
 
     // The template will match only the configurations supporting rendering
     // to windows.
@@ -47,7 +40,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
     let template =
         ConfigTemplateBuilder::new().with_alpha_size(8).with_transparency(cfg!(cgl_backend));
 
-    let display_builder = DisplayBuilder::new().with_window_builder(window_builder);
+    let display_builder = DisplayBuilder::new().with_window_attributes(Some(window_attributes));
 
     let (mut window, gl_config) = display_builder.build(&event_loop, template, gl_config_picker)?;
 
@@ -91,17 +84,17 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
 
     let mut state = None;
     let mut renderer = None;
-    event_loop.run(move |event, window_target| {
+    event_loop.run(move |event, event_loop| {
         match event {
             Event::Resumed => {
                 #[cfg(android_platform)]
                 println!("Android window available");
 
                 let window = window.take().unwrap_or_else(|| {
-                    let window_builder = WindowBuilder::new()
+                    let window_attributes = Window::default_attributes()
                         .with_transparent(true)
                         .with_title("Glutin triangle gradient example (press Escape to exit)");
-                    glutin_winit::finalize_window(window_target, window_builder, &gl_config)
+                    glutin_winit::finalize_window(event_loop, window_attributes, &gl_config)
                         .unwrap()
                 });
 
@@ -164,7 +157,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
                 | WindowEvent::KeyboardInput {
                     event: KeyEvent { logical_key: Key::Named(NamedKey::Escape), .. },
                     ..
-                } => window_target.exit(),
+                } => event_loop.exit(),
                 _ => (),
             },
             Event::AboutToWait => {

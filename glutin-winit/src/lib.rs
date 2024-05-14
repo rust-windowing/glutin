@@ -25,13 +25,13 @@ use raw_window_handle::HasWindowHandle;
 
 use raw_window_handle::{HasDisplayHandle, RawWindowHandle};
 use winit::error::OsError;
-use winit::event_loop::EventLoopWindowTarget;
-use winit::window::{Window, WindowBuilder};
+use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::window::{Window, WindowAttributes};
 
 #[cfg(glx_backend)]
 use winit::platform::x11::register_xlib_error_hook;
 #[cfg(x11_platform)]
-use winit::platform::x11::WindowBuilderExtX11;
+use winit::platform::x11::WindowAttributesExtX11;
 
 #[cfg(all(not(egl_backend), not(glx_backend), not(wgl_backend), not(cgl_backend)))]
 compile_error!("Please select at least one api backend");
@@ -50,7 +50,7 @@ compile_error!("Please select at least one api backend");
 #[derive(Default, Debug, Clone)]
 pub struct DisplayBuilder {
     preference: ApiPreference,
-    window_builder: Option<WindowBuilder>,
+    window_attributes: Option<WindowAttributes>,
 }
 
 impl DisplayBuilder {
@@ -65,30 +65,30 @@ impl DisplayBuilder {
         self
     }
 
-    /// The window builder to use when building a window.
+    /// The window attributes to use when building a window.
     ///
     /// By default no window is created.
-    pub fn with_window_builder(mut self, window_builder: Option<WindowBuilder>) -> Self {
-        self.window_builder = window_builder;
+    pub fn with_window_attributes(mut self, window_attributes: Option<WindowAttributes>) -> Self {
+        self.window_attributes = window_attributes;
         self
     }
 
     /// Initialize the OpenGL platform and create a compatible window to use
-    /// with it when the [`WindowBuilder`] was passed with
-    /// [`Self::with_window_builder`]. It's optional, since on some
+    /// with it when the [`WindowAttributes`] was passed with
+    /// [`Self::with_window_attributes()`]. It's optional, since on some
     /// platforms like `Android` it is not available early on, so you want to
     /// find configuration and later use it with the [`finalize_window`].
     /// But if you don't care about such platform you can always pass
-    /// [`WindowBuilder`].
+    /// [`WindowAttributes`].
     ///
     /// # Api-specific
     ///
-    /// **WGL:** - [`WindowBuilder`] **must** be passed in
-    /// [`Self::with_window_builder`] if modern OpenGL(ES) is desired,
+    /// **WGL:** - [`WindowAttributes`] **must** be passed in
+    /// [`Self::with_window_attributes()`] if modern OpenGL(ES) is desired,
     /// otherwise only builtin functions like `glClear` will be available.
     pub fn build<T, Picker>(
         mut self,
-        window_target: &EventLoopWindowTarget<T>,
+        event_loop: &EventLoop<T>,
         template_builder: ConfigTemplateBuilder,
         config_picker: Picker,
     ) -> Result<(Option<Window>, Config), Box<dyn Error>>
@@ -97,8 +97,8 @@ impl DisplayBuilder {
     {
         // XXX with WGL backend window should be created first.
         #[cfg(wgl_backend)]
-        let window = if let Some(wb) = self.window_builder.take() {
-            Some(wb.build(window_target)?)
+        let window = if let Some(wa) = self.window_attributes.take() {
+            Some(event_loop.create_window(wa)?)
         } else {
             None
         };
@@ -111,7 +111,7 @@ impl DisplayBuilder {
         #[cfg(not(wgl_backend))]
         let raw_window_handle = None;
 
-        let gl_display = create_display(window_target, self.preference, raw_window_handle)?;
+        let gl_display = create_display(event_loop, self.preference, raw_window_handle)?;
 
         // XXX the native window must be passed to config picker when WGL is used
         // otherwise very limited OpenGL features will be supported.
@@ -130,8 +130,8 @@ impl DisplayBuilder {
         };
 
         #[cfg(not(wgl_backend))]
-        let window = if let Some(wb) = self.window_builder.take() {
-            Some(finalize_window(window_target, wb, &gl_config)?)
+        let window = if let Some(wa) = self.window_attributes.take() {
+            Some(finalize_window(event_loop, wa, &gl_config)?)
         } else {
             None
         };
@@ -141,7 +141,7 @@ impl DisplayBuilder {
 }
 
 fn create_display<T>(
-    window_target: &EventLoopWindowTarget<T>,
+    event_loop: &EventLoop<T>,
     _api_preference: ApiPreference,
     _raw_window_handle: Option<RawWindowHandle>,
 ) -> Result<Display, Box<dyn Error>> {
@@ -173,7 +173,7 @@ fn create_display<T>(
         ApiPreference::FallbackEgl => DisplayApiPreference::WglThenEgl(_raw_window_handle),
     };
 
-    let handle = window_target.display_handle()?.as_raw();
+    let handle = event_loop.display_handle()?.as_raw();
     unsafe { Ok(Display::new(handle, _preference)?) }
 }
 
@@ -183,24 +183,24 @@ fn create_display<T>(
 ///
 /// [`Window`]: winit::window::Window
 /// [`Config`]: glutin::config::Config
-pub fn finalize_window<T>(
-    window_target: &EventLoopWindowTarget<T>,
-    mut builder: WindowBuilder,
+pub fn finalize_window(
+    event_loop: &ActiveEventLoop,
+    mut attributes: WindowAttributes,
     gl_config: &Config,
 ) -> Result<Window, OsError> {
     // Disable transparency if the end config doesn't support it.
     if gl_config.supports_transparency() == Some(false) {
-        builder = builder.with_transparent(false);
+        attributes = attributes.with_transparent(false);
     }
 
     #[cfg(x11_platform)]
-    let builder = if let Some(x11_visual) = gl_config.x11_visual() {
-        builder.with_x11_visual(x11_visual.visual_id() as _)
+    let attributes = if let Some(x11_visual) = gl_config.x11_visual() {
+        attributes.with_x11_visual(x11_visual.visual_id() as _)
     } else {
-        builder
+        attributes
     };
 
-    builder.build(window_target)
+    event_loop.create_window(attributes)
 }
 
 /// Simplified version of the [`DisplayApiPreference`] which is used to simplify
