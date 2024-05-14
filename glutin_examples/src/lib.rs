@@ -10,7 +10,9 @@ use winit::keyboard::{Key, NamedKey};
 use winit::window::Window;
 
 use glutin::config::{Config, ConfigTemplateBuilder};
-use glutin::context::{ContextApi, ContextAttributesBuilder, PossiblyCurrentContext, Version};
+use glutin::context::{
+    ContextApi, ContextAttributesBuilder, NotCurrentContext, PossiblyCurrentContext, Version,
+};
 use glutin::display::GetGlDisplay;
 use glutin::prelude::*;
 use glutin::surface::{Surface, SwapInterval, WindowSurface};
@@ -70,7 +72,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
         .with_context_api(ContextApi::OpenGl(Some(Version::new(2, 1))))
         .build(raw_window_handle);
 
-    let mut not_current_gl_context = Some(unsafe {
+    let not_current_gl_context = unsafe {
         gl_display.create_context(&gl_config, &context_attributes).unwrap_or_else(|_| {
             gl_display.create_context(&gl_config, &fallback_context_attributes).unwrap_or_else(
                 |_| {
@@ -80,10 +82,9 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
                 },
             )
         })
-    });
+    };
 
-    let mut state = None;
-    let mut renderer = None;
+    let mut app = App::new(not_current_gl_context);
     event_loop.run(move |event, event_loop| {
         match event {
             Event::Resumed => {
@@ -107,12 +108,12 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
 
                 // Make it current.
                 let gl_context =
-                    not_current_gl_context.take().unwrap().make_current(&gl_surface).unwrap();
+                    app.not_current_gl_context.take().unwrap().make_current(&gl_surface).unwrap();
 
                 // The context needs to be current for the Renderer to set up shaders and
                 // buffers. It also performs function loading, which needs a current context on
                 // WGL.
-                renderer.get_or_insert_with(|| Renderer::new(&gl_display));
+                app.renderer.get_or_insert_with(|| Renderer::new(&gl_display));
 
                 // Try setting vsync.
                 if let Err(res) = gl_surface
@@ -121,7 +122,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
                     eprintln!("Error setting vsync: {res:?}");
                 }
 
-                assert!(state.replace(AppState { gl_context, gl_surface, window }).is_none());
+                assert!(app.state.replace(AppState { gl_context, gl_surface, window }).is_none());
             },
             Event::Suspended => {
                 // This event is only raised on Android, where the backing NativeWindow for a GL
@@ -130,8 +131,9 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
 
                 // Destroy the GL Surface and un-current the GL Context before ndk-glue releases
                 // the window back to the system.
-                let gl_context = state.take().unwrap().gl_context;
-                assert!(not_current_gl_context
+                let gl_context = app.state.take().unwrap().gl_context;
+                assert!(app
+                    .not_current_gl_context
                     .replace(gl_context.make_not_current().unwrap())
                     .is_none());
             },
@@ -142,13 +144,15 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
                         // Notable platforms here are Wayland and macOS, other don't require it
                         // and the function is no-op, but it's wise to resize it for portability
                         // reasons.
-                        if let Some(AppState { gl_context, gl_surface, window: _ }) = &state {
+                        if let Some(AppState { gl_context, gl_surface, window: _ }) =
+                            app.state.as_ref()
+                        {
                             gl_surface.resize(
                                 gl_context,
                                 NonZeroU32::new(size.width).unwrap(),
                                 NonZeroU32::new(size.height).unwrap(),
                             );
-                            let renderer = renderer.as_ref().unwrap();
+                            let renderer = app.renderer.as_ref().unwrap();
                             renderer.resize(size.width as i32, size.height as i32);
                         }
                     }
@@ -161,8 +165,8 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
                 _ => (),
             },
             Event::AboutToWait => {
-                if let Some(AppState { gl_context, gl_surface, window }) = &state {
-                    let renderer = renderer.as_ref().unwrap();
+                if let Some(AppState { gl_context, gl_surface, window }) = app.state.as_ref() {
+                    let renderer = app.renderer.as_ref().unwrap();
                     renderer.draw();
                     window.request_redraw();
 
@@ -174,6 +178,18 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
     })?;
 
     Ok(())
+}
+
+struct App {
+    not_current_gl_context: Option<NotCurrentContext>,
+    state: Option<AppState>,
+    renderer: Option<Renderer>,
+}
+
+impl App {
+    fn new(not_current_gl_context: NotCurrentContext) -> Self {
+        Self { not_current_gl_context: Some(not_current_gl_context), state: None, renderer: None }
+    }
 }
 
 struct AppState {
