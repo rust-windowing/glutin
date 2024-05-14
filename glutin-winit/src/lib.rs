@@ -25,7 +25,7 @@ use raw_window_handle::HasWindowHandle;
 
 use raw_window_handle::{HasDisplayHandle, RawWindowHandle};
 use winit::error::OsError;
-use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window, WindowAttributes};
 
 #[cfg(glx_backend)]
@@ -86,9 +86,9 @@ impl DisplayBuilder {
     /// **WGL:** - [`WindowAttributes`] **must** be passed in
     /// [`Self::with_window_attributes()`] if modern OpenGL(ES) is desired,
     /// otherwise only builtin functions like `glClear` will be available.
-    pub fn build<T, Picker>(
+    pub fn build<Picker>(
         mut self,
-        event_loop: &EventLoop<T>,
+        event_loop: &ActiveEventLoop,
         template_builder: ConfigTemplateBuilder,
         config_picker: Picker,
     ) -> Result<(Option<Window>, Config), Box<dyn Error>>
@@ -140,8 +140,8 @@ impl DisplayBuilder {
     }
 }
 
-fn create_display<T>(
-    event_loop: &EventLoop<T>,
+fn create_display(
+    event_loop: &ActiveEventLoop,
     _api_preference: ApiPreference,
     _raw_window_handle: Option<RawWindowHandle>,
 ) -> Result<Display, Box<dyn Error>> {

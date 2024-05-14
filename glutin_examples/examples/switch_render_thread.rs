@@ -26,39 +26,63 @@ fn main() -> Result<(), Box<dyn Error>> {
     // loop from any thread.
     let event_loop_proxy = event_loop.create_proxy();
 
-    let (_window, render_context) = create_window_with_render_context(&event_loop)?;
-    let render_context = Arc::new(Mutex::new(render_context));
+    let mut app = App::new(event_loop_proxy);
 
-    let (_render_threads, render_thread_senders) =
-        spawn_render_threads(render_context, event_loop_proxy.clone());
+    event_loop.run(|event, event_loop| app.handle_event(event, event_loop))?;
 
-    let app_state = AppState {
-        render_thread_senders,
-        render_thread_index: 0,
-        thread_switch_in_progress: false,
-    };
-    app_state.send_event_to_current_render_thread(RenderThreadEvent::MakeCurrent);
-
-    let mut app = App { state: Some(app_state) };
-
-    event_loop.run(move |event, event_loop| app.handle_event(event, event_loop))?;
-
-    Ok(())
+    app.exit_state
 }
 
 struct App {
+    event_loop_proxy: EventLoopProxy<PlatformThreadEvent>,
+    exit_state: Result<(), Box<dyn Error>>,
     state: Option<AppState>,
+}
+
+impl App {
+    fn new(event_loop_proxy: EventLoopProxy<PlatformThreadEvent>) -> Self {
+        Self { event_loop_proxy, exit_state: Ok(()), state: None }
+    }
 }
 
 impl App {
     fn handle_event(&mut self, event: Event<PlatformThreadEvent>, event_loop: &ActiveEventLoop) {
         match event {
+            Event::Resumed => self.resumed(event_loop),
             Event::WindowEvent { event, window_id } => {
                 self.window_event(event_loop, window_id, event)
             },
             Event::UserEvent(event) => self.user_event(event_loop, event),
             _ => (),
         }
+    }
+
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        if self.state.is_some() {
+            return;
+        }
+
+        let (window, render_context) = match create_window_with_render_context(event_loop) {
+            Ok(ok) => ok,
+            Err(e) => {
+                self.exit_state = Err(e);
+                event_loop.exit();
+                return;
+            },
+        };
+        let render_context = Arc::new(Mutex::new(render_context));
+
+        let (_render_threads, render_thread_senders) =
+            spawn_render_threads(render_context, self.event_loop_proxy.clone());
+
+        let state = AppState {
+            _window: window,
+            render_thread_senders,
+            render_thread_index: 0,
+            thread_switch_in_progress: false,
+        };
+        state.send_event_to_current_render_thread(RenderThreadEvent::MakeCurrent);
+        assert!(self.state.replace(state).is_none());
     }
 
     fn window_event(
@@ -102,6 +126,7 @@ impl App {
 }
 
 struct AppState {
+    _window: Window,
     render_thread_senders: Vec<Sender<RenderThreadEvent>>,
     render_thread_index: usize,
     thread_switch_in_progress: bool,
@@ -195,7 +220,7 @@ impl RenderContext {
 }
 
 fn create_window_with_render_context(
-    event_loop: &winit::event_loop::EventLoop<PlatformThreadEvent>,
+    event_loop: &ActiveEventLoop,
 ) -> Result<(Window, RenderContext), Box<dyn Error>> {
     let window_attributes = Window::default_attributes().with_transparent(true);
 

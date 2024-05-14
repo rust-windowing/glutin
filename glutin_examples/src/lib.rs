@@ -44,50 +44,63 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
 
     let display_builder = DisplayBuilder::new().with_window_attributes(Some(window_attributes));
 
-    let (mut window, gl_config) = display_builder.build(&event_loop, template, gl_config_picker)?;
-
-    println!("Picked a config with {} samples", gl_config.num_samples());
-
-    let raw_window_handle = window
-        .as_ref()
-        .and_then(|window| window.window_handle().ok())
-        .map(|handle| handle.as_raw());
-
-    // XXX The display could be obtained from any object created by it, so we can
-    // query it from the config.
-    let gl_display = gl_config.display();
-
-    // The context creation part.
-    let context_attributes = ContextAttributesBuilder::new().build(raw_window_handle);
-
-    // Since glutin by default tries to create OpenGL core context, which may not be
-    // present we should try gles.
-    let fallback_context_attributes = ContextAttributesBuilder::new()
-        .with_context_api(ContextApi::Gles(None))
-        .build(raw_window_handle);
-
-    // There are also some old devices that support neither modern OpenGL nor GLES.
-    // To support these we can try and create a 2.1 context.
-    let legacy_context_attributes = ContextAttributesBuilder::new()
-        .with_context_api(ContextApi::OpenGl(Some(Version::new(2, 1))))
-        .build(raw_window_handle);
-
-    let not_current_gl_context = unsafe {
-        gl_display.create_context(&gl_config, &context_attributes).unwrap_or_else(|_| {
-            gl_display.create_context(&gl_config, &fallback_context_attributes).unwrap_or_else(
-                |_| {
-                    gl_display
-                        .create_context(&gl_config, &legacy_context_attributes)
-                        .expect("failed to create context")
-                },
-            )
-        })
-    };
-
-    let mut app = App::new(not_current_gl_context);
-    event_loop.run(move |event, event_loop| {
+    let mut app = App::new(display_builder);
+    event_loop.run(|event, event_loop| {
         match event {
             Event::Resumed => {
+                let (mut window, gl_config) = match app.display_builder.clone().build(
+                    event_loop,
+                    template.clone(),
+                    gl_config_picker,
+                ) {
+                    Ok(ok) => ok,
+                    Err(e) => {
+                        app.exit_state = Err(e);
+                        event_loop.exit();
+                        return;
+                    },
+                };
+
+                println!("Picked a config with {} samples", gl_config.num_samples());
+
+                let raw_window_handle = window
+                    .as_ref()
+                    .and_then(|window| window.window_handle().ok())
+                    .map(|handle| handle.as_raw());
+
+                // XXX The display could be obtained from any object created by it, so we can
+                // query it from the config.
+                let gl_display = gl_config.display();
+
+                // The context creation part.
+                let context_attributes = ContextAttributesBuilder::new().build(raw_window_handle);
+
+                // Since glutin by default tries to create OpenGL core context, which may not be
+                // present we should try gles.
+                let fallback_context_attributes = ContextAttributesBuilder::new()
+                    .with_context_api(ContextApi::Gles(None))
+                    .build(raw_window_handle);
+
+                // There are also some old devices that support neither modern OpenGL nor GLES.
+                // To support these we can try and create a 2.1 context.
+                let legacy_context_attributes = ContextAttributesBuilder::new()
+                    .with_context_api(ContextApi::OpenGl(Some(Version::new(2, 1))))
+                    .build(raw_window_handle);
+
+                app.not_current_gl_context.replace(unsafe {
+                    gl_display.create_context(&gl_config, &context_attributes).unwrap_or_else(
+                        |_| {
+                            gl_display
+                                .create_context(&gl_config, &fallback_context_attributes)
+                                .unwrap_or_else(|_| {
+                                    gl_display
+                                        .create_context(&gl_config, &legacy_context_attributes)
+                                        .expect("failed to create context")
+                                })
+                        },
+                    )
+                });
+
                 #[cfg(android_platform)]
                 println!("Android window available");
 
@@ -177,18 +190,26 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
         }
     })?;
 
-    Ok(())
+    app.exit_state
 }
 
 struct App {
+    display_builder: DisplayBuilder,
+    exit_state: Result<(), Box<dyn Error>>,
     not_current_gl_context: Option<NotCurrentContext>,
     state: Option<AppState>,
     renderer: Option<Renderer>,
 }
 
 impl App {
-    fn new(not_current_gl_context: NotCurrentContext) -> Self {
-        Self { not_current_gl_context: Some(not_current_gl_context), state: None, renderer: None }
+    fn new(display_builder: DisplayBuilder) -> Self {
+        Self {
+            display_builder,
+            exit_state: Ok(()),
+            not_current_gl_context: None,
+            state: None,
+            renderer: None,
+        }
     }
 }
 
