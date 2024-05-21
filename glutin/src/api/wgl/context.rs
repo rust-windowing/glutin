@@ -35,7 +35,7 @@ impl Display {
         let hdc = match context_attributes.raw_window_handle.as_ref() {
             handle @ Some(RawWindowHandle::Win32(window)) => unsafe {
                 let _ = config.apply_on_native_window(handle.unwrap());
-                gdi::GetDC(window.hwnd as _)
+                gdi::GetDC(window.hwnd.get() as _)
             },
             _ => config.inner.hdc,
         };

@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use std::num::NonZeroU32;
 
 use objc2::rc::Id;
-use objc2_app_kit::{NSView, NSWindow};
+use objc2_app_kit::NSView;
 use objc2_foundation::{run_on_main, MainThreadBound, MainThreadMarker};
 use raw_window_handle::RawWindowHandle;
 
@@ -59,28 +59,19 @@ impl Display {
 
         // SAFETY: Validity of the view and window is ensured by caller
         // This function makes sure the window is non null.
-        let ns_view = if let Some(ns_view) = unsafe { Id::retain(native_window.ns_view.cast()) } {
+        let ns_view = if let Some(ns_view) =
+            unsafe { Id::retain(native_window.ns_view.as_ptr().cast()) }
+        {
             ns_view
         } else {
             return Err(ErrorKind::NotSupported("ns_view of provided native window is nil").into());
         };
         let ns_view = MainThreadBound::new(ns_view, mtm);
 
-        let ns_window =
-            if let Some(ns_window) = unsafe { Id::retain(native_window.ns_window.cast()) } {
-                ns_window
-            } else {
-                return Err(
-                    ErrorKind::NotSupported("ns_window of provided native window is nil").into()
-                );
-            };
-        let ns_window = MainThreadBound::new(ns_window, mtm);
-
         let surface = Surface {
             display: self.clone(),
             config: config.clone(),
             ns_view,
-            ns_window,
             _nosync: PhantomData,
             _ty: PhantomData,
         };
@@ -93,7 +84,6 @@ pub struct Surface<T: SurfaceTypeTrait> {
     display: Display,
     config: Config,
     pub(crate) ns_view: MainThreadBound<Id<NSView>>,
-    ns_window: MainThreadBound<Id<NSWindow>>,
     _nosync: PhantomData<*const std::ffi::c_void>,
     _ty: PhantomData<T>,
 }
@@ -110,21 +100,27 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     }
 
     fn width(&self) -> Option<u32> {
-        let window = &self.ns_window;
         let view = &self.ns_view;
         run_on_main(|mtm| {
-            let scale_factor = window.get(mtm).backingScaleFactor();
-            let frame = view.get(mtm).frame();
+            let view = view.get(mtm);
+            let scale_factor = match view.window() {
+                Some(window) => window.backingScaleFactor(),
+                None => 1.0,
+            };
+            let frame = view.frame();
             Some((frame.size.width * scale_factor) as u32)
         })
     }
 
     fn height(&self) -> Option<u32> {
-        let window = &self.ns_window;
         let view = &self.ns_view;
         run_on_main(|mtm| {
-            let scale_factor = window.get(mtm).backingScaleFactor();
-            let frame = view.get(mtm).frame();
+            let view = view.get(mtm);
+            let scale_factor = match view.window() {
+                Some(window) => window.backingScaleFactor(),
+                None => 1.0,
+            };
+            let frame = view.frame();
             Some((frame.size.height * scale_factor) as u32)
         })
     }

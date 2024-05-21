@@ -33,7 +33,7 @@ impl Display {
         template: ConfigTemplate,
     ) -> Result<Box<dyn Iterator<Item = Config> + '_>> {
         let hwnd = match template.native_window {
-            Some(RawWindowHandle::Win32(window_handle)) => window_handle.hwnd as _,
+            Some(RawWindowHandle::Win32(window_handle)) => window_handle.hwnd.get() as _,
             _ => 0,
         };
         let hdc = unsafe { gdi::GetDC(hwnd) };
@@ -289,7 +289,7 @@ impl Config {
     /// The `raw_window_handle` should point to a valid value.
     pub unsafe fn apply_on_native_window(&self, raw_window_handle: &RawWindowHandle) -> Result<()> {
         let hdc = match raw_window_handle {
-            RawWindowHandle::Win32(window) => unsafe { gdi::GetDC(window.hwnd as _) },
+            RawWindowHandle::Win32(window) => unsafe { gdi::GetDC(window.hwnd.get() as _) },
             _ => return Err(ErrorKind::BadNativeWindow.into()),
         };
 

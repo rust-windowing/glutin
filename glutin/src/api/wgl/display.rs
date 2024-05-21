@@ -60,8 +60,10 @@ impl Display {
         let (wgl_extra, client_extensions) =
             if let Some(RawWindowHandle::Win32(window)) = native_window {
                 unsafe {
-                    let (wgl_extra, client_extensions) =
-                        super::load_extra_functions(window.hinstance as _, window.hwnd as _)?;
+                    let (wgl_extra, client_extensions) = super::load_extra_functions(
+                        window.hinstance.unwrap().get() as _,
+                        window.hwnd.get() as _,
+                    )?;
                     (Some(wgl_extra), client_extensions)
                 }
             } else {
