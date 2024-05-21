@@ -73,7 +73,7 @@ features = [
 ]
 
 [build-dependencies]
-cfg_aliases = "0.1.1"
+cfg_aliases = "0.2.1"
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]
