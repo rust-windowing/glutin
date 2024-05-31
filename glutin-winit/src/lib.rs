@@ -8,8 +8,10 @@
 #![deny(missing_docs)]
 #![cfg_attr(clippy, deny(warnings))]
 
+mod event_loop;
 mod window;
 
+use event_loop::GlutinEventLoop;
 pub use window::GlWindow;
 
 use std::error::Error;
@@ -23,9 +25,8 @@ use glutin::prelude::*;
 #[cfg(wgl_backend)]
 use raw_window_handle::HasWindowHandle;
 
-use raw_window_handle::{HasDisplayHandle, RawWindowHandle};
+use raw_window_handle::RawWindowHandle;
 use winit::error::OsError;
-use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window, WindowAttributes};
 
 #[cfg(glx_backend)]
@@ -35,6 +36,13 @@ use winit::platform::x11::WindowAttributesExtX11;
 
 #[cfg(all(not(egl_backend), not(glx_backend), not(wgl_backend), not(cgl_backend)))]
 compile_error!("Please select at least one api backend");
+
+pub(crate) mod private {
+    /// Prevent traits from being implemented downstream, since those are used
+    /// purely for documentation organization and simplify platform api
+    /// implementation maintenance.
+    pub trait Sealed {}
+}
 
 /// The helper to perform [`Display`] creation and OpenGL platform
 /// bootstrapping with the help of [`winit`] with little to no platform specific
@@ -88,7 +96,7 @@ impl DisplayBuilder {
     /// otherwise only builtin functions like `glClear` will be available.
     pub fn build<Picker>(
         mut self,
-        event_loop: &ActiveEventLoop,
+        event_loop: &impl GlutinEventLoop,
         template_builder: ConfigTemplateBuilder,
         config_picker: Picker,
     ) -> Result<(Option<Window>, Config), Box<dyn Error>>
@@ -141,7 +149,7 @@ impl DisplayBuilder {
 }
 
 fn create_display(
-    event_loop: &ActiveEventLoop,
+    event_loop: &impl GlutinEventLoop,
     _api_preference: ApiPreference,
     _raw_window_handle: Option<RawWindowHandle>,
 ) -> Result<Display, Box<dyn Error>> {
@@ -173,7 +181,7 @@ fn create_display(
         ApiPreference::FallbackEgl => DisplayApiPreference::WglThenEgl(_raw_window_handle),
     };
 
-    let handle = event_loop.display_handle()?.as_raw();
+    let handle = event_loop.glutin_display_handle()?.as_raw();
     unsafe { Ok(Display::new(handle, _preference)?) }
 }
 
@@ -184,7 +192,7 @@ fn create_display(
 /// [`Window`]: winit::window::Window
 /// [`Config`]: glutin::config::Config
 pub fn finalize_window(
-    event_loop: &ActiveEventLoop,
+    event_loop: &impl GlutinEventLoop,
     mut attributes: WindowAttributes,
     gl_config: &Config,
 ) -> Result<Window, OsError> {
