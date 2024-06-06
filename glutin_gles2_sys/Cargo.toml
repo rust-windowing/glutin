@@ -1,6 +1,6 @@
 [package]
 name = "glutin_gles2_sys"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["Kirill Chibisov <contact@kchibisov.com>"]
 description = "The gles2 bindings for glutin"
 repository = "https://github.com/rust-windowing/glutin"

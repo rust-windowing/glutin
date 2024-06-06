@@ -5,11 +5,6 @@ A low-level library for OpenGL context creation.
 [![](https://img.shields.io/crates/v/glutin.svg)](https://crates.io/crates/glutin)
 [![Docs.rs](https://docs.rs/glutin/badge.svg)](https://docs.rs/glutin)
 
-```toml
-[dependencies]
-glutin = "0.31.3"
-```
-
 ## [Documentation](https://docs.rs/glutin)
 
 ## Contact Us
