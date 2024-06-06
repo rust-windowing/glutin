@@ -14,67 +14,106 @@ use glutin_examples::gl::types::GLfloat;
 use glutin_examples::{gl_config_picker, Renderer};
 use glutin_winit::{self, DisplayBuilder, GlWindow};
 use raw_window_handle::HasWindowHandle;
+use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
-use winit::event::{ElementState, Event, WindowEvent};
-use winit::event_loop::{EventLoopBuilder, EventLoopProxy};
-use winit::window::{Window, WindowBuilder};
+use winit::event::{ElementState, WindowEvent};
+use winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy};
+use winit::window::Window;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let event_loop = EventLoopBuilder::<PlatformThreadEvent>::with_user_event().build().unwrap();
-
-    let (_window, render_context) = create_window_with_render_context(&event_loop)?;
-    let render_context = Arc::new(Mutex::new(render_context));
+    let event_loop = EventLoop::<PlatformThreadEvent>::with_user_event().build().unwrap();
 
     // `EventLoopProxy` allows you to dispatch custom events to the main Winit event
     // loop from any thread.
     let event_loop_proxy = event_loop.create_proxy();
 
-    let (_render_threads, render_thread_senders) =
-        spawn_render_threads(render_context, event_loop_proxy);
+    let mut app = App::new(event_loop_proxy);
 
-    let mut app_state = AppState {
-        render_thread_senders,
-        render_thread_index: 0,
-        thread_switch_in_progress: false,
-    };
-    app_state.send_event_to_current_render_thread(RenderThreadEvent::MakeCurrent);
+    event_loop.run_app(&mut app)?;
 
-    event_loop.run(move |event, elwt| match event {
-        Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => elwt.exit(),
-        Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
-            if size.width != 0 && size.height != 0 {
-                app_state.send_event_to_current_render_thread(RenderThreadEvent::Resize(
-                    PhysicalSize {
+    app.exit_state
+}
+
+struct App {
+    event_loop_proxy: EventLoopProxy<PlatformThreadEvent>,
+    exit_state: Result<(), Box<dyn Error>>,
+    state: Option<AppState>,
+}
+
+impl App {
+    fn new(event_loop_proxy: EventLoopProxy<PlatformThreadEvent>) -> Self {
+        Self { event_loop_proxy, exit_state: Ok(()), state: None }
+    }
+}
+
+impl ApplicationHandler<PlatformThreadEvent> for App {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        if self.state.is_some() {
+            return;
+        }
+
+        let (window, render_context) = match create_window_with_render_context(event_loop) {
+            Ok(ok) => ok,
+            Err(e) => {
+                self.exit_state = Err(e);
+                event_loop.exit();
+                return;
+            },
+        };
+        let render_context = Arc::new(Mutex::new(render_context));
+
+        let (_render_threads, render_thread_senders) =
+            spawn_render_threads(render_context, self.event_loop_proxy.clone());
+
+        let state = AppState {
+            _window: window,
+            render_thread_senders,
+            render_thread_index: 0,
+            thread_switch_in_progress: false,
+        };
+        state.send_event_to_current_render_thread(RenderThreadEvent::MakeCurrent);
+        assert!(self.state.replace(state).is_none());
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        _window_id: winit::window::WindowId,
+        event: WindowEvent,
+    ) {
+        match event {
+            WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::Resized(size) if size.width != 0 && size.height != 0 => {
+                self.state.as_ref().unwrap().send_event_to_current_render_thread(
+                    RenderThreadEvent::Resize(PhysicalSize {
                         width: NonZeroU32::new(size.width).unwrap(),
                         height: NonZeroU32::new(size.height).unwrap(),
-                    },
-                ));
-            }
-        },
-        Event::WindowEvent { event: WindowEvent::RedrawRequested, .. } => {
-            app_state.send_event_to_current_render_thread(RenderThreadEvent::Draw);
-        },
-        Event::WindowEvent {
-            event: WindowEvent::MouseInput { state: ElementState::Pressed, .. },
-            ..
-        } => {
-            app_state.start_render_thread_switch();
-        },
-        Event::UserEvent(event) => match event {
-            PlatformThreadEvent::ContextNotCurrent => {
-                app_state.complete_render_thread_switch();
+                    }),
+                );
             },
-        },
-        _ => (),
-    })?;
+            WindowEvent::RedrawRequested => {
+                self.state
+                    .as_ref()
+                    .unwrap()
+                    .send_event_to_current_render_thread(RenderThreadEvent::Draw);
+            },
+            WindowEvent::MouseInput { state: ElementState::Pressed, .. } => {
+                self.state.as_mut().unwrap().start_render_thread_switch();
+            },
+            _ => (),
+        }
+    }
 
-    Ok(())
+    fn user_event(&mut self, _event_loop: &ActiveEventLoop, _event: PlatformThreadEvent) {
+        self.state.as_mut().unwrap().complete_render_thread_switch();
+    }
 }
 
 struct AppState {
     render_thread_senders: Vec<Sender<RenderThreadEvent>>,
     render_thread_index: usize,
     thread_switch_in_progress: bool,
+    _window: Window,
 }
 
 impl AppState {
@@ -165,13 +204,13 @@ impl RenderContext {
 }
 
 fn create_window_with_render_context(
-    event_loop: &winit::event_loop::EventLoop<PlatformThreadEvent>,
+    event_loop: &ActiveEventLoop,
 ) -> Result<(Window, RenderContext), Box<dyn Error>> {
-    let window_builder = WindowBuilder::new().with_transparent(true);
+    let window_attributes = Window::default_attributes().with_transparent(true);
 
     let template = ConfigTemplateBuilder::new().with_alpha_size(8);
 
-    let display_builder = DisplayBuilder::new().with_window_builder(Some(window_builder));
+    let display_builder = DisplayBuilder::new().with_window_attributes(Some(window_attributes));
 
     let (mut window, gl_config) = display_builder.build(event_loop, template, gl_config_picker)?;
 
