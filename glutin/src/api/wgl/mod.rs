@@ -74,8 +74,7 @@ unsafe fn load_extra_functions(
         class
     };
 
-    let class_name =
-        OsStr::new("WglDummy Window").encode_wide().chain(Some(0).into_iter()).collect::<Vec<_>>();
+    let class_name = OsStr::new("WglDummy Window").encode_wide().chain(Some(0)).collect::<Vec<_>>();
 
     class.cbSize = mem::size_of::<WNDCLASSEXW>() as _;
     class.lpszClassName = class_name.as_ptr();
@@ -89,8 +88,7 @@ unsafe fn load_extra_functions(
 
     // This dummy window should match the real one enough to get the same OpenGL
     // driver.
-    let title =
-        OsStr::new("dummy window").encode_wide().chain(Some(0).into_iter()).collect::<Vec<_>>();
+    let title = OsStr::new("dummy window").encode_wide().chain(Some(0)).collect::<Vec<_>>();
 
     let ex_style = wm::WS_EX_APPWINDOW;
     let style = wm::WS_POPUP | wm::WS_CLIPSIBLINGS | wm::WS_CLIPCHILDREN;
