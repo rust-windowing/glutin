@@ -112,7 +112,7 @@ mod example {
         }
 
         let path = Path::new(IMG_PATH);
-        let file = OpenOptions::new().write(true).create(true).open(path).unwrap();
+        let file = OpenOptions::new().write(true).truncate(true).open(path).unwrap();
 
         let mut encoder = png::Encoder::new(file, 1280, 720);
         encoder.set_depth(png::BitDepth::Eight);

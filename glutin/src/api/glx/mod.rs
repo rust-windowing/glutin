@@ -58,7 +58,9 @@ static GLX_EXTRA: Lazy<Option<GlxExtra>> = Lazy::new(|| {
     Some(GlxExtra::new(glx))
 });
 
-pub(crate) struct Glx(pub SymWrapper<glx::Glx>);
+/// GLX interface.
+#[allow(missing_debug_implementations)]
+pub struct Glx(pub SymWrapper<glx::Glx>);
 
 unsafe impl Sync for Glx {}
 unsafe impl Send for Glx {}

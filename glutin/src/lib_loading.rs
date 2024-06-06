@@ -15,6 +15,7 @@ pub trait SymLoading {
 }
 
 #[derive(Clone)]
+#[allow(missing_debug_implementations)]
 pub struct SymWrapper<T> {
     sym: T,
     _lib: Arc<Library>,

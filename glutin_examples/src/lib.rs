@@ -18,7 +18,7 @@ use glutin::display::GetGlDisplay;
 use glutin::prelude::*;
 use glutin::surface::{Surface, SwapInterval, WindowSurface};
 
-use glutin_winit::{self, DisplayBuilder, GlWindow};
+use glutin_winit::{DisplayBuilder, GlWindow};
 
 pub mod gl {
     #![allow(clippy::all)]
