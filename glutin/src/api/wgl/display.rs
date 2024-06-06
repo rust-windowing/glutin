@@ -1,10 +1,11 @@
 //! WGL display initialization and extension loading.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::ffi::{self, CStr, OsStr};
-use std::fmt;
 use std::os::windows::ffi::OsStrExt;
 use std::sync::Arc;
+use std::{env, fmt};
 
 use glutin_wgl_sys::wgl;
 use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
@@ -24,6 +25,9 @@ use super::context::NotCurrentContext;
 use super::surface::Surface;
 use super::WglExtra;
 
+/// The name of the OpenGL DLL to use.
+pub(crate) static GLUTIN_WGL_OPENGL_DLL_ENV: &str = "GLUTIN_WGL_OPENGL_DLL";
+
 /// A WGL display.
 #[derive(Debug, Clone)]
 pub struct Display {
@@ -37,6 +41,9 @@ impl Display {
     /// passed the OpenGL will be limited to what it can do, though, basic
     /// operations could still be performed.
     ///
+    /// You can alter OpenGL DLL name by setting `GLUTIN_WGL_OPENGL_DLL`
+    /// environment variable. The default one is `opengl32.dll`.
+    ///
     /// # Safety
     ///
     /// The `native_window` must point to the valid platform window and have
@@ -49,8 +56,10 @@ impl Display {
             return Err(ErrorKind::NotSupported("provided native display is not supported").into());
         }
 
-        let name =
-            OsStr::new("opengl32.dll").encode_wide().chain(Some(0).into_iter()).collect::<Vec<_>>();
+        let dll_name: Cow<'_, str> = env::var(GLUTIN_WGL_OPENGL_DLL_ENV)
+            .map(Into::into)
+            .unwrap_or_else(|_| Cow::Borrowed("opengl32.dll"));
+        let name = OsStr::new(dll_name.as_ref()).encode_wide().chain(Some(0)).collect::<Vec<_>>();
         let lib_opengl32 = unsafe { dll_loader::LoadLibraryW(name.as_ptr()) };
         if lib_opengl32 == 0 {
             return Err(ErrorKind::NotFound.into());

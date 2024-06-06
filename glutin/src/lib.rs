@@ -9,6 +9,10 @@
 //! The initialization starts by loading and connecting to the platform's
 //! graphics Api when creating a [`display`]. This object is used to create all
 //! the OpenGL objects, such as [`config`], [`context`], and [`surface`].
+//!
+//! ## Environment variables
+//!
+//! `GLUTIN_WGL_OPENGL_DLL` - change the name of the OpenGL DLL to load.
 
 #![deny(rust_2018_idioms)]
 #![deny(rustdoc::broken_intra_doc_links)]
