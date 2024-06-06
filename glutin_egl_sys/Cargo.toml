@@ -13,7 +13,7 @@ edition = "2021"
 gl_generator = "0.14"
 
 [target.'cfg(windows)'.dependencies.windows-sys]
-version = "0.48"
+version = "0.52"
 features = [
     "Win32_Foundation",
     "Win32_Graphics_Gdi",
