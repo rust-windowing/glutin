@@ -157,8 +157,6 @@ pub const TEXTURE_Y_U_V_WL: i32 = 0x31D7;
 pub const TEXTURE_Y_UV_WL: i32 = 0x31D8;
 pub const TEXTURE_Y_XUXV_WL: i32 = 0x31D9;
 pub const TEXTURE_EXTERNAL_WL: i32 = 0x31DA;
-// Accepted in the <attribute> parameter of eglQueryWaylandBufferWL.
-pub const EGL_TEXTURE_FORMAT: i32 = 0x3080;
 pub const WAYLAND_Y_INVERTED_WL: i32 = 0x31DB;
 
 #[allow(non_snake_case)]
