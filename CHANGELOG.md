@@ -1,5 +1,7 @@
 # Unreleased
 
+# Version 0.32.0
+
 - **Breaking:** updated `raw-window-handle` dependency to `0.6`.
 - Bump MSRV from `1.65` to `1.70`.
 - Bump `windows-sys` from `0.48.0` to `0.52.0`.
