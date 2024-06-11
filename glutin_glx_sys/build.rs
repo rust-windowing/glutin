@@ -21,22 +21,28 @@ fn main() {
             .unwrap();
 
         let mut file = File::create(dest.join("glx_extra_bindings.rs")).unwrap();
-        Registry::new(Api::Glx, (1, 4), Profile::Core, Fallbacks::All, [
-            "GLX_ARB_context_flush_control",
-            "GLX_ARB_create_context",
-            "GLX_ARB_create_context_no_error",
-            "GLX_ARB_create_context_profile",
-            "GLX_ARB_create_context_robustness",
-            "GLX_ARB_fbconfig_float",
-            "GLX_ARB_framebuffer_sRGB",
-            "GLX_ARB_multisample",
-            "GLX_EXT_buffer_age",
-            "GLX_EXT_create_context_es2_profile",
-            "GLX_EXT_framebuffer_sRGB",
-            "GLX_EXT_swap_control",
-            "GLX_MESA_swap_control",
-            "GLX_SGI_swap_control",
-        ])
+        Registry::new(
+            Api::Glx,
+            (1, 4),
+            Profile::Core,
+            Fallbacks::All,
+            [
+                "GLX_ARB_context_flush_control",
+                "GLX_ARB_create_context",
+                "GLX_ARB_create_context_no_error",
+                "GLX_ARB_create_context_profile",
+                "GLX_ARB_create_context_robustness",
+                "GLX_ARB_fbconfig_float",
+                "GLX_ARB_framebuffer_sRGB",
+                "GLX_ARB_multisample",
+                "GLX_EXT_buffer_age",
+                "GLX_EXT_create_context_es2_profile",
+                "GLX_EXT_framebuffer_sRGB",
+                "GLX_EXT_swap_control",
+                "GLX_MESA_swap_control",
+                "GLX_SGI_swap_control",
+            ],
+        )
         .write_bindings(gl_generator::StructGenerator, &mut file)
         .unwrap();
     }
