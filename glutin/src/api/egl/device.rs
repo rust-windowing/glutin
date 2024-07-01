@@ -41,9 +41,9 @@ impl Device {
         //
         // Or we can check for the EGL_EXT_device_base extension since it contains both
         // extensions.
-        if (!no_display_extensions.contains("EGL_EXT_device_enumeration")
-            && !no_display_extensions.contains("EGL_EXT_device_query"))
-            || !no_display_extensions.contains("EGL_EXT_device_base")
+        if !no_display_extensions.contains("EGL_EXT_device_base")
+        && ( !no_display_extensions.contains("EGL_EXT_device_enumeration")
+          || !no_display_extensions.contains("EGL_EXT_device_query"))
         {
             return Err(ErrorKind::NotSupported("EGL does not support EGL_EXT_device_base").into());
         }
