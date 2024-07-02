@@ -92,7 +92,10 @@ impl ApplicationHandler for App {
             .with_context_api(ContextApi::OpenGl(Some(Version::new(2, 1))))
             .build(raw_window_handle);
 
-        self.not_current_gl_context.replace(unsafe {
+        // Reuse the uncurrented context from a suspended() call if it exists, otherwise
+        // this is the first time resumed() is called, where the context still
+        // has to be created.
+        let not_current_gl_context = self.not_current_gl_context.take().unwrap_or_else(|| unsafe {
             gl_display.create_context(&gl_config, &context_attributes).unwrap_or_else(|_| {
                 gl_display.create_context(&gl_config, &fallback_context_attributes).unwrap_or_else(
                     |_| {
@@ -121,8 +124,7 @@ impl ApplicationHandler for App {
             unsafe { gl_config.display().create_window_surface(&gl_config, &attrs).unwrap() };
 
         // Make it current.
-        let gl_context =
-            self.not_current_gl_context.take().unwrap().make_current(&gl_surface).unwrap();
+        let gl_context = not_current_gl_context.make_current(&gl_surface).unwrap();
 
         // The context needs to be current for the Renderer to set up shaders and
         // buffers. It also performs function loading, which needs a current context on
