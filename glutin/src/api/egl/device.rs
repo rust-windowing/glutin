@@ -4,7 +4,6 @@ use std::collections::HashSet;
 use std::ffi::{c_void, CStr};
 use std::ptr;
 
-use bitflags::Flags;
 use glutin_egl_sys::egl;
 use glutin_egl_sys::egl::types::EGLDeviceEXT;
 
