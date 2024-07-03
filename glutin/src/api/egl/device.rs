@@ -33,7 +33,7 @@ impl Device {
             None => return Err(ErrorKind::NotFound.into()),
         };
 
-        let no_display_extensions =
+        let client_extensions =
             CLIENT_EXTENSIONS.get_or_init(|| get_extensions(egl, egl::NO_DISPLAY));
 
         // Querying devices requires EGL_EXT_device_enumeration and
@@ -41,11 +41,13 @@ impl Device {
         //
         // Or we can check for the EGL_EXT_device_base extension since it contains both
         // extensions.
-        if !no_display_extensions.contains("EGL_EXT_device_base")
-            && (!no_display_extensions.contains("EGL_EXT_device_enumeration")
-                || !no_display_extensions.contains("EGL_EXT_device_query"))
+        if !client_extensions.contains("EGL_EXT_device_base")
+            && !client_extensions.contains("EGL_EXT_device_enumeration")
         {
-            return Err(ErrorKind::NotSupported("EGL does not support EGL_EXT_device_base").into());
+            return Err(ErrorKind::NotSupported(
+                "enumerating devices is not supported by the EGL instance",
+            )
+            .into());
         }
 
         let mut device_count = 0;
