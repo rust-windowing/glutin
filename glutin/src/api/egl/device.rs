@@ -43,7 +43,7 @@ impl Device {
             let query = client_extensions.contains("EGL_EXT_device_query");
             let enumr = client_extensions.contains("EGL_EXT_device_enumeration");
             if !(query & enumr) {
-                let msg = if query {
+                let msg = if !enumr {
                     "enumerating devices is not supported by the EGL instance"
                 } else {
                     // this should not happen as device_enumeration depends on device_query
