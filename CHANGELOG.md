@@ -1,5 +1,7 @@
 # Unreleased
 
+- Fixed EGL's `Device::query_devices()` being too strict about required extensions
+
 # Version 0.32.0
 
 - **Breaking:** updated `raw-window-handle` dependency to `0.6`.
