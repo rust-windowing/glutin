@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use std::ffi::{c_void, CStr};
 use std::ptr;
 
+use bitflags::Flags;
 use glutin_egl_sys::egl;
 use glutin_egl_sys::egl::types::EGLDeviceEXT;
 
@@ -36,18 +37,21 @@ impl Device {
         let client_extensions =
             CLIENT_EXTENSIONS.get_or_init(|| get_extensions(egl, egl::NO_DISPLAY));
 
-        // Querying devices requires EGL_EXT_device_enumeration and
-        // EGL_EXT_device_query.
+        // Querying devices requires EGL_EXT_device_enumeration or EGL_EXT_device_base.
         //
-        // Or we can check for the EGL_EXT_device_base extension since it contains both
-        // extensions.
-        if !client_extensions.contains("EGL_EXT_device_base")
-            && !client_extensions.contains("EGL_EXT_device_enumeration")
-        {
-            return Err(ErrorKind::NotSupported(
-                "enumerating devices is not supported by the EGL instance",
-            )
-            .into());
+        // The former depends on EGL_EXT_device_query, so also check that for validation.
+        if !client_extensions.contains("EGL_EXT_device_base") {
+            let query = client_extensions.contains("EGL_EXT_device_query");
+            let enumr = client_extensions.contains("EGL_EXT_device_enumeration");
+            if !(query & enumr) {
+                let msg = if query {
+                    "enumerating devices is not supported by the EGL instance"
+                } else {
+                    // this should not happen as device_enumeration depends on device_query
+                    "EGL_EXT_device_enumeration without EGL_EXT_device_query, buggy driver?"
+                };
+                return Err(ErrorKind::NotSupported(msg).into());
+            }
         }
 
         let mut device_count = 0;
