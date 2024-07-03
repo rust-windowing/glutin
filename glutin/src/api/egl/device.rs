@@ -38,7 +38,7 @@ impl Device {
 
         // Querying devices requires EGL_EXT_device_enumeration or EGL_EXT_device_base.
         //
-        // The former depends on EGL_EXT_device_query, so also check that for validation.
+        // The former depends on EGL_EXT_device_query, so also check that just in case.
         if !client_extensions.contains("EGL_EXT_device_base") {
             let query = client_extensions.contains("EGL_EXT_device_query");
             let enumr = client_extensions.contains("EGL_EXT_device_enumeration");
