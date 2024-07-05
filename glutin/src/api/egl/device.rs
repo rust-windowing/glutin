@@ -42,11 +42,11 @@ impl Device {
         if !client_extensions.contains("EGL_EXT_device_base") {
             let query = client_extensions.contains("EGL_EXT_device_query");
             let enumr = client_extensions.contains("EGL_EXT_device_enumeration");
-            if !(query & enumr) {
+            if !(query && enumr) {
                 let msg = if !enumr {
                     "Enumerating devices is not supported by the EGL instance"
                 } else {
-                    // this should not happen as device_enumeration depends on device_query
+                    // This should not happen as device_enumeration depends on device_query.
                     "EGL_EXT_device_enumeration without EGL_EXT_device_query, buggy driver?"
                 };
                 return Err(ErrorKind::NotSupported(msg).into());
