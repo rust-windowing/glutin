@@ -33,19 +33,25 @@ impl Device {
             None => return Err(ErrorKind::NotFound.into()),
         };
 
-        let no_display_extensions =
+        let client_extensions =
             CLIENT_EXTENSIONS.get_or_init(|| get_extensions(egl, egl::NO_DISPLAY));
 
-        // Querying devices requires EGL_EXT_device_enumeration and
-        // EGL_EXT_device_query.
-        //
-        // Or we can check for the EGL_EXT_device_base extension since it contains both
-        // extensions.
-        if (!no_display_extensions.contains("EGL_EXT_device_enumeration")
-            && !no_display_extensions.contains("EGL_EXT_device_query"))
-            || !no_display_extensions.contains("EGL_EXT_device_base")
-        {
-            return Err(ErrorKind::NotSupported("EGL does not support EGL_EXT_device_base").into());
+        // Querying devices requires EGL_EXT_device_enumeration or EGL_EXT_device_base.
+        if !client_extensions.contains("EGL_EXT_device_base") {
+            if !client_extensions.contains("EGL_EXT_device_enumeration") {
+                return Err(ErrorKind::NotSupported(
+                    "Enumerating devices is not supported by the EGL instance",
+                )
+                .into());
+            }
+            // EGL_EXT_device_enumeration depends on EGL_EXT_device_query,
+            // so also check that just in case.
+            if !client_extensions.contains("EGL_EXT_device_query") {
+                return Err(ErrorKind::NotSupported(
+                    "EGL_EXT_device_enumeration without EGL_EXT_device_query, buggy driver?",
+                )
+                .into());
+            }
         }
 
         let mut device_count = 0;
