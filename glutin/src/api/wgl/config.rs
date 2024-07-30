@@ -315,10 +315,10 @@ impl Config {
     /// # Safety
     ///
     /// The caller must ensure that the attribute could be present.
-    unsafe fn raw_attribute(&self, attr: c_int) -> c_int {
-        unsafe {
-            let wgl_extra = self.inner.display.inner.wgl_extra.unwrap();
-            let mut res = 0;
+    pub(super) unsafe fn raw_attribute(&self, attr: c_int) -> c_int {
+        let wgl_extra = self.inner.display.inner.wgl_extra.unwrap();
+        let mut res = 0;
+        let success = unsafe {
             wgl_extra.GetPixelFormatAttribivARB(
                 self.inner.hdc as *const _,
                 self.inner.pixel_format_index,
@@ -326,9 +326,12 @@ impl Config {
                 1,
                 &attr,
                 &mut res,
-            );
-            res
+            )
+        };
+        if success != 1 {
+            eprintln!("Could not read Attrib {attr:#0x} from {:?}", self)
         }
+        res
     }
 }
 
@@ -363,12 +366,14 @@ impl GlConfig for Config {
     }
 
     fn srgb_capable(&self) -> bool {
-        if self.inner.display.inner.client_extensions.contains(SRGB_EXT)
-            || self.inner.display.inner.client_extensions.contains("WGL_EXT_colorspace")
+        // TODO(Marijn): Use DisplayFeatures::SRGB_FRAMEBUFFERS
+        let client_extensions = &self.inner.display.inner.client_extensions;
+        if client_extensions.contains(SRGB_EXT)
+            || client_extensions.contains(SRGB_ARB)
+            || client_extensions.contains("WGL_EXT_colorspace")
         {
+            // Attribute is the same for EXT an ARB
             unsafe { self.raw_attribute(wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as c_int) != 0 }
-        } else if self.inner.display.inner.client_extensions.contains(SRGB_ARB) {
-            unsafe { self.raw_attribute(wgl_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as c_int) != 0 }
         } else {
             false
         }
