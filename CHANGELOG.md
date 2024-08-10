@@ -1,9 +1,11 @@
 # Unreleased
 
-- Fixed EGL's `Device::query_devices()` being too strict about required extensions
-- Fixed crash in `EglGetProcAddress` on Win32-x86 platform due to wrong calling convention
-- Fixed EGL's `Display::device()` always returning an error due to invalid pointer-argument passing inside
+- Fixed EGL's `Device::query_devices()` being too strict about required extensions.
+- Fixed crash in `EglGetProcAddress` on Win32-x86 platform due to wrong calling convention.
+- Fixed EGL's `Display::device()` always returning an error due to invalid pointer-argument passing inside.
 - Fixed EGL's `Display::new()` making an `EGLDisplay::Khr` when the EGL version for the display is 1.4 or lower.
+- Added `Device::drm_device_node_path()` and `Device::drm_render_device_node_path()` getters to EGL via `EGL_EXT_device_drm`.
+- Added support for `DrmDisplayHandle` in EGL's `Display::with_device()` using `EGL_DRM_MASTER_FD_EXT` from `EGL_EXT_device_drm`.
 
 # Version 0.32.0
 
