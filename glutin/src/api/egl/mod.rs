@@ -38,7 +38,7 @@ pub(crate) static EGL: Lazy<Option<Egl>> = Lazy::new(|| {
     unsafe { SymWrapper::new(&paths).map(Egl).ok() }
 });
 
-type EglGetProcAddress = unsafe extern "C" fn(*const ffi::c_void) -> *const ffi::c_void;
+type EglGetProcAddress = unsafe extern "system" fn(*const ffi::c_void) -> *const ffi::c_void;
 static EGL_GET_PROC_ADDRESS: OnceCell<libloading_os::Symbol<EglGetProcAddress>> = OnceCell::new();
 
 /// EGL interface.
