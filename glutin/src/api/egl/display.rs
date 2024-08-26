@@ -510,11 +510,9 @@ impl Display {
             // for a platform that does not support KHR functions and only supports EXT
             // functions. As such, we check if the version is equal to 1.4 and downgrade to
             // `EglDisplay::Ext` if so.
-            (EglDisplay::Khr(display), Version { major: 1, minor: 4 })
-                => EglDisplay::Ext(display),
+            (EglDisplay::Khr(display), Version { major: 1, minor: 4 }) => EglDisplay::Ext(display),
             // We do not do anything otherwise.
-            (display, _)
-                => display,
+            (display, _) => display,
         }
     }
 }
