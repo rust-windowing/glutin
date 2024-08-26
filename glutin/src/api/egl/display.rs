@@ -485,6 +485,9 @@ impl Display {
             Version::new(major as u8, minor as u8)
         };
 
+        // Sanitize for libglvnd's aliasing.
+        let display = Self::sanitize_libglvnd_aliasing(display, version);
+
         // Load extensions.
         let display_extensions = get_extensions(egl, *display);
         let features = Self::extract_display_features(&display_extensions, version);
@@ -498,6 +501,21 @@ impl Display {
             features,
         });
         Ok(Self { inner })
+    }
+
+    fn sanitize_libglvnd_aliasing(display: EglDisplay, version: Version) -> EglDisplay {
+        match (display, version) {
+            // libglvnd has an unsavoury quirk of aliasing `getPlatformDisplay` and
+            // `getPlatformDisplayEXT`, which may result in an `EglDisplay::Khr` being created
+            // for a platform that does not support KHR functions and only supports EXT
+            // functions. As such, we check if the version is equal to 1.4 and downgrade to
+            // `EglDisplay::Ext` if so.
+            (EglDisplay::Khr(display), Version { major: 1, minor: 4 })
+                => EglDisplay::Ext(display),
+            // We do not do anything otherwise.
+            (display, _)
+                => display,
+        }
     }
 }
 
