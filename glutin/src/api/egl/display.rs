@@ -507,11 +507,11 @@ impl Display {
     #[cfg(free_unix)]
     fn sanitize_libglvnd_aliasing(display: EglDisplay, version: Version) -> EglDisplay {
         match (display, version) {
-            // libglvnd has an unsavoury quirk of unconditionally aliasing `getPlatformDisplay` (unavailable on EGL 1.4) and
-            // `getPlatformDisplayEXT`, which may result in an `EglDisplay::Khr` being created
-            // for a platform that does not support KHR functions and only supports EXT
-            // functions. As such, we check if the version is equal to 1.4 and downgrade to
-            // `EglDisplay::Ext` if so.
+            // libglvnd has an unsavoury quirk of unconditionally aliasing `getPlatformDisplay`
+            // (unavailable on EGL 1.4) and `getPlatformDisplayEXT`, which may result in
+            // an `EglDisplay::Khr` being created for a platform that does not support
+            // KHR functions and only supports EXT functions. As such, we check if the
+            // version is equal to 1.4 and downgrade to `EglDisplay::Ext` if so.
             // See: https://gitlab.freedesktop.org/glvnd/libglvnd/-/blob/606f6627cf481ee6dcb32387edc010c502cdf38b/src/EGL/libegl.c#L270-358
             // https://gitlab.freedesktop.org/glvnd/libglvnd/-/blob/606f6627cf481ee6dcb32387edc010c502cdf38b/src/EGL/libegl.c#L409-461
             // https://gitlab.freedesktop.org/glvnd/libglvnd/-/blob/606f6627cf481ee6dcb32387edc010c502cdf38b/include/glvnd/libeglabi.h#L231-232
