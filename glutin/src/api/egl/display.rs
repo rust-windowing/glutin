@@ -512,6 +512,9 @@ impl Display {
             // for a platform that does not support KHR functions and only supports EXT
             // functions. As such, we check if the version is equal to 1.4 and downgrade to
             // `EglDisplay::Ext` if so.
+            // See: https://gitlab.freedesktop.org/glvnd/libglvnd/-/blob/606f6627cf481ee6dcb32387edc010c502cdf38b/src/EGL/libegl.c#L270-358
+            // https://gitlab.freedesktop.org/glvnd/libglvnd/-/blob/606f6627cf481ee6dcb32387edc010c502cdf38b/src/EGL/libegl.c#L409-461
+            // https://gitlab.freedesktop.org/glvnd/libglvnd/-/blob/606f6627cf481ee6dcb32387edc010c502cdf38b/include/glvnd/libeglabi.h#L231-232
             (EglDisplay::Khr(display), Version { major: 1, minor: 4 }) => EglDisplay::Ext(display),
             // We do not do anything otherwise.
             (display, _) => display,
