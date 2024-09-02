@@ -18,18 +18,23 @@ jobs:
     name: Check formatting
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - uses: hecrj/setup-rust-action@v1
+    - uses: taiki-e/checkout-action@v1
+    - uses: dtolnay/rust-toolchain@nightly
       with:
-        rust-version: nightly
         components: rustfmt
     - uses: taiki-e/install-action@v2
       with:
         tool: typos-cli
     - name: Check Formatting
-      run: cargo +nightly fmt --all -- --check
-    - name: Run Typos
+      run: cargo fmt --all -- --check
+    - name: run typos
       run: typos
+    - name: Typos info
+      if: failure()
+      run: |
+        echo 'To fix typos, please run `typos -w`'
+        echo 'To check for a diff, run `typos`'
+        echo 'You can find typos here: https://crates.io/crates/typos'
 
   tests:
     name: Tests
