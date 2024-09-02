@@ -486,6 +486,7 @@ impl Display {
         };
 
         // Sanitize for libglvnd's aliasing.
+        #[cfg(free_unix)]
         let display = Self::sanitize_libglvnd_aliasing(display, version);
 
         // Load extensions.
@@ -503,6 +504,7 @@ impl Display {
         Ok(Self { inner })
     }
 
+    #[cfg(free_unix)]
     fn sanitize_libglvnd_aliasing(display: EglDisplay, version: Version) -> EglDisplay {
         match (display, version) {
             // libglvnd has an unsavoury quirk of aliasing `getPlatformDisplay` and
