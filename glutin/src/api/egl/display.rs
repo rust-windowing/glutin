@@ -507,7 +507,7 @@ impl Display {
     #[cfg(free_unix)]
     fn sanitize_libglvnd_aliasing(display: EglDisplay, version: Version) -> EglDisplay {
         match (display, version) {
-            // libglvnd has an unsavoury quirk of aliasing `getPlatformDisplay` and
+            // libglvnd has an unsavoury quirk of unconditionally aliasing `getPlatformDisplay` (unavailable on EGL 1.4) and
             // `getPlatformDisplayEXT`, which may result in an `EglDisplay::Khr` being created
             // for a platform that does not support KHR functions and only supports EXT
             // functions. As such, we check if the version is equal to 1.4 and downgrade to
