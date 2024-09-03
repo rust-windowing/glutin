@@ -487,7 +487,7 @@ impl Display {
 
         // Sanitize for libglvnd's aliasing.
         #[cfg(free_unix)]
-        let display = Self::sanitize_libglvnd_aliasing(display, version);
+        let display = Self::sanitize_egl_display_provider(display, version);
 
         // Load extensions.
         let display_extensions = get_extensions(egl, *display);
@@ -505,20 +505,25 @@ impl Display {
     }
 
     #[cfg(free_unix)]
-    fn sanitize_libglvnd_aliasing(display: EglDisplay, version: Version) -> EglDisplay {
-        match (display, version) {
-            // libglvnd has an unsavoury quirk of unconditionally aliasing `getPlatformDisplay`
-            // (unavailable on EGL 1.4) and `getPlatformDisplayEXT`, which may result in
-            // an `EglDisplay::Khr` being created for a platform that does not support
-            // KHR functions and only supports EXT functions. As such, we check if the
-            // version is equal to 1.4 and downgrade to `EglDisplay::Ext` if so.
+    fn sanitize_egl_display_provider(display: EglDisplay, version: Version) -> EglDisplay {
+        let client_extensions = CLIENT_EXTENSIONS.get().unwrap();
+        match display {
+            // Since according to libglvnd, `eglGetPlatformDisplay` and `GetPlatformDisplayEXT`
+            // aren't really differentiated under the hood, we must check if the version of the
+            // initialized display is not sensible for the EglDisplay type and downgrade it if so
             // See: https://gitlab.freedesktop.org/glvnd/libglvnd/-/blob/606f6627cf481ee6dcb32387edc010c502cdf38b/src/EGL/libegl.c#L270-358
             // https://gitlab.freedesktop.org/glvnd/libglvnd/-/blob/606f6627cf481ee6dcb32387edc010c502cdf38b/src/EGL/libegl.c#L409-461
             // https://gitlab.freedesktop.org/glvnd/libglvnd/-/blob/606f6627cf481ee6dcb32387edc010c502cdf38b/include/glvnd/libeglabi.h#L231-232
             // https://gitlab.freedesktop.org/glvnd/libglvnd/-/issues/251
-            (EglDisplay::Khr(display), Version { major: 1, minor: 4 }) => EglDisplay::Ext(display),
+            EglDisplay::Khr(display) if version == Version { major: 1, minor: 4 } => {
+                if client_extensions.contains("EGL_EXT_platform_base") {
+                    EglDisplay::Ext(display)
+                } else {
+                    EglDisplay::Legacy(display)
+                }
+            },
             // We do not do anything otherwise.
-            (display, _) => display,
+            display => display,
         }
     }
 }
