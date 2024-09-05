@@ -487,18 +487,18 @@ impl Display {
 
         // Sanitize the display provider, as the received EGL 1.4 display could have
         // been marked incorrectly as `EglDisplay::Khr`.
-        #[cfg(free_unix)]
+        // See pull request #1690.
         let display = match display {
-            // Since according to libglvnd, `eglGetPlatformDisplay` and `GetPlatformDisplayEXT`
-            // aren't really differentiated under the hood, we must check if the version of the
-            // initialized display is not sensible for the EglDisplay type and downgrade it if so
-            // See: https://gitlab.freedesktop.org/glvnd/libglvnd/-/blob/606f6627cf481ee6dcb32387edc010c502cdf38b/src/EGL/libegl.c#L270-358
-            // https://gitlab.freedesktop.org/glvnd/libglvnd/-/blob/606f6627cf481ee6dcb32387edc010c502cdf38b/src/EGL/libegl.c#L409-461
-            // https://gitlab.freedesktop.org/glvnd/libglvnd/-/blob/606f6627cf481ee6dcb32387edc010c502cdf38b/include/glvnd/libeglabi.h#L231-232
-            // https://gitlab.freedesktop.org/glvnd/libglvnd/-/issues/251
-            EglDisplay::Khr(display) if version == Version { major: 1, minor: 4 } => {
+            // `eglGetPlatformDisplay` and `GetPlatformDisplayEXT` aren't really differentiated,
+            // we must check if the version of the initialized display is not sensible for the
+            // EglDisplay type and downgrade it if so.
+            EglDisplay::Khr(display) if version <= Version { major: 1, minor: 4 } => {
                 let client_extensions = CLIENT_EXTENSIONS.get().unwrap();
-                if client_extensions.contains("EGL_EXT_platform_base") {
+                if client_extensions.contains("EGL_EXT_platform_base")
+                    && (version == Version { major: 1, minor: 4 })
+                {
+                    // `EGL_EXT_platform_base` requires EGL 1.4 per specification; we cannot safely
+                    // presume that an `Ext` display would be valid for older versions.
                     EglDisplay::Ext(display)
                 } else {
                     EglDisplay::Legacy(display)

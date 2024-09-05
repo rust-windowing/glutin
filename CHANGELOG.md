@@ -2,7 +2,7 @@
 
 - Fixed EGL's `Device::query_devices()` being too strict about required extensions
 - Fixed crash in `EglGetProcAddress` on Win32-x86 platform due to wrong calling convention
-- Implement a workaround for EGL's `Display::new()` making an `EGLDisplay::Khr` when the underlying platform only supports `EGLDisplay::Ext` due to `libglvnd` using the same vendor functions for obtaining a display connection for both `eglGetPlatformDisplay()` and `eglGetPlatformDisplayEXT()`.
+- Fixed EGL's `Display::new()` making an `EGLDisplay::Khr` when the EGL version for the display is 1.4 or lower.
 
 # Version 0.32.0
 
