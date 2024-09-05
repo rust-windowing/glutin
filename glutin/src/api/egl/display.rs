@@ -2,11 +2,11 @@
 
 use std::collections::HashSet;
 use std::ffi::{self, CStr};
+use std::fmt;
 use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::os::raw::c_char;
 use std::sync::Arc;
-use std::{fmt, ptr};
 
 use glutin_egl_sys::egl;
 use glutin_egl_sys::egl::types::{EGLAttrib, EGLDisplay, EGLint};
@@ -193,12 +193,12 @@ impl Display {
             .into());
         }
 
-        let device = ptr::null_mut();
+        let mut device = MaybeUninit::uninit();
         if unsafe {
             self.inner.egl.QueryDisplayAttribEXT(
                 *self.inner.raw,
                 egl::DEVICE_EXT as EGLint,
-                device as *mut _,
+                device.as_mut_ptr(),
             )
         } == egl::FALSE
         {
@@ -211,6 +211,13 @@ impl Display {
             }));
         }
 
+        let device = unsafe { device.assume_init() } as egl::types::EGLDeviceEXT;
+        debug_assert_ne!(
+            device,
+            egl::NO_DEVICE_EXT,
+            "eglQueryDisplayAttribEXT(EGL_DEVICE_EXT) should never return EGL_NO_DEVICE_EXT on \
+             success"
+        );
         Device::from_ptr(self.inner.egl, device)
     }
 
