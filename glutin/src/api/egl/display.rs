@@ -1,7 +1,7 @@
 //! Everything related to `EGLDisplay`.
 
 use std::collections::HashSet;
-use std::ffi::{self, CStr};
+use std::ffi::{self, c_void, CStr};
 use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::os::raw::c_char;
@@ -193,12 +193,12 @@ impl Display {
             .into());
         }
 
-        let device = ptr::null_mut();
+        let mut device_offset = 0;
         if unsafe {
             self.inner.egl.QueryDisplayAttribEXT(
                 *self.inner.raw,
                 egl::DEVICE_EXT as EGLint,
-                device as *mut _,
+                &mut device_offset,
             )
         } == egl::FALSE
         {
@@ -211,7 +211,8 @@ impl Display {
             }));
         }
 
-        Device::from_ptr(self.inner.egl, device)
+        let device_ptr = unsafe { ptr::null_mut::<c_void>().offset(device_offset) };
+        Device::from_ptr(self.inner.egl, device_ptr)
     }
 
     /// Get a reference to the initialized EGL API.
