@@ -2,11 +2,11 @@
 
 use std::collections::HashSet;
 use std::ffi::{self, CStr};
+use std::fmt;
 use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::os::raw::c_char;
 use std::sync::Arc;
-use std::{fmt, ptr};
 
 use glutin_egl_sys::egl;
 use glutin_egl_sys::egl::types::{EGLAttrib, EGLDisplay, EGLint};
@@ -193,12 +193,12 @@ impl Display {
             .into());
         }
 
-        let device = ptr::null_mut();
+        let mut device = MaybeUninit::uninit();
         if unsafe {
             self.inner.egl.QueryDisplayAttribEXT(
                 *self.inner.raw,
                 egl::DEVICE_EXT as EGLint,
-                device as *mut _,
+                device.as_mut_ptr(),
             )
         } == egl::FALSE
         {
@@ -211,6 +211,13 @@ impl Display {
             }));
         }
 
+        let device = unsafe { device.assume_init() } as egl::types::EGLDeviceEXT;
+        debug_assert_ne!(
+            device,
+            egl::NO_DEVICE_EXT,
+            "eglQueryDisplayAttribEXT(EGL_DEVICE_EXT) should never return EGL_NO_DEVICE_EXT on \
+             success"
+        );
         Device::from_ptr(self.inner.egl, device)
     }
 
@@ -485,9 +492,6 @@ impl Display {
             Version::new(major as u8, minor as u8)
         };
 
-        // Sanitize the display provider, as the received EGL 1.4 display could have
-        // been marked incorrectly as `EglDisplay::Khr`.
-        // See pull request #1690.
         let display = match display {
             // `eglGetPlatformDisplay` and `GetPlatformDisplayEXT` aren't really differentiated,
             // we must check if the version of the initialized display is not sensible for the
