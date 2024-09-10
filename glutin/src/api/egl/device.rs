@@ -1,7 +1,8 @@
 //! Everything related to `EGLDevice`.
 
 use std::collections::HashSet;
-use std::ffi::{c_void, CStr};
+use std::ffi::CStr;
+use std::path::Path;
 use std::ptr;
 
 use glutin_egl_sys::egl;
@@ -17,9 +18,14 @@ use super::{Egl, EGL};
 pub struct Device {
     inner: EGLDeviceEXT,
     extensions: HashSet<&'static str>,
-    name: Option<String>,
-    vendor: Option<String>,
+    name: Option<&'static str>,
+    vendor: Option<&'static str>,
 }
+
+// SAFETY: An EGLDevice is immutable and valid for the lifetime of the EGL
+// library.
+unsafe impl Send for Device {}
+unsafe impl Sync for Device {}
 
 impl Device {
     /// Query the available devices.
@@ -93,7 +99,7 @@ impl Device {
     ///
     /// These extensions are distinct from the display extensions and should not
     /// be used interchangeably.
-    pub fn extensions(&self) -> &HashSet<&str> {
+    pub fn extensions(&self) -> &HashSet<&'static str> {
         &self.extensions
     }
 
@@ -101,31 +107,79 @@ impl Device {
     ///
     /// This function will return [`None`] if the `EGL_EXT_device_query_name`
     /// device extension is not available.
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
+    pub fn name(&self) -> Option<&'static str> {
+        self.name
     }
 
     /// Get the vendor of the device.
     ///
     /// This function will return [`None`] if the `EGL_EXT_device_query_name`
     /// device extension is not available.
-    pub fn vendor(&self) -> Option<&str> {
-        self.vendor.as_deref()
+    pub fn vendor(&self) -> Option<&'static str> {
+        self.vendor
     }
 
     /// Get a raw handle to the `EGLDevice`.
-    pub fn raw_device(&self) -> *const c_void {
+    pub fn raw_device(&self) -> EGLDeviceEXT {
         self.inner
     }
-}
 
-// SAFETY: An EGLDevice is immutable and valid for the lifetime of the EGL
-// library.
-unsafe impl Send for Device {}
-unsafe impl Sync for Device {}
+    /// Get the DRM primary or render device node path for this
+    /// [`EGLDeviceEXT`].
+    ///
+    /// Requires the [`EGL_EXT_device_drm`] extension.
+    ///
+    /// If the [`EGL_EXT_device_drm_render_node`] extension is supported, this
+    /// is guaranteed to return the **primary** device node path, or [`None`].
+    /// Consult [`Self::drm_render_device_node_path()`] to retrieve the
+    /// **render** device node path.
+    ///
+    /// [`EGL_EXT_device_drm`]: https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_device_drm.txt
+    /// [`EGL_EXT_device_drm_render_node`]: https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_device_drm_render_node.txt
+    pub fn drm_device_node_path(&self) -> Option<&'static Path> {
+        if !self.extensions.contains("EGL_EXT_device_drm") {
+            return None;
+        }
 
-impl Device {
-    unsafe fn query_string(egl_device: *const c_void, name: egl::types::EGLenum) -> Option<String> {
+        // SAFETY: We pass a valid EGLDevice pointer, and validated that the enum name
+        // is valid because the extension is present.
+        unsafe { Self::query_string(self.raw_device(), egl::DRM_DEVICE_FILE_EXT) }.map(Path::new)
+    }
+
+    /// Get the DRM render device node path for this [`EGLDeviceEXT`].
+    ///
+    /// Requires the [`EGL_EXT_device_drm_render_node`] extension.
+    ///
+    /// If the [`EGL_EXT_device_drm`] extension is supported in addition to
+    /// [`EGL_EXT_device_drm_render_node`],
+    /// consult [`Self::drm_device_node_path()`] to retrieve the **primary**
+    /// device node path.
+    ///
+    /// [`EGL_EXT_device_drm`]: https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_device_drm.txt
+    /// [`EGL_EXT_device_drm_render_node`]: https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_device_drm_render_node.txt
+    pub fn drm_render_device_node_path(&self) -> Option<&'static Path> {
+        if !self.extensions.contains("EGL_EXT_device_drm_render_node") {
+            return None;
+        }
+
+        const EGL_DRM_RENDER_NODE_PATH_EXT: egl::types::EGLenum = 0x3377;
+        // SAFETY: We pass a valid EGLDevice pointer, and validated that the enum name
+        // is valid because the extension is present.
+        unsafe { Self::query_string(self.raw_device(), EGL_DRM_RENDER_NODE_PATH_EXT) }
+            .map(Path::new)
+    }
+
+    /// # Safety
+    /// The caller must pass  a valid `egl_device` pointer and must ensure that
+    /// `name` is valid for this device, i.e. by guaranteeing that the
+    /// extension that introduces it is present.
+    ///
+    /// The returned string is `'static` for the lifetime of the globally loaded
+    /// EGL library in [`EGL`].
+    unsafe fn query_string(
+        egl_device: EGLDeviceEXT,
+        name: egl::types::EGLenum,
+    ) -> Option<&'static str> {
         let egl = super::EGL.as_ref().unwrap();
 
         // SAFETY: The caller has ensured the name is valid.
@@ -135,10 +189,10 @@ impl Device {
             return None;
         }
 
-        unsafe { CStr::from_ptr(ptr) }.to_str().ok().map(String::from)
+        unsafe { CStr::from_ptr(ptr) }.to_str().ok()
     }
 
-    pub(crate) fn from_ptr(egl: &Egl, ptr: *const c_void) -> Result<Self> {
+    pub(crate) fn from_ptr(egl: &Egl, ptr: EGLDeviceEXT) -> Result<Self> {
         // SAFETY: The EGL specification guarantees the returned string is
         // static and null terminated:
         //
