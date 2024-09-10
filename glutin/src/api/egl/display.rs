@@ -492,6 +492,26 @@ impl Display {
             Version::new(major as u8, minor as u8)
         };
 
+        let display = match display {
+            // `eglGetPlatformDisplay` and `GetPlatformDisplayEXT` aren't really differentiated,
+            // we must check if the version of the initialized display is not sensible for the
+            // EglDisplay type and downgrade it if so.
+            EglDisplay::Khr(display) if version <= Version { major: 1, minor: 4 } => {
+                let client_extensions = CLIENT_EXTENSIONS.get().unwrap();
+                if client_extensions.contains("EGL_EXT_platform_base")
+                    && (version == Version { major: 1, minor: 4 })
+                {
+                    // `EGL_EXT_platform_base` requires EGL 1.4 per specification; we cannot safely
+                    // presume that an `Ext` display would be valid for older versions.
+                    EglDisplay::Ext(display)
+                } else {
+                    EglDisplay::Legacy(display)
+                }
+            },
+            // We do not do anything otherwise.
+            display => display,
+        };
+
         // Load extensions.
         let display_extensions = get_extensions(egl, *display);
         let features = Self::extract_display_features(&display_extensions, version);
