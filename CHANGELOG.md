@@ -1,5 +1,7 @@
 # Unreleased
 
+# Version 0.32.1
+
 - Fixed EGL's `Device::query_devices()` being too strict about required extensions.
 - Fixed crash in `EglGetProcAddress` on Win32-x86 platform due to wrong calling convention.
 - Fixed EGL's `Display::device()` always returning an error due to invalid pointer-argument passing inside.
