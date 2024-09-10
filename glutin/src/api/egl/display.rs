@@ -13,9 +13,7 @@ use glutin_egl_sys::egl::types::{EGLAttrib, EGLDisplay, EGLint};
 
 use once_cell::sync::OnceCell;
 
-use raw_window_handle::RawDisplayHandle;
-#[cfg(x11_platform)]
-use raw_window_handle::XlibDisplayHandle;
+use raw_window_handle::{RawDisplayHandle, XlibDisplayHandle};
 
 use crate::config::ConfigTemplate;
 use crate::context::Version;
@@ -91,8 +89,10 @@ impl Display {
     ///
     /// # Safety
     ///
-    /// If `raw_display` is [`Some`], `raw_display` must point to a valid system
-    /// display.
+    /// If `raw_display` is [`Some`], `raw_display` must point to a valid
+    /// [`RawDisplayHandle::Drm`]. The provided
+    /// [`raw_display_handle::DrmDisplayHandle.fd`] may be closed after calling
+    /// this function.
     pub unsafe fn with_device(
         device: &Device,
         raw_display: Option<RawDisplayHandle>,
@@ -101,13 +101,6 @@ impl Display {
             Some(egl) => egl,
             None => return Err(ErrorKind::NotFound.into()),
         };
-
-        if raw_display.is_some() {
-            return Err(ErrorKind::NotSupported(
-                "Display::with_device does not support a `raw_display` argument yet",
-            )
-            .into());
-        }
 
         if !egl.GetPlatformDisplayEXT.is_loaded() {
             return Err(ErrorKind::NotSupported("eglGetPlatformDisplayEXT is not supported").into());
@@ -129,9 +122,22 @@ impl Display {
 
         let mut attrs = Vec::<EGLint>::with_capacity(3);
 
-        // TODO: Some extensions exist like EGL_EXT_device_drm which allow specifying
-        // which DRM master fd to use under the hood by the implementation. This would
-        // mean there would need to be an unsafe equivalent to this function.
+        match raw_display {
+            Some(RawDisplayHandle::Drm(handle))
+                if device.extensions().contains("EGL_EXT_device_drm") =>
+            {
+                attrs.push(egl::DRM_MASTER_FD_EXT as EGLint);
+                attrs.push(handle.fd as EGLint);
+            },
+            Some(_) => {
+                return Err(ErrorKind::NotSupported(
+                    "`egl::display::Display::with_device()` does not support \
+                     non-`DrmDisplayHandle` `RawDisplayHandle`s",
+                )
+                .into())
+            },
+            None => {},
+        };
 
         // Push at the end so we can pop it on failure
         let mut has_display_reference = extensions.contains("EGL_KHR_display_reference");
@@ -254,13 +260,11 @@ impl Display {
 
         let mut attrs = Vec::<EGLAttrib>::with_capacity(5);
         let (platform, display) = match display {
-            #[cfg(wayland_platform)]
             RawDisplayHandle::Wayland(handle)
                 if extensions.contains("EGL_KHR_platform_wayland") =>
             {
                 (egl::PLATFORM_WAYLAND_KHR, handle.display.as_ptr())
             },
-            #[cfg(x11_platform)]
             RawDisplayHandle::Xlib(handle) if extensions.contains("EGL_KHR_platform_x11") => {
                 attrs.push(egl::PLATFORM_X11_SCREEN_KHR as EGLAttrib);
                 attrs.push(handle.screen as EGLAttrib);
@@ -271,6 +275,12 @@ impl Display {
             },
             RawDisplayHandle::Gbm(handle) if extensions.contains("EGL_KHR_platform_gbm") => {
                 (egl::PLATFORM_GBM_KHR, handle.gbm_device.as_ptr())
+            },
+            RawDisplayHandle::Drm(_) => {
+                return Err(ErrorKind::NotSupported(
+                    "`DrmDisplayHandle` must be used with `egl::display::Display::with_device()`",
+                )
+                .into())
             },
             RawDisplayHandle::Android(_) if extensions.contains("EGL_KHR_platform_android") => {
                 (egl::PLATFORM_ANDROID_KHR, egl::DEFAULT_DISPLAY as *mut _)
@@ -328,13 +338,11 @@ impl Display {
         let mut attrs = Vec::<EGLint>::with_capacity(5);
         let mut legacy = false;
         let (platform, display) = match display {
-            #[cfg(wayland_platform)]
             RawDisplayHandle::Wayland(handle)
                 if extensions.contains("EGL_EXT_platform_wayland") =>
             {
                 (egl::PLATFORM_WAYLAND_EXT, handle.display.as_ptr())
             },
-            #[cfg(x11_platform)]
             RawDisplayHandle::Xlib(handle) if extensions.contains("EGL_EXT_platform_x11") => {
                 attrs.push(egl::PLATFORM_X11_SCREEN_EXT as EGLint);
                 attrs.push(handle.screen as EGLint);
@@ -343,7 +351,6 @@ impl Display {
                     handle.display.map_or(egl::DEFAULT_DISPLAY as *mut _, |d| d.as_ptr()),
                 )
             },
-            #[cfg(x11_platform)]
             RawDisplayHandle::Xcb(handle)
                 if extensions.contains("EGL_MESA_platform_xcb")
                     || extensions.contains("EGL_EXT_platform_xcb") =>
@@ -357,6 +364,12 @@ impl Display {
             },
             RawDisplayHandle::Gbm(handle) if extensions.contains("EGL_MESA_platform_gbm") => {
                 (egl::PLATFORM_GBM_MESA, handle.gbm_device.as_ptr())
+            },
+            RawDisplayHandle::Drm(_) => {
+                return Err(ErrorKind::NotSupported(
+                    "`DrmDisplayHandle` must be used with `egl::display::Display::with_device()`",
+                )
+                .into())
             },
             RawDisplayHandle::Windows(..) if extensions.contains("EGL_ANGLE_platform_angle") => {
                 // Only CreateWindowSurface appears to work with Angle.
@@ -419,7 +432,12 @@ impl Display {
     fn get_display(egl: &Egl, display: RawDisplayHandle) -> Result<EglDisplay> {
         let display = match display {
             RawDisplayHandle::Gbm(handle) => handle.gbm_device.as_ptr(),
-            #[cfg(x11_platform)]
+            RawDisplayHandle::Drm(_) => {
+                return Err(ErrorKind::NotSupported(
+                    "`DrmDisplayHandle` must be used with `egl::display::Display::with_device()`",
+                )
+                .into())
+            },
             RawDisplayHandle::Xlib(XlibDisplayHandle { display, .. }) => {
                 display.map_or(egl::DEFAULT_DISPLAY as *mut _, |d| d.as_ptr())
             },

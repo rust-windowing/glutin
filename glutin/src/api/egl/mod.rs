@@ -28,6 +28,9 @@ pub mod device;
 pub mod display;
 pub mod surface;
 
+// WARNING: If this implementation is ever changed to unload or replace the
+// library, note that public API functions currently retirm `&'static str`ings
+// out of it, which would become invalid.
 pub(crate) static EGL: Lazy<Option<Egl>> = Lazy::new(|| {
     #[cfg(windows)]
     let paths = ["libEGL.dll", "atioglxx.dll"];
