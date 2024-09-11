@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use std::num::NonZeroU32;
 
 use objc2::rc::Id;
-use objc2_app_kit::NSView;
+use objc2_app_kit::{NSAppKitVersionNumber, NSAppKitVersionNumber10_12, NSView};
 use objc2_foundation::{run_on_main, MainThreadBound, MainThreadMarker};
 use raw_window_handle::RawWindowHandle;
 
@@ -60,12 +60,29 @@ impl Display {
         // SAFETY: Validity of the view and window is ensured by caller
         // This function makes sure the window is non null.
         let ns_view = if let Some(ns_view) =
-            unsafe { Id::retain(native_window.ns_view.as_ptr().cast()) }
+            unsafe { Id::retain(native_window.ns_view.as_ptr().cast::<NSView>()) }
         {
             ns_view
         } else {
             return Err(ErrorKind::NotSupported("ns_view of provided native window is nil").into());
         };
+
+        // The default value of `wantsBestResolutionOpenGLSurface` is `false` when
+        // linked with the macOS 10.14 SDK and `true` if linked with a macOS 10.15 SDK
+        // or newer. We always set it to `true` because we want High DPI surfaces, and
+        // we want to avoid this confusing default system value.
+        #[allow(deprecated)]
+        ns_view.setWantsBestResolutionOpenGLSurface(true);
+
+        // On Mojave, views apparently automatically become layer-backed shortly after
+        // being added to a window. Changing the layer-backedness of a view breaks the
+        // association between the view and its associated OpenGL context. To work
+        // around this, we explicitly make the view layer-backed up front so that AppKit
+        // doesn't do it itself and break the association with its context.
+        if unsafe { NSAppKitVersionNumber }.floor() > NSAppKitVersionNumber10_12 {
+            ns_view.setWantsLayer(true);
+        }
+
         let ns_view = MainThreadBound::new(ns_view, mtm);
 
         let surface = Surface {
