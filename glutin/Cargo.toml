@@ -66,10 +66,12 @@ features = [
 [target.'cfg(any(target_os = "macos"))'.dependencies.objc2-app-kit]
 version = "0.2.0"
 features = [
+    "NSApplication",
     "NSResponder",
     "NSView",
     "NSWindow",
     "NSOpenGL",
+    "NSOpenGLView",
 ]
 
 [build-dependencies]
