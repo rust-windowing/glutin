@@ -9,7 +9,8 @@ use glutin_egl_sys::{egl, EGLContext};
 
 use crate::config::{Api, GetGlConfig};
 use crate::context::{
-    self, AsRawContext, ContextApi, ContextAttributes, GlProfile, RawContext, Robustness, Version,
+    self, AsRawContext, ContextApi, ContextAttributes, GlProfile, Priority, RawContext, Robustness,
+    Version,
 };
 use crate::display::{DisplayFeatures, GetGlDisplay};
 use crate::error::{ErrorKind, Result};
@@ -124,6 +125,24 @@ impl Display {
                 attrs.push(egl::CONTEXT_CLIENT_VERSION as EGLint);
                 attrs.push(version.major as EGLint);
             }
+        }
+
+        if context_attributes.priority != Priority::Medium
+            && self.inner.display_extensions.contains("EGL_IMG_context_priority")
+        {
+            attrs.push(egl::CONTEXT_PRIORITY_LEVEL_IMG as EGLint);
+            attrs.push(match context_attributes.priority {
+                Priority::Low => egl::CONTEXT_PRIORITY_LOW_IMG,
+                Priority::High => egl::CONTEXT_PRIORITY_HIGH_IMG,
+                Priority::Realtime => {
+                    if self.inner.display_extensions.contains("EGL_NV_context_priority_realtime") {
+                        egl::CONTEXT_PRIORITY_REALTIME_NV
+                    } else {
+                        egl::CONTEXT_PRIORITY_HIGH_IMG
+                    }
+                },
+                _ => unreachable!(),
+            } as EGLint);
         }
 
         attrs.push(egl::NONE as EGLint);

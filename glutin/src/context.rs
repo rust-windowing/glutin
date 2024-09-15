@@ -201,6 +201,19 @@ impl ContextAttributesBuilder {
         self
     }
 
+    /// Sets the priority hint, which might not be honored if the API does not
+    /// support it, if there are constraints on the number of high priority
+    /// contexts available in the system, or system policy limits access to
+    /// high priority contexts to appropriate system privilege level
+    ///
+    /// # Api-specific
+    ///
+    /// - Only EGL at the moment implements context priorities.
+    pub fn with_priority(mut self, priority: Priority) -> Self {
+        self.attributes.priority = priority;
+        self
+    }
+
     /// Build the context attributes.
     ///
     /// The `raw_window_handle` isn't required and here for WGL compatibility.
@@ -227,6 +240,8 @@ pub struct ContextAttributes {
     pub(crate) profile: Option<GlProfile>,
 
     pub(crate) api: Option<ContextApi>,
+
+    pub(crate) priority: Priority,
 
     pub(crate) shared_context: Option<RawContext>,
 
@@ -606,6 +621,22 @@ pub enum RawContext {
     /// Pointer to NSOpenGLContext.
     #[cfg(cgl_backend)]
     Cgl(*const ffi::c_void),
+}
+
+/// Priority hint
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
+pub enum Priority {
+    /// Lowest priority, contexts using this priority give way for most other
+    /// contexts.
+    Low,
+    /// Default priority.
+    #[default]
+    Medium,
+    /// High priority is usually required for VR applications.
+    High,
+    /// Realtime priority contexts are executed immediately and preempt any
+    /// current context running. But will fallback to high if not supported.
+    Realtime,
 }
 
 /// Pick `GlProfile` and `Version` based on the provided params.
