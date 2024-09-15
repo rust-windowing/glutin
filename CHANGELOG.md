@@ -10,7 +10,7 @@
 - Added `NotCurrentContext::make_current_surfaceless(self)` and
   `PossiblyCurrentContext::make_current_surfaceless(&self)` in the `Wgl`
   implementation to allow the use of surfaceless contexts with WGL.
-
+- Added `GlContext::priority`/`ContextAttributesBuilder::with_priority` to get/set context priority.
 
 # Version 0.32.1
 
