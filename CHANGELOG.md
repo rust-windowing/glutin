@@ -7,6 +7,7 @@
 - Added `Device::drm_device_node_path()` and `Device::drm_render_device_node_path()` getters to EGL via `EGL_EXT_device_drm`.
 - Added support for `DrmDisplayHandle` in EGL's `Display::with_device()` using `EGL_DRM_MASTER_FD_EXT` from `EGL_EXT_device_drm`.
 - Properly set up OpenGL-specific stuff on the `NSView`, instead of relying on Winit to do it.
+- Added support for `Display::create_pbuffer_surface()` in WGL via `WGL_ARB_pbuffer`.
 
 # Version 0.32.0
 

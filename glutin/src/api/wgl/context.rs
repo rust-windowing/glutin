@@ -22,7 +22,7 @@ use crate::prelude::*;
 use crate::private::Sealed;
 use crate::surface::SurfaceTypeTrait;
 
-use super::config::Config;
+use super::{config::Config, surface::WGLSurface};
 use super::display::Display;
 use super::surface::Surface;
 
@@ -387,7 +387,12 @@ impl ContextInner {
 
     fn make_current<T: SurfaceTypeTrait>(&self, surface: &Surface<T>) -> Result<()> {
         unsafe {
-            if wgl::MakeCurrent(surface.hdc as _, self.raw.cast()) == 0 {
+            let hdc = match surface.raw {
+                WGLSurface::Window(_, hdc) => hdc  as _,
+                WGLSurface::PBuffer(_, hdc) => hdc as _,
+            };
+
+            if wgl::MakeCurrent(hdc, self.raw.cast()) == 0 {
                 Err(IoError::last_os_error().into())
             } else {
                 Ok(())
