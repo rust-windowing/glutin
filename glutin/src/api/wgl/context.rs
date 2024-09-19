@@ -22,9 +22,9 @@ use crate::prelude::*;
 use crate::private::Sealed;
 use crate::surface::SurfaceTypeTrait;
 
-use super::{config::Config, surface::WGLSurface};
+use super::config::Config;
 use super::display::Display;
-use super::surface::Surface;
+use super::surface::{Surface, WGLSurface};
 
 impl Display {
     pub(crate) unsafe fn create_context(
@@ -388,7 +388,7 @@ impl ContextInner {
     fn make_current<T: SurfaceTypeTrait>(&self, surface: &Surface<T>) -> Result<()> {
         unsafe {
             let hdc = match surface.raw {
-                WGLSurface::Window(_, hdc) => hdc  as _,
+                WGLSurface::Window(_, hdc) => hdc as _,
                 WGLSurface::PBuffer(_, hdc) => hdc as _,
             };
 
