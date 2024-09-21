@@ -441,7 +441,9 @@ impl Display {
             RawDisplayHandle::Xlib(XlibDisplayHandle { display, .. }) => {
                 display.map_or(egl::DEFAULT_DISPLAY as *mut _, |d| d.as_ptr())
             },
-            RawDisplayHandle::Android(_) | RawDisplayHandle::Ohos(_) => egl::DEFAULT_DISPLAY as *mut _,
+            RawDisplayHandle::Android(_) | RawDisplayHandle::Ohos(_) => {
+                egl::DEFAULT_DISPLAY as *mut _
+            },
             _ => {
                 return Err(
                     ErrorKind::NotSupported("provided display handle is not supported").into()
