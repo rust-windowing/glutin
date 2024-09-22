@@ -387,7 +387,7 @@ impl ContextInner {
 
     fn make_current<T: SurfaceTypeTrait>(&self, surface: &Surface<T>) -> Result<()> {
         unsafe {
-            if wgl::MakeCurrent(surface.hdc as _, self.raw.cast()) == 0 {
+            if wgl::MakeCurrent(surface.raw.hdc() as _, self.raw.cast()) == 0 {
                 Err(IoError::last_os_error().into())
             } else {
                 Ok(())
