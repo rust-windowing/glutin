@@ -18,12 +18,13 @@ fn main() {
         let mut file = File::create(dest.join("wgl_extra_bindings.rs")).unwrap();
         Registry::new(Api::Wgl, (1, 0), Profile::Core, Fallbacks::All, [
             "WGL_ARB_context_flush_control",
-            "WGL_ARB_create_context",
             "WGL_ARB_create_context_no_error",
             "WGL_ARB_create_context_profile",
             "WGL_ARB_create_context_robustness",
+            "WGL_ARB_create_context",
             "WGL_ARB_extensions_string",
             "WGL_ARB_framebuffer_sRGB",
+            "WGL_ARB_pbuffer",
             "WGL_ARB_multisample",
             "WGL_ARB_pixel_format",
             "WGL_ARB_pixel_format_float",

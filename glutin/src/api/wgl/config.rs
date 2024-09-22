@@ -237,6 +237,11 @@ impl Display {
             attrs.push(1);
         }
 
+        if template.config_surface_types.contains(ConfigSurfaceTypes::PBUFFER) {
+            attrs.push(wgl_extra::DRAW_TO_PBUFFER_ARB as c_int);
+            attrs.push(1);
+        }
+
         if template.transparency {
             attrs.push(wgl_extra::TRANSPARENT_ARB as c_int);
             attrs.push(1);
