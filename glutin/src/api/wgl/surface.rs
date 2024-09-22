@@ -116,7 +116,7 @@ impl Display {
     }
 }
 
-/// A Wrapper around `WGLSurface`.
+/// A Wrapper around `WglSurface`.
 pub struct Surface<T: SurfaceTypeTrait> {
     display: Display,
     config: Config,
