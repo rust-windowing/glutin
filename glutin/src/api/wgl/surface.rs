@@ -52,13 +52,11 @@ impl Display {
         let hdc = config.inner.hdc;
         let width = surface_attributes.width.unwrap().get() as c_int;
         let height = surface_attributes.height.unwrap().get() as c_int;
-        let attrs: [c_int; 3] = {
-            if surface_attributes.largest_pbuffer {
-                [wgl_extra::PBUFFER_LARGEST_ARB as _, 1, 0]
-            } else {
-                [0; 3]
-            }
-        };
+        let mut attrs = [0; 3];
+        if surface_attributes.largest_pbuffer {
+            attrs[0] = wgl_extra::PBUFFER_LARGEST_ARB as c_int;
+            attrs[1] = 1;
+        }
 
         let hbuf = unsafe {
             extra.CreatePbufferARB(
@@ -272,7 +270,7 @@ impl<T: SurfaceTypeTrait> AsRawSurface for Surface<T> {
     fn raw_surface(&self) -> RawSurface {
         match self.raw {
             WglSurface::Window(hwnd, _) => RawSurface::Wgl(hwnd as _),
-            WglSurface::PBuffer(..) => RawSurface::Wgl(0 as _),
+            WglSurface::PBuffer(hbuf, _) => RawSurface::Wgl(hbuf as _),
         }
     }
 }
@@ -305,7 +303,7 @@ pub enum WglSurface {
 }
 
 impl WglSurface {
-    fn hdc(&self) -> HDC {
+    pub(crate) fn hdc(&self) -> HDC {
         *match self {
             WglSurface::Window(_, hdc) => hdc,
             WglSurface::PBuffer(_, hdc) => hdc,
