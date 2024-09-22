@@ -135,12 +135,11 @@ impl<T: SurfaceTypeTrait> Surface<T> {
             WglSurface::Window(..) => None,
             WglSurface::PBuffer(hbuf, _) => {
                 let extra = self.display.inner.wgl_extra.unwrap();
-
                 let mut value = 0;
-                if unsafe { extra.QueryPbufferARB(hbuf, attr as _, &mut value) } != 0 {
-                    Some(value)
-                } else {
+                if unsafe { extra.QueryPbufferARB(hbuf, attr as _, &mut value) } == false.into() {
                     None
+                } else {
+                    Some(value)
                 }
             },
         }
