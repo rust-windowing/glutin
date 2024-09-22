@@ -519,7 +519,7 @@ pub enum RawSurface {
     #[cfg(glx_backend)]
     Glx(u64),
 
-    /// HWND
+    /// Either a `HWND` or `HPBUFFEREXT` depending on [`SurfaceType`].
     #[cfg(wgl_backend)]
     Wgl(*const std::ffi::c_void),
 

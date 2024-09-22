@@ -3,8 +3,12 @@
 use std::io::Error as IoError;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
+use std::os::raw::c_int;
 use std::{fmt, mem};
 
+use glutin_wgl_sys::wgl::types::GLenum;
+use glutin_wgl_sys::wgl_extra::types::HPBUFFEREXT;
+use glutin_wgl_sys::wgl_extra::{self};
 use raw_window_handle::RawWindowHandle;
 use windows_sys::Win32::Foundation::{HWND, RECT};
 use windows_sys::Win32::Graphics::Gdi::HDC;
@@ -36,10 +40,50 @@ impl Display {
 
     pub(crate) unsafe fn create_pbuffer_surface(
         &self,
-        _config: &Config,
-        _surface_attributes: &SurfaceAttributes<PbufferSurface>,
+        config: &Config,
+        surface_attributes: &SurfaceAttributes<PbufferSurface>,
     ) -> Result<Surface<PbufferSurface>> {
-        Err(ErrorKind::NotSupported("pbuffers are not implemented with WGL").into())
+        let extra = self
+            .inner
+            .wgl_extra
+            .filter(|_| self.inner.client_extensions.contains("WGL_ARB_pbuffer"))
+            .ok_or(ErrorKind::NotSupported("pbuffer extensions are not supported"))?;
+
+        let hdc = config.inner.hdc;
+        let width = surface_attributes.width.unwrap().get() as c_int;
+        let height = surface_attributes.height.unwrap().get() as c_int;
+        let mut attrs = [0; 3];
+        if surface_attributes.largest_pbuffer {
+            attrs[0] = wgl_extra::PBUFFER_LARGEST_ARB as c_int;
+            attrs[1] = 1;
+        }
+
+        let hbuf = unsafe {
+            extra.CreatePbufferARB(
+                hdc as _,
+                config.inner.pixel_format_index,
+                width,
+                height,
+                attrs.as_ptr(),
+            )
+        };
+        if hbuf.is_null() {
+            return Err(IoError::last_os_error().into());
+        }
+
+        let hdc = unsafe { extra.GetPbufferDCARB(hbuf) };
+        if hdc.is_null() {
+            return Err(IoError::last_os_error().into());
+        }
+
+        let surface = Surface {
+            display: self.clone(),
+            config: config.clone(),
+            raw: WglSurface::PBuffer(hbuf, hdc as _),
+            _ty: PhantomData,
+        };
+
+        Ok(surface)
     }
 
     pub(crate) unsafe fn create_window_surface(
@@ -61,29 +105,58 @@ impl Display {
 
         let hdc = unsafe { gdi::GetDC(hwnd) };
 
-        let surface =
-            Surface { display: self.clone(), config: config.clone(), hwnd, hdc, _ty: PhantomData };
+        let surface = Surface {
+            display: self.clone(),
+            config: config.clone(),
+            raw: WglSurface::Window(hwnd, hdc),
+            _ty: PhantomData,
+        };
 
         Ok(surface)
     }
 }
 
-/// A Wrapper around `HWND`.
+/// A Wrapper around `WglSurface`.
 pub struct Surface<T: SurfaceTypeTrait> {
     display: Display,
     config: Config,
-    pub(crate) hwnd: HWND,
-    pub(crate) hdc: HDC,
+    pub(crate) raw: WglSurface,
     _ty: PhantomData<T>,
 }
 
 // Impl only `Send` for Surface.
 unsafe impl<T: SurfaceTypeTrait> Send for Surface<T> {}
 
+impl<T: SurfaceTypeTrait> Surface<T> {
+    fn raw_attribute(&self, attr: GLenum) -> Option<c_int> {
+        match self.raw {
+            WglSurface::Window(..) => None,
+            WglSurface::PBuffer(hbuf, _) => {
+                let extra = self.display.inner.wgl_extra.unwrap();
+                let mut value = 0;
+                if unsafe { extra.QueryPbufferARB(hbuf, attr as _, &mut value) } == false.into() {
+                    None
+                } else {
+                    Some(value)
+                }
+            },
+        }
+    }
+}
+
 impl<T: SurfaceTypeTrait> Drop for Surface<T> {
     fn drop(&mut self) {
         unsafe {
-            gdi::ReleaseDC(self.hwnd, self.hdc);
+            match self.raw {
+                WglSurface::Window(hwnd, hdc) => {
+                    gdi::ReleaseDC(hwnd, hdc);
+                },
+                WglSurface::PBuffer(hbuf, hdc) => {
+                    let extra = self.display.inner.wgl_extra.unwrap();
+                    extra.ReleasePbufferDCARB(hbuf, hdc as _);
+                    extra.DestroyPbufferARB(hbuf);
+                },
+            }
         }
     }
 }
@@ -97,20 +170,34 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     }
 
     fn width(&self) -> Option<u32> {
-        let mut rect: RECT = unsafe { mem::zeroed() };
-        if unsafe { GetClientRect(self.hwnd, &mut rect) } == false.into() {
-            None
-        } else {
-            Some((rect.right - rect.left) as u32)
+        match self.raw {
+            WglSurface::Window(hwnd, _) => {
+                let mut rect: RECT = unsafe { mem::zeroed() };
+                if unsafe { GetClientRect(hwnd, &mut rect) } == false.into() {
+                    None
+                } else {
+                    Some((rect.right - rect.left) as u32)
+                }
+            },
+            WglSurface::PBuffer(..) => {
+                self.raw_attribute(wgl_extra::PBUFFER_WIDTH_ARB).map(|x| x as _)
+            },
         }
     }
 
     fn height(&self) -> Option<u32> {
-        let mut rect: RECT = unsafe { mem::zeroed() };
-        if unsafe { GetClientRect(self.hwnd, &mut rect) } == false.into() {
-            None
-        } else {
-            Some((rect.bottom - rect.top) as u32)
+        match self.raw {
+            WglSurface::Window(hwnd, _) => {
+                let mut rect: RECT = unsafe { mem::zeroed() };
+                if unsafe { GetClientRect(hwnd, &mut rect) } == false.into() {
+                    None
+                } else {
+                    Some((rect.bottom - rect.top) as u32)
+                }
+            },
+            WglSurface::PBuffer(..) => {
+                self.raw_attribute(wgl_extra::PBUFFER_HEIGHT_ARB).map(|x| x as _)
+            },
         }
     }
 
@@ -120,7 +207,7 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
 
     fn swap_buffers(&self, _context: &Self::Context) -> Result<()> {
         unsafe {
-            if gl::SwapBuffers(self.hdc) == 0 {
+            if gl::SwapBuffers(self.raw.hdc()) == 0 {
                 Err(IoError::last_os_error().into())
             } else {
                 Ok(())
@@ -129,26 +216,27 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     }
 
     fn set_swap_interval(&self, _context: &Self::Context, interval: SwapInterval) -> Result<()> {
-        let interval = match interval {
-            SwapInterval::DontWait => 0,
-            SwapInterval::Wait(n) => n.get(),
-        };
+        match self.raw {
+            WglSurface::Window(..) => {
+                let extra = self
+                    .display
+                    .inner
+                    .wgl_extra
+                    .filter(|_| self.display.inner.features.contains(DisplayFeatures::SWAP_CONTROL))
+                    .ok_or(ErrorKind::NotSupported("swap control extensions are not supported"))?;
 
-        let res = match self.display.inner.wgl_extra {
-            Some(extra) if self.display.inner.features.contains(DisplayFeatures::SWAP_CONTROL) => unsafe {
-                extra.SwapIntervalEXT(interval as _)
-            },
-            _ => {
-                return Err(
-                    ErrorKind::NotSupported("swap control extensions are not supported").into()
-                )
-            },
-        };
+                let interval = match interval {
+                    SwapInterval::DontWait => 0,
+                    SwapInterval::Wait(n) => n.get(),
+                };
 
-        if res == 0 {
-            Err(IoError::last_os_error().into())
-        } else {
-            Ok(())
+                if unsafe { extra.SwapIntervalEXT(interval as _) } == 0 {
+                    Err(IoError::last_os_error().into())
+                } else {
+                    Ok(())
+                }
+            },
+            _ => Err(ErrorKind::NotSupported("swap control not supported for surface").into()),
         }
     }
 
@@ -173,15 +261,17 @@ impl<T: SurfaceTypeTrait> fmt::Debug for Surface<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Surface")
             .field("config", &self.config.inner.pixel_format_index)
-            .field("hwnd", &self.hwnd)
-            .field("hdc", &self.hdc)
+            .field("raw", &self.raw)
             .finish()
     }
 }
 
 impl<T: SurfaceTypeTrait> AsRawSurface for Surface<T> {
     fn raw_surface(&self) -> RawSurface {
-        RawSurface::Wgl(self.hwnd as _)
+        match self.raw {
+            WglSurface::Window(hwnd, _) => RawSurface::Wgl(hwnd as _),
+            WglSurface::PBuffer(hbuf, _) => RawSurface::Wgl(hbuf as _),
+        }
     }
 }
 
@@ -202,3 +292,21 @@ impl<T: SurfaceTypeTrait> GetGlDisplay for Surface<T> {
 }
 
 impl<T: SurfaceTypeTrait> Sealed for Surface<T> {}
+
+/// A wrapper around WGL surfaces.
+#[derive(Debug)]
+pub enum WglSurface {
+    /// Surface backed by a window surface.
+    Window(HWND, HDC),
+    /// Surface backed by a pixel buffer.
+    PBuffer(HPBUFFEREXT, HDC),
+}
+
+impl WglSurface {
+    pub(crate) fn hdc(&self) -> HDC {
+        *match self {
+            WglSurface::Window(_, hdc) => hdc,
+            WglSurface::PBuffer(_, hdc) => hdc,
+        }
+    }
+}
