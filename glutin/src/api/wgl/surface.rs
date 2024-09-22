@@ -69,12 +69,12 @@ impl Display {
                 attrs.as_ptr(),
             )
         };
-        if hbuf == std::ptr::null() {
+        if hbuf.is_null() {
             return Err(IoError::last_os_error().into());
         }
 
         let hdc = unsafe { extra.GetPbufferDCARB(hbuf) };
-        if hdc == std::ptr::null() {
+        if hdc.is_null() {
             return Err(IoError::last_os_error().into());
         }
 
