@@ -225,7 +225,7 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
                     .inner
                     .wgl_extra
                     .filter(|_| self.display.inner.features.contains(DisplayFeatures::SWAP_CONTROL))
-                    .ok_or(ErrorKind::NotSupported("pbuffer extensions are not supported"))?;
+                    .ok_or(ErrorKind::NotSupported("swap control extensions are not supported"))?;
 
                 let interval = match interval {
                     SwapInterval::DontWait => 0,
@@ -238,7 +238,7 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
                     Ok(())
                 }
             },
-            _ => Err(ErrorKind::NotSupported("swap control not support for surface").into()),
+            _ => Err(ErrorKind::NotSupported("swap control not supported for surface").into()),
         }
     }
 
