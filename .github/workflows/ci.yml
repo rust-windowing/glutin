@@ -55,8 +55,8 @@ jobs:
           - { target: x86_64-unknown-linux-gnu,   os: ubuntu-latest, options: --no-default-features, features: "egl,wayland" }
           - { target: x86_64-unknown-linux-gnu,   os: ubuntu-latest, options: --no-default-features, features: "egl,x11" }
           - { target: x86_64-unknown-linux-gnu,   os: ubuntu-latest, options: --no-default-features, features: glx }
-          - { target: aarch64-unknown-linux-ohos, os: ubuntu-latest, options: --no-default-features, features: egl }
-          - { target: x86_64-unknown-linux-ohos,  os: ubuntu-latest, options: --no-default-features, features: egl }
+          - { target: aarch64-unknown-linux-ohos, os: ubuntu-latest, options: --no-default-features, features: egl, arch: aarch }
+          - { target: x86_64-unknown-linux-ohos,  os: ubuntu-latest, options: --no-default-features, features: egl, arch: x64 }
           - { target: aarch64-linux-android,      os: ubuntu-latest, cmd: 'apk --'   }
           - { target: x86_64-apple-darwin,        os: macos-latest,    }
         exclude:
@@ -64,9 +64,9 @@ jobs:
           - rust_version: '1.70.0'
             platform: { target: aarch64-linux-android,      os: ubuntu-latest, cmd: 'apk --'   }
           - rust_version: '1.70.0'
-            platform: { target: aarch64-unknown-linux-ohos, os: ubuntu-latest, options: --no-default-features, features: egl }
+            platform: { target: aarch64-unknown-linux-ohos, os: ubuntu-latest, options: --no-default-features, features: egl, arch: aarch }
           - rust_version: '1.70.0'
-            platform: { target: x86_64-unknown-linux-ohos,  os: ubuntu-latest, options: --no-default-features, features: egl }
+            platform: { target: x86_64-unknown-linux-ohos,  os: ubuntu-latest, options: --no-default-features, features: egl, arch: x64 }
         include:
           - rust_version: '1.70.0'
             platform: { target: aarch64-linux-android,      os: ubuntu-latest, cmd: 'apk --'   }
@@ -126,7 +126,7 @@ jobs:
     - name: Build ohos tests
       shell: bash
       if: contains(matrix.platform.target, 'ohos')
-      run: ohrs cargo test -- -p glutin --no-run --verbose --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES
+      run: ohrs cargo test --arch=${{ matrix.platform.arch }} -- -p glutin --no-run --verbose $OPTIONS --features $FEATURES
       env:
         OHOS_NDK_HOME: ${{ steps.setup_sdk.outputs.ohos-base-sdk-home }}
 
