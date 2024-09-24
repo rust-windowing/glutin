@@ -62,10 +62,11 @@ jobs:
         exclude:
           # Android is tested on stable-3
           - rust_version: '1.70.0'
-            platform: 
-              - { target: aarch64-linux-android,      os: ubuntu-latest, cmd: 'apk --'   }
-              - { target: aarch64-unknown-linux-ohos, os: ubuntu-latest, options: --no-default-features, features: egl }
-              - { target: x86_64-unknown-linux-ohos,  os: ubuntu-latest, options: --no-default-features, features: egl }
+            platform: { target: aarch64-linux-android,      os: ubuntu-latest, cmd: 'apk --'   }
+          - rust_version: '1.70.0'
+            platform: { target: aarch64-unknown-linux-ohos, os: ubuntu-latest, options: --no-default-features, features: egl }
+          - rust_version: '1.70.0'
+            platform: { target: x86_64-unknown-linux-ohos,  os: ubuntu-latest, options: --no-default-features, features: egl }
         include:
           - rust_version: '1.70.0'
             platform: { target: aarch64-linux-android,      os: ubuntu-latest, cmd: 'apk --'   }
@@ -112,7 +113,6 @@ jobs:
       with:
         version: "4.1"
         components: "native;toolchains;ets;js;previewer"
-        fixup-path: true
 
     - name: Install ohrs
       if: contains(matrix.platform.target, 'ohos')
@@ -128,7 +128,7 @@ jobs:
       if: contains(matrix.platform.target, 'ohos')
       run: ohrs cargo test -- -p glutin --no-run --verbose --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES
       env:
-        OHOS_NDK_HOME: ${{ steps.setup_sdk.outputs.ohos_sdk_native }}
+        OHOS_NDK_HOME: ${{ steps.setup_sdk.outputs.OHOS_BASE_SDK_HOME }}
 
     - name: Run tests
       shell: bash
