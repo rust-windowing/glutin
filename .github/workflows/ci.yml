@@ -62,10 +62,16 @@ jobs:
         exclude:
           # Android is tested on stable-3
           - rust_version: '1.70.0'
-            platform: { target: aarch64-linux-android,    os: ubuntu-latest, cmd: 'apk --'   }
+            platform: 
+              - { target: aarch64-linux-android,      os: ubuntu-latest, cmd: 'apk --'   }
+              - { target: aarch64-unknown-linux-ohos, os: ubuntu-latest, options: --no-default-features, features: egl }
+              - { target: x86_64-unknown-linux-ohos,  os: ubuntu-latest, options: --no-default-features, features: egl }
         include:
           - rust_version: '1.70.0'
-            platform: { target: aarch64-linux-android,    os: ubuntu-latest, cmd: 'apk --'   }
+            platform: 
+              - { target: aarch64-linux-android,      os: ubuntu-latest, cmd: 'apk --'   }
+              - { target: aarch64-unknown-linux-ohos, os: ubuntu-latest, options: --no-default-features, features: egl }
+              - { target: x86_64-unknown-linux-ohos,  os: ubuntu-latest, options: --no-default-features, features: egl }
 
 
     env:
