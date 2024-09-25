@@ -11,6 +11,7 @@
 - Properly set up OpenGL-specific stuff on the `NSView`, instead of relying on Winit to do it.
 - Added `OpenHarmony` platform support with EGL.
 - Added support for `Display::create_pbuffer_surface()` in WGL via `WGL_ARB_pbuffer`.
+- Added `OpenHarmony` platform some logic for CI.
 
 # Version 0.32.0
 
