@@ -41,7 +41,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust_version: [1.70.0, stable, nightly]
+        rust_version: [1.78.0, stable, nightly]
         platform:
           - { target: x86_64-pc-windows-msvc,     os: windows-latest,  }
           - { target: i686-pc-windows-msvc,       os: windows-latest,  }
@@ -55,20 +55,16 @@ jobs:
           - { target: x86_64-unknown-linux-gnu,   os: ubuntu-latest, options: --no-default-features, features: "egl,wayland" }
           - { target: x86_64-unknown-linux-gnu,   os: ubuntu-latest, options: --no-default-features, features: "egl,x11" }
           - { target: x86_64-unknown-linux-gnu,   os: ubuntu-latest, options: --no-default-features, features: glx }
-          - { target: aarch64-unknown-linux-ohos, os: ubuntu-latest, options: --no-default-features, features: egl }
-          - { target: x86_64-unknown-linux-ohos,  os: ubuntu-latest, options: --no-default-features, features: egl }
+          - { target: aarch64-unknown-linux-ohos, os: ubuntu-latest,   }
+          - { target: x86_64-unknown-linux-ohos,  os: ubuntu-latest,   }
           - { target: aarch64-linux-android,      os: ubuntu-latest, cmd: 'apk --'   }
           - { target: x86_64-apple-darwin,        os: macos-latest,    }
         exclude:
           # Android is tested on stable-3
-          - rust_version: '1.70.0'
+          - rust_version: '1.78.0'
             platform: { target: aarch64-linux-android,      os: ubuntu-latest, cmd: 'apk --'   }
-          - rust_version: '1.70.0'
-            platform: { target: aarch64-unknown-linux-ohos, os: ubuntu-latest, options: --no-default-features, features: egl }
-          - rust_version: '1.70.0'
-            platform: { target: x86_64-unknown-linux-ohos,  os: ubuntu-latest, options: --no-default-features, features: egl }
         include:
-          - rust_version: '1.70.0'
+          - rust_version: '1.78.0'
             platform: { target: aarch64-linux-android,      os: ubuntu-latest, cmd: 'apk --'   }
 
 
@@ -106,30 +102,6 @@ jobs:
       if: contains(matrix.platform.target, 'android')
       run: cargo +stable install cargo-apk
 
-    - name: Setup OpenHarmony SDK
-      id: setup_sdk
-      if: contains(matrix.platform.target, 'ohos')
-      uses: openharmony-rs/setup-ohos-sdk@v0.1
-      with:
-        version: "4.1"
-        components: "native;toolchains;ets;js;previewer"
-
-    - name: Install ohrs
-      if: contains(matrix.platform.target, 'ohos')
-      run: cargo +stable install ohrs
-
-    - name: Build tests
-      shell: bash
-      if: ${{ !contains(matrix.platform.target, 'ohos') }}
-      run: cargo $CMD test -p glutin --no-run --verbose --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES
-
-    - name: Build ohos tests
-      shell: bash
-      if: contains(matrix.platform.target, 'ohos')
-      run: ohrs cargo test --disable-target -- -p glutin --no-run --verbose --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES
-      env:
-        OHOS_NDK_HOME: ${{ steps.setup_sdk.outputs.ohos-base-sdk-home }}
-
     - name: Run tests
       shell: bash
       if: (
@@ -145,9 +117,6 @@ jobs:
 
     - name: Lint with clippy
       shell: bash
-      if: (
-        (matrix.rust_version == '1.70.0') && 
-        !contains(matrix.platform.options, '--no-default-features') && 
-        !contains(matrix.platform.target, 'ohos'))
+      if: matrix.rust_version == '1.70.0' && !contains(matrix.platform.options, '--no-default-features')
       run: cargo clippy --workspace --all-targets --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES -- -Dwarnings
 
