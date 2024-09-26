@@ -117,6 +117,6 @@ jobs:
 
     - name: Lint with clippy
       shell: bash
-      if: matrix.rust_version == '1.70.0' && !contains(matrix.platform.options, '--no-default-features')
+      if: matrix.rust_version == '1.78.0' && !contains(matrix.platform.options, '--no-default-features')
       run: cargo clippy --workspace --all-targets --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES -- -Dwarnings
 
