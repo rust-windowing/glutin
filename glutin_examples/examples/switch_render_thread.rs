@@ -7,7 +7,6 @@ use std::thread;
 use glutin::config::ConfigTemplateBuilder;
 use glutin::context::{ContextAttributesBuilder, PossiblyCurrentContext};
 use glutin::display::GetGlDisplay;
-use glutin::error::{Error as GlutinError, ErrorKind};
 use glutin::prelude::*;
 use glutin::surface::{Surface, WindowSurface};
 use glutin_examples::gl::types::GLfloat;
@@ -148,7 +147,7 @@ impl AppState {
 
 /// A rendering context that can be shared between tasks.
 struct RenderContext {
-    context: Option<PossiblyCurrentContext>,
+    context: PossiblyCurrentContext,
     surface: Surface<WindowSurface>,
     renderer: Renderer,
 }
@@ -161,31 +160,19 @@ impl RenderContext {
         surface: Surface<WindowSurface>,
         renderer: Renderer,
     ) -> Self {
-        Self { context: Some(context), surface, renderer }
+        Self { context, surface, renderer }
     }
 
     fn make_current(&mut self) -> Result<(), impl Error> {
-        let ctx =
-            self.context.take().ok_or_else(|| GlutinError::from(ErrorKind::BadContextState))?;
-        let result = ctx.make_current(&self.surface);
-        self.context = Some(ctx);
-        result
+        self.context.make_current(&self.surface)
     }
 
     fn make_not_current(&mut self) -> Result<(), impl Error> {
-        let ctx =
-            self.context.take().ok_or_else(|| GlutinError::from(ErrorKind::BadContextState))?;
-        let not_current_ctx = ctx.make_not_current()?;
-        self.context = Some(not_current_ctx.treat_as_possibly_current());
-        Ok::<(), GlutinError>(())
+        self.context.make_not_current_in_place()
     }
 
     fn swap_buffers(&mut self) -> Result<(), impl Error> {
-        let ctx =
-            self.context.take().ok_or_else(|| GlutinError::from(ErrorKind::BadContextState))?;
-        let result = self.surface.swap_buffers(&ctx);
-        self.context = Some(ctx);
-        result
+        self.surface.swap_buffers(&self.context)
     }
 
     fn draw_with_clear_color(&self, red: GLfloat, green: GLfloat, blue: GLfloat, alpha: GLfloat) {
@@ -193,12 +180,7 @@ impl RenderContext {
     }
 
     fn resize(&mut self, size: PhysicalSize<NonZeroU32>) {
-        let Some(ctx) = self.context.take() else {
-            return;
-        };
-        self.surface.resize(&ctx, size.width, size.height);
-        self.context = Some(ctx);
-
+        self.surface.resize(&self.context, size.width, size.height);
         self.renderer.resize(size.width.get() as i32, size.height.get() as i32);
     }
 }

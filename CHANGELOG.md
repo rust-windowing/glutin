@@ -1,5 +1,7 @@
 # Unreleased
 
+- Add `PossiblyCurrentContext::make_not_current_in_place(&self)` for when `Send` capability of `NotCurrentContext` is not required.
+
 # Version 0.32.1
 
 - Fixed EGL's `Device::query_devices()` being too strict about required extensions.
