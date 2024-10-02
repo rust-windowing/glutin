@@ -1,6 +1,6 @@
 use std::error::Error;
 use std::ffi::{CStr, CString};
-use std::num::{NonZero, NonZeroU32};
+use std::num::NonZeroU32;
 use std::ops::Deref;
 
 use gl::types::GLfloat;
@@ -74,7 +74,7 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::Resized(size) => {
                 if let (Some(width), Some(height)) =
-                    (NonZeroU32::new(size.width), NonZero::new(size.height))
+                    (NonZeroU32::new(size.width), NonZeroU32::new(size.height))
                 {
                     self.transition(event_loop, |state| {
                         match &state {
@@ -144,8 +144,8 @@ impl ApplicationHandler for App {
 struct TerminateDisplayOnDrop<T: GetGlDisplay<Target = Display>>(T);
 
 // impl TerminateDisplayOnDrop<NotCurrentContext> {
-//     fn make_current(self, surface: ()) -> TerminateDisplayOnDrop<PossiblyCurrentContext> {
-//         unsafe {
+//     fn make_current(self, surface: ()) ->
+// TerminateDisplayOnDrop<PossiblyCurrentContext> {         unsafe {
 //             let old = std::mem::ManuallyDrop::new(self);
 //             let context = std::ptr::read(std::ptr::from_ref(&old.0));
 //             match
@@ -316,7 +316,7 @@ impl AppStateResumed {
         Ok(AppStateSuspended { gl_context, renderer })
     }
 
-    fn resize(&self, width: NonZero<u32>, height: NonZero<u32>) {
+    fn resize(&self, width: NonZeroU32, height: NonZeroU32) {
         // Some platforms like EGL require resizing GL surface to update the
         // size Notable platforms here are
         // Wayland and macOS, other don't require it
