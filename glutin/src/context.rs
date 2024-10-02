@@ -98,7 +98,7 @@ pub trait PossiblyCurrentGlContext: Sealed {
     fn make_not_current(self) -> Result<Self::NotCurrentContext>;
 
     /// Make the context not current to the current thread. If you need to
-    /// send the context toanother thread, use [`Self::make_not_current`]
+    /// send the context to another thread, use [`Self::make_not_current`]
     /// instead.
     fn make_not_current_in_place(&self) -> Result<()>;
 
