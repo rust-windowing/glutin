@@ -288,6 +288,11 @@ impl PossiblyCurrentGlContext for PossiblyCurrentContext {
     type Surface<T: SurfaceTypeTrait> = Surface<T>;
 
     fn make_not_current(self) -> Result<Self::NotCurrentContext> {
+        self.make_not_current_in_place()?;
+        Ok(NotCurrentContext::new(self.inner))
+    }
+
+    fn make_not_current_in_place(&self) -> Result<()> {
         unsafe {
             if self.is_current() {
                 let hdc = wgl::GetCurrentDC();
@@ -295,9 +300,8 @@ impl PossiblyCurrentGlContext for PossiblyCurrentContext {
                     return Err(IoError::last_os_error().into());
                 }
             }
-
-            Ok(NotCurrentContext::new(self.inner))
         }
+        Ok(())
     }
 
     fn is_current(&self) -> bool {
