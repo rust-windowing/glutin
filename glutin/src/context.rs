@@ -97,6 +97,11 @@ pub trait PossiblyCurrentGlContext: Sealed {
     /// - **macOS: this will block if your main thread is blocked.**
     fn make_not_current(self) -> Result<Self::NotCurrentContext>;
 
+    /// Make the context not current to the current thread. If you need to
+    /// send the context toanother thread, use [`Self::make_not_current`]
+    /// instead.
+    fn make_not_current_in_place(&self) -> Result<()>;
+
     /// Make [`Self::Surface`] current on the calling thread.
     ///
     /// # Platform specific
@@ -515,6 +520,10 @@ impl PossiblyCurrentGlContext for PossiblyCurrentContext {
         Ok(
             gl_api_dispatch!(self; Self(context) => context.make_not_current()?; as NotCurrentContext),
         )
+    }
+
+    fn make_not_current_in_place(&self) -> Result<()> {
+        Ok(gl_api_dispatch!(self; Self(context) => context.make_not_current_in_place()?))
     }
 
     fn make_current<T: SurfaceTypeTrait>(&self, surface: &Self::Surface<T>) -> Result<()> {

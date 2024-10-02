@@ -148,8 +148,12 @@ impl PossiblyCurrentGlContext for PossiblyCurrentContext {
     type Surface<T: SurfaceTypeTrait> = Surface<T>;
 
     fn make_not_current(self) -> Result<Self::NotCurrentContext> {
-        self.inner.make_not_current()?;
+        self.make_not_current_in_place()?;
         Ok(NotCurrentContext::new(self.inner))
+    }
+
+    fn make_not_current_in_place(&self) -> Result<()> {
+        self.inner.make_not_current()
     }
 
     fn is_current(&self) -> bool {
