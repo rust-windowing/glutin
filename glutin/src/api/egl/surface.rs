@@ -444,25 +444,13 @@ impl<T: SurfaceTypeTrait> Sealed for Surface<T> {}
 
 #[derive(Debug)]
 enum NativeWindow {
-    #[cfg(wayland_platform)]
+    #[allow(dead_code)]
     Wayland(*mut ffi::c_void),
-
-    #[cfg(x11_platform)]
     Xlib(std::os::raw::c_ulong),
-
-    #[cfg(x11_platform)]
     Xcb(u32),
-
-    #[cfg(android_platform)]
     Android(*mut ffi::c_void),
-
-    #[cfg(ohos_platform)]
     Ohos(*mut ffi::c_void),
-
-    #[cfg(windows)]
     Win32(isize),
-
-    #[cfg(free_unix)]
     Gbm(*mut ffi::c_void),
 }
 
@@ -487,7 +475,6 @@ impl NativeWindow {
                 }
                 Self::Wayland(ptr.cast())
             },
-            #[cfg(x11_platform)]
             RawWindowHandle::Xlib(window_handle) => {
                 if window_handle.window == 0 {
                     return Err(ErrorKind::BadNativeWindow.into());
@@ -495,19 +482,14 @@ impl NativeWindow {
 
                 Self::Xlib(window_handle.window as _)
             },
-            #[cfg(x11_platform)]
             RawWindowHandle::Xcb(window_handle) => Self::Xcb(window_handle.window.get() as _),
-            #[cfg(android_platform)]
             RawWindowHandle::AndroidNdk(window_handle) => {
                 Self::Android(window_handle.a_native_window.as_ptr())
             },
-            #[cfg(ohos_platform)]
             RawWindowHandle::OhosNdk(window_handle) => {
                 Self::Ohos(window_handle.native_window.as_ptr())
             },
-            #[cfg(windows)]
             RawWindowHandle::Win32(window_handle) => Self::Win32(window_handle.hwnd.get() as _),
-            #[cfg(free_unix)]
             RawWindowHandle::Gbm(window_handle) => Self::Gbm(window_handle.gbm_surface.as_ptr()),
             _ => {
                 return Err(
@@ -539,20 +521,13 @@ impl NativeWindow {
     /// Returns the underlying handle value.
     fn as_native_window(&self) -> egl::NativeWindowType {
         match *self {
-            #[cfg(wayland_platform)]
-            Self::Wayland(wl_egl_surface) => wl_egl_surface,
-            #[cfg(x11_platform)]
+            Self::Wayland(wl_egl_surface) => wl_egl_surface as egl::NativeWindowType,
             Self::Xlib(window_id) => window_id as egl::NativeWindowType,
-            #[cfg(x11_platform)]
             Self::Xcb(window_id) => window_id as egl::NativeWindowType,
-            #[cfg(windows)]
-            Self::Win32(hwnd) => hwnd,
-            #[cfg(android_platform)]
-            Self::Android(a_native_window) => a_native_window,
-            #[cfg(ohos_platform)]
-            Self::Ohos(native_window) => native_window,
-            #[cfg(free_unix)]
-            Self::Gbm(gbm_surface) => gbm_surface,
+            Self::Win32(hwnd) => hwnd as egl::NativeWindowType,
+            Self::Android(a_native_window) => a_native_window as egl::NativeWindowType,
+            Self::Ohos(native_window) => native_window as egl::NativeWindowType,
+            Self::Gbm(gbm_surface) => gbm_surface as egl::NativeWindowType,
         }
     }
 
@@ -572,19 +547,12 @@ impl NativeWindow {
     /// On X11 the returned pointer is a cast of the `&self` borrow.
     fn as_platform_window(&self) -> *mut ffi::c_void {
         match self {
-            #[cfg(wayland_platform)]
             Self::Wayland(wl_egl_surface) => *wl_egl_surface,
-            #[cfg(x11_platform)]
             Self::Xlib(window_id) => window_id as *const _ as *mut ffi::c_void,
-            #[cfg(x11_platform)]
             Self::Xcb(window_id) => window_id as *const _ as *mut ffi::c_void,
-            #[cfg(windows)]
             Self::Win32(hwnd) => *hwnd as *const ffi::c_void as *mut _,
-            #[cfg(android_platform)]
             Self::Android(a_native_window) => *a_native_window,
-            #[cfg(ohos_platform)]
             Self::Ohos(native_window) => *native_window,
-            #[cfg(free_unix)]
             Self::Gbm(gbm_surface) => *gbm_surface,
         }
     }

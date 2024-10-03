@@ -327,21 +327,15 @@ impl GlConfig for Config {
         unsafe { self.raw_attribute(egl::CONFIG_CAVEAT as EGLint) != egl::SLOW_CONFIG as EGLint }
     }
 
-    #[cfg(not(any(wayland_platform, x11_platform)))]
     fn supports_transparency(&self) -> Option<bool> {
-        None
-    }
-
-    #[cfg(any(wayland_platform, x11_platform))]
-    fn supports_transparency(&self) -> Option<bool> {
-        use raw_window_handle::RawDisplayHandle;
         match *self.inner.display.inner._native_display? {
             #[cfg(x11_platform)]
-            RawDisplayHandle::Xlib(_) | RawDisplayHandle::Xcb(_) => {
+            raw_window_handle::RawDisplayHandle::Xlib(_)
+            | raw_window_handle::RawDisplayHandle::Xcb(_) => {
                 self.x11_visual().map(|visual| visual.supports_transparency())
             },
             #[cfg(wayland_platform)]
-            RawDisplayHandle::Wayland(_) => Some(self.alpha_size() != 0),
+            raw_window_handle::RawDisplayHandle::Wayland(_) => Some(self.alpha_size() != 0),
             _ => None,
         }
     }
