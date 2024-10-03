@@ -11,6 +11,7 @@
 #![allow(clippy::missing_safety_doc)]
 #![allow(clippy::manual_non_exhaustive)]
 #![allow(clippy::unnecessary_cast)]
+#![allow(unknown_lints, clippy::missing_transmute_annotations)]
 
 pub mod egl;
 

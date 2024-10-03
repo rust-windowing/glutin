@@ -10,6 +10,7 @@
 #![allow(clippy::unused_unit)]
 #![allow(clippy::redundant_static_lifetimes)]
 #![allow(clippy::unnecessary_cast)]
+#![allow(unknown_lints, clippy::missing_transmute_annotations)]
 
 pub use self::glx::types::GLXContext;
 pub use x11_dl::xlib::*;
