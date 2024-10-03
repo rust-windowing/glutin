@@ -116,46 +116,50 @@ impl ApplicationHandler for App {
     }
 
     fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
-        self.final_transition(|state| {
-            // NOTE: The handling below is only needed due to nvidia on Wayland to not crash
-            // on exit due to nvidia driver touching the Wayland display from on
-            // `exit` hook.
-
-            let _gl_display = match state {
-                AppState::Uninitialized { .. } => return Err("invalid transition".into()),
-                AppState::Resumed(AppStateResumed { gl_context, renderer, gl_surface, window }) => {
-                    // Clear the window.
-                    drop(gl_surface);
-                    drop(window);
-                    drop(renderer);
-                    gl_context.display()
-                },
-                AppState::Suspended(AppStateSuspended { gl_context, renderer }) => {
-                    drop(renderer);
-                    gl_context.display()
-                },
-            };
-
-            Ok(())
-        });
+        self.final_transition(|_| Ok(()))
     }
 }
 
-struct TerminateDisplayOnDrop<T: GetGlDisplay<Target = Display>>(T);
+// TODO: Should this be done by glutin by default?
+struct ContextTerminateDisplay<T: GetGlDisplay<Target = Display>>(T);
 
-// impl TerminateDisplayOnDrop<NotCurrentContext> {
-//     fn make_current(self, surface: ()) ->
-// TerminateDisplayOnDrop<PossiblyCurrentContext> {         unsafe {
-//             let old = std::mem::ManuallyDrop::new(self);
-//             let context = std::ptr::read(std::ptr::from_ref(&old.0));
-//             match
-//             TerminateDisplayOnDrop(context.make_current(surface))
-//         }
-//     }
-// }
+impl<T: GetGlDisplay<Target = Display>> Deref for ContextTerminateDisplay<T> {
+    type Target = T;
 
-impl<T: GetGlDisplay<Target = Display>> Drop for TerminateDisplayOnDrop<T> {
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T: GetGlDisplay<Target = Display>> ContextTerminateDisplay<T> {
+    unsafe fn into_inner_without_drop(self) -> T {
+        std::ptr::read(&std::mem::ManuallyDrop::new(self).0)
+    }
+}
+
+impl ContextTerminateDisplay<PossiblyCurrentContext> {
+    fn make_not_current(
+        self,
+    ) -> Result<ContextTerminateDisplay<NotCurrentContext>, glutin::error::Error> {
+        unsafe { self.into_inner_without_drop().make_not_current().map(ContextTerminateDisplay) }
+    }
+}
+
+impl ContextTerminateDisplay<NotCurrentContext> {
+    fn make_current<T: glutin::surface::SurfaceTypeTrait>(
+        self,
+        surface: &glutin::surface::Surface<T>,
+    ) -> Result<ContextTerminateDisplay<PossiblyCurrentContext>, glutin::error::Error> {
+        unsafe { self.into_inner_without_drop().make_current(surface).map(ContextTerminateDisplay) }
+    }
+}
+
+impl<T: GetGlDisplay<Target = Display>> Drop for ContextTerminateDisplay<T> {
     fn drop(&mut self) {
+        // NOTE: The handling below is only needed due to nvidia on Wayland to not crash
+        // on exit due to nvidia driver touching the Wayland display from on
+        // `exit` hook.
+
         #[cfg(egl_backend)]
         #[allow(irrefutable_let_patterns)]
         if let glutin::display::Display::Egl(display) = self.0.display() {
@@ -177,7 +181,10 @@ fn create_gl_surface(
     Ok(gl_surface)
 }
 
-fn create_gl_context(window: &Window, gl_config: &Config) -> NotCurrentContext {
+fn create_gl_context(
+    window: &Window,
+    gl_config: &Config,
+) -> ContextTerminateDisplay<NotCurrentContext> {
     let raw_window_handle = window.window_handle().ok().map(|wh| wh.as_raw());
 
     // The context creation part.
@@ -201,15 +208,17 @@ fn create_gl_context(window: &Window, gl_config: &Config) -> NotCurrentContext {
     let gl_display = gl_config.display();
 
     unsafe {
-        gl_display.create_context(gl_config, &context_attributes).unwrap_or_else(|_| {
-            gl_display.create_context(gl_config, &fallback_context_attributes).unwrap_or_else(
-                |_| {
-                    gl_display
-                        .create_context(gl_config, &legacy_context_attributes)
-                        .expect("failed to create context")
-                },
-            )
-        })
+        ContextTerminateDisplay(
+            gl_display.create_context(gl_config, &context_attributes).unwrap_or_else(|_| {
+                gl_display.create_context(gl_config, &fallback_context_attributes).unwrap_or_else(
+                    |_| {
+                        gl_display
+                            .create_context(gl_config, &legacy_context_attributes)
+                            .expect("failed to create context")
+                    },
+                )
+            }),
+        )
     }
 }
 
@@ -281,6 +290,21 @@ struct AppStateUninitialized {
     display_builder: DisplayBuilder,
 }
 
+struct AppStateResumed {
+    // NOTE: Window should be dropped after all resources created using its raw-window-handle.
+    gl_surface: Surface<WindowSurface>,
+    window: Window,
+    // TODO: Does the context need to be dropped after the window? Specifically, the egl display
+    // terminate code, when should it run?
+    gl_context: ContextTerminateDisplay<PossiblyCurrentContext>,
+    renderer: Renderer,
+}
+
+struct AppStateSuspended {
+    gl_context: ContextTerminateDisplay<NotCurrentContext>,
+    renderer: Renderer,
+}
+
 impl AppStateUninitialized {
     fn initialize(self, event_loop: &ActiveEventLoop) -> Result<AppStateResumed, Box<dyn Error>> {
         let Self { template_builder, display_builder } = self;
@@ -288,6 +312,7 @@ impl AppStateUninitialized {
             display_builder.build(event_loop, template_builder, gl_config_picker)?;
         let window = window.ok_or("failed to create window")?;
         println!("Picked a config with {} samples", gl_config.num_samples());
+        // TODO: Can we create the context and the surface in any order?
         let gl_context = create_gl_context(&window, &gl_config);
         let gl_surface = create_gl_surface(&window, &gl_config)?;
         let gl_context = gl_context.make_current(&gl_surface)?;
@@ -295,15 +320,6 @@ impl AppStateUninitialized {
         let renderer = Renderer::new(&gl_config.display());
         Ok(AppStateResumed { window, gl_surface, gl_context, renderer })
     }
-}
-
-struct AppStateResumed {
-    gl_context: PossiblyCurrentContext,
-    renderer: Renderer,
-    // NOTE: Window should be dropped after all resources created using its
-    // raw-window-handle.
-    gl_surface: Surface<WindowSurface>,
-    window: Window,
 }
 
 impl AppStateResumed {
@@ -317,13 +333,11 @@ impl AppStateResumed {
     }
 
     fn resize(&self, width: NonZeroU32, height: NonZeroU32) {
-        // Some platforms like EGL require resizing GL surface to update the
-        // size Notable platforms here are
-        // Wayland and macOS, other don't require it
-        // and the function is no-op, but it's wise to resize it for
-        // portability reasons.
+        // Some platforms like EGL require resizing GL surface to update the size
+        // Notable platforms here are Wayland and macOS, other don't require it
+        // and the function is no-op, but it's wise to resize it for portability
+        // reasons.
         self.gl_surface.resize(&self.gl_context, width, height);
-
         self.renderer.resize(width.get() as i32, height.get() as i32);
     }
 
@@ -334,11 +348,6 @@ impl AppStateResumed {
         self.gl_surface.swap_buffers(&self.gl_context)?;
         Ok(())
     }
-}
-
-struct AppStateSuspended {
-    gl_context: NotCurrentContext,
-    renderer: Renderer,
 }
 
 impl AppStateSuspended {
