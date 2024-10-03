@@ -132,8 +132,10 @@ impl<T: GetGlDisplay<Target = Display>> Deref for ContextTerminateDisplay<T> {
 }
 
 impl<T: GetGlDisplay<Target = Display>> ContextTerminateDisplay<T> {
-    unsafe fn into_inner_without_drop(self) -> T {
-        std::ptr::read(&std::mem::ManuallyDrop::new(self).0)
+    fn into_inner_without_drop(self) -> T {
+        // SAFETY: We ensure that the contents of self are not aliased. Leaking a value
+        // is safe.
+        unsafe { std::ptr::read(&std::mem::ManuallyDrop::new(self).0) }
     }
 }
 
@@ -141,7 +143,7 @@ impl ContextTerminateDisplay<PossiblyCurrentContext> {
     fn make_not_current(
         self,
     ) -> Result<ContextTerminateDisplay<NotCurrentContext>, glutin::error::Error> {
-        unsafe { self.into_inner_without_drop().make_not_current().map(ContextTerminateDisplay) }
+        self.into_inner_without_drop().make_not_current().map(ContextTerminateDisplay)
     }
 }
 
@@ -150,7 +152,7 @@ impl ContextTerminateDisplay<NotCurrentContext> {
         self,
         surface: &glutin::surface::Surface<T>,
     ) -> Result<ContextTerminateDisplay<PossiblyCurrentContext>, glutin::error::Error> {
-        unsafe { self.into_inner_without_drop().make_current(surface).map(ContextTerminateDisplay) }
+        self.into_inner_without_drop().make_current(surface).map(ContextTerminateDisplay)
     }
 }
 
