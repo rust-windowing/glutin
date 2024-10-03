@@ -3,6 +3,8 @@
 #![allow(clippy::missing_safety_doc)]
 #![allow(clippy::manual_non_exhaustive)]
 #![allow(clippy::unnecessary_cast)]
+#![allow(unused_imports)]
+#![allow(unknown_lints, clippy::missing_transmute_annotations)]
 
 /// WGL bindings
 pub mod wgl {
