@@ -255,6 +255,10 @@ impl ContextInner {
             self.update();
             self.raw.makeCurrentContext();
 
+            run_on_main(|_mtm| unsafe {
+                self.raw.setView(None);
+            });
+
             Ok(())
         })
     }
