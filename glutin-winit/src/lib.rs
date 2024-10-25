@@ -25,7 +25,7 @@ use glutin::prelude::*;
 #[cfg(wgl_backend)]
 use raw_window_handle::HasWindowHandle;
 
-use raw_window_handle::RawWindowHandle;
+use raw_window_handle::{RawDisplayHandle, RawWindowHandle};
 use winit::error::OsError;
 use winit::window::{Window, WindowAttributes};
 
@@ -111,6 +111,23 @@ impl DisplayBuilder {
             None
         };
 
+        #[cfg(x11_platform)]
+        let mut raw_display_handle = event_loop.glutin_display_handle()?.as_raw();
+        #[cfg(x11_platform)]
+        if let Some(screen_id) = self.window_attributes.as_ref().and_then(|wa| wa.x11_screen()) {
+            eprintln!("Injecting screen_id {screen_id} into raw_display_handle.");
+            match &mut raw_display_handle {
+                RawDisplayHandle::Xlib(xlib) => xlib.screen = screen_id,
+                RawDisplayHandle::Xcb(xcb) => xcb.screen = screen_id,
+                other => {
+                    eprintln!("Cannot inject screen_id to RawDisplayHandle variant {other:?}.")
+                },
+            }
+        }
+
+        #[cfg(not(x11_platform))]
+        let raw_display_handle = event_loop.glutin_display_handle()?.as_raw();
+
         #[cfg(wgl_backend)]
         let raw_window_handle = window
             .as_ref()
@@ -119,7 +136,7 @@ impl DisplayBuilder {
         #[cfg(not(wgl_backend))]
         let raw_window_handle = None;
 
-        let gl_display = create_display(event_loop, self.preference, raw_window_handle)?;
+        let gl_display = create_display(raw_display_handle, self.preference, raw_window_handle)?;
 
         // XXX the native window must be passed to config picker when WGL is used
         // otherwise very limited OpenGL features will be supported.
@@ -149,7 +166,7 @@ impl DisplayBuilder {
 }
 
 fn create_display(
-    event_loop: &impl GlutinEventLoop,
+    handle: RawDisplayHandle,
     _api_preference: ApiPreference,
     _raw_window_handle: Option<RawWindowHandle>,
 ) -> Result<Display, Box<dyn Error>> {
@@ -181,7 +198,6 @@ fn create_display(
         ApiPreference::FallbackEgl => DisplayApiPreference::WglThenEgl(_raw_window_handle),
     };
 
-    let handle = event_loop.glutin_display_handle()?.as_raw();
     unsafe { Ok(Display::new(handle, _preference)?) }
 }
 

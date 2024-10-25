@@ -9,3 +9,6 @@ members = [
     "glutin_wgl_sys",
     "glutin_gles2_sys",
 ]
+
+[patch.crates-io]
+winit = { git = "https://github.com/tonarino/winit.git", branch = "x11-screen-id" }
