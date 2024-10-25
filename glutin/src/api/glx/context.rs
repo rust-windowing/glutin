@@ -228,6 +228,13 @@ pub struct NotCurrentContext {
 }
 
 impl NotCurrentContext {
+    /// Make a [`Self::PossiblyCurrentContext`] indicating that the context
+    /// could be current on the thread.
+    pub fn make_current_surfaceless(self) -> Result<PossiblyCurrentContext> {
+        self.inner.make_current_surfaceless()?;
+        Ok(PossiblyCurrentContext { inner: self.inner, _nosendsync: PhantomData })
+    }
+
     fn new(inner: ContextInner) -> Self {
         Self { inner }
     }
@@ -295,6 +302,13 @@ pub struct PossiblyCurrentContext {
     inner: ContextInner,
     // The context could be current only on the one thread.
     _nosendsync: PhantomData<GLXContext>,
+}
+
+impl PossiblyCurrentContext {
+    /// Make this context current on the calling thread.
+    pub fn make_current_surfaceless(&self) -> Result<()> {
+        self.inner.make_current_surfaceless()
+    }
 }
 
 impl PossiblyCurrentGlContext for PossiblyCurrentContext {
@@ -365,6 +379,17 @@ struct ContextInner {
 }
 
 impl ContextInner {
+    fn make_current_surfaceless(&self) -> Result<()> {
+        super::last_glx_error(|| unsafe {
+            self.display.inner.glx.MakeContextCurrent(
+                self.display.inner.raw.cast(),
+                0,
+                0,
+                *self.raw,
+            );
+        })
+    }
+
     fn make_current_draw_read<T: SurfaceTypeTrait>(
         &self,
         surface_draw: &Surface<T>,
