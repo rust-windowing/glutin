@@ -11,11 +11,11 @@ use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowAttributes};
 
-use glutin::config::{Config, ConfigTemplateBuilder, GetGlConfig};
+use glutin::config::{ColorBufferType, Config, ConfigTemplateBuilder, GetGlConfig as _};
 use glutin::context::{
     ContextApi, ContextAttributesBuilder, NotCurrentContext, PossiblyCurrentContext, Version,
 };
-use glutin::display::GetGlDisplay;
+use glutin::display::GetGlDisplay as _;
 use glutin::prelude::*;
 use glutin::surface::{Surface, SwapInterval, WindowSurface};
 
@@ -37,8 +37,13 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
     // that, because we can query only one config at a time on it, but all
     // normal platforms will return multiple configs, so we can find the config
     // with transparency ourselves inside the `reduce`.
-    let template =
-        ConfigTemplateBuilder::new().with_alpha_size(8).with_transparency(cfg!(cgl_backend));
+    let template = ConfigTemplateBuilder::new()
+        // The default is 8, but then we miss out on R10G10B10A2 formats.  Requesting at least 2
+        // bits for alpha allows us to find it. Note that the default ConfigTemplate still requests
+        // at least 8 bits for RGB.
+        .with_alpha_size(2)
+        // .with_float_pixels(false)
+        .with_transparency(cfg!(cgl_backend));
 
     let display_builder = DisplayBuilder::new().with_window_attributes(Some(window_attributes()));
 
@@ -67,7 +72,14 @@ impl ApplicationHandler for App {
                     },
                 };
 
-                println!("Picked a config with {} samples", gl_config.num_samples());
+                println!(
+                    "Picked a config with {} samples, transparency {:?}, pixel layout {:?}, alpha \
+                     {}",
+                    gl_config.num_samples(),
+                    gl_config.supports_transparency(),
+                    gl_config.color_buffer_type(),
+                    gl_config.alpha_size(),
+                );
 
                 // Mark the display as initialized to not recreate it on resume, since the
                 // display is valid until we explicitly destroy it.
@@ -141,7 +153,7 @@ impl ApplicationHandler for App {
     ) {
         match event {
             WindowEvent::Resized(size) if size.width != 0 && size.height != 0 => {
-                // Some platforms like EGL require resizing GL surface to update the size
+                // Some platforms like EGL require resizing GL surface to update the size.
                 // Notable platforms here are Wayland and macOS, other don't require it
                 // and the function is no-op, but it's wise to resize it for portability
                 // reasons.
@@ -279,10 +291,22 @@ struct AppState {
 pub fn gl_config_picker(configs: Box<dyn Iterator<Item = Config> + '_>) -> Config {
     configs
         .reduce(|accum, config| {
+            let mut higher_bit_depth = false;
+            if let Some(ColorBufferType::Rgb { r_size, g_size, b_size }) = accum.color_buffer_type()
+            {
+                if let Some(ColorBufferType::Rgb { r_size: r, g_size: g, b_size: b }) =
+                    config.color_buffer_type()
+                {
+                    higher_bit_depth = r > r_size || g > g_size || b > b_size;
+                }
+            }
             let transparency_check = config.supports_transparency().unwrap_or(false)
                 & !accum.supports_transparency().unwrap_or(false);
 
-            if transparency_check || config.num_samples() > accum.num_samples() {
+            // TODO: Note that there's no preference order here. We accept the new config
+            // based on any of these changes
+            if transparency_check || config.num_samples() > accum.num_samples() || higher_bit_depth
+            {
                 config
             } else {
                 accum
@@ -421,12 +445,26 @@ impl Drop for Renderer {
 
 unsafe fn create_shader(
     gl: &gl::Gl,
-    shader: gl::types::GLenum,
+    shader_type: gl::types::GLenum,
     source: &[u8],
 ) -> gl::types::GLuint {
-    let shader = gl.CreateShader(shader);
+    let shader = gl.CreateShader(shader_type);
     gl.ShaderSource(shader, 1, [source.as_ptr().cast()].as_ptr(), std::ptr::null());
     gl.CompileShader(shader);
+    let mut len = 0;
+    gl.GetShaderiv(shader, gl::INFO_LOG_LENGTH, &mut len);
+    if len > 0 {
+        let mut log = Vec::<u8>::with_capacity(len as usize);
+        gl.GetShaderInfoLog(shader, len, &mut len, log.as_mut_ptr().cast());
+        log.set_len(len as usize);
+        log.push(0);
+        let log = CString::from_vec_with_nul(log).unwrap();
+        eprintln!("Shader {shader_type:?} log");
+        eprintln!("{}", log.to_string_lossy());
+    }
+    let mut status = 0;
+    gl.GetShaderiv(shader, gl::COMPILE_STATUS, &mut status);
+    assert_eq!(status, 1, "Shader {shader_type:?} compilation failed");
     shader
 }
 

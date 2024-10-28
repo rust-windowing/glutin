@@ -119,13 +119,22 @@ impl<T: SurfaceTypeTrait + Default> SurfaceAttributesBuilder<T> {
         Default::default()
     }
 
-    /// Specify whether the surface should support srgb or not. Passing `None`
+    /// Specify whether the surface should support srgb or not. Passing [`None`]
     /// means you don't care.
     ///
-    /// # Api-specific.
+    /// # Api-specific
     ///
     /// This only controls EGL surfaces, other platforms use the context for
-    /// that.
+    /// that.  More color spaces besides sRGB are available on the
+    #[cfg_attr(
+        egl_backend,
+        doc = "[`EglSurfaceAttributes::color_space`][crate::api::egl::surface::EglSurfaceAttributes::color_space]"
+    )]
+    #[cfg_attr(
+        not(egl_backend),
+        doc = "[`EglSurfaceAttributes::color_space`](https://docs.rs/glutin/latest/glutin/api/egl/surface/struct.EglSurfaceAttributes.html#structfield.color_space)"
+    )]
+    /// field.
     pub fn with_srgb(mut self, srgb: Option<bool>) -> Self {
         self.attributes.srgb = srgb;
         self
@@ -140,7 +149,7 @@ impl SurfaceAttributesBuilder<WindowSurface> {
     ///
     /// The surface is requested as double buffered by default.
     ///
-    /// # Api-specific.
+    /// # Api-specific
     ///
     /// This is EGL specific, other platforms use the context for that.
     pub fn with_single_buffer(mut self, single_buffer: bool) -> Self {

@@ -193,16 +193,19 @@ impl Config {
     ///
     /// The caller must ensure that the attribute could be present.
     unsafe fn raw_attribute(&self, attr: c_int) -> c_int {
-        unsafe {
-            let mut val = 0;
+        let mut val = 0;
+        let err = unsafe {
             self.inner.display.inner.glx.GetFBConfigAttrib(
                 self.inner.display.inner.raw.cast(),
                 *self.inner.raw,
                 attr,
                 &mut val,
-            );
-            val as c_int
+            )
+        };
+        if err != 0 {
+            eprintln!("Could not read Attrib {attr:#0x} from {:?}", self)
         }
+        val as c_int
     }
 
     pub(crate) fn is_single_buffered(&self) -> bool {
@@ -248,10 +251,13 @@ impl GlConfig for Config {
     }
 
     fn srgb_capable(&self) -> bool {
-        if self.inner.display.inner.client_extensions.contains("GLX_ARB_framebuffer_sRGB") {
+        // TODO(Marijn): Use DisplayFeatures::SRGB_FRAMEBUFFERS
+        let client_extensions = &self.inner.display.inner.client_extensions;
+        if client_extensions.contains("GLX_ARB_framebuffer_sRGB")
+            || client_extensions.contains("GLX_EXT_framebuffer_sRGB")
+        {
+            // Attribute is the same for EXT an ARB
             unsafe { self.raw_attribute(glx_extra::FRAMEBUFFER_SRGB_CAPABLE_ARB as c_int) != 0 }
-        } else if self.inner.display.inner.client_extensions.contains("GLX_EXT_framebuffer_sRGB") {
-            unsafe { self.raw_attribute(glx_extra::FRAMEBUFFER_SRGB_CAPABLE_EXT as c_int) != 0 }
         } else {
             false
         }

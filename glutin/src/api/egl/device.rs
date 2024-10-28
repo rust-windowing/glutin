@@ -162,10 +162,9 @@ impl Device {
             return None;
         }
 
-        const EGL_DRM_RENDER_NODE_PATH_EXT: egl::types::EGLenum = 0x3377;
         // SAFETY: We pass a valid EGLDevice pointer, and validated that the enum name
         // is valid because the extension is present.
-        unsafe { Self::query_string(self.raw_device(), EGL_DRM_RENDER_NODE_PATH_EXT) }
+        unsafe { Self::query_string(self.raw_device(), egl::DRM_RENDER_NODE_FILE_EXT) }
             .map(Path::new)
     }
 
