@@ -1,6 +1,7 @@
 # Unreleased
 
 - Add `PossiblyCurrentContext::make_not_current_in_place(&self)` for when `Send` capability of `NotCurrentContext` is not required.
+- Add `NotCurrentContext::make_current_surfaceless(self)` and `PossiblyCurrentContext::make_current_surfaceless(&self)` in the `Cgl` implementation to allow the use of surfaceless contexts on MacOS.
 
 # Version 0.32.1
 
