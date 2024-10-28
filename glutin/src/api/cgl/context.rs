@@ -74,6 +74,13 @@ pub struct NotCurrentContext {
 }
 
 impl NotCurrentContext {
+    /// Make a [`Self::PossiblyCurrentContext`] indicating that the context
+    /// could be current on the thread.
+    pub fn make_current_surfaceless(self) -> Result<PossiblyCurrentContext> {
+        self.inner.make_current_surfaceless()?;
+        Ok(PossiblyCurrentContext { inner: self.inner, _nosendsync: PhantomData })
+    }
+
     fn new(inner: ContextInner) -> Self {
         Self { inner, _nosync: PhantomData }
     }
@@ -141,6 +148,13 @@ pub struct PossiblyCurrentContext {
     pub(crate) inner: ContextInner,
     // The context could be current only on the one thread.
     _nosendsync: PhantomData<*mut ()>,
+}
+
+impl PossiblyCurrentContext {
+    /// Make this context current on the calling thread.
+    pub fn make_current_surfaceless(&self) -> Result<()> {
+        self.inner.make_current_surfaceless()
+    }
 }
 
 impl PossiblyCurrentGlContext for PossiblyCurrentContext {
@@ -230,6 +244,19 @@ impl ContextInner {
             let view = &surface.ns_view;
             run_on_main(|mtm| unsafe {
                 self.raw.setView(Some(view.get(mtm)));
+            });
+
+            Ok(())
+        })
+    }
+
+    fn make_current_surfaceless(&self) -> Result<()> {
+        autoreleasepool(|_| {
+            self.update();
+            self.raw.makeCurrentContext();
+
+            run_on_main(|_mtm| unsafe {
+                self.raw.setView(None);
             });
 
             Ok(())
