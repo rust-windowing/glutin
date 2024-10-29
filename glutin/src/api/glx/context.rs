@@ -230,6 +230,8 @@ pub struct NotCurrentContext {
 impl NotCurrentContext {
     /// Make a [`Self::PossiblyCurrentContext`] indicating that the context
     /// could be current on the thread.
+    ///
+    /// Requires the GLX_ARB_create_context extension and OpenGL 3.0 or greater.
     pub fn make_current_surfaceless(self) -> Result<PossiblyCurrentContext> {
         self.inner.make_current_surfaceless()?;
         Ok(PossiblyCurrentContext { inner: self.inner, _nosendsync: PhantomData })
@@ -306,6 +308,8 @@ pub struct PossiblyCurrentContext {
 
 impl PossiblyCurrentContext {
     /// Make this context current on the calling thread.
+    ///
+    /// Requires the GLX_ARB_create_context extension and OpenGL 3.0 or greater.
     pub fn make_current_surfaceless(&self) -> Result<()> {
         self.inner.make_current_surfaceless()
     }
@@ -380,6 +384,22 @@ struct ContextInner {
 
 impl ContextInner {
     fn make_current_surfaceless(&self) -> Result<()> {
+        // Surfaceless contexts are supported with the GLX_ARB_create_context extension
+        // when using OpenGL 3.0 or greater.
+        // Source: https://registry.khronos.org/OpenGL/extensions/ARB/GLX_ARB_create_context.txt
+        {
+            let extension_enabled =
+                self.display.inner.client_extensions.contains("GLX_ARB_create_context");
+            let version_supported = self.display.inner.version >= Version::new(3, 0);
+            if !extension_enabled || !version_supported {
+                return Err(
+                    ErrorKind::NotSupported("the surfaceless context Api isn't supported").into()
+                );
+            }
+        }
+
+        // Passing zero arguments for both `draw` and `read` parameters makes
+        // the context current without a default framebuffer.
         super::last_glx_error(|| unsafe {
             self.display.inner.glx.MakeContextCurrent(
                 self.display.inner.raw.cast(),
