@@ -45,27 +45,34 @@ impl Display {
             _ => std::ptr::null(),
         };
 
-        let context = if self.inner.client_extensions.contains("WGL_ARB_create_context") {
-            self.create_context_arb(hdc, share_ctx, context_attributes)?
-        } else {
-            unsafe {
-                let raw = wgl::CreateContext(hdc as *const _);
-                if raw.is_null() {
-                    return Err(IoError::last_os_error().into());
-                }
+        let (context, supports_surfaceless) =
+            if self.inner.client_extensions.contains("WGL_ARB_create_context") {
+                self.create_context_arb(hdc, share_ctx, context_attributes)?
+            } else {
+                unsafe {
+                    let raw = wgl::CreateContext(hdc as *const _);
+                    if raw.is_null() {
+                        return Err(IoError::last_os_error().into());
+                    }
 
-                // Context sharing.
-                if !share_ctx.is_null() && wgl::ShareLists(share_ctx, raw) == 0 {
-                    return Err(IoError::last_os_error().into());
-                }
+                    // Context sharing.
+                    if !share_ctx.is_null() && wgl::ShareLists(share_ctx, raw) == 0 {
+                        return Err(IoError::last_os_error().into());
+                    }
 
-                WglContext(raw)
-            }
-        };
+                    (WglContext(raw), false)
+                }
+            };
 
         let config = config.clone();
         let is_gles = matches!(context_attributes.api, Some(ContextApi::Gles(_)));
-        let inner = ContextInner { display: self.clone(), config, raw: context, is_gles };
+        let inner = ContextInner {
+            display: self.clone(),
+            config,
+            raw: context,
+            is_gles,
+            supports_surfaceless,
+        };
         Ok(NotCurrentContext { inner })
     }
 
@@ -74,14 +81,14 @@ impl Display {
         hdc: HDC,
         share_context: HGLRC,
         context_attributes: &ContextAttributes,
-    ) -> Result<WglContext> {
+    ) -> Result<(WglContext, bool)> {
         let extra = self.inner.wgl_extra.as_ref().unwrap();
         let mut attrs = Vec::<c_int>::with_capacity(16);
 
         // Check whether the ES context creation is supported.
         let supports_es = self.inner.features.contains(DisplayFeatures::CREATE_ES_CONTEXT);
 
-        let (profile, version) = match context_attributes.api {
+        let (profile, version, supports_surfaceless) = match context_attributes.api {
             api @ Some(ContextApi::OpenGl(_)) | api @ None => {
                 let version = api.and_then(|api| api.version());
                 let (profile, version) = context::pick_profile(context_attributes.profile, version);
@@ -90,11 +97,16 @@ impl Display {
                     GlProfile::Compatibility => wgl_extra::CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
                 };
 
-                (Some(profile), Some(version))
+                // Surfaceless contexts are supported with the WGL_ARB_create_context extension
+                // when using OpenGL 3.0 or greater.
+                let supports_surfaceless = version >= Version::new(3, 0);
+
+                (Some(profile), Some(version), supports_surfaceless)
             },
             Some(ContextApi::Gles(version)) if supports_es => (
                 Some(wgl_extra::CONTEXT_ES2_PROFILE_BIT_EXT),
                 Some(version.unwrap_or(Version::new(2, 0))),
+                false,
             ),
             _ => {
                 return Err(ErrorKind::NotSupported(
@@ -201,7 +213,7 @@ impl Display {
             if raw.is_null() {
                 Err(IoError::last_os_error().into())
             } else {
-                Ok(WglContext(raw))
+                Ok((WglContext(raw), supports_surfaceless))
             }
         }
     }
@@ -219,6 +231,15 @@ impl Sealed for NotCurrentContext {}
 impl NotCurrentContext {
     fn new(inner: ContextInner) -> Self {
         Self { inner }
+    }
+
+    /// Make a [`Self::PossiblyCurrentContext`] indicating that the context
+    /// could be current on the thread.
+    ///
+    /// Requires the WGL_ARB_create_context extension and OpenGL 3.0 or greater.
+    pub fn make_current_surfaceless(self) -> Result<PossiblyCurrentContext> {
+        self.inner.make_current_surfaceless()?;
+        Ok(PossiblyCurrentContext { inner: self.inner, _nosendsync: PhantomData })
     }
 }
 
@@ -281,6 +302,15 @@ pub struct PossiblyCurrentContext {
     inner: ContextInner,
     // The context could be current only on the one thread.
     _nosendsync: PhantomData<HGLRC>,
+}
+
+impl PossiblyCurrentContext {
+    /// Make this context current on the calling thread.
+    ///
+    /// Requires the WGL_ARB_create_context extension and OpenGL 3.0 or greater.
+    pub fn make_current_surfaceless(&self) -> Result<()> {
+        self.inner.make_current_surfaceless()
+    }
 }
 
 impl PossiblyCurrentGlContext for PossiblyCurrentContext {
@@ -356,6 +386,7 @@ struct ContextInner {
     config: Config,
     raw: WglContext,
     is_gles: bool,
+    supports_surfaceless: bool,
 }
 
 impl fmt::Debug for ContextInner {
@@ -381,6 +412,22 @@ impl Deref for WglContext {
 unsafe impl Send for WglContext {}
 
 impl ContextInner {
+    fn make_current_surfaceless(&self) -> Result<()> {
+        if !self.supports_surfaceless {
+            return Err(
+                ErrorKind::NotSupported("the surfaceless context Api isn't supported").into()
+            );
+        }
+
+        unsafe {
+            if wgl::MakeCurrent(std::ptr::null(), self.raw.cast()) == 0 {
+                Err(IoError::last_os_error().into())
+            } else {
+                Ok(())
+            }
+        }
+    }
+
     fn make_current_draw_read<T: SurfaceTypeTrait>(
         &self,
         _surface_draw: &Surface<T>,
