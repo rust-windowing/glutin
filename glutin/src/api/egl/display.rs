@@ -362,7 +362,18 @@ impl Display {
                     handle.connection.map_or(egl::DEFAULT_DISPLAY as *mut _, |c| c.as_ptr()),
                 )
             },
-            RawDisplayHandle::Gbm(handle) if extensions.contains("EGL_MESA_platform_gbm") => {
+            RawDisplayHandle::Gbm(handle)
+                // NOTE: Some drivers report that they support KHR extension with 1.4 EGL display, so
+                // workaround here by checking the KHR gbm display as well. The MESA and KHR has
+                // the same constant values, thus it'll work regardless.
+                //
+                // They do require EXT during the runtime as well, so we don't change the display
+                // to Khr here.
+                //
+                // See https://github.com/rust-windowing/glutin/issues/1708.
+                if extensions.contains("EGL_MESA_platform_gbm")
+                    || extensions.contains("EGL_KHR_platform_gbm") =>
+            {
                 (egl::PLATFORM_GBM_MESA, handle.gbm_device.as_ptr())
             },
             RawDisplayHandle::Drm(_) => {
