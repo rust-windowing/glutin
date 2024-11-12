@@ -232,15 +232,6 @@ impl NotCurrentContext {
     fn new(inner: ContextInner) -> Self {
         Self { inner }
     }
-
-    /// Make a [`Self::PossiblyCurrentContext`] indicating that the context
-    /// could be current on the thread.
-    ///
-    /// Requires the WGL_ARB_create_context extension and OpenGL 3.0 or greater.
-    pub fn make_current_surfaceless(self) -> Result<PossiblyCurrentContext> {
-        self.inner.make_current_surfaceless()?;
-        Ok(PossiblyCurrentContext { inner: self.inner, _nosendsync: PhantomData })
-    }
 }
 
 impl NotCurrentGlContext for NotCurrentContext {
@@ -265,6 +256,11 @@ impl NotCurrentGlContext for NotCurrentContext {
         surface_read: &Self::Surface<T>,
     ) -> Result<Self::PossiblyCurrentContext> {
         Err(self.inner.make_current_draw_read(surface_draw, surface_read).into())
+    }
+
+    fn make_current_surfaceless(self) -> Result<PossiblyCurrentContext> {
+        self.inner.make_current_surfaceless()?;
+        Ok(PossiblyCurrentContext { inner: self.inner, _nosendsync: PhantomData })
     }
 }
 
@@ -304,15 +300,6 @@ pub struct PossiblyCurrentContext {
     _nosendsync: PhantomData<HGLRC>,
 }
 
-impl PossiblyCurrentContext {
-    /// Make this context current on the calling thread.
-    ///
-    /// Requires the WGL_ARB_create_context extension and OpenGL 3.0 or greater.
-    pub fn make_current_surfaceless(&self) -> Result<()> {
-        self.inner.make_current_surfaceless()
-    }
-}
-
 impl PossiblyCurrentGlContext for PossiblyCurrentContext {
     type NotCurrentContext = NotCurrentContext;
     type Surface<T: SurfaceTypeTrait> = Surface<T>;
@@ -348,6 +335,10 @@ impl PossiblyCurrentGlContext for PossiblyCurrentContext {
         surface_read: &Self::Surface<T>,
     ) -> Result<()> {
         Err(self.inner.make_current_draw_read(surface_draw, surface_read).into())
+    }
+
+    fn make_current_surfaceless(&self) -> Result<()> {
+        self.inner.make_current_surfaceless()
     }
 }
 

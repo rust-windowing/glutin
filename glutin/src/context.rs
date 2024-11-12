@@ -49,9 +49,9 @@ pub trait NotCurrentGlContext: Sealed {
     /// guaranteed to be current.
     fn treat_as_possibly_current(self) -> Self::PossiblyCurrentContext;
 
-    /// Make [`Self::Surface`] on the calling thread producing the
+    /// Make [`Self::Surface`] current on the calling thread producing the
     /// [`Self::PossiblyCurrentContext`] indicating that the context could
-    /// be current on the thread.
+    /// be current on the calling thread.
     ///
     /// # Platform specific
     ///
@@ -67,7 +67,7 @@ pub trait NotCurrentGlContext: Sealed {
     /// The same as [`Self::make_current`], but provides a way to set read and
     /// draw surfaces.
     ///
-    /// # Api-specific:
+    /// # Api specific
     ///
     /// - **WGL/CGL:** not supported.
     fn make_current_draw_read<T: SurfaceTypeTrait>(
@@ -75,6 +75,16 @@ pub trait NotCurrentGlContext: Sealed {
         surface_draw: &Self::Surface<T>,
         surface_read: &Self::Surface<T>,
     ) -> Result<Self::PossiblyCurrentContext>;
+
+    /// Make context current on the calling thread without a default
+    /// framebuffer producing the [`Self::PossiblyCurrentContext`] indicating
+    /// that the context could be current on the calling thread.
+    ///
+    /// # Api specific
+    ///
+    /// - **WGL/GLX:** requires OpenGL 3.0 or greater context and
+    ///   ARB_create_context extensions.
+    fn make_current_surfaceless(self) -> Result<Self::PossiblyCurrentContext>;
 }
 
 /// A trait to group common context operations.
@@ -109,10 +119,10 @@ pub trait PossiblyCurrentGlContext: Sealed {
     /// - **macOS: this will block if your main thread is blocked.**
     fn make_current<T: SurfaceTypeTrait>(&self, surface: &Self::Surface<T>) -> Result<()>;
 
-    /// The same as [`Self::make_current`] but provides a way to set read and
+    /// The same as [`Self::make_current`], but provides a way to set read and
     /// draw surfaces explicitly.
     ///
-    /// # Api-specific:
+    /// # Api specific
     ///
     /// - **CGL/WGL:** not supported.
     fn make_current_draw_read<T: SurfaceTypeTrait>(
@@ -120,6 +130,15 @@ pub trait PossiblyCurrentGlContext: Sealed {
         surface_draw: &Self::Surface<T>,
         surface_read: &Self::Surface<T>,
     ) -> Result<()>;
+
+    /// Make context current on the calling thread without a default
+    /// framebuffer.
+    ///
+    /// # Api specific
+    ///
+    /// - **WGL/GLX:** requires OpenGL 3.0 or greater context and
+    ///   ARB_create_context extensions.
+    fn make_current_surfaceless(&self) -> Result<()>;
 }
 
 /// A trait that provides raw context.
@@ -156,7 +175,7 @@ impl ContextAttributesBuilder {
     /// To get sharing working it's recommended to use the same [`Config`] when
     /// creating contexts that are going to be shared.
     ///
-    /// # Platform-specific
+    /// # Platform specific
     ///
     /// - **Wayland:** both contexts must use the same Wayland connection.
     ///
@@ -190,7 +209,7 @@ impl ContextAttributesBuilder {
     ///
     /// By default the profile is unspecified.
     ///
-    /// # Api-specific
+    /// # Api specific
     ///
     /// - **macOS:** not supported, the latest is picked automatically.
     pub fn with_profile(mut self, profile: GlProfile) -> Self {
@@ -210,7 +229,7 @@ impl ContextAttributesBuilder {
     ///
     /// The `raw_window_handle` isn't required and here for WGL compatibility.
     ///
-    /// # Api-specific
+    /// # Api specific
     ///
     /// - **WGL:** you **must** pass a `raw_window_handle` if you plan to use
     ///   this context with that window.
@@ -338,7 +357,7 @@ pub enum ReleaseBehavior {
     /// Doesn't do anything. Most notably doesn't flush. Not supported by all
     /// drivers.
     ///
-    /// # Api-specific
+    /// # Api specific
     ///
     /// - **macOS:** not supported, [`Self::Flush`] is always used.
     None,
@@ -389,6 +408,12 @@ impl NotCurrentGlContext for NotCurrentContext {
 
     fn treat_as_possibly_current(self) -> Self::PossiblyCurrentContext {
         gl_api_dispatch!(self; Self(context) => context.treat_as_possibly_current(); as PossiblyCurrentContext)
+    }
+
+    fn make_current_surfaceless(self) -> Result<PossiblyCurrentContext> {
+        Ok(
+            gl_api_dispatch!(self; Self(context) => context.make_current_surfaceless()?; as PossiblyCurrentContext),
+        )
     }
 
     fn make_current<T: SurfaceTypeTrait>(
@@ -520,6 +545,10 @@ impl PossiblyCurrentGlContext for PossiblyCurrentContext {
         Ok(
             gl_api_dispatch!(self; Self(context) => context.make_not_current()?; as NotCurrentContext),
         )
+    }
+
+    fn make_current_surfaceless(&self) -> Result<()> {
+        gl_api_dispatch!(self; Self(context) => context.make_current_surfaceless())
     }
 
     fn make_not_current_in_place(&self) -> Result<()> {
