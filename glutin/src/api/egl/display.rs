@@ -363,12 +363,10 @@ impl Display {
                 )
             },
             RawDisplayHandle::Gbm(handle)
-                // NOTE: Some drivers report that they support the KHR GBM extension without EGL 1.5 client, so
-                // work around that here by checking the KHR GBM extension as well. The MESA and KHR extensions have
-                // the same constant values, thus it'll work regardless.
-                //
-                // They do require EXT during the runtime as well, so we don't change the display
-                // to Khr here.
+                // NOTE: Some drivers report that they support the KHR GBM extension without EGL
+                // 1.5 client, so work around that here by checking the KHR GBM extension as well.
+                // The MESA and KHR extensions have the same constant values, thus it'll work
+                // regardless.
                 //
                 // See https://github.com/rust-windowing/glutin/issues/1708.
                 if extensions.contains("EGL_MESA_platform_gbm")
