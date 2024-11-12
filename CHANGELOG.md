@@ -10,6 +10,7 @@
 - Added `NotCurrentContext::make_current_surfaceless(self)` and
   `PossiblyCurrentContext::make_current_surfaceless(&self)` in the `Wgl`
   implementation to allow the use of surfaceless contexts with WGL.
+- Added workaround for EGL drivers reporting `EGL_KHR_platform_gbm` without EGL 1.5 client.
 
 
 # Version 0.32.1
