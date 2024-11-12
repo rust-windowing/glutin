@@ -363,8 +363,8 @@ impl Display {
                 )
             },
             RawDisplayHandle::Gbm(handle)
-                // NOTE: Some drivers report that they support KHR extension with 1.4 EGL display, so
-                // workaround here by checking the KHR gbm display as well. The MESA and KHR has
+                // NOTE: Some drivers report that they support the KHR GBM extension without EGL 1.5 client, so
+                // work around that here by checking the KHR GBM extension as well. The MESA and KHR extensions have
                 // the same constant values, thus it'll work regardless.
                 //
                 // They do require EXT during the runtime as well, so we don't change the display
