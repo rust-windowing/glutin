@@ -49,9 +49,9 @@ pub trait NotCurrentGlContext: Sealed {
     /// guaranteed to be current.
     fn treat_as_possibly_current(self) -> Self::PossiblyCurrentContext;
 
-    /// Make context current on the calling thread producing the
+    /// Make context current on the calling thread and change its type to
     /// [`Self::PossiblyCurrentContext`]. The `surface` is used as a target for
-    /// default framebuffer.
+    /// the default framebuffer.
     ///
     /// # Platform specific
     ///
@@ -77,7 +77,7 @@ pub trait NotCurrentGlContext: Sealed {
     ) -> Result<Self::PossiblyCurrentContext>;
 
     /// Make context current on the calling thread without a default
-    /// framebuffer producing the [`Self::PossiblyCurrentContext`].
+    /// framebuffer and change its type to [`Self::PossiblyCurrentContext`].
     ///
     /// # Api specific
     ///
@@ -97,21 +97,21 @@ pub trait PossiblyCurrentGlContext: Sealed {
     /// Returns `true` if this context is the current one in this thread.
     fn is_current(&self) -> bool;
 
-    /// Make the context not current to the current thread and returns a
-    /// [`Self::NotCurrentContext`].
+    /// Make the context not current to the current thread and change its type
+    /// to [`Self::NotCurrentContext`].
     ///
     /// # Platform specific
     ///
     /// - **macOS: this will block if your main thread is blocked.**
     fn make_not_current(self) -> Result<Self::NotCurrentContext>;
 
-    /// Make the context not current on the current thread. If you need to
+    /// Make the context not current on the calling thread. If you need to
     /// send the context to another thread, use [`Self::make_not_current`]
     /// instead.
     fn make_not_current_in_place(&self) -> Result<()>;
 
-    /// Make context current on the calling. The `surface` is used as a target
-    /// for default framebuffer.
+    /// Make context current on the calling thread. The `surface` is used as a
+    /// target for the default framebuffer.
     ///
     /// # Platform specific
     ///
