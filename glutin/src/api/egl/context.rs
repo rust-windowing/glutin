@@ -9,7 +9,8 @@ use glutin_egl_sys::{egl, EGLContext};
 
 use crate::config::{Api, GetGlConfig};
 use crate::context::{
-    self, AsRawContext, ContextApi, ContextAttributes, GlProfile, RawContext, Robustness, Version,
+    self, AsRawContext, ContextApi, ContextAttributes, GlProfile, Priority, RawContext, Robustness,
+    Version,
 };
 use crate::display::{DisplayFeatures, GetGlDisplay};
 use crate::error::{ErrorKind, Result};
@@ -126,6 +127,38 @@ impl Display {
             }
         }
 
+        if let Some(priority) = context_attributes.priority.filter(|_| {
+            let extensions = &self.inner.display_extensions;
+
+            // Some android versions don't report support for this extension, even though
+            // it's supported.
+            //
+            // https://github.com/googlevr/gvr-android-sdk/issues/330
+            #[cfg(android_platform)]
+            let android = extensions.contains("EGL_ANDROID_front_buffer_auto_refresh")
+                && extensions.contains("EGL_ANDROID_create_native_client_buffer");
+            #[cfg(not(android_platform))]
+            let android = false;
+
+            extensions.contains("EGL_IMG_context_priority") || android
+        }) {
+            let priority = match priority {
+                Priority::Low => egl::CONTEXT_PRIORITY_LOW_IMG,
+                Priority::Medium => egl::CONTEXT_PRIORITY_MEDIUM_IMG,
+                Priority::High => egl::CONTEXT_PRIORITY_HIGH_IMG,
+                Priority::Realtime => {
+                    if self.inner.display_extensions.contains("EGL_NV_context_priority_realtime") {
+                        egl::CONTEXT_PRIORITY_REALTIME_NV
+                    } else {
+                        egl::CONTEXT_PRIORITY_HIGH_IMG
+                    }
+                },
+            };
+
+            attrs.push(egl::CONTEXT_PRIORITY_LEVEL_IMG as EGLint);
+            attrs.push(priority as EGLint);
+        }
+
         attrs.push(egl::NONE as EGLint);
 
         let shared_context = if let Some(shared_context) =
@@ -214,6 +247,10 @@ impl GlContext for NotCurrentContext {
     fn context_api(&self) -> ContextApi {
         self.inner.context_api()
     }
+
+    fn priority(&self) -> Priority {
+        self.inner.priority()
+    }
 }
 
 impl GetGlConfig for NotCurrentContext {
@@ -290,6 +327,10 @@ impl PossiblyCurrentGlContext for PossiblyCurrentContext {
 impl GlContext for PossiblyCurrentContext {
     fn context_api(&self) -> ContextApi {
         self.inner.context_api()
+    }
+
+    fn priority(&self) -> Priority {
+        self.inner.priority()
     }
 }
 
@@ -382,6 +423,16 @@ impl ContextInner {
             Some(egl::OPENGL_API) => ContextApi::OpenGl(None),
             // Map the rest to the GLES.
             _ => ContextApi::Gles(None),
+        }
+    }
+
+    fn priority(&self) -> Priority {
+        match self.query_attribute(egl::CONTEXT_PRIORITY_LEVEL_IMG as EGLint).map(|a| a as EGLenum)
+        {
+            Some(egl::CONTEXT_PRIORITY_LOW_IMG) => Priority::Low,
+            Some(egl::CONTEXT_PRIORITY_HIGH_IMG) => Priority::High,
+            Some(egl::CONTEXT_PRIORITY_REALTIME_NV) => Priority::Realtime,
+            _ => Priority::Medium,
         }
     }
 
