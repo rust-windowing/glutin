@@ -10,7 +10,9 @@ use objc2_app_kit::{NSOpenGLCPSwapInterval, NSView};
 use objc2_foundation::{run_on_main, MainThreadBound};
 
 use crate::config::GetGlConfig;
-use crate::context::{AsRawContext, ContextApi, ContextAttributes, RawContext, Robustness};
+use crate::context::{
+    AsRawContext, ContextApi, ContextAttributes, Priority, RawContext, Robustness,
+};
 use crate::display::GetGlDisplay;
 use crate::error::{ErrorKind, Result};
 use crate::prelude::*;
@@ -113,6 +115,10 @@ impl GlContext for NotCurrentContext {
     fn context_api(&self) -> ContextApi {
         self.inner.context_api()
     }
+
+    fn priority(&self) -> Priority {
+        Priority::Medium
+    }
 }
 
 impl GetGlConfig for NotCurrentContext {
@@ -189,6 +195,10 @@ impl PossiblyCurrentGlContext for PossiblyCurrentContext {
 impl GlContext for PossiblyCurrentContext {
     fn context_api(&self) -> ContextApi {
         self.inner.context_api()
+    }
+
+    fn priority(&self) -> Priority {
+        Priority::Medium
     }
 }
 

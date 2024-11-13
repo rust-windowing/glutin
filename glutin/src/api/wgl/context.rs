@@ -13,8 +13,8 @@ use windows_sys::Win32::Graphics::Gdi::{self as gdi, HDC};
 
 use crate::config::GetGlConfig;
 use crate::context::{
-    self, AsRawContext, ContextApi, ContextAttributes, GlProfile, RawContext, ReleaseBehavior,
-    Robustness, Version,
+    self, AsRawContext, ContextApi, ContextAttributes, GlProfile, Priority, RawContext,
+    ReleaseBehavior, Robustness, Version,
 };
 use crate::display::{DisplayFeatures, GetGlDisplay};
 use crate::error::{ErrorKind, Result};
@@ -268,6 +268,10 @@ impl GlContext for NotCurrentContext {
     fn context_api(&self) -> ContextApi {
         self.inner.context_api()
     }
+
+    fn priority(&self) -> Priority {
+        Priority::Medium
+    }
 }
 
 impl GetGlDisplay for NotCurrentContext {
@@ -363,6 +367,10 @@ impl GetGlConfig for PossiblyCurrentContext {
 impl GlContext for PossiblyCurrentContext {
     fn context_api(&self) -> ContextApi {
         self.inner.context_api()
+    }
+
+    fn priority(&self) -> Priority {
+        Priority::Medium
     }
 }
 
