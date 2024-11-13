@@ -74,13 +74,6 @@ pub struct NotCurrentContext {
 }
 
 impl NotCurrentContext {
-    /// Make a [`Self::PossiblyCurrentContext`] indicating that the context
-    /// could be current on the thread.
-    pub fn make_current_surfaceless(self) -> Result<PossiblyCurrentContext> {
-        self.inner.make_current_surfaceless()?;
-        Ok(PossiblyCurrentContext { inner: self.inner, _nosendsync: PhantomData })
-    }
-
     fn new(inner: ContextInner) -> Self {
         Self { inner, _nosync: PhantomData }
     }
@@ -108,6 +101,11 @@ impl NotCurrentGlContext for NotCurrentContext {
         surface_read: &Self::Surface<T>,
     ) -> Result<Self::PossiblyCurrentContext> {
         Err(self.inner.make_current_draw_read(surface_draw, surface_read).into())
+    }
+
+    fn make_current_surfaceless(self) -> Result<PossiblyCurrentContext> {
+        self.inner.make_current_surfaceless()?;
+        Ok(PossiblyCurrentContext { inner: self.inner, _nosendsync: PhantomData })
     }
 }
 
@@ -150,13 +148,6 @@ pub struct PossiblyCurrentContext {
     _nosendsync: PhantomData<*mut ()>,
 }
 
-impl PossiblyCurrentContext {
-    /// Make this context current on the calling thread.
-    pub fn make_current_surfaceless(&self) -> Result<()> {
-        self.inner.make_current_surfaceless()
-    }
-}
-
 impl PossiblyCurrentGlContext for PossiblyCurrentContext {
     type NotCurrentContext = NotCurrentContext;
     type Surface<T: SurfaceTypeTrait> = Surface<T>;
@@ -188,6 +179,10 @@ impl PossiblyCurrentGlContext for PossiblyCurrentContext {
         surface_read: &Self::Surface<T>,
     ) -> Result<()> {
         Err(self.inner.make_current_draw_read(surface_draw, surface_read).into())
+    }
+
+    fn make_current_surfaceless(&self) -> Result<()> {
+        self.inner.make_current_surfaceless()
     }
 }
 
