@@ -97,7 +97,7 @@ pub trait PossiblyCurrentGlContext: Sealed {
     /// Returns `true` if this context is the current one in this thread.
     fn is_current(&self) -> bool;
 
-    /// Make the context not current to the current thread and change its type
+    /// Make the context not current on the calling thread and change its type
     /// to [`Self::NotCurrentContext`].
     ///
     /// # Platform specific
