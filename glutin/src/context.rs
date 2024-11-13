@@ -34,6 +34,9 @@ pub trait GlContext: Sealed {
     ///
     /// The returned value's [`Version`] will always be `None`.
     fn context_api(&self) -> ContextApi;
+
+    /// Get the [`Priority`] used by the context.
+    fn priority(&self) -> Priority;
 }
 
 /// A trait to group common not current operations.
@@ -206,6 +209,24 @@ impl ContextAttributesBuilder {
         self
     }
 
+    /// Set the priority hint, which might not be honored if the API does not
+    /// support it, if there are constraints on the number of high priority
+    /// contexts available in the system, or system policy limits access to
+    /// high priority contexts to appropriate system privilege level the
+    /// context creation may fail.
+    ///
+    /// By default no priority is specified, which corresponds to
+    /// [`Priority::Medium`].
+    ///
+    /// # Api specific
+    ///
+    /// - **WGL/GLX:** not implemented.
+    /// - **CGL:** not supported.
+    pub fn with_priority(mut self, priority: Priority) -> Self {
+        self.attributes.priority = Some(priority);
+        self
+    }
+
     /// Build the context attributes.
     ///
     /// The `raw_window_handle` isn't required and here for WGL compatibility.
@@ -232,6 +253,8 @@ pub struct ContextAttributes {
     pub(crate) profile: Option<GlProfile>,
 
     pub(crate) api: Option<ContextApi>,
+
+    pub(crate) priority: Option<Priority>,
 
     pub(crate) shared_context: Option<RawContext>,
 
@@ -447,6 +470,10 @@ impl GlContext for NotCurrentContext {
     fn context_api(&self) -> ContextApi {
         gl_api_dispatch!(self; Self(context) => context.context_api())
     }
+
+    fn priority(&self) -> Priority {
+        gl_api_dispatch!(self; Self(context) => context.priority())
+    }
 }
 
 impl GetGlConfig for NotCurrentContext {
@@ -571,6 +598,10 @@ impl GlContext for PossiblyCurrentContext {
     fn context_api(&self) -> ContextApi {
         gl_api_dispatch!(self; Self(context) => context.context_api())
     }
+
+    fn priority(&self) -> Priority {
+        gl_api_dispatch!(self; Self(context) => context.priority())
+    }
 }
 
 impl GetGlConfig for PossiblyCurrentContext {
@@ -615,6 +646,25 @@ pub enum RawContext {
     /// Pointer to NSOpenGLContext.
     #[cfg(cgl_backend)]
     Cgl(*const ffi::c_void),
+}
+
+/// Priority hint
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
+pub enum Priority {
+    /// Lowest priority, contexts using this priority give way for most other
+    /// contexts.
+    Low,
+    /// Default priority.
+    #[default]
+    Medium,
+    /// High priority is usually required for VR applications.
+    High,
+    /// Realtime priority contexts are executed immediately and preempt any
+    /// current context running.
+    ///
+    /// When such context is not supported, [`Priority::High`] will be requested
+    /// instead.
+    Realtime,
 }
 
 /// Pick `GlProfile` and `Version` based on the provided params.

@@ -10,8 +10,8 @@ use glutin_glx_sys::{glx, glx_extra};
 
 use crate::config::GetGlConfig;
 use crate::context::{
-    self, AsRawContext, ContextApi, ContextAttributes, GlProfile, RawContext, ReleaseBehavior,
-    Robustness, Version,
+    self, AsRawContext, ContextApi, ContextAttributes, GlProfile, Priority, RawContext,
+    ReleaseBehavior, Robustness, Version,
 };
 use crate::display::{DisplayFeatures, GetGlDisplay};
 use crate::error::{ErrorKind, Result};
@@ -285,6 +285,10 @@ impl GlContext for NotCurrentContext {
     fn context_api(&self) -> ContextApi {
         self.inner.context_api()
     }
+
+    fn priority(&self) -> Priority {
+        Priority::Medium
+    }
 }
 
 impl GetGlConfig for NotCurrentContext {
@@ -361,6 +365,10 @@ impl PossiblyCurrentGlContext for PossiblyCurrentContext {
 impl GlContext for PossiblyCurrentContext {
     fn context_api(&self) -> ContextApi {
         self.inner.context_api()
+    }
+
+    fn priority(&self) -> Priority {
+        Priority::Medium
     }
 }
 

@@ -35,6 +35,7 @@ fn main() {
             "EGL_EXT_platform_wayland",
             "EGL_EXT_platform_x11",
             "EGL_EXT_swap_buffers_with_damage",
+            "EGL_IMG_context_priority",
             "EGL_KHR_create_context",
             "EGL_KHR_create_context_no_error",
             "EGL_KHR_display_reference",
@@ -47,6 +48,7 @@ fn main() {
             "EGL_KHR_swap_buffers_with_damage",
             "EGL_KHR_wait_sync",
             "EGL_MESA_platform_gbm",
+            "EGL_NV_context_priority_realtime",
         ]);
 
         if target.contains("ios") {
