@@ -295,7 +295,7 @@ impl<T: SurfaceTypeTrait> Sealed for Surface<T> {}
 
 /// A wrapper around WGL surfaces.
 #[derive(Debug)]
-pub enum WglSurface {
+pub(crate) enum WglSurface {
     /// Surface backed by a window surface.
     Window(HWND, HDC),
     /// Surface backed by a pixel buffer.
