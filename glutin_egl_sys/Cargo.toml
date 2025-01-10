@@ -1,6 +1,6 @@
 [package]
 name = "glutin_egl_sys"
-version = "0.7.0"
+version = "0.7.1"
 authors = ["Kirill Chibisov <contact@kchibisov.com>"]
 description = "The egl bindings for glutin"
 repository = "https://github.com/rust-windowing/glutin"

@@ -1,5 +1,7 @@
 # Unreleased
 
+# Version 0.32.2
+
 - Added `PossiblyCurrentContext::make_not_current_in_place(&self)` for when `Send` capability of `NotCurrentContext` is not required.
 - Added `NotCurrentContext::make_current_surfaceless(self)` and
   `PossiblyCurrentContext::make_current_surfaceless(&self)` in the `Cgl`
