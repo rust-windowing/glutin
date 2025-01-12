@@ -1,8 +1,20 @@
 # Unreleased
 
-- Added `PossiblyCurrentContext::make_not_current_in_place(&self)` for when `Send` capability of `NotCurrentContext` is not required.
-- Added workaround for EGL drivers reporting `EGL_KHR_platform_gbm` without EGL 1.5 client.
 - **Breaking:** Added `make_current_surfaceless(self)` for `{Possibly,Not}CurrentGlContext`.
+
+# Version 0.32.2
+
+- Added `PossiblyCurrentContext::make_not_current_in_place(&self)` for when `Send` capability of `NotCurrentContext` is not required.
+- Added `NotCurrentContext::make_current_surfaceless(self)` and
+  `PossiblyCurrentContext::make_current_surfaceless(&self)` in the `Cgl`
+  implementation to allow the use of surfaceless contexts on MacOS.
+- Added `NotCurrentContext::make_current_surfaceless(self)` and
+  `PossiblyCurrentContext::make_current_surfaceless(&self)` in the `Glx`
+  implementation to allow the use of surfaceless contexts with GLX.
+- Added `NotCurrentContext::make_current_surfaceless(self)` and
+  `PossiblyCurrentContext::make_current_surfaceless(&self)` in the `Wgl`
+  implementation to allow the use of surfaceless contexts with WGL.
+- Added workaround for EGL drivers reporting `EGL_KHR_platform_gbm` without EGL 1.5 client.
 - Added `GlContext::priority`/`ContextAttributesBuilder::with_priority` to get/set context priority.
 
 # Version 0.32.1
