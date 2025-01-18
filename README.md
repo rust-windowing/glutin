@@ -59,3 +59,18 @@ and start the app using:
 ```console
 $ cargo apk r -p glutin_examples --example android
 ```
+
+### OpenHarmony/HarmonyNext
+
+Be sure to handle OpenHarmony's lifecycle correctly when using a `winit` window
+by only creating a GL surface after `winit` raises `Event::Resumed`, and
+destroy it again upon receiving `Event::Suspended`. See this in action in the
+[`ohos.rs` example](./glutin_examples/examples/ohos.rs).
+
+To compile and run the OpenHarmony example on your device,
+install [`ohrs`](https://crates.io/crates/ohrs)
+and start the app using:
+
+```console
+$ ohrs build --arch aarch
+```

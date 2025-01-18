@@ -21,6 +21,9 @@ use glutin::surface::{Surface, SwapInterval, WindowSurface};
 
 use glutin_winit::{DisplayBuilder, GlWindow};
 
+#[cfg(target_env = "ohos")]
+use winit::platform::ohos::EventLoopBuilderExtOpenHarmony;
+
 pub mod gl {
     #![allow(clippy::all)]
     include!(concat!(env!("OUT_DIR"), "/gl_bindings.rs"));
@@ -42,10 +45,21 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
 
     let display_builder = DisplayBuilder::new().with_window_attributes(Some(window_attributes()));
 
-    let mut app = App::new(template, display_builder);
-    event_loop.run_app(&mut app)?;
+    #[cfg(not(target_env = "ohos"))]
+    {
+        let mut app = App::new(template, display_builder);
+        event_loop.run_app(&mut app)?;
 
-    app.exit_state
+        app.exit_state
+    }
+
+    #[cfg(target_env = "ohos")]
+    {
+        let app = App::new(template, display_builder);
+        // For OpenHarmony, we need to use `spawn_app` instead of `run_app`.
+        event_loop.spawn_app(app);
+        Ok(())
+    }
 }
 
 impl ApplicationHandler for App {

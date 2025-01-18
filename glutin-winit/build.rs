@@ -6,12 +6,13 @@ fn main() {
     // Setup alias to reduce `cfg` boilerplate.
     cfg_aliases! {
         // Systems.
+        ohos_platform: { target_env = "ohos" },
         android_platform: { target_os = "android" },
         wasm_platform: { target_family = "wasm" },
         macos_platform: { target_os = "macos" },
         ios_platform: { target_os = "ios" },
         apple: { any(ios_platform, macos_platform) },
-        free_unix: { all(unix, not(apple), not(android_platform)) },
+        free_unix: { all(unix, not(apple), not(android_platform), not(ohos_platform)) },
 
         // Native displays.
         x11_platform: { all(feature = "x11", free_unix, not(wasm_platform)) },

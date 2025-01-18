@@ -29,12 +29,20 @@ drm = { version = "0.12", optional = true }
 [target.'cfg(target_os = "android")'.dependencies]
 winit = { version = "0.30.0", default-features = false, features = ["android-native-activity", "rwh_06"] }
 
+[target.'cfg(target_env = "ohos")'.dependencies]
+openharmony_ability = { version = "0.0.1" }
+openharmony_ability_derive = { version = "0.0.1" }
+
 [build-dependencies]
 gl_generator = "0.14"
 cfg_aliases = "0.2.1"
 
 [[example]]
 name = "android"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "ohos_test"
 crate-type = ["cdylib"]
 
 [[example]]
