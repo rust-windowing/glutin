@@ -22,7 +22,7 @@ use glutin::surface::{Surface, SwapInterval, WindowSurface};
 use glutin_winit::{DisplayBuilder, GlWindow};
 
 #[cfg(target_env = "ohos")]
-use winit::platform::ohos::EventLoopBuilderExtOpenHarmony;
+use winit::platform::ohos::EventLoopExtOpenHarmony;
 
 pub mod gl {
     #![allow(clippy::all)]
