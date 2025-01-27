@@ -9,3 +9,7 @@ members = [
     "glutin_wgl_sys",
     "glutin_gles2_sys",
 ]
+
+[workspace.package]
+# MSRV. Also update in ci.yml
+rust-version = "1.71.0"

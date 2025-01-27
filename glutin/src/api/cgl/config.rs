@@ -3,7 +3,7 @@
 use std::sync::Arc;
 use std::{fmt, iter};
 
-use objc2::rc::Id;
+use objc2::rc::Retained;
 #[allow(deprecated)]
 use objc2_app_kit::{
     NSOpenGLPFAAccelerated, NSOpenGLPFAAllowOfflineRenderers, NSOpenGLPFAAlphaSize,
@@ -219,7 +219,7 @@ impl GetGlDisplay for Config {
 
 impl AsRawConfig for Config {
     fn raw_config(&self) -> RawConfig {
-        RawConfig::Cgl(Id::as_ptr(&self.inner.raw).cast())
+        RawConfig::Cgl(Retained::as_ptr(&self.inner.raw).cast())
     }
 }
 
@@ -228,7 +228,7 @@ impl Sealed for Config {}
 pub(crate) struct ConfigInner {
     display: Display,
     pub(crate) transparency: bool,
-    pub(crate) raw: Id<NSOpenGLPixelFormat>,
+    pub(crate) raw: Retained<NSOpenGLPixelFormat>,
 }
 
 impl PartialEq for ConfigInner {
