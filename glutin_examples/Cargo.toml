@@ -37,7 +37,7 @@ winit = { git = "https://github.com/richerfu/winit.git", branch = "feat-ohos-30"
 ] }
 
 [target.'cfg(target_env = "ohos")'.dependencies]
-openharmony-ability = { version = "0.0.1" }
+openharmony-ability = { version = "0.0.2" }
 openharmony-ability-derive = { version = "0.0.1" }
 winit = { git = "https://github.com/richerfu/winit.git", branch = "feat-ohos-30", default-features = false, features = [
     "rwh_06",

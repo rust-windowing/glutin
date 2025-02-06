@@ -72,5 +72,7 @@ install [`ohrs`](https://crates.io/crates/ohrs)
 and start the app using:
 
 ```console
-$ ohrs build --arch aarch
+$ ohrs build --arch aarch -- -p glutin_examples --example ohos
 ```
+
+Then copy the `$PWD/dist/arm64-v8a/libohos.so` into your OpenHarmony or HarmonyNext project.

@@ -3,3 +3,4 @@ target/
 .DS_Store
 *~
 #*#
+glutin_examples/dist
