@@ -6,11 +6,11 @@ description = "The egl bindings for glutin"
 repository = "https://github.com/rust-windowing/glutin"
 license = "Apache-2.0"
 readme = "README.md"
-rust-version = "1.70.0"
+rust-version = "1.71.0"
 edition = "2021"
 
 [build-dependencies]
-gl_generator = "0.14"
+gl_generator = { workspace = true }
 
 [target.'cfg(windows)'.dependencies.windows-sys]
 version = "0.52"

@@ -8,7 +8,7 @@ license = "Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/rust-windowing/glutin"
 documentation = "https://docs.rs/glutin"
-rust-version = "1.70.0"
+rust-version = "1.71.0"
 edition = "2021"
 
 [features]
@@ -20,10 +20,10 @@ x11 = ["x11-dl"]
 wayland = ["wayland-sys", "egl"]
 
 [dependencies]
-bitflags = "2.2.1"
-libloading = { version = "0.8.0", optional = true }
-once_cell = "1.13"
-raw-window-handle = "0.6.2"
+bitflags = { workspace = true }
+libloading = { workspace = true, optional = true }
+once_cell = { workspace = true }
+raw-window-handle = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 glutin_egl_sys = { version = "0.7.1", path = "../glutin_egl_sys", optional = true }
@@ -75,7 +75,7 @@ features = [
 ]
 
 [build-dependencies]
-cfg_aliases = "0.2.1"
+cfg_aliases = { workspace = true }
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]

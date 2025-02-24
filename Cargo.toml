@@ -9,3 +9,15 @@ members = [
     "glutin_wgl_sys",
     "glutin_gles2_sys",
 ]
+
+[workspace.dependencies]
+bitflags = "2.2.1"
+cfg_aliases = "0.2.1"
+drm = "0.12"
+gl_generator = "0.14"
+glutin-winit = { path = "glutin-winit", default-features = false }
+libloading = "0.8.0"
+once_cell = "1.13"
+png = "0.17.6"
+raw-window-handle = "0.6.2"
+winit = { version = "0.30.0", default-features = false }

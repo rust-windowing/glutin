@@ -6,11 +6,11 @@ description = "The glx bindings for glutin"
 repository = "https://github.com/rust-windowing/glutin"
 license = "Apache-2.0"
 readme = "README.md"
-rust-version = "1.70.0"
+rust-version = "1.71.0"
 edition = "2021"
 
 [build-dependencies]
-gl_generator = "0.14"
+gl_generator = { workspace = true }
 
 [target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os="dragonfly", target_os="netbsd", target_os="openbsd"))'.dependencies]
 x11-dl = "2.18.3"

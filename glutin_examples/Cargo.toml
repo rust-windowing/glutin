@@ -6,7 +6,7 @@ description = "Examples for glutin"
 repository = "https://github.com/rust-windowing/glutin"
 license = "Apache-2.0"
 readme = "../README.md"
-rust-version = "1.70.0"
+rust-version = "1.71.0"
 edition = "2021"
 publish = false
 
@@ -20,18 +20,18 @@ wayland = ["glutin-winit/wayland", "winit/wayland-dlopen", "winit/wayland-csd-ad
 
 [dependencies]
 glutin = { path = "../glutin", default-features = false }
-glutin-winit = { path = "../glutin-winit", default-features = false }
-png = { version = "0.17.6", optional = true }
-raw-window-handle = "0.6"
-winit = { version = "0.30.0", default-features = false, features = ["rwh_06"] }
-drm = { version = "0.12", optional = true }
+glutin-winit = { workspace = true }
+png = { workspace = true, optional = true }
+raw-window-handle = { workspace = true }
+winit = { workspace = true, features = ["rwh_06"] }
+drm = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "android")'.dependencies]
 winit = { version = "0.30.0", default-features = false, features = ["android-native-activity", "rwh_06"] }
 
 [build-dependencies]
-gl_generator = "0.14"
-cfg_aliases = "0.2.1"
+gl_generator = { workspace = true }
+cfg_aliases = { workspace = true }
 
 [[example]]
 name = "android"

@@ -8,7 +8,7 @@ license = "MIT"
 readme = "README.md"
 repository = "https://github.com/rust-windowing/glutin"
 edition = "2021"
-rust-version = "1.70.0"
+rust-version = "1.71.0"
 
 [features]
 default = ["egl", "glx", "x11", "wayland", "wgl"]
@@ -20,8 +20,8 @@ wayland = ["glutin/wayland", "winit/wayland"]
 
 [dependencies]
 glutin = { version = "0.32.0", path = "../glutin", default-features = false }
-raw-window-handle = "0.6"
-winit = { version = "0.30.0", default-features = false, features = ["rwh_06"] }
+raw-window-handle = { workspace = true }
+winit = { workspace = true, features = ["rwh_06"] }
 
 [build-dependencies]
-cfg_aliases = "0.2.1"
+cfg_aliases = { workspace = true }
