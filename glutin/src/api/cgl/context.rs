@@ -4,10 +4,10 @@ use std::fmt;
 use std::marker::PhantomData;
 
 use cgl::CGLSetParameter;
-use objc2::rc::{autoreleasepool, Id};
-use objc2::ClassType;
+use dispatch2::{run_on_main, MainThreadBound};
+use objc2::rc::{autoreleasepool, Retained};
+use objc2::AllocAnyThread;
 use objc2_app_kit::{NSOpenGLCPSwapInterval, NSView};
-use objc2_foundation::{run_on_main, MainThreadBound};
 
 use crate::config::GetGlConfig;
 use crate::context::{
@@ -141,7 +141,7 @@ impl GetGlDisplay for NotCurrentContext {
 
 impl AsRawContext for NotCurrentContext {
     fn raw_context(&self) -> RawContext {
-        RawContext::Cgl(Id::as_ptr(&self.inner.raw).cast())
+        RawContext::Cgl(Retained::as_ptr(&self.inner.raw).cast())
     }
 }
 
@@ -225,7 +225,7 @@ impl GetGlDisplay for PossiblyCurrentContext {
 
 impl AsRawContext for PossiblyCurrentContext {
     fn raw_context(&self) -> RawContext {
-        RawContext::Cgl(Id::as_ptr(&self.inner.raw).cast())
+        RawContext::Cgl(Retained::as_ptr(&self.inner.raw).cast())
     }
 }
 
@@ -234,7 +234,7 @@ impl Sealed for PossiblyCurrentContext {}
 pub(crate) struct ContextInner {
     display: Display,
     config: Config,
-    pub(crate) raw: Id<NSOpenGLContext>,
+    pub(crate) raw: Retained<NSOpenGLContext>,
 }
 
 impl ContextInner {
@@ -299,7 +299,7 @@ impl ContextInner {
         })
     }
 
-    pub(crate) fn is_view_current(&self, view: &MainThreadBound<Id<NSView>>) -> bool {
+    pub(crate) fn is_view_current(&self, view: &MainThreadBound<Retained<NSView>>) -> bool {
         run_on_main(|mtm| {
             self.raw.view(mtm).expect("context to have a current view") == *view.get(mtm)
         })
