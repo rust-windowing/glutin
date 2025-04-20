@@ -4,9 +4,10 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
 
-use objc2::rc::Id;
+use dispatch2::{run_on_main, MainThreadBound};
+use objc2::rc::Retained;
+use objc2::MainThreadMarker;
 use objc2_app_kit::{NSAppKitVersionNumber, NSAppKitVersionNumber10_12, NSView};
-use objc2_foundation::{run_on_main, MainThreadBound, MainThreadMarker};
 use raw_window_handle::RawWindowHandle;
 
 use crate::config::GetGlConfig;
@@ -60,7 +61,7 @@ impl Display {
         // SAFETY: Validity of the view and window is ensured by caller
         // This function makes sure the window is non null.
         let ns_view = if let Some(ns_view) =
-            unsafe { Id::retain(native_window.ns_view.as_ptr().cast::<NSView>()) }
+            unsafe { Retained::retain(native_window.ns_view.as_ptr().cast::<NSView>()) }
         {
             ns_view
         } else {
@@ -100,7 +101,7 @@ impl Display {
 pub struct Surface<T: SurfaceTypeTrait> {
     display: Display,
     config: Config,
-    pub(crate) ns_view: MainThreadBound<Id<NSView>>,
+    pub(crate) ns_view: MainThreadBound<Retained<NSView>>,
     _nosync: PhantomData<*const std::ffi::c_void>,
     _ty: PhantomData<T>,
 }
@@ -192,7 +193,7 @@ impl<T: SurfaceTypeTrait> AsRawSurface for Surface<T> {
     fn raw_surface(&self) -> RawSurface {
         // SAFETY: We only use the thread marker to get the pointer value of the view
         let mtm = unsafe { MainThreadMarker::new_unchecked() };
-        RawSurface::Cgl(Id::as_ptr(self.ns_view.get(mtm)).cast())
+        RawSurface::Cgl(Retained::as_ptr(self.ns_view.get(mtm)).cast())
     }
 }
 

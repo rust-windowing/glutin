@@ -2,6 +2,7 @@
 
 - **Breaking:** Added `make_current_surfaceless(self)` for `{Possibly,Not}CurrentGlContext`.
 - Bump MSRV from `1.70` to `1.71`.
+- Updated `objc2` dependency to `v0.6`.
 
 # Version 0.32.2
 
