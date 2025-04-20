@@ -46,33 +46,41 @@ glutin_egl_sys = { version = "0.7.1", path = "../glutin_egl_sys" }
 [target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "dragonfly", target_os = "netbsd", target_os = "openbsd"))'.dependencies]
 glutin_egl_sys = { version = "0.7.1", path = "../glutin_egl_sys", optional = true }
 glutin_glx_sys = { version = "0.6.1", path = "../glutin_glx_sys", optional = true }
-wayland-sys = { version = "0.31.1", default-features = false, features = ["egl", "client", "dlopen"], optional = true }
+wayland-sys = { version = "0.31.1", default-features = false, features = [
+    "egl",
+    "client",
+    "dlopen",
+], optional = true }
 x11-dl = { version = "2.20.0", optional = true }
 
 [target.'cfg(any(target_os = "macos"))'.dependencies]
 cgl = "0.3.2"
-core-foundation = "0.9.3"
-objc2 = "0.5.1"
-dispatch = "0.2.0"
-
-[target.'cfg(any(target_os = "macos"))'.dependencies.objc2-foundation]
-version = "0.2.0"
-features = [
-    "dispatch",
+dispatch2 = { version = "0.3.0", default-features = false, features = [
+    "std",
+    "objc2",
+] }
+objc2 = "0.6.1"
+objc2-core-foundation = { version = "0.3.1", default-features = false, features = [
+    "std",
+    "CFBase",
+    "CFString",
+    "CFBundle",
+] }
+objc2-foundation = { version = "0.3.1", default-features = false, features = [
+    "std",
     "NSArray",
     "NSThread",
-]
-
-[target.'cfg(any(target_os = "macos"))'.dependencies.objc2-app-kit]
-version = "0.2.0"
-features = [
+] }
+objc2-app-kit = { version = "0.3.1", default-features = false, features = [
+    "std",
+    "objc2-core-foundation",
     "NSApplication",
     "NSResponder",
     "NSView",
     "NSWindow",
     "NSOpenGL",
     "NSOpenGLView",
-]
+] }
 
 [build-dependencies]
 cfg_aliases = "0.2.1"
