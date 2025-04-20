@@ -3,9 +3,7 @@
 use std::ffi::{self, CStr};
 use std::marker::PhantomData;
 
-use core_foundation::base::TCFType;
-use core_foundation::bundle::{CFBundleGetBundleWithIdentifier, CFBundleGetFunctionPointerForName};
-use core_foundation::string::CFString;
+use objc2_core_foundation::{CFBundle, CFString};
 use raw_window_handle::RawDisplayHandle;
 
 use crate::config::ConfigTemplate;
@@ -87,12 +85,10 @@ impl GlDisplay for Display {
     }
 
     fn get_proc_address(&self, addr: &CStr) -> *const ffi::c_void {
-        let symbol_name = CFString::new(addr.to_str().unwrap());
-        let framework_name = CFString::new("com.apple.opengl");
-        unsafe {
-            let framework = CFBundleGetBundleWithIdentifier(framework_name.as_concrete_TypeRef());
-            CFBundleGetFunctionPointerForName(framework, symbol_name.as_concrete_TypeRef()).cast()
-        }
+        let symbol_name = CFString::from_str(addr.to_str().unwrap());
+        let framework_name = CFString::from_static_str("com.apple.opengl");
+        let framework = CFBundle::bundle_with_identifier(Some(&framework_name)).unwrap();
+        CFBundle::function_pointer_for_name(&framework, Some(&symbol_name))
     }
 
     fn version_string(&self) -> String {
