@@ -78,13 +78,6 @@ jobs:
     runs-on: ${{ matrix.platform.os }}
     steps:
     - uses: actions/checkout@v3
-    # Used to cache cargo-web
-    - name: Cache cargo folder
-      uses: actions/cache@v1
-      with:
-        path: ~/.cargo
-        key: ${{ matrix.platform.target }}-cargo-${{ matrix.rust_version }}
-
     - uses: hecrj/setup-rust-action@v1
       with:
         rust-version: ${{ matrix.rust_version }}${{ matrix.platform.host }}
