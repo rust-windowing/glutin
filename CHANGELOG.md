@@ -1,6 +1,7 @@
 # Unreleased
 
 - **Breaking:** Added `make_current_surfaceless(self)` for `{Possibly,Not}CurrentGlContext`.
+- Added OpenHarmony support for `glutin-winit`.
 
 # Version 0.32.3
 
