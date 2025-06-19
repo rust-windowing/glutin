@@ -1,6 +1,7 @@
 # Unreleased
 
 - **Breaking:** Added `make_current_surfaceless(self)` for `{Possibly,Not}CurrentGlContext`.
+- Made `GlutinEventLoop` trait public
 
 # Version 0.32.3
 
