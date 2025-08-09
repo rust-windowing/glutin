@@ -7,7 +7,6 @@ members = [
     "glutin_egl_sys",
     "glutin_glx_sys",
     "glutin_wgl_sys",
-    "glutin_gles2_sys",
 ]
 
 [workspace.package]
