@@ -112,7 +112,7 @@ impl Display {
                 return Err(ErrorKind::NotSupported(
                     "extension to create ES context with wgl is not present",
                 )
-                .into())
+                .into());
             },
         };
 
@@ -446,11 +446,7 @@ impl ContextInner {
     }
 
     fn context_api(&self) -> ContextApi {
-        if self.is_gles {
-            ContextApi::Gles(None)
-        } else {
-            ContextApi::OpenGl(None)
-        }
+        if self.is_gles { ContextApi::Gles(None) } else { ContextApi::OpenGl(None) }
     }
 }
 

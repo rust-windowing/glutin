@@ -197,7 +197,7 @@ impl Display {
                 // when calling `eglChooseConfig` since the visual is ignored.
                 match template.native_window {
                     Some(RawWindowHandle::Xcb(xcb)) => {
-                        xcb.visual_id.map_or(false, |id| id.get() == config.native_visual())
+                        xcb.visual_id.is_some_and(|id| id.get() == config.native_visual())
                     },
                     Some(RawWindowHandle::Xlib(xlib)) if xlib.visual_id > 0 => {
                         xlib.visual_id as u32 == config.native_visual()

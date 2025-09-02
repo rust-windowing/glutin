@@ -9,7 +9,7 @@ readme = "README.md"
 repository = "https://github.com/rust-windowing/glutin"
 documentation = "https://docs.rs/glutin"
 rust-version.workspace = true
-edition = "2021"
+edition.workspace = true
 
 [features]
 default = ["egl", "glx", "x11", "wayland", "wgl"]
@@ -54,32 +54,36 @@ wayland-sys = { version = "0.31.1", default-features = false, features = [
 x11-dl = { version = "2.20.0", optional = true }
 
 [target.'cfg(any(target_os = "macos"))'.dependencies]
-cgl = "0.3.2"
 dispatch2 = { version = "0.3.0", default-features = false, features = [
     "std",
     "objc2",
 ] }
 objc2 = "0.6.1"
-objc2-core-foundation = { version = "0.3.1", default-features = false, features = [
+objc2-core-foundation = { version = "0.3.2", default-features = false, features = [
     "std",
     "CFBase",
     "CFString",
     "CFBundle",
 ] }
-objc2-foundation = { version = "0.3.1", default-features = false, features = [
+objc2-foundation = { version = "0.3.2", default-features = false, features = [
     "std",
     "NSArray",
     "NSThread",
 ] }
-objc2-app-kit = { version = "0.3.1", default-features = false, features = [
+objc2-app-kit = { version = "0.3.2", default-features = false, features = [
     "std",
     "objc2-core-foundation",
+    "objc2-open-gl",
     "NSApplication",
     "NSResponder",
     "NSView",
     "NSWindow",
     "NSOpenGL",
     "NSOpenGLView",
+] }
+objc2-open-gl = { version = "0.3.2", default-features = false, features = [
+    "std",
+    "CGLTypes",
 ] }
 
 [build-dependencies]

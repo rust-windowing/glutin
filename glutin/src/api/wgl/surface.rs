@@ -99,7 +99,7 @@ impl Display {
             _ => {
                 return Err(
                     ErrorKind::NotSupported("provided native window is not supported").into()
-                )
+                );
             },
         };
 

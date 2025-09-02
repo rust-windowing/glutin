@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 
 use glutin_egl_sys::egl::types::{EGLenum, EGLint};
-use glutin_egl_sys::{egl, EGLContext};
+use glutin_egl_sys::{EGLContext, egl};
 
 use crate::config::{Api, GetGlConfig};
 use crate::context::{
@@ -51,7 +51,7 @@ impl Display {
             _ => {
                 return Err(
                     ErrorKind::NotSupported("the requested context Api isn't supported.").into()
-                )
+                );
             },
         };
 
@@ -105,7 +105,7 @@ impl Display {
                 _ => {
                     return Err(
                         ErrorKind::NotSupported("context robustness is not supported").into()
-                    )
+                    );
                 },
             }
 

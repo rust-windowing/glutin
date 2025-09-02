@@ -20,10 +20,10 @@ use crate::prelude::*;
 use crate::private::Sealed;
 use crate::surface::{PbufferSurface, PixmapSurface, SurfaceAttributes, WindowSurface};
 
+use super::WglExtra;
 use super::config::Config;
 use super::context::NotCurrentContext;
 use super::surface::Surface;
-use super::WglExtra;
 
 /// The name of the OpenGL DLL to use.
 pub(crate) static GLUTIN_WGL_OPENGL_DLL_ENV: &str = "GLUTIN_WGL_OPENGL_DLL";

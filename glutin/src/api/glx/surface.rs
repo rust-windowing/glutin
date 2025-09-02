@@ -43,7 +43,7 @@ impl Display {
             _ => {
                 return Err(
                     ErrorKind::NotSupported("provided native pixmap is not supported.").into()
-                )
+                );
             },
         };
 
@@ -121,7 +121,7 @@ impl Display {
             _ => {
                 return Err(
                     ErrorKind::NotSupported("provided native window is not supported").into()
-                )
+                );
             },
         };
 
@@ -205,12 +205,11 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     type SurfaceType = T;
 
     fn buffer_age(&self) -> u32 {
-        self.display
-            .inner
-            .client_extensions
-            .contains("GLX_EXT_buffer_age")
-            .then(|| unsafe { self.raw_attribute(glx_extra::BACK_BUFFER_AGE_EXT as c_int) })
-            .unwrap_or(0) as u32
+        if self.display.inner.client_extensions.contains("GLX_EXT_buffer_age") {
+            unsafe { self.raw_attribute(glx_extra::BACK_BUFFER_AGE_EXT as c_int) as u32 }
+        } else {
+            0
+        }
     }
 
     fn width(&self) -> Option<u32> {
@@ -271,11 +270,7 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
             }
         }
 
-        if applied {
-            Ok(())
-        } else {
-            Err(ErrorKind::BadContext.into())
-        }
+        if applied { Ok(()) } else { Err(ErrorKind::BadContext.into()) }
     }
 
     fn is_current(&self, context: &Self::Context) -> bool {

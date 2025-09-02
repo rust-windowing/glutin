@@ -83,12 +83,12 @@ impl X11VisualInfo {
 
     pub(crate) fn has_non_zero_alpha(display: *mut Display, raw: *const XVisualInfo) -> bool {
         let xrender = XRENDER.as_ref().unwrap();
-        unsafe {
-            let visual_format = (xrender.XRenderFindVisualFormat)(display, (*raw).visual);
+        let visual_format = unsafe { (xrender.XRenderFindVisualFormat)(display, (*raw).visual) };
 
-            (!visual_format.is_null())
-                .then(|| (*visual_format).direct.alphaMask != 0)
-                .unwrap_or(false)
+        if !visual_format.is_null() {
+            unsafe { (*visual_format).direct.alphaMask != 0 }
+        } else {
+            false
         }
     }
 }

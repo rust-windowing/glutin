@@ -7,8 +7,8 @@ keywords = ["windowing", "opengl", "winit"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/rust-windowing/glutin"
-edition = "2021"
 rust-version.workspace = true
+edition.workspace = true
 
 [features]
 default = ["egl", "glx", "x11", "wayland", "wgl"]

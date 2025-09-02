@@ -4,8 +4,8 @@ use std::collections::HashSet;
 use std::ffi::{self, CStr};
 use std::fmt;
 use std::ops::Deref;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use glutin_glx_sys::glx;
 use glutin_glx_sys::glx::types::Display as GLXDisplay;
@@ -22,7 +22,7 @@ use crate::surface::{PbufferSurface, PixmapSurface, SurfaceAttributes, WindowSur
 use super::config::Config;
 use super::context::NotCurrentContext;
 use super::surface::Surface;
-use super::{Glx, GlxExtra, XlibErrorHookRegistrar, GLX, GLX_BASE_ERROR, GLX_EXTRA};
+use super::{GLX, GLX_BASE_ERROR, GLX_EXTRA, Glx, GlxExtra, XlibErrorHookRegistrar};
 
 /// A wrapper for the `GLXDisplay`, which is basically an `XDisplay`.
 #[derive(Debug, Clone)]
@@ -51,7 +51,7 @@ impl Display {
             _ => {
                 return Err(
                     ErrorKind::NotSupported("provided native display isn't supported").into()
-                )
+                );
             },
         };
 

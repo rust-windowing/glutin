@@ -7,7 +7,7 @@ repository = "https://github.com/rust-windowing/glutin"
 license = "Apache-2.0"
 readme = "../README.md"
 rust-version.workspace = true
-edition = "2021"
+edition.workspace = true
 publish = false
 
 [features]
