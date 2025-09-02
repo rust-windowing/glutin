@@ -10,7 +10,7 @@ use glutin::display::GetGlDisplay;
 use glutin::prelude::*;
 use glutin::surface::{Surface, WindowSurface};
 use glutin_examples::gl::types::GLfloat;
-use glutin_examples::{gl_config_picker, Renderer};
+use glutin_examples::{Renderer, gl_config_picker};
 use glutin_winit::{self, DisplayBuilder, GlWindow};
 use raw_window_handle::HasWindowHandle;
 use winit::application::ApplicationHandler;

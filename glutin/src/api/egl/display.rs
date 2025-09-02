@@ -28,7 +28,7 @@ use super::context::NotCurrentContext;
 use super::device::Device;
 use super::surface::Surface;
 
-use super::{Egl, EGL};
+use super::{EGL, Egl};
 
 /// Extensions that don't require any display.
 pub(crate) static CLIENT_EXTENSIONS: OnceCell<HashSet<&'static str>> = OnceCell::new();
@@ -90,9 +90,8 @@ impl Display {
     /// # Safety
     ///
     /// If `raw_display` is [`Some`], `raw_display` must point to a valid
-    /// [`RawDisplayHandle::Drm`]. The provided
-    /// [`raw_display_handle::DrmDisplayHandle.fd`] may be closed after calling
-    /// this function.
+    /// [`RawDisplayHandle::Drm`]. The provided DRM file descriptor may be
+    /// closed after calling this function.
     pub unsafe fn with_device(
         device: &Device,
         raw_display: Option<RawDisplayHandle>,
@@ -134,7 +133,7 @@ impl Display {
                     "`egl::display::Display::with_device()` does not support \
                      non-`DrmDisplayHandle` `RawDisplayHandle`s",
                 )
-                .into())
+                .into());
             },
             None => {},
         };
@@ -280,7 +279,7 @@ impl Display {
                 return Err(ErrorKind::NotSupported(
                     "`DrmDisplayHandle` must be used with `egl::display::Display::with_device()`",
                 )
-                .into())
+                .into());
             },
             RawDisplayHandle::Android(_) if extensions.contains("EGL_KHR_platform_android") => {
                 (egl::PLATFORM_ANDROID_KHR, egl::DEFAULT_DISPLAY as *mut _)
@@ -288,7 +287,7 @@ impl Display {
             _ => {
                 return Err(
                     ErrorKind::NotSupported("provided display handle is not supported").into()
-                )
+                );
             },
         };
 
@@ -445,7 +444,7 @@ impl Display {
                 return Err(ErrorKind::NotSupported(
                     "`DrmDisplayHandle` must be used with `egl::display::Display::with_device()`",
                 )
-                .into())
+                .into());
             },
             RawDisplayHandle::Xlib(XlibDisplayHandle { display, .. }) => {
                 display.map_or(egl::DEFAULT_DISPLAY as *mut _, |d| d.as_ptr())
@@ -456,7 +455,7 @@ impl Display {
             _ => {
                 return Err(
                     ErrorKind::NotSupported("provided display handle is not supported").into()
-                )
+                );
             },
         };
 

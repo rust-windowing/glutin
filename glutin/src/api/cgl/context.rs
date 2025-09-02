@@ -2,12 +2,15 @@
 
 use std::fmt;
 use std::marker::PhantomData;
+use std::ptr::NonNull;
 
-use cgl::CGLSetParameter;
-use dispatch2::{run_on_main, MainThreadBound};
-use objc2::rc::{autoreleasepool, Retained};
-use objc2::AllocAnyThread;
-use objc2_app_kit::{NSOpenGLCPSwapInterval, NSView};
+use dispatch2::{MainThreadBound, run_on_main};
+use objc2::AnyThread;
+use objc2::rc::{Retained, autoreleasepool};
+#[allow(deprecated)]
+use objc2_app_kit::{NSOpenGLCPSwapInterval, NSOpenGLContext, NSView};
+#[allow(deprecated)]
+use objc2_open_gl::{CGLContextParameter, CGLSetParameter};
 
 use crate::config::GetGlConfig;
 use crate::context::{
@@ -19,7 +22,6 @@ use crate::prelude::*;
 use crate::private::Sealed;
 use crate::surface::{SurfaceTypeTrait, SwapInterval};
 
-use super::appkit::NSOpenGLContext;
 use super::config::Config;
 use super::display::Display;
 use super::surface::Surface;
@@ -30,6 +32,7 @@ impl Display {
         config: &Config,
         context_attributes: &ContextAttributes,
     ) -> Result<NotCurrentContext> {
+        #[allow(deprecated)]
         let share_context = match context_attributes.shared_context.as_ref() {
             Some(RawContext::Cgl(share_context)) => unsafe {
                 share_context.cast::<NSOpenGLContext>().as_ref()
@@ -46,6 +49,7 @@ impl Display {
         }
 
         let config = config.clone();
+        #[allow(deprecated)]
         let raw = NSOpenGLContext::initWithFormat_shareContext(
             NSOpenGLContext::alloc(),
             &config.inner.raw,
@@ -53,10 +57,15 @@ impl Display {
         )
         .ok_or(ErrorKind::BadConfig)?;
 
+        #[allow(deprecated)]
         if config.inner.transparency {
             let opacity = 0;
             super::check_error(unsafe {
-                CGLSetParameter(raw.CGLContextObj().cast(), cgl::kCGLCPSurfaceOpacity, &opacity)
+                CGLSetParameter(
+                    raw.CGLContextObj().cast(),
+                    CGLContextParameter::CGLCPSurfaceOpacity,
+                    NonNull::from(&opacity),
+                )
             })?;
         }
 
@@ -167,6 +176,7 @@ impl PossiblyCurrentGlContext for PossiblyCurrentContext {
         self.inner.make_not_current()
     }
 
+    #[allow(deprecated)]
     fn is_current(&self) -> bool {
         if let Some(current) = NSOpenGLContext::currentContext() {
             current == self.inner.raw
@@ -229,8 +239,12 @@ impl Sealed for PossiblyCurrentContext {}
 pub(crate) struct ContextInner {
     display: Display,
     config: Config,
+    #[allow(deprecated)]
     pub(crate) raw: Retained<NSOpenGLContext>,
 }
+
+unsafe impl Send for ContextInner {}
+unsafe impl Sync for ContextInner {}
 
 impl ContextInner {
     fn make_current_draw_read<T: SurfaceTypeTrait>(
@@ -247,9 +261,8 @@ impl ContextInner {
             self.raw.makeCurrentContext();
 
             let view = &surface.ns_view;
-            run_on_main(|mtm| unsafe {
-                self.raw.setView(Some(view.get(mtm)));
-            });
+            #[allow(deprecated)]
+            run_on_main(|mtm| self.raw.setView(Some(view.get(mtm)), mtm));
 
             Ok(())
         })
@@ -260,9 +273,8 @@ impl ContextInner {
             self.update();
             self.raw.makeCurrentContext();
 
-            run_on_main(|_mtm| unsafe {
-                self.raw.setView(None);
-            });
+            #[allow(deprecated)]
+            run_on_main(|mtm| self.raw.setView(None, mtm));
 
             Ok(())
         })
@@ -278,13 +290,14 @@ impl ContextInner {
             SwapInterval::Wait(_) => 1,
         };
 
+        #[allow(deprecated)]
         autoreleasepool(|_| unsafe {
-            self.raw.setValues_forParameter(&interval, NSOpenGLCPSwapInterval);
+            self.raw.setValues_forParameter(NonNull::from(&interval), NSOpenGLCPSwapInterval);
         })
     }
 
     pub(crate) fn update(&self) {
-        run_on_main(|_| self.raw.update());
+        run_on_main(|mtm| self.raw.update(mtm));
     }
 
     pub(crate) fn flush_buffer(&self) -> Result<()> {
@@ -294,12 +307,14 @@ impl ContextInner {
         })
     }
 
+    #[allow(deprecated)]
     pub(crate) fn is_view_current(&self, view: &MainThreadBound<Retained<NSView>>) -> bool {
         run_on_main(|mtm| {
             self.raw.view(mtm).expect("context to have a current view") == *view.get(mtm)
         })
     }
 
+    #[allow(deprecated)]
     fn make_not_current(&self) -> Result<()> {
         self.update();
         NSOpenGLContext::clearCurrentContext();

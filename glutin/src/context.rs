@@ -8,7 +8,7 @@ use raw_window_handle::RawWindowHandle;
 use crate::config::{Config, GetGlConfig};
 use crate::display::{Display, GetGlDisplay};
 use crate::error::Result;
-use crate::private::{gl_api_dispatch, Sealed};
+use crate::private::{Sealed, gl_api_dispatch};
 use crate::surface::{GlSurface, Surface, SurfaceTypeTrait};
 
 #[cfg(cgl_backend)]

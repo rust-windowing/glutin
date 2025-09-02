@@ -10,8 +10,8 @@ use glutin_egl_sys::egl::types::EGLDeviceEXT;
 
 use crate::error::{ErrorKind, Result};
 
-use super::display::{extensions_from_ptr, get_extensions, CLIENT_EXTENSIONS};
-use super::{Egl, EGL};
+use super::display::{CLIENT_EXTENSIONS, extensions_from_ptr, get_extensions};
+use super::{EGL, Egl};
 
 /// Wrapper for `EGLDevice`.
 #[derive(Debug, Clone, PartialEq, Eq)]

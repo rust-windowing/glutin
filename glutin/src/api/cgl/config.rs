@@ -1,8 +1,10 @@
 //! Everything related to `NSOpenGLPixelFormat`.
 
+use std::ptr::NonNull;
 use std::sync::Arc;
 use std::{fmt, iter};
 
+use objc2::AllocAnyThread;
 use objc2::rc::Retained;
 #[allow(deprecated)]
 use objc2_app_kit::{
@@ -10,8 +12,8 @@ use objc2_app_kit::{
     NSOpenGLPFAColorFloat, NSOpenGLPFAColorSize, NSOpenGLPFADepthSize, NSOpenGLPFADoubleBuffer,
     NSOpenGLPFAMinimumPolicy, NSOpenGLPFAMultisample, NSOpenGLPFAOpenGLProfile,
     NSOpenGLPFASampleBuffers, NSOpenGLPFASamples, NSOpenGLPFAStencilSize, NSOpenGLPFAStereo,
-    NSOpenGLPFATripleBuffer, NSOpenGLPixelFormatAttribute, NSOpenGLProfileVersion3_2Core,
-    NSOpenGLProfileVersion4_1Core, NSOpenGLProfileVersionLegacy,
+    NSOpenGLPFATripleBuffer, NSOpenGLPixelFormat, NSOpenGLPixelFormatAttribute,
+    NSOpenGLProfileVersion3_2Core, NSOpenGLProfileVersion4_1Core, NSOpenGLProfileVersionLegacy,
 };
 
 use crate::config::{
@@ -21,7 +23,6 @@ use crate::display::GetGlDisplay;
 use crate::error::{ErrorKind, Result};
 use crate::private::Sealed;
 
-use super::appkit::NSOpenGLPixelFormat;
 use super::display::Display;
 
 impl Display {
@@ -47,9 +48,10 @@ impl Display {
                 attrs.push((r_size + g_size + b_size + template.alpha_size) as u32);
             },
             _ => {
-                return Err(
-                    ErrorKind::NotSupported("luminance buffers are not supported with CGL").into()
+                return Err(ErrorKind::NotSupported(
+                    "luminance buffers are not supported with CGL",
                 )
+                .into());
             },
         }
 
@@ -113,7 +115,12 @@ impl Display {
         .find_map(|profile| {
             attrs[profile_attr_pos] = profile;
             // initWithAttributes returns None if the attributes were invalid
-            unsafe { NSOpenGLPixelFormat::newWithAttributes(&attrs) }
+            unsafe {
+                NSOpenGLPixelFormat::initWithAttributes(
+                    <NSOpenGLPixelFormat as AllocAnyThread>::alloc(),
+                    NonNull::new(attrs.as_ptr().cast_mut()).unwrap(),
+                )
+            }
         })
         .ok_or(ErrorKind::BadConfig)?;
 
@@ -135,11 +142,13 @@ pub struct Config {
 }
 
 impl Config {
+    #[allow(deprecated)]
     fn raw_attribute(&self, attrib: NSOpenGLPixelFormatAttribute) -> i32 {
         unsafe {
             let mut value = 0;
             self.inner.raw.getValues_forAttribute_forVirtualScreen(
-                &mut value, attrib,
+                NonNull::from(&mut value),
+                attrib,
                 // They do differ per monitor and require context. Which is kind of insane, but
                 // whatever. Zero is a primary monitor.
                 0,
@@ -228,8 +237,12 @@ impl Sealed for Config {}
 pub(crate) struct ConfigInner {
     display: Display,
     pub(crate) transparency: bool,
+    #[allow(deprecated)]
     pub(crate) raw: Retained<NSOpenGLPixelFormat>,
 }
+
+unsafe impl Send for ConfigInner {}
+unsafe impl Sync for ConfigInner {}
 
 impl PartialEq for ConfigInner {
     fn eq(&self, other: &Self) -> bool {

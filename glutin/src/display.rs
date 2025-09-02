@@ -11,7 +11,7 @@ use raw_window_handle::RawDisplayHandle;
 use crate::config::{Config, ConfigTemplate, GlConfig};
 use crate::context::{ContextAttributes, NotCurrentContext, NotCurrentGlContext};
 use crate::error::Result;
-use crate::private::{gl_api_dispatch, Sealed};
+use crate::private::{Sealed, gl_api_dispatch};
 use crate::surface::{
     GlSurface, PbufferSurface, PixmapSurface, Surface, SurfaceAttributes, WindowSurface,
 };
@@ -21,9 +21,9 @@ use crate::api::cgl::display::Display as CglDisplay;
 #[cfg(egl_backend)]
 use crate::api::egl::display::Display as EglDisplay;
 #[cfg(glx_backend)]
-use crate::api::glx::display::Display as GlxDisplay;
-#[cfg(glx_backend)]
 use crate::api::glx::XlibErrorHookRegistrar;
+#[cfg(glx_backend)]
+use crate::api::glx::display::Display as GlxDisplay;
 #[cfg(wgl_backend)]
 use crate::api::wgl::display::Display as WglDisplay;
 

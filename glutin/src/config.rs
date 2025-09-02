@@ -7,7 +7,7 @@ use bitflags::bitflags;
 use raw_window_handle::RawWindowHandle;
 
 use crate::display::{Display, GetGlDisplay};
-use crate::private::{gl_api_dispatch, Sealed};
+use crate::private::{Sealed, gl_api_dispatch};
 
 #[cfg(x11_platform)]
 use crate::platform::x11::{X11GlConfigExt, X11VisualInfo};
@@ -225,8 +225,8 @@ impl ConfigTemplateBuilder {
     /// not.
     ///
     /// By default hardware acceleration or its absence is not requested.
-    pub fn prefer_hardware_accelerated(mut self, hardware_accerelated: Option<bool>) -> Self {
-        self.template.hardware_accelerated = hardware_accerelated;
+    pub fn prefer_hardware_accelerated(mut self, hardware_accelerated: Option<bool>) -> Self {
+        self.template.hardware_accelerated = hardware_accelerated;
         self
     }
 
