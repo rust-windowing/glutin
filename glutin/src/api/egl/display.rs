@@ -482,7 +482,7 @@ impl Display {
 
         supported_features.set(
             DisplayFeatures::CONTEXT_ROBUSTNESS,
-            version > Version::new(1, 5)
+            version >= Version::new(1, 5)
                 || extensions.contains("EGL_EXT_create_context_robustness"),
         );
 
