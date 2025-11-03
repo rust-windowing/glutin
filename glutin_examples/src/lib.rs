@@ -23,6 +23,7 @@ use glutin_winit::{DisplayBuilder, GlWindow};
 
 pub mod gl {
     #![allow(clippy::all)]
+    #![allow(unsafe_op_in_unsafe_fn)]
     include!(concat!(env!("OUT_DIR"), "/gl_bindings.rs"));
 
     pub use Gles2 as Gl;
@@ -239,7 +240,7 @@ fn window_attributes() -> WindowAttributes {
 
 enum GlDisplayCreationState {
     /// The display was not build yet.
-    Builder(DisplayBuilder),
+    Builder(Box<DisplayBuilder>),
     /// The display was already created for the application.
     Init,
 }
@@ -258,7 +259,7 @@ impl App {
     fn new(template: ConfigTemplateBuilder, display_builder: DisplayBuilder) -> Self {
         Self {
             template,
-            gl_display: GlDisplayCreationState::Builder(display_builder),
+            gl_display: GlDisplayCreationState::Builder(Box::new(display_builder)),
             exit_state: Ok(()),
             gl_context: None,
             state: None,
@@ -346,8 +347,8 @@ impl Renderer {
                 gl::STATIC_DRAW,
             );
 
-            let pos_attrib = gl.GetAttribLocation(program, b"position\0".as_ptr() as *const _);
-            let color_attrib = gl.GetAttribLocation(program, b"color\0".as_ptr() as *const _);
+            let pos_attrib = gl.GetAttribLocation(program, c"position".as_ptr() as *const _);
+            let color_attrib = gl.GetAttribLocation(program, c"color".as_ptr() as *const _);
             gl.VertexAttribPointer(
                 pos_attrib as gl::types::GLuint,
                 2,
@@ -424,10 +425,12 @@ unsafe fn create_shader(
     shader: gl::types::GLenum,
     source: &[u8],
 ) -> gl::types::GLuint {
-    let shader = gl.CreateShader(shader);
-    gl.ShaderSource(shader, 1, [source.as_ptr().cast()].as_ptr(), std::ptr::null());
-    gl.CompileShader(shader);
-    shader
+    unsafe {
+        let shader = gl.CreateShader(shader);
+        gl.ShaderSource(shader, 1, [source.as_ptr().cast()].as_ptr(), std::ptr::null());
+        gl.CompileShader(shader);
+        shader
+    }
 }
 
 fn get_gl_string(gl: &gl::Gl, variant: gl::types::GLenum) -> Option<&'static CStr> {

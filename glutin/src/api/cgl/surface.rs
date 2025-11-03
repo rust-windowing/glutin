@@ -4,9 +4,9 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
 
-use dispatch2::{run_on_main, MainThreadBound};
-use objc2::rc::Retained;
+use dispatch2::{MainThreadBound, run_on_main};
 use objc2::MainThreadMarker;
+use objc2::rc::Retained;
 use objc2_app_kit::{NSAppKitVersionNumber, NSAppKitVersionNumber10_12, NSView};
 use raw_window_handle::RawWindowHandle;
 
@@ -50,7 +50,7 @@ impl Display {
             _ => {
                 return Err(
                     ErrorKind::NotSupported("provided native window is not supported").into()
-                )
+                );
             },
         };
 

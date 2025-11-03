@@ -1,6 +1,7 @@
 # Unreleased
 
 - **Breaking:** Added `make_current_surfaceless(self)` for `{Possibly,Not}CurrentGlContext`.
+- Bump MSRV from `1.71` to `1.85`.
 
 # Version 0.32.3
 

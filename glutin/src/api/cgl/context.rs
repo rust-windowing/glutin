@@ -4,9 +4,9 @@ use std::fmt;
 use std::marker::PhantomData;
 
 use cgl::CGLSetParameter;
-use dispatch2::{run_on_main, MainThreadBound};
-use objc2::rc::{autoreleasepool, Retained};
+use dispatch2::{MainThreadBound, run_on_main};
 use objc2::AllocAnyThread;
+use objc2::rc::{Retained, autoreleasepool};
 use objc2_app_kit::{NSOpenGLCPSwapInterval, NSView};
 
 use crate::config::GetGlConfig;

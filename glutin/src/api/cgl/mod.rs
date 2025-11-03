@@ -6,7 +6,7 @@
 use std::ffi::CStr;
 use std::os::raw::c_int;
 
-use cgl::{kCGLNoError, CGLError, CGLErrorString};
+use cgl::{CGLError, CGLErrorString, kCGLNoError};
 
 use crate::error::{Error, ErrorKind, Result};
 

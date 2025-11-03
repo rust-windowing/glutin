@@ -47,9 +47,10 @@ impl Display {
                 attrs.push((r_size + g_size + b_size + template.alpha_size) as u32);
             },
             _ => {
-                return Err(
-                    ErrorKind::NotSupported("luminance buffers are not supported with CGL").into()
+                return Err(ErrorKind::NotSupported(
+                    "luminance buffers are not supported with CGL",
                 )
+                .into());
             },
         }
 

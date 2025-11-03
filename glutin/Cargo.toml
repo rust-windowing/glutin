@@ -9,7 +9,7 @@ readme = "README.md"
 repository = "https://github.com/rust-windowing/glutin"
 documentation = "https://docs.rs/glutin"
 rust-version.workspace = true
-edition = "2021"
+edition.workspace = true
 
 [features]
 default = ["egl", "glx", "x11", "wayland", "wgl"]

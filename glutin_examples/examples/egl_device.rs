@@ -13,7 +13,7 @@ mod example {
     use glutin::config::{ConfigSurfaceTypes, ConfigTemplate, ConfigTemplateBuilder};
     use glutin::context::{ContextApi, ContextAttributesBuilder};
     use glutin::prelude::*;
-    use glutin_examples::{gl, Renderer};
+    use glutin_examples::{Renderer, gl};
 
     const IMG_PATH: &str = concat!(env!("OUT_DIR"), "/egl_device.png");
 
@@ -40,11 +40,7 @@ mod example {
             .unwrap()
             .reduce(
                 |config, acc| {
-                    if config.num_samples() > acc.num_samples() {
-                        config
-                    } else {
-                        acc
-                    }
+                    if config.num_samples() > acc.num_samples() { config } else { acc }
                 },
             )
             .expect("No available configs");

@@ -4,7 +4,7 @@
 
 use objc2::encode::{Encoding, RefEncode};
 use objc2::rc::{Allocated, Retained};
-use objc2::{extern_class, extern_methods, AllocAnyThread, MainThreadMarker};
+use objc2::{AllocAnyThread, MainThreadMarker, extern_class, extern_methods};
 #[allow(deprecated)]
 use objc2_app_kit::{NSOpenGLContextParameter, NSOpenGLPixelFormatAttribute, NSView};
 use objc2_foundation::NSObject;

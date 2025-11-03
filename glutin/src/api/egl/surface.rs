@@ -297,11 +297,7 @@ impl<T: SurfaceTypeTrait> Surface<T> {
             }
         };
 
-        if res == egl::FALSE {
-            super::check_error()
-        } else {
-            Ok(())
-        }
+        if res == egl::FALSE { super::check_error() } else { Ok(()) }
     }
 
     /// # Safety
@@ -334,12 +330,11 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
     type SurfaceType = T;
 
     fn buffer_age(&self) -> u32 {
-        self.display
-            .inner
-            .display_extensions
-            .contains("EGL_EXT_buffer_age")
-            .then(|| unsafe { self.raw_attribute(egl::BUFFER_AGE_EXT as EGLint) })
-            .unwrap_or(0) as u32
+        if self.display.inner.display_extensions.contains("EGL_EXT_buffer_age") {
+            unsafe { self.raw_attribute(egl::BUFFER_AGE_EXT as EGLint) as u32 }
+        } else {
+            0
+        }
     }
 
     fn width(&self) -> Option<u32> {
@@ -494,7 +489,7 @@ impl NativeWindow {
             _ => {
                 return Err(
                     ErrorKind::NotSupported("provided native window is not supported").into()
-                )
+                );
             },
         };
 

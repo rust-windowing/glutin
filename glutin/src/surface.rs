@@ -9,7 +9,7 @@ use raw_window_handle::RawWindowHandle;
 use crate::context::{PossiblyCurrentContext, PossiblyCurrentGlContext};
 use crate::display::{Display, GetGlDisplay};
 use crate::error::Result;
-use crate::private::{gl_api_dispatch, Sealed};
+use crate::private::{Sealed, gl_api_dispatch};
 
 #[cfg(cgl_backend)]
 use crate::api::cgl::surface::Surface as CglSurface;

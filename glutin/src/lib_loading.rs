@@ -6,7 +6,7 @@ use std::sync::Arc;
 use libloading::Library;
 
 #[cfg(windows)]
-use libloading::os::windows::{Library as WinLibrary, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS};
+use libloading::os::windows::{LOAD_LIBRARY_SEARCH_DEFAULT_DIRS, Library as WinLibrary};
 
 pub trait SymLoading {
     /// # Safety

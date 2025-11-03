@@ -13,4 +13,4 @@ newline_style = "Unix"
 format_strings = true
 wrap_comments = true
 comment_width = 80
-edition = "2021"
+edition = "2024"

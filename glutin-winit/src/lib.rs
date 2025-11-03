@@ -29,10 +29,10 @@ use raw_window_handle::RawWindowHandle;
 use winit::error::OsError;
 use winit::window::{Window, WindowAttributes};
 
-#[cfg(glx_backend)]
-use winit::platform::x11::register_xlib_error_hook;
 #[cfg(x11_platform)]
 use winit::platform::x11::WindowAttributesExtX11;
+#[cfg(glx_backend)]
+use winit::platform::x11::register_xlib_error_hook;
 
 #[cfg(all(not(egl_backend), not(glx_backend), not(wgl_backend), not(cgl_backend)))]
 compile_error!("Please select at least one api backend");

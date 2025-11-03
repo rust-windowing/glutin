@@ -3,8 +3,8 @@
 
 use std::ffi::{self, CStr, CString};
 use std::ops::{Deref, DerefMut};
-use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 
 use libloading::Library;
 use once_cell::sync::Lazy;
