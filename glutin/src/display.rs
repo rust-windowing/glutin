@@ -531,6 +531,10 @@ bitflags! {
     pub struct DisplayFeatures: u32 {
         /// The display supports creating [`robust`] context.
         ///
+        /// The robust context creation may still fail, so it's
+        /// recommended to try and fallback to non-robust
+        /// context.
+        ///
         /// [`robust`]: crate::context::Robustness
         const CONTEXT_ROBUSTNESS          = 0b0000_0001;
 
