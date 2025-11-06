@@ -22,9 +22,10 @@ wayland = ["glutin/wayland", "winit/wayland"]
 glutin = { version = "0.32.0", path = "../glutin", default-features = false }
 raw-window-handle = "0.6"
 # winit = { version = "0.30.0", default-features = false, features = ["rwh_06"] }
-winit = { git = "https://github.com/richerfu/winit.git", branch = "feat-ohos-30", default-features = false, features = [
+winit = { git = "https://github.com/richerfu/winit.git", branch = "feat-ohos-3x", default-features = false, features = [
     "rwh_06",
 ] }
+# winit = {path = "../../winit", default-features = false, features = ["rwh_06"]}
 
 [build-dependencies]
 cfg_aliases = "0.2.1"
