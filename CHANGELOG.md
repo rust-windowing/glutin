@@ -6,6 +6,7 @@
 - Bump MSRV from `1.71` to `1.85`.
 - Fixed EGL's robustness detection without extension, but on EGL 1.5.
 - Added `PossibilityCurrentContext::current` and `Display::current` for EGL
+- `RawContext` now implements `AsRawContext`
 
 # Version 0.32.3
 
