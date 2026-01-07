@@ -179,6 +179,41 @@ impl Display {
         Self::initialize_display(egl, platform_display, None)
     }
 
+    /// Loads the currently active EGL display, if present
+    /// Returns a `ManuallyDrop` display to avoid terminating the display
+    /// by default, since you may not be in control of it.
+    pub fn current() -> Result<std::mem::ManuallyDrop<Self>> {
+        let egl = match EGL.as_ref() {
+            Some(egl) => egl,
+            None => return Err(ErrorKind::NotFound.into()),
+        };
+
+        let display = unsafe { egl.GetCurrentDisplay() };
+        let version = unsafe { egl.QueryString(display, egl::VERSION as EGLint) };
+        if version.is_null() {
+            return Err(ErrorKind::BadDisplay.into());
+        }
+        // Version string is "<major>.<minor> <vendor info>"
+        let version = unsafe { CStr::from_ptr(version) }.to_string_lossy();
+        let (major, rest) = version.split_once('.').unwrap();
+        let major: u8 = major.parse().unwrap();
+        let minor = rest.split(' ').next().unwrap();
+        let minor: u8 = minor.parse().unwrap();
+        let version = Version::new(major, minor);
+
+        let display_extensions = get_extensions(egl, display);
+        let features = Self::extract_display_features(&display_extensions, version);
+        let inner = Arc::new(DisplayInner {
+            egl,
+            raw: EglDisplay::Ext(display),
+            _native_display: None,
+            version,
+            display_extensions,
+            features,
+        });
+        Ok(std::mem::ManuallyDrop::new(Self { inner }))
+    }
+
     /// Get the [`Device`] the display is using.
     ///
     /// This function returns [`Err`] if the `EGL_EXT_device_query` or
