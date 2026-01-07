@@ -12,7 +12,7 @@ use crate::context::{
     self, AsRawContext, ContextApi, ContextAttributes, GlProfile, Priority, RawContext, Robustness,
     Version,
 };
-use crate::display::{DisplayFeatures, GetGlDisplay};
+use crate::display::{AsRawDisplay, DisplayFeatures, GetGlDisplay, RawDisplay};
 use crate::error::{ErrorKind, Result};
 use crate::prelude::*;
 use crate::private::Sealed;
@@ -280,6 +280,57 @@ impl Sealed for NotCurrentContext {}
 pub struct PossiblyCurrentContext {
     pub(crate) inner: ContextInner,
     _nosendsync: PhantomData<EGLContext>,
+}
+
+impl PossiblyCurrentContext {
+    /// Grabs the current context, if one is present.
+    /// Returns `BadContext` if no context is current.
+    /// Returns a `ManuallyDrop` context, since you might not have control over
+    /// it.
+    pub fn current() -> Result<std::mem::ManuallyDrop<Self>> {
+        let display = Display::current()?;
+        let egl = display.egl();
+        let raw = unsafe { egl.GetCurrentContext() };
+        if raw == egl::NO_CONTEXT {
+            return Err(ErrorKind::BadContext.into());
+        }
+        let mut config_id = 0;
+        let RawDisplay::Egl(raw_display) = display.raw_display() else { unreachable!() };
+        let result =
+            unsafe { egl.QueryContext(raw_display, raw, egl::CONFIG_ID as EGLint, &mut config_id) };
+        if result == egl::FALSE {
+            return Err(ErrorKind::BadContext.into());
+        }
+        let mut api = 0;
+        let result = unsafe {
+            egl.QueryContext(raw_display, raw, egl::CONTEXT_CLIENT_TYPE as EGLint, &mut api)
+        };
+        if result == egl::FALSE {
+            return Err(ErrorKind::BadContext.into());
+        }
+
+        let attribs = [egl::CONFIG_ID as EGLint, config_id, egl::NONE as EGLint];
+        let mut raw_config = std::ptr::null();
+        let mut wrote_configs = 0;
+        let result = unsafe {
+            egl.ChooseConfig(raw_display, attribs.as_ptr(), &mut raw_config, 1, &mut wrote_configs)
+        };
+        if result == egl::FALSE {
+            return Err(ErrorKind::BadConfig.into());
+        }
+
+        // The DisplayInner here won't get dropped because we're cloning it into the
+        // context and config.
+        let display = std::mem::ManuallyDrop::into_inner(display);
+        let inner = ContextInner {
+            display: display.clone(),
+            config: Config::from_raw(display, raw_config),
+            raw: EglContext(raw),
+            api: api as EGLenum,
+        };
+
+        Ok(std::mem::ManuallyDrop::new(NotCurrentContext::new(inner).treat_as_possibly_current()))
+    }
 }
 
 impl PossiblyCurrentGlContext for PossiblyCurrentContext {

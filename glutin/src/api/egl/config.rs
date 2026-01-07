@@ -229,6 +229,10 @@ pub struct Config {
 }
 
 impl Config {
+    pub(crate) fn from_raw(display: Display, raw: EGLConfig) -> Self {
+        Self { inner: Arc::new(ConfigInner { display, raw: EglConfig(raw) }) }
+    }
+
     /// The native visual identifier.
     ///
     /// The interpretation of this value is platform dependant. Consult
