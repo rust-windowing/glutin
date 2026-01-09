@@ -149,6 +149,12 @@ pub trait AsRawContext {
     fn raw_context(&self) -> RawContext;
 }
 
+impl AsRawContext for RawContext {
+    fn raw_context(&self) -> RawContext {
+        *self
+    }
+}
+
 /// The builder to help customizing context
 #[derive(Default, Debug, Clone)]
 pub struct ContextAttributesBuilder {
