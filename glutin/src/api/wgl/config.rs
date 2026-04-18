@@ -445,7 +445,12 @@ impl GlConfig for Config {
         if self.inner.descriptor.as_ref().is_some() {
             None
         } else {
-            unsafe { Some(self.raw_attribute(wgl_extra::TRANSPARENT_ARB as c_int) != 0) }
+            // WGL_TRANSPARENT_ARB is not reliable and can sometimes produce false
+            // negatives. return None to provide consistent semantics, since we
+            // don't have any better way to detect
+            let transparent =
+                unsafe { self.raw_attribute(wgl_extra::TRANSPARENT_ARB as c_int) != 0 };
+            transparent.then_some(true)
         }
     }
 
