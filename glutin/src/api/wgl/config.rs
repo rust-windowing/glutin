@@ -448,9 +448,10 @@ impl GlConfig for Config {
             // WGL_TRANSPARENT_ARB is not reliable and can sometimes produce false
             // negatives. return None to provide consistent semantics, since we
             // don't have any better way to detect
-            let transparent =
-                unsafe { self.raw_attribute(wgl_extra::TRANSPARENT_ARB as c_int) != 0 };
-            transparent.then_some(true)
+            match unsafe { self.raw_attribute(wgl_extra::TRANSPARENT_ARB as c_int) } {
+                1 => Some(true),
+                _ => None,
+            }
         }
     }
 
