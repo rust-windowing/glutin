@@ -52,7 +52,7 @@ impl Display {
     pub unsafe fn new(raw_display: RawDisplayHandle) -> Result<Self> {
         let egl = match EGL.as_ref() {
             Some(egl) => egl,
-            None => return Err(ErrorKind::NotFound.into()),
+            None => return Err(ErrorKind::NotFound("failed to load the EGL library").into()),
         };
 
         CLIENT_EXTENSIONS.get_or_init(|| get_extensions(egl, egl::NO_DISPLAY));
@@ -98,7 +98,7 @@ impl Display {
     ) -> Result<Self> {
         let egl = match EGL.as_ref() {
             Some(egl) => egl,
-            None => return Err(ErrorKind::NotFound.into()),
+            None => return Err(ErrorKind::NotFound("failed to load the EGL library").into()),
         };
 
         if !egl.GetPlatformDisplayEXT.is_loaded() {

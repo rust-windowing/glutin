@@ -76,9 +76,9 @@ impl From<ErrorKind> for Error {
 /// errors.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum ErrorKind {
-    /// The requested display wasn't found or some required symbol in it was
+    /// The requested resource wasn't found or some required symbol in it was
     /// missing.
-    NotFound,
+    NotFound(&'static str),
 
     /// Failed to perform resource initialization.
     InitializationFailed,
@@ -147,7 +147,7 @@ impl ErrorKind {
     pub(crate) fn as_str(&self) -> &'static str {
         use ErrorKind::*;
         match *self {
-            NotFound => "not found",
+            NotFound(reason) => reason,
             InitializationFailed => "initialization failed",
             BadAccess => "access to the resource failed",
             OutOfMemory => "out of memory",

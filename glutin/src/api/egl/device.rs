@@ -36,7 +36,7 @@ impl Device {
     pub fn query_devices() -> Result<impl Iterator<Item = Device>> {
         let egl = match EGL.as_ref() {
             Some(egl) => egl,
-            None => return Err(ErrorKind::NotFound.into()),
+            None => return Err(ErrorKind::NotFound("failed to load the EGL library").into()),
         };
 
         let client_extensions =
