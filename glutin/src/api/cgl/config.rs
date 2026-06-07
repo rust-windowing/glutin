@@ -95,34 +95,33 @@ impl Display {
             attrs.push(NSOpenGLPFAStereo);
         }
 
-        attrs.push(NSOpenGLPFAOpenGLProfile);
+        // Skip `NSOpenGLPFAOpenGLProfile` when configured.
+        let profile_attrs = if template.skip_cgl_profile {
+            vec![[0u32, 0u32]]
+        } else {
+            vec![
+                // Automatically pick the latest profile. If all profiles fail,
+                // skip profile selection.
+                [NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion4_1Core],
+                [NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion3_2Core],
+                [NSOpenGLPFAOpenGLProfile,  NSOpenGLProfileVersionLegacy],
+                [                       0,                             0],
+            ]
+        };
 
-        // Stash profile pos for latter insert.
-        let profile_attr_pos = attrs.len();
-        // Add place holder for the GL profile.
-        attrs.push(NSOpenGLProfileVersion4_1Core);
-
-        // Terminate attrs with zero.
-        attrs.push(0);
-
-        // Automatically pick the latest profile.
-        let raw = [
-            NSOpenGLProfileVersion4_1Core,
-            NSOpenGLProfileVersion3_2Core,
-            NSOpenGLProfileVersionLegacy,
-        ]
-        .into_iter()
-        .find_map(|profile| {
-            attrs[profile_attr_pos] = profile;
-            // initWithAttributes returns None if the attributes were invalid
-            unsafe {
-                NSOpenGLPixelFormat::initWithAttributes(
-                    <NSOpenGLPixelFormat as AllocAnyThread>::alloc(),
-                    NonNull::new(attrs.as_ptr().cast_mut()).unwrap(),
-                )
-            }
-        })
-        .ok_or(ErrorKind::BadConfig)?;
+        let raw = profile_attrs
+            .into_iter()
+            .find_map(|profile| {
+                let attrs: Vec<_> = attrs.iter().chain(profile.iter()).copied().collect();
+                // initWithAttributes returns None if the attributes were invalid
+                unsafe {
+                    NSOpenGLPixelFormat::initWithAttributes(
+                        <NSOpenGLPixelFormat as AllocAnyThread>::alloc(),
+                        NonNull::new(attrs.as_ptr().cast_mut()).unwrap(),
+                    )
+                }
+            })
+            .ok_or(ErrorKind::BadConfig)?;
 
         let inner = Arc::new(ConfigInner {
             display: self.clone(),
