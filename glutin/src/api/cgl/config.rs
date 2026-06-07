@@ -111,7 +111,7 @@ impl Display {
         };
 
         let raw = profiles
-            .into_iter()
+            .iter()
             .find_map(|profile| {
                 attrs.truncate(base_len);
                 if let Some((key, val)) = profile {
