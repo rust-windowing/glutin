@@ -266,9 +266,9 @@ impl ConfigTemplateBuilder {
     /// Request that the `NSOpenGLProfile` selection is skipped on `CGL/macOS`.
     /// This allows better compatibility with older openGL profiles
     /// that rely on certain OpenGL extensions (from newer versions).
-    /// 
+    ///
     /// # Api-specific
-    /// 
+    ///
     /// Only supported with `CGL` (`macOS`)
     #[inline]
     pub fn skip_cgl_profile(mut self, skip: bool) -> Self {
@@ -377,7 +377,7 @@ impl Default for ConfigTemplate {
 
             api: None,
 
-            skip_cgl_profile: false
+            skip_cgl_profile: false,
         }
     }
 }

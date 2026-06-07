@@ -105,7 +105,7 @@ impl Display {
             &[
                 Some((NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion4_1Core)),
                 Some((NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion3_2Core)),
-                Some((NSOpenGLPFAOpenGLProfile,  NSOpenGLProfileVersionLegacy)),
+                Some((NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersionLegacy)),
                 None,
             ]
         };
