@@ -95,24 +95,30 @@ impl Display {
             attrs.push(NSOpenGLPFAStereo);
         }
 
-        // Skip `NSOpenGLPFAOpenGLProfile` when configured.
-        let profile_attrs = if template.skip_cgl_profile {
-            vec![[0u32, 0u32]]
+        let base_len = attrs.len();
+
+        // When `skip_cgl_profile` is set, skip profile selection entirely (None only).
+        // Otherwise try each profile in order, falling back to no profile on failure.
+        let profiles: &[Option<(_, _)>] = if template.skip_cgl_profile {
+            &[None]
         } else {
-            vec![
-                // Automatically pick the latest profile. If all profiles fail,
-                // skip profile selection.
-                [NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion4_1Core],
-                [NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion3_2Core],
-                [NSOpenGLPFAOpenGLProfile,  NSOpenGLProfileVersionLegacy],
-                [                       0,                             0],
+            &[
+                Some((NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion4_1Core)),
+                Some((NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion3_2Core)),
+                Some((NSOpenGLPFAOpenGLProfile,  NSOpenGLProfileVersionLegacy)),
+                None,
             ]
         };
 
-        let raw = profile_attrs
+        let raw = profiles
             .into_iter()
             .find_map(|profile| {
-                let attrs: Vec<_> = attrs.iter().chain(profile.iter()).copied().collect();
+                attrs.truncate(base_len);
+                if let Some((key, val)) = profile {
+                    attrs.push(*key);
+                    attrs.push(*val);
+                }
+                attrs.push(0); // null terminator
                 // initWithAttributes returns None if the attributes were invalid
                 unsafe {
                     NSOpenGLPixelFormat::initWithAttributes(
