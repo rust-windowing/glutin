@@ -7,6 +7,8 @@
 - Fixed EGL's robustness detection without extension, but on EGL 1.5.
 - Fixed building docs on docs.rs.
 - Fixed WGL's unreliable TRANSPARENT_ARB false negatives by returning None
+- Added `ConfigTemplateBuilder::skip_cgl_profile` to allow skipping CGL's `NSOpenGLProfile`
+  (allowing an older openGL version with extensions to work on macOS).
 
 # Version 0.32.3
 
