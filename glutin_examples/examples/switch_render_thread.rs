@@ -313,17 +313,17 @@ impl RenderThread {
 
                 match event {
                     RenderThreadEvent::Draw => {
-                        println!("thread {}: drawing", id);
+                        println!("thread {id}: drawing");
                         render_context_guard
                             .draw_with_clear_color(color.r, color.g, color.b, color.a);
                         render_context_guard.swap_buffers().expect("swap buffers failed");
                     },
                     RenderThreadEvent::MakeCurrent => {
-                        println!("thread {}: make current", id);
+                        println!("thread {id}: make current");
                         render_context_guard.make_current().expect("make current failed");
                     },
                     RenderThreadEvent::MakeNotCurrent => {
-                        println!("thread {}: make not current", id);
+                        println!("thread {id}: make not current");
                         render_context_guard.make_not_current().expect("make not current failed");
                         event_loop_proxy
                             .send_event(PlatformThreadEvent::ContextNotCurrent)

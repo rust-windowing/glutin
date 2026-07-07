@@ -11,5 +11,5 @@ members = [
 
 [workspace.package]
 # MSRV. Also update in ci.yml
-rust-version = "1.85.0"
+rust-version = "1.88.0"
 edition = "2024"
