@@ -472,6 +472,11 @@ impl Drop for ContextInner {
     fn drop(&mut self) {
         unsafe {
             self.display.inner.egl.DestroyContext(*self.display.inner.raw, *self.raw);
+
+            let error_code = self.display.inner.egl.GetError();
+            if error_code != egl::SUCCESS as i32 {
+                log::debug!("Drained EGL context destruction error: {}", error_code);
+            }
         }
     }
 }

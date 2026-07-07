@@ -448,9 +448,15 @@ impl ContextInner {
 
 impl Drop for ContextInner {
     fn drop(&mut self) {
-        let _ = super::last_glx_error(|| unsafe {
-            self.display.inner.glx.DestroyContext(self.display.inner.raw.cast(), *self.raw);
+        let res = super::last_glx_error({
+            let dpy = self.display.inner.raw.cast();
+            let ctx = *self.raw;
+            move || unsafe { self.display.inner.glx.DestroyContext(dpy, ctx)}
         });
+
+        if let Err(err) = res {
+            log::debug!("Drained GLX context destruction error: {:?}", err);
+        }
     }
 }
 

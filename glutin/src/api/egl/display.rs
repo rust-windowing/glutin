@@ -696,6 +696,11 @@ impl Drop for DisplayInner {
         if self.uses_display_reference() {
             unsafe {
                 self.egl.Terminate(*self.raw);
+
+                let error_code = self.egl.GetError();
+                if error_code != egl::SUCCESS as i32 {
+                    log::debug!("Drained EGL display termination error: {}", error_code);
+                }
             }
         }
 
