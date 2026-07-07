@@ -36,8 +36,8 @@ pub const PLATFORM_ANGLE_DEVICE_TYPE_HARDWARE_ANGLE: super::EGLenum = 0x320A;
 pub const PLATFORM_ANGLE_DEVICE_TYPE_NULL_ANGLE: super::EGLenum = 0x345E;
 
 mod wayland_storage {
-    use super::FnPtr;
     use super::__gl_imports::raw;
+    use super::FnPtr;
 
     // EGL_WL_create_wayland_buffer_from_image
     pub static mut CREATE_WAYLAND_BUFFER_FROM_IMAGE_WL: FnPtr =

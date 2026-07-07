@@ -451,7 +451,7 @@ impl Drop for ContextInner {
         let res = super::last_glx_error({
             let dpy = self.display.inner.raw.cast();
             let ctx = *self.raw;
-            move || unsafe { self.display.inner.glx.DestroyContext(dpy, ctx)}
+            move || unsafe { self.display.inner.glx.DestroyContext(dpy, ctx) }
         });
 
         if let Err(err) = res {
