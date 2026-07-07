@@ -72,7 +72,7 @@ impl From<ErrorKind> for Error {
     }
 }
 
-/// A list specifying general categoires of native platform graphics interface
+/// A list specifying general categories of native platform graphics interface
 /// errors.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum ErrorKind {
