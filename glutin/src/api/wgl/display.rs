@@ -62,7 +62,7 @@ impl Display {
         let name = OsStr::new(dll_name.as_ref()).encode_wide().chain(Some(0)).collect::<Vec<_>>();
         let lib_opengl32 = unsafe { dll_loader::LoadLibraryW(name.as_ptr()) };
         if lib_opengl32 == 0 {
-            return Err(ErrorKind::NotFound.into());
+            return Err(ErrorKind::NotFound("failed to load the OpenGL library").into());
         }
 
         // In case native window was provided init extra functions.

@@ -1,5 +1,6 @@
 # Unreleased
 
+- **Breaking:** `ErrorKind::NotFound` now carries a `&'static str` describing what was not found.
 - **Breaking:** Added `make_current_surfaceless(self)` for `{Possibly,Not}CurrentGlContext`.
 - Updated `objc2` frameworks dependency to `v0.3.2`.
 - Use `objc2-open-gl` instead of `cgl` dependency.
