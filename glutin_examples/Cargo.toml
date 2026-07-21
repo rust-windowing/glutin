@@ -21,7 +21,7 @@ wayland = ["glutin-winit/wayland", "winit/wayland-dlopen", "winit/wayland-csd-ad
 [dependencies]
 glutin = { path = "../glutin", default-features = false }
 glutin-winit = { path = "../glutin-winit", default-features = false }
-png = { version = "0.17.6", optional = true }
+png = { version = "0.18.1", optional = true }
 raw-window-handle = "0.6"
 winit = { version = "0.30.0", default-features = false, features = ["rwh_06"] }
 drm = { version = "0.12", optional = true }
