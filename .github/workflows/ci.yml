@@ -78,7 +78,7 @@ jobs:
     runs-on: ${{ matrix.platform.os }}
     steps:
     - uses: actions/checkout@v7
-    - uses: hecrj/setup-rust-action@v1
+    - uses: hecrj/setup-rust-action@v2
       with:
         rust-version: ${{ matrix.rust_version }}${{ matrix.platform.host }}
         targets: ${{ matrix.platform.target }}
