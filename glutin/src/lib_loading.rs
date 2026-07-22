@@ -24,7 +24,7 @@ pub struct SymWrapper<T> {
 impl<T: SymLoading> SymWrapper<T> {
     pub unsafe fn new(lib_paths: &[&str]) -> Result<Self, ()> {
         unsafe {
-            for path in lib_paths {
+            for &path in lib_paths {
                 #[cfg(windows)]
                 let lib = WinLibrary::load_with_flags(path, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS)
                     .map(From::from);
