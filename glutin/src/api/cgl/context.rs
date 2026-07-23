@@ -2,6 +2,7 @@
 
 use std::fmt;
 use std::marker::PhantomData;
+use std::ops::Deref;
 use std::ptr::NonNull;
 
 use dispatch2::{MainThreadBound, run_on_main};
@@ -69,7 +70,7 @@ impl Display {
             })?;
         }
 
-        let inner = ContextInner { display: self.clone(), config, raw };
+        let inner = ContextInner { display: self.clone(), config, raw: CglContext(raw) };
         let context = NotCurrentContext::new(inner);
 
         Ok(context)
@@ -179,7 +180,7 @@ impl PossiblyCurrentGlContext for PossiblyCurrentContext {
     #[allow(deprecated)]
     fn is_current(&self) -> bool {
         if let Some(current) = NSOpenGLContext::currentContext() {
-            current == self.inner.raw
+            current == self.inner.raw.0
         } else {
             false
         }
@@ -236,15 +237,27 @@ impl AsRawContext for PossiblyCurrentContext {
 
 impl Sealed for PossiblyCurrentContext {}
 
+#[allow(deprecated)]
+#[derive(Debug)]
+pub(crate) struct CglContext(pub(crate) Retained<NSOpenGLContext>);
+
+unsafe impl Send for CglContext {}
+unsafe impl Sync for CglContext {}
+
+#[allow(deprecated)]
+impl Deref for CglContext {
+    type Target = Retained<NSOpenGLContext>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 pub(crate) struct ContextInner {
     display: Display,
     config: Config,
-    #[allow(deprecated)]
-    pub(crate) raw: Retained<NSOpenGLContext>,
+    pub(crate) raw: CglContext,
 }
-
-unsafe impl Send for ContextInner {}
-unsafe impl Sync for ContextInner {}
 
 impl ContextInner {
     fn make_current_draw_read<T: SurfaceTypeTrait>(
@@ -325,8 +338,8 @@ impl ContextInner {
 impl fmt::Debug for ContextInner {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Context")
-            .field("config", &self.config.inner.raw)
-            .field("raw", &self.raw)
+            .field("config", &self.config.inner.raw.0)
+            .field("raw", &self.raw.0)
             .finish()
     }
 }

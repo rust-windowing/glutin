@@ -200,7 +200,7 @@ impl<T: SurfaceTypeTrait> AsRawSurface for Surface<T> {
 impl<T: SurfaceTypeTrait> fmt::Debug for Surface<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Surface")
-            .field("config", &self.config.inner.raw)
+            .field("config", &self.config.inner.raw.0)
             .field("ns_view", &self.ns_view)
             .field("type", &T::surface_type())
             .finish()

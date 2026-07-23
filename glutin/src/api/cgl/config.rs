@@ -1,5 +1,6 @@
 //! Everything related to `NSOpenGLPixelFormat`.
 
+use std::ops::Deref;
 use std::ptr::NonNull;
 use std::sync::Arc;
 use std::{fmt, iter};
@@ -126,7 +127,7 @@ impl Display {
 
         let inner = Arc::new(ConfigInner {
             display: self.clone(),
-            raw,
+            raw: CglPixelFormat(raw),
             transparency: template.transparency,
         });
         let config = Config { inner };
@@ -234,19 +235,31 @@ impl AsRawConfig for Config {
 
 impl Sealed for Config {}
 
+#[allow(deprecated)]
+#[derive(Debug)]
+pub(crate) struct CglPixelFormat(pub(crate) Retained<NSOpenGLPixelFormat>);
+
+unsafe impl Send for CglPixelFormat {}
+unsafe impl Sync for CglPixelFormat {}
+
+#[allow(deprecated)]
+impl Deref for CglPixelFormat {
+    type Target = Retained<NSOpenGLPixelFormat>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 pub(crate) struct ConfigInner {
     display: Display,
     pub(crate) transparency: bool,
-    #[allow(deprecated)]
-    pub(crate) raw: Retained<NSOpenGLPixelFormat>,
+    pub(crate) raw: CglPixelFormat,
 }
-
-unsafe impl Send for ConfigInner {}
-unsafe impl Sync for ConfigInner {}
 
 impl PartialEq for ConfigInner {
     fn eq(&self, other: &Self) -> bool {
-        self.raw == other.raw
+        self.raw.0 == other.raw.0
     }
 }
 
@@ -254,6 +267,6 @@ impl Eq for ConfigInner {}
 
 impl fmt::Debug for ConfigInner {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Config").field("id", &self.raw).finish()
+        f.debug_struct("Config").field("id", &self.raw.0).finish()
     }
 }
