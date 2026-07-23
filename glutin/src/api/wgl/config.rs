@@ -34,7 +34,7 @@ impl Display {
     ) -> Result<Box<dyn Iterator<Item = Config> + '_>> {
         let hwnd = match template.native_window {
             Some(RawWindowHandle::Win32(window_handle)) => window_handle.hwnd.get() as _,
-            _ => 0,
+            _ => std::ptr::null_mut(),
         };
         let hdc = unsafe { gdi::GetDC(hwnd) };
 
@@ -143,7 +143,7 @@ impl Display {
 
             let inner = Arc::new(ConfigInner {
                 display: self.clone(),
-                hdc,
+                hdc: DeviceContext(hdc),
                 pixel_format_index,
                 descriptor: Some(descriptor),
             });
@@ -272,7 +272,7 @@ impl Display {
             Ok(Box::new(configs.into_iter().map(move |pixel_format_index| {
                 let inner = Arc::new(ConfigInner {
                     display: self.clone(),
-                    hdc,
+                    hdc: DeviceContext(hdc),
                     pixel_format_index,
                     descriptor: None,
                 });
@@ -327,7 +327,7 @@ impl Config {
             let wgl_extra = self.inner.display.inner.wgl_extra.unwrap();
             let mut res = 0;
             wgl_extra.GetPixelFormatAttribivARB(
-                self.inner.hdc as *const _,
+                self.inner.hdc.0 as *const _,
                 self.inner.pixel_format_index,
                 gl::PFD_MAIN_PLANE as _,
                 1,
@@ -481,9 +481,15 @@ impl AsRawConfig for Config {
 
 impl Sealed for Config {}
 
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct DeviceContext(pub(crate) HDC);
+
+unsafe impl Send for DeviceContext {}
+unsafe impl Sync for DeviceContext {}
+
 pub(crate) struct ConfigInner {
     pub(crate) display: Display,
-    pub(crate) hdc: HDC,
+    pub(crate) hdc: DeviceContext,
     pub(crate) pixel_format_index: i32,
     pub(crate) descriptor: Option<PIXELFORMATDESCRIPTOR>,
 }
@@ -499,7 +505,7 @@ impl Eq for ConfigInner {}
 impl fmt::Debug for ConfigInner {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Config")
-            .field("hdc", &self.hdc)
+            .field("hdc", &self.hdc.0)
             .field("pixel_format_index", &self.pixel_format_index)
             .finish()
     }
