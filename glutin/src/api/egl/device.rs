@@ -13,19 +13,22 @@ use crate::error::{ErrorKind, Result};
 use super::display::{CLIENT_EXTENSIONS, extensions_from_ptr, get_extensions};
 use super::{EGL, Egl};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct EglDevice(EGLDeviceEXT);
+
+// SAFETY: An EGLDevice is immutable and valid for the lifetime of the EGL
+// library.
+unsafe impl Send for EglDevice {}
+unsafe impl Sync for EglDevice {}
+
 /// Wrapper for `EGLDevice`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Device {
-    inner: EGLDeviceEXT,
+    inner: EglDevice,
     extensions: HashSet<&'static str>,
     name: Option<&'static str>,
     vendor: Option<&'static str>,
 }
-
-// SAFETY: An EGLDevice is immutable and valid for the lifetime of the EGL
-// library.
-unsafe impl Send for Device {}
-unsafe impl Sync for Device {}
 
 impl Device {
     /// Query the available devices.
@@ -121,7 +124,7 @@ impl Device {
 
     /// Get a raw handle to the `EGLDevice`.
     pub fn raw_device(&self) -> EGLDeviceEXT {
-        self.inner
+        self.inner.0
     }
 
     /// Get the DRM primary or render device node path for this
@@ -212,6 +215,6 @@ impl Device {
             (None, None)
         };
 
-        Ok(Self { inner: ptr, extensions, name, vendor })
+        Ok(Self { inner: EglDevice(ptr), extensions, name, vendor })
     }
 }
