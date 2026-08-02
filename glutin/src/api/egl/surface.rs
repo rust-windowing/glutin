@@ -8,7 +8,7 @@ use glutin_egl_sys::egl;
 use glutin_egl_sys::egl::types::{EGLAttrib, EGLSurface, EGLint};
 use raw_window_handle::RawWindowHandle;
 #[cfg(wayland_platform)]
-use wayland_sys::{egl::*, ffi_dispatch};
+use wayland_egl::WlEglSurface;
 
 use crate::api::egl::display::EglDisplay;
 use crate::config::GetGlConfig;
@@ -440,7 +440,7 @@ impl<T: SurfaceTypeTrait> Sealed for Surface<T> {}
 #[derive(Debug)]
 enum NativeWindow {
     #[allow(dead_code)]
-    Wayland(*mut ffi::c_void),
+    Wayland(WlEglSurface),
     Xlib(std::os::raw::c_ulong),
     Xcb(u32),
     Android(*mut ffi::c_void),
@@ -458,17 +458,13 @@ impl NativeWindow {
         let native_window = match raw_window_handle {
             #[cfg(wayland_platform)]
             RawWindowHandle::Wayland(window_handle) => unsafe {
-                let ptr = ffi_dispatch!(
-                    wayland_egl_handle(),
-                    wl_egl_window_create,
-                    window_handle.surface.as_ptr().cast(),
+                let surface = WlEglSurface::new_from_raw(
+                    window_handle.surface.cast(),
                     _width.get() as _,
-                    _height.get() as _
-                );
-                if ptr.is_null() {
-                    return Err(ErrorKind::OutOfMemory.into());
-                }
-                Self::Wayland(ptr.cast())
+                    _height.get() as _,
+                )
+                .unwrap();
+                Self::Wayland(surface)
             },
             RawWindowHandle::Xlib(window_handle) => {
                 if window_handle.window == 0 {
@@ -499,30 +495,20 @@ impl NativeWindow {
     fn resize(&self, _width: NonZeroU32, _height: NonZeroU32) {
         #[cfg(wayland_platform)]
         if let Self::Wayland(wl_egl_surface) = self {
-            unsafe {
-                ffi_dispatch!(
-                    wayland_egl_handle(),
-                    wl_egl_window_resize,
-                    *wl_egl_surface as _,
-                    _width.get() as _,
-                    _height.get() as _,
-                    0,
-                    0
-                )
-            }
+            wl_egl_surface.resize(_width.get() as _, _height.get() as _, 0, 0);
         }
     }
 
     /// Returns the underlying handle value.
     fn as_native_window(&self) -> egl::NativeWindowType {
-        match *self {
-            Self::Wayland(wl_egl_surface) => wl_egl_surface as egl::NativeWindowType,
-            Self::Xlib(window_id) => window_id as egl::NativeWindowType,
-            Self::Xcb(window_id) => window_id as egl::NativeWindowType,
-            Self::Win32(hwnd) => hwnd as egl::NativeWindowType,
-            Self::Android(a_native_window) => a_native_window as egl::NativeWindowType,
-            Self::Ohos(native_window) => native_window as egl::NativeWindowType,
-            Self::Gbm(gbm_surface) => gbm_surface as egl::NativeWindowType,
+        match self {
+            Self::Wayland(wl_egl_surface) => wl_egl_surface.ptr().as_ptr() as egl::NativeWindowType,
+            Self::Xlib(window_id) => *window_id as egl::NativeWindowType,
+            Self::Xcb(window_id) => *window_id as egl::NativeWindowType,
+            Self::Win32(hwnd) => *hwnd as egl::NativeWindowType,
+            Self::Android(a_native_window) => *a_native_window as egl::NativeWindowType,
+            Self::Ohos(native_window) => *native_window as egl::NativeWindowType,
+            Self::Gbm(gbm_surface) => *gbm_surface as egl::NativeWindowType,
         }
     }
 
@@ -542,24 +528,13 @@ impl NativeWindow {
     /// On X11 the returned pointer is a cast of the `&self` borrow.
     fn as_platform_window(&self) -> *mut ffi::c_void {
         match self {
-            Self::Wayland(wl_egl_surface) => *wl_egl_surface,
+            Self::Wayland(wl_egl_surface) => wl_egl_surface.ptr().as_ptr(),
             Self::Xlib(window_id) => window_id as *const _ as *mut ffi::c_void,
             Self::Xcb(window_id) => window_id as *const _ as *mut ffi::c_void,
             Self::Win32(hwnd) => *hwnd as *const ffi::c_void as *mut _,
             Self::Android(a_native_window) => *a_native_window,
             Self::Ohos(native_window) => *native_window,
             Self::Gbm(gbm_surface) => *gbm_surface,
-        }
-    }
-}
-
-#[cfg(wayland_platform)]
-impl Drop for NativeWindow {
-    fn drop(&mut self) {
-        unsafe {
-            if let Self::Wayland(wl_egl_window) = self {
-                ffi_dispatch!(wayland_egl_handle(), wl_egl_window_destroy, wl_egl_window.cast());
-            }
         }
     }
 }
