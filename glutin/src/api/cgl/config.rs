@@ -95,32 +95,40 @@ impl Display {
             attrs.push(NSOpenGLPFAStereo);
         }
 
-        attrs.push(NSOpenGLPFAOpenGLProfile);
+        // First, try WITHOUT NSOpenGLPFAOpenGLProfile to match GLFW's default
+        // behavior when no version hint is set.
+        attrs.push(0); // Terminate attrs
 
-        // Stash profile pos for latter insert.
-        let profile_attr_pos = attrs.len();
-        // Add place holder for the GL profile.
-        attrs.push(NSOpenGLProfileVersion4_1Core);
+        let raw = unsafe {
+            NSOpenGLPixelFormat::initWithAttributes(
+                <NSOpenGLPixelFormat as AllocAnyThread>::alloc(),
+                NonNull::new(attrs.as_ptr().cast_mut()).unwrap(),
+            )
+        }
+        .or_else(|| {
+            // If that fails, fall back to trying explicit profiles.
+            // Remove the terminating 0 and add profile attribute.
+            attrs.pop();
+            attrs.push(NSOpenGLPFAOpenGLProfile);
+            let profile_attr_pos = attrs.len();
+            attrs.push(NSOpenGLProfileVersion4_1Core);
+            attrs.push(0);
 
-        // Terminate attrs with zero.
-        attrs.push(0);
-
-        // Automatically pick the latest profile.
-        let raw = [
-            NSOpenGLProfileVersion4_1Core,
-            NSOpenGLProfileVersion3_2Core,
-            NSOpenGLProfileVersionLegacy,
-        ]
-        .into_iter()
-        .find_map(|profile| {
-            attrs[profile_attr_pos] = profile;
-            // initWithAttributes returns None if the attributes were invalid
-            unsafe {
-                NSOpenGLPixelFormat::initWithAttributes(
-                    <NSOpenGLPixelFormat as AllocAnyThread>::alloc(),
-                    NonNull::new(attrs.as_ptr().cast_mut()).unwrap(),
-                )
-            }
+            [
+                NSOpenGLProfileVersion4_1Core,
+                NSOpenGLProfileVersion3_2Core,
+                NSOpenGLProfileVersionLegacy,
+            ]
+            .into_iter()
+            .find_map(|profile| {
+                attrs[profile_attr_pos] = profile;
+                unsafe {
+                    NSOpenGLPixelFormat::initWithAttributes(
+                        <NSOpenGLPixelFormat as AllocAnyThread>::alloc(),
+                        NonNull::new(attrs.as_ptr().cast_mut()).unwrap(),
+                    )
+                }
+            })
         })
         .ok_or(ErrorKind::BadConfig)?;
 
