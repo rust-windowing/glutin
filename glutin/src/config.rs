@@ -175,6 +175,9 @@ impl ConfigTemplateBuilder {
     /// - **EGL:** [`Api::GLES2`] bit is set by default to avoid matching
     ///   [`Api::GLES1`] configs;
     /// - **GLX/WGL/CGL:** [`Api::OPENGL`] is always present in the result.
+    /// - **CGL:** requesting [`Api::OPENGL`] picks the latest supported
+    ///   `NSOpenGLProfile`; otherwise no profile is requested, which selects
+    ///   the legacy OpenGL together with the extensions it exposes.
     #[inline]
     pub fn with_api(mut self, api: Api) -> Self {
         self.template.api = Some(api);

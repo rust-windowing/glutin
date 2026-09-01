@@ -1,6 +1,8 @@
 # Unreleased
 
 - **Breaking:** Added `make_current_surfaceless(self)` for `{Possibly,Not}CurrentGlContext`.
+- **Breaking:** CGL (macOS) no longer requests an `NSOpenGLProfile` unless `Api::OPENGL` was
+  requested via `ConfigTemplateBuilder::with_api`.
 - Updated `objc2` frameworks dependency to `v0.3.2`.
 - Use `objc2-open-gl` instead of `cgl` dependency.
 - Bump MSRV from `1.71` to `1.85`.
