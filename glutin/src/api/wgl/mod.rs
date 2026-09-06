@@ -74,7 +74,10 @@ unsafe fn load_extra_functions(
         class
     };
 
-    let class_name = OsStr::new("WglDummy Window").encode_wide().chain(Some(0)).collect::<Vec<_>>();
+    let class_name = OsStr::new("WglDummy Window")
+        .encode_wide()
+        .chain(Some(0))
+        .collect::<Vec<_>>();
 
     class.cbSize = mem::size_of::<WNDCLASSEXW>() as _;
     class.lpszClassName = class_name.as_ptr();
@@ -88,7 +91,10 @@ unsafe fn load_extra_functions(
 
     // This dummy window should match the real one enough to get the same OpenGL
     // driver.
-    let title = OsStr::new("dummy window").encode_wide().chain(Some(0)).collect::<Vec<_>>();
+    let title = OsStr::new("dummy window")
+        .encode_wide()
+        .chain(Some(0))
+        .collect::<Vec<_>>();
 
     let ex_style = wm::WS_EX_APPWINDOW;
     let style = wm::WS_POPUP | wm::WS_CLIPSIBLINGS | wm::WS_CLIPCHILDREN;
@@ -113,32 +119,83 @@ unsafe fn load_extra_functions(
         return Err(IoError::last_os_error().into());
     }
 
+    // Recovery may enter with a live context. Restore its binding after loading WGL.
+    let previous_context = unsafe { gl::wglGetCurrentContext() };
+    let previous_dc = unsafe { gl::wglGetCurrentDC() };
+    let mut context = 0;
+    let mut binding_attempted = false;
     let hdc = unsafe { gdi::GetDC(win) };
-    unsafe {
-        let (pixel_format_index, descriptor) = config::choose_dummy_pixel_format(hdc)?;
-        if gl::SetPixelFormat(hdc, pixel_format_index, &descriptor) == 0 {
+    // Keep initialization errors before any cleanup call changes the OS error.
+    let result = (|| -> Result<_> {
+        if hdc == 0 {
             return Err(IoError::last_os_error().into());
         }
-    };
-
-    let context = unsafe {
-        let context = gl::wglCreateContext(hdc);
-        if gl::wglMakeCurrent(hdc, context) == 0 {
-            return Err(IoError::last_os_error().into());
+        unsafe {
+            let (pixel_format_index, descriptor) = config::choose_dummy_pixel_format(hdc)?;
+            if gl::SetPixelFormat(hdc, pixel_format_index, &descriptor) == 0 {
+                return Err(IoError::last_os_error().into());
+            }
+            context = gl::wglCreateContext(hdc);
+            if context == 0 {
+                return Err(IoError::last_os_error().into());
+            }
+            // A failed MakeCurrent can also clear the previous binding.
+            binding_attempted = true;
+            if gl::wglMakeCurrent(hdc, context) == 0 {
+                return Err(IoError::last_os_error().into());
+            }
         }
-        context
-    };
 
-    // Load WGL.
-    let wgl_extra = WGL_EXTRA.get_or_init(WglExtra::new);
-    let client_extensions = display::load_extensions(hdc, wgl_extra);
+        // Load WGL.
+        let wgl_extra = WGL_EXTRA.get_or_init(WglExtra::new);
+        let client_extensions = display::load_extensions(hdc, wgl_extra);
+        Ok((wgl_extra, client_extensions))
+    })();
 
+    let mut cleanup_error: Option<Error> = None;
     unsafe {
-        wm::DestroyWindow(win);
-        gl::wglDeleteContext(context);
+        if binding_attempted && gl::wglMakeCurrent(previous_dc, previous_context) == 0 {
+            cleanup_error = Some(IoError::last_os_error().into());
+        }
+
+        // If restoration failed, detach the dummy before deleting its resources.
+        if context != 0 && gl::wglGetCurrentContext() == context {
+            if gl::wglMakeCurrent(0, 0) == 0 {
+                let error = IoError::last_os_error();
+                cleanup_error.get_or_insert_with(|| error.into());
+            }
+        }
+
+        let mut context_deleted = context == 0;
+        if context != 0 && gl::wglGetCurrentContext() != context {
+            if gl::wglDeleteContext(context) == 0 {
+                let error = IoError::last_os_error();
+                cleanup_error.get_or_insert_with(|| error.into());
+            } else {
+                context_deleted = true;
+            }
+        }
+
+        // Do not invalidate a drawable still needed by an undeleted dummy context.
+        if context_deleted {
+            if hdc != 0 && gdi::ReleaseDC(win, hdc) == 0 {
+                // ReleaseDC does not document GetLastError support.
+                cleanup_error.get_or_insert_with(|| {
+                    Error::new(None, Some("dummy ReleaseDC failed".into()), ErrorKind::Misc)
+                });
+            }
+            if wm::DestroyWindow(win) == 0 {
+                let error = IoError::last_os_error();
+                cleanup_error.get_or_insert_with(|| error.into());
+            }
+        }
     }
 
-    Ok((wgl_extra, client_extensions))
+    // Prefer the original initialization error, but never report cleanup failure as success.
+    result.and_then(|loaded| match cleanup_error {
+        Some(error) => Err(error),
+        None => Ok(loaded),
+    })
 }
 
 impl From<std::io::Error> for Error {
