@@ -159,11 +159,9 @@ unsafe fn load_extra_functions(
         }
 
         // If restoration failed, detach the dummy before deleting its resources.
-        if context != 0 && gl::wglGetCurrentContext() == context {
-            if gl::wglMakeCurrent(0, 0) == 0 {
-                let error = IoError::last_os_error();
-                cleanup_error.get_or_insert_with(|| error.into());
-            }
+        if context != 0 && gl::wglGetCurrentContext() == context && gl::wglMakeCurrent(0, 0) == 0 {
+            let error = IoError::last_os_error();
+            cleanup_error.get_or_insert_with(|| error.into());
         }
 
         let mut context_deleted = context == 0;
