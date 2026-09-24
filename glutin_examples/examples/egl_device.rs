@@ -49,12 +49,12 @@ mod example {
 
         // Context creation.
         //
-        // In particular, since we are doing offscreen rendering we have no raw window
-        // handle to provide.
+        // In particular, since we are doing offscreen rendering we have no raw
+        // window handle to provide.
         let context_attributes = ContextAttributesBuilder::new().build(None);
 
-        // Since glutin by default tries to create OpenGL core context, which may not be
-        // present we should try gles.
+        // Since glutin by default tries to create OpenGL core context, which
+        // may not be present we should try gles.
         let fallback_context_attributes =
             ContextAttributesBuilder::new().with_context_api(ContextApi::Gles(None)).build(None);
 
@@ -70,7 +70,8 @@ mod example {
         let _context = not_current.make_current_surfaceless().unwrap();
         let renderer = Renderer::new(&display);
 
-        // Create a framebuffer for offscreen rendering since we do not have a window.
+        // Create a framebuffer for offscreen rendering since we do not have a
+        // window.
         let mut framebuffer = 0;
         let mut renderbuffer = 0;
         unsafe {
@@ -92,7 +93,8 @@ mod example {
 
         let mut buffer = Vec::<u8>::with_capacity(1280 * 720 * 4);
         unsafe {
-            // Wait for the previous commands to finish before reading from the framebuffer.
+            // Wait for the previous commands to finish before reading from the
+            // framebuffer.
             renderer.Finish();
             // Download the framebuffer contents to the buffer.
             renderer.ReadPixels(

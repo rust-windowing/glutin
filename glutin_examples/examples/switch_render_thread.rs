@@ -22,8 +22,8 @@ use winit::window::Window;
 fn main() -> Result<(), Box<dyn Error>> {
     let event_loop = EventLoop::<PlatformThreadEvent>::with_user_event().build().unwrap();
 
-    // `EventLoopProxy` allows you to dispatch custom events to the main Winit event
-    // loop from any thread.
+    // `EventLoopProxy` allows you to dispatch custom events to the main Winit
+    // event loop from any thread.
     let event_loop_proxy = event_loop.create_proxy();
 
     let mut app = App::new(event_loop_proxy);
@@ -224,8 +224,8 @@ fn create_window_with_render_context(
     let gl_context = not_current_gl_context.make_current(&gl_surface).unwrap();
 
     // The context needs to be current for the Renderer to set up shaders and
-    // buffers. It also performs function loading, which needs a current context on
-    // WGL.
+    // buffers. It also performs function loading, which needs a current context
+    // on WGL.
     let renderer = Renderer::new(&gl_display);
 
     let gl_context = gl_context.make_not_current().unwrap().treat_as_possibly_current();

@@ -121,8 +121,9 @@ impl DisplayBuilder {
 
         let gl_display = create_display(event_loop, self.preference, raw_window_handle)?;
 
-        // XXX the native window must be passed to config picker when WGL is used
-        // otherwise very limited OpenGL features will be supported.
+        // XXX the native window must be passed to config picker when WGL is
+        // used otherwise very limited OpenGL features will be
+        // supported.
         #[cfg(wgl_backend)]
         let template_builder = if let Some(raw_window_handle) = raw_window_handle {
             template_builder.compatible_with_native_window(raw_window_handle)

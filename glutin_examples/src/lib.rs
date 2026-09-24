@@ -70,8 +70,9 @@ impl ApplicationHandler for App {
 
                 println!("Picked a config with {} samples", gl_config.num_samples());
 
-                // Mark the display as initialized to not recreate it on resume, since the
-                // display is valid until we explicitly destroy it.
+                // Mark the display as initialized to not recreate it on resume,
+                // since the display is valid until we
+                // explicitly destroy it.
                 self.gl_display = GlDisplayCreationState::Init;
 
                 // Create gl context.
@@ -101,9 +102,9 @@ impl ApplicationHandler for App {
         let gl_surface =
             unsafe { gl_config.display().create_window_surface(&gl_config, &attrs).unwrap() };
 
-        // The context needs to be current for the Renderer to set up shaders and
-        // buffers. It also performs function loading, which needs a current context on
-        // WGL.
+        // The context needs to be current for the Renderer to set up shaders
+        // and buffers. It also performs function loading, which needs a
+        // current context on WGL.
         let gl_context = self.gl_context.as_ref().unwrap();
         gl_context.make_current(&gl_surface).unwrap();
 
@@ -120,12 +121,12 @@ impl ApplicationHandler for App {
     }
 
     fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
-        // This event is only raised on Android, where the backing NativeWindow for a GL
-        // Surface can appear and disappear at any moment.
+        // This event is only raised on Android, where the backing NativeWindow
+        // for a GL Surface can appear and disappear at any moment.
         println!("Android window removed");
 
-        // Destroy the GL Surface and un-current the GL Context before ndk-glue releases
-        // the window back to the system.
+        // Destroy the GL Surface and un-current the GL Context before ndk-glue
+        // releases the window back to the system.
         self.state = None;
 
         // Make context not current.
@@ -142,10 +143,11 @@ impl ApplicationHandler for App {
     ) {
         match event {
             WindowEvent::Resized(size) if size.width != 0 && size.height != 0 => {
-                // Some platforms like EGL require resizing GL surface to update the size
-                // Notable platforms here are Wayland and macOS, other don't require it
-                // and the function is no-op, but it's wise to resize it for portability
-                // reasons.
+                // Some platforms like EGL require resizing GL surface to update
+                // the size Notable platforms here are Wayland
+                // and macOS, other don't require it
+                // and the function is no-op, but it's wise to resize it for
+                // portability reasons.
                 if let Some(AppState { gl_surface, window: _ }) = self.state.as_ref() {
                     let gl_context = self.gl_context.as_ref().unwrap();
                     gl_surface.resize(
@@ -168,9 +170,9 @@ impl ApplicationHandler for App {
     }
 
     fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
-        // NOTE: The handling below is only needed due to nvidia on Wayland to not crash
-        // on exit due to nvidia driver touching the Wayland display from on
-        // `exit` hook.
+        // NOTE: The handling below is only needed due to nvidia on Wayland to
+        // not crash on exit due to nvidia driver touching the Wayland
+        // display from on `exit` hook.
         let _gl_display = self.gl_context.take().unwrap().display();
 
         // Clear the window.
@@ -202,21 +204,21 @@ fn create_gl_context(window: &Window, gl_config: &Config) -> NotCurrentContext {
     // The context creation part.
     let context_attributes = ContextAttributesBuilder::new().build(raw_window_handle);
 
-    // Since glutin by default tries to create OpenGL core context, which may not be
-    // present we should try gles.
+    // Since glutin by default tries to create OpenGL core context, which may
+    // not be present we should try gles.
     let fallback_context_attributes = ContextAttributesBuilder::new()
         .with_context_api(ContextApi::Gles(None))
         .build(raw_window_handle);
 
-    // There are also some old devices that support neither modern OpenGL nor GLES.
-    // To support these we can try and create a 2.1 context.
+    // There are also some old devices that support neither modern OpenGL nor
+    // GLES. To support these we can try and create a 2.1 context.
     let legacy_context_attributes = ContextAttributesBuilder::new()
         .with_context_api(ContextApi::OpenGl(Some(Version::new(2, 1))))
         .build(raw_window_handle);
 
-    // Reuse the uncurrented context from a suspended() call if it exists, otherwise
-    // this is the first time resumed() is called, where the context still
-    // has to be created.
+    // Reuse the uncurrented context from a suspended() call if it exists,
+    // otherwise this is the first time resumed() is called, where the
+    // context still has to be created.
     let gl_display = gl_config.display();
 
     unsafe {

@@ -42,7 +42,8 @@ impl Device {
         let client_extensions =
             CLIENT_EXTENSIONS.get_or_init(|| get_extensions(egl, egl::NO_DISPLAY));
 
-        // Querying devices requires EGL_EXT_device_enumeration or EGL_EXT_device_base.
+        // Querying devices requires EGL_EXT_device_enumeration or
+        // EGL_EXT_device_base.
         if !client_extensions.contains("EGL_EXT_device_base") {
             if !client_extensions.contains("EGL_EXT_device_enumeration") {
                 return Err(ErrorKind::NotSupported(
@@ -141,8 +142,8 @@ impl Device {
             return None;
         }
 
-        // SAFETY: We pass a valid EGLDevice pointer, and validated that the enum name
-        // is valid because the extension is present.
+        // SAFETY: We pass a valid EGLDevice pointer, and validated that the
+        // enum name is valid because the extension is present.
         unsafe { Self::query_string(self.raw_device(), egl::DRM_DEVICE_FILE_EXT) }.map(Path::new)
     }
 
@@ -163,8 +164,8 @@ impl Device {
         }
 
         const EGL_DRM_RENDER_NODE_PATH_EXT: egl::types::EGLenum = 0x3377;
-        // SAFETY: We pass a valid EGLDevice pointer, and validated that the enum name
-        // is valid because the extension is present.
+        // SAFETY: We pass a valid EGLDevice pointer, and validated that the
+        // enum name is valid because the extension is present.
         unsafe { Self::query_string(self.raw_device(), EGL_DRM_RENDER_NODE_PATH_EXT) }
             .map(Path::new)
     }
@@ -203,8 +204,8 @@ impl Device {
             unsafe { extensions_from_ptr(egl.QueryDeviceStringEXT(ptr, egl::EXTENSIONS as _)) };
 
         let (name, vendor) = if extensions.contains("EGL_EXT_device_query_name") {
-            // SAFETY: RENDERER_EXT and VENDOR are valid strings for device string queries
-            // if EGL_EXT_device_query_name.
+            // SAFETY: RENDERER_EXT and VENDOR are valid strings for device
+            // string queries if EGL_EXT_device_query_name.
             unsafe {
                 (Self::query_string(ptr, egl::RENDERER_EXT), Self::query_string(ptr, egl::VENDOR))
             }

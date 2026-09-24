@@ -193,8 +193,9 @@ impl Display {
             .filter(move |config| {
                 // Filter configs not compatible with the native window.
                 //
-                // XXX This can't be done by passing visual in the EGL attributes
-                // when calling `eglChooseConfig` since the visual is ignored.
+                // XXX This can't be done by passing visual in the EGL
+                // attributes when calling `eglChooseConfig`
+                // since the visual is ignored.
                 match template.native_window {
                     Some(RawWindowHandle::Xcb(xcb)) => {
                         xcb.visual_id.is_some_and(|id| id.get() == config.native_visual())
