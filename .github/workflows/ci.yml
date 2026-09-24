@@ -81,19 +81,11 @@ jobs:
     runs-on: ${{ matrix.platform.os }}
     steps:
     - uses: actions/checkout@v7
-    - uses: hecrj/setup-rust-action@v2
+    - uses: dtolnay/rust-toolchain@master
       with:
-        rust-version: ${{ matrix.rust_version }}
+        toolchain: ${{ matrix.rust_version }}${{ matrix.platform.host }}
         targets: ${{ matrix.platform.target }}
         components: clippy
-
-      # The setup action can't pass `--force-non-host`, needed for i686-pc-windows-gnu.
-    - name: Install host-specific toolchain
-      if: matrix.platform.host
-      shell: bash
-      run: |
-        rustup toolchain install ${{ matrix.rust_version }}${{ matrix.platform.host }} --profile minimal --component clippy --target ${{ matrix.platform.target }} --force-non-host
-        rustup default ${{ matrix.rust_version }}${{ matrix.platform.host }} --force-non-host
 
       # We need those for examples.
     - name: Install GCC Multilib
