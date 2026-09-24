@@ -96,6 +96,14 @@ jobs:
       if: contains(matrix.platform.target, 'android')
       run: cargo +stable install cargo-apk
 
+      # yoke-derive 0.8.3 requires Rust 1.87 but doesn't declare it, so the MSRV-aware
+      # resolver can't skip it. It's pulled in via winit-core's url dependency, which is
+      # gone after winit 0.31.0-beta.3, so remove this with the next winit release.
+    - name: Pin dependencies for MSRV
+      if: matrix.rust_version == '1.86.0'
+      shell: bash
+      run: cargo generate-lockfile && cargo update -p yoke-derive --precise 0.8.2
+
     - name: Build tests
       shell: bash
       run: cargo $CMD test -p glutin --no-run --verbose --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES
