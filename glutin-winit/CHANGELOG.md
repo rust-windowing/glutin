@@ -1,5 +1,11 @@
 # Unreleased
 
+- **Breaking:** Update _winit_ to `0.31.0-beta.3`. See [winit's CHANGELOG](https://docs.rs/winit/0.31.0-beta.3/winit/changelog/index.html) for more info.
+- **Breaking:** Windows are now returned as `Box<dyn Window>` and `GlWindow` is implemented for `dyn Window`.
+- **Breaking:** Removed the `GlutinEventLoop` trait, functions take `&dyn ActiveEventLoop` instead, since winit's `EventLoop` can no longer create windows.
+- **Breaking:** `finalize_window` now returns winit's `RequestError` instead of `OsError`.
+- On X11, `finalize_window` now preserves existing `WindowAttributesX11` when setting the visual.
+
 # Version 0.5.0
 
 - **Breaking:** Update _winit_ to `0.30`. See [winit's CHANGELOG](https://github.com/rust-windowing/winit/releases/tag/v0.30.0) for more info.

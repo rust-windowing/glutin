@@ -8,10 +8,8 @@
 #![deny(missing_docs)]
 #![cfg_attr(clippy, deny(warnings))]
 
-mod event_loop;
 mod window;
 
-use event_loop::GlutinEventLoop;
 pub use window::GlWindow;
 
 use std::error::Error;
@@ -25,24 +23,18 @@ use glutin::prelude::*;
 #[cfg(wgl_backend)]
 use raw_window_handle::HasWindowHandle;
 
-use raw_window_handle::RawWindowHandle;
-use winit::error::OsError;
+use raw_window_handle::{HasDisplayHandle, RawWindowHandle};
+use winit::error::RequestError;
+use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window, WindowAttributes};
 
 #[cfg(x11_platform)]
-use winit::platform::x11::WindowAttributesExtX11;
+use winit::platform::x11::WindowAttributesX11;
 #[cfg(glx_backend)]
 use winit::platform::x11::register_xlib_error_hook;
 
 #[cfg(all(not(egl_backend), not(glx_backend), not(wgl_backend), not(cgl_backend)))]
 compile_error!("Please select at least one api backend");
-
-pub(crate) mod private {
-    /// Prevent traits from being implemented downstream, since those are used
-    /// purely for documentation organization and simplify platform api
-    /// implementation maintenance.
-    pub trait Sealed {}
-}
 
 /// The helper to perform [`Display`] creation and OpenGL platform
 /// bootstrapping with the help of [`winit`] with little to no platform specific
@@ -94,12 +86,13 @@ impl DisplayBuilder {
     /// **WGL:** - [`WindowAttributes`] **must** be passed in
     /// [`Self::with_window_attributes()`] if modern OpenGL(ES) is desired,
     /// otherwise only builtin functions like `glClear` will be available.
+    #[allow(clippy::type_complexity)]
     pub fn build<Picker>(
         mut self,
-        event_loop: &impl GlutinEventLoop,
+        event_loop: &dyn ActiveEventLoop,
         template_builder: ConfigTemplateBuilder,
         config_picker: Picker,
-    ) -> Result<(Option<Window>, Config), Box<dyn Error>>
+    ) -> Result<(Option<Box<dyn Window>>, Config), Box<dyn Error>>
     where
         Picker: FnOnce(Box<dyn Iterator<Item = Config> + '_>) -> Config,
     {
@@ -150,7 +143,7 @@ impl DisplayBuilder {
 }
 
 fn create_display(
-    event_loop: &impl GlutinEventLoop,
+    event_loop: &dyn ActiveEventLoop,
     _api_preference: ApiPreference,
     _raw_window_handle: Option<RawWindowHandle>,
 ) -> Result<Display, Box<dyn Error>> {
@@ -182,7 +175,7 @@ fn create_display(
         ApiPreference::FallbackEgl => DisplayApiPreference::WglThenEgl(_raw_window_handle),
     };
 
-    let handle = event_loop.glutin_display_handle()?.as_raw();
+    let handle = event_loop.display_handle()?.as_raw();
     unsafe { Ok(Display::new(handle, _preference)?) }
 }
 
@@ -193,21 +186,27 @@ fn create_display(
 /// [`Window`]: winit::window::Window
 /// [`Config`]: glutin::config::Config
 pub fn finalize_window(
-    event_loop: &impl GlutinEventLoop,
+    event_loop: &dyn ActiveEventLoop,
     mut attributes: WindowAttributes,
     gl_config: &Config,
-) -> Result<Window, OsError> {
+) -> Result<Box<dyn Window>, RequestError> {
     // Disable transparency if the end config doesn't support it.
     if gl_config.supports_transparency() == Some(false) {
         attributes = attributes.with_transparent(false);
     }
 
     #[cfg(x11_platform)]
-    let attributes = if let Some(x11_visual) = gl_config.x11_visual() {
-        attributes.with_x11_visual(x11_visual.visual_id() as _)
-    } else {
-        attributes
-    };
+    if let Some(x11_visual) = gl_config.x11_visual() {
+        // Preserve the X11 attributes the user might have already set.
+        let x11_attributes = attributes
+            .platform
+            .as_ref()
+            .and_then(|platform| platform.cast_ref::<WindowAttributesX11>())
+            .cloned()
+            .unwrap_or_default()
+            .with_x11_visual(x11_visual.visual_id() as _);
+        attributes = attributes.with_platform_attributes(Box::new(x11_attributes));
+    }
 
     event_loop.create_window(attributes)
 }

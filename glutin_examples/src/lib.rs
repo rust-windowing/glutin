@@ -1,7 +1,9 @@
+use std::cell::RefCell;
 use std::error::Error;
 use std::ffi::{CStr, CString};
 use std::num::NonZeroU32;
 use std::ops::Deref;
+use std::rc::Rc;
 
 use gl::types::GLfloat;
 use raw_window_handle::HasWindowHandle;
@@ -29,7 +31,7 @@ pub mod gl {
     pub use Gles2 as Gl;
 }
 
-pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn Error>> {
+pub fn main(event_loop: winit::event_loop::EventLoop) -> Result<(), Box<dyn Error>> {
     // The template will match only the configurations supporting rendering
     // to windows.
     //
@@ -43,14 +45,15 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
 
     let display_builder = DisplayBuilder::new().with_window_attributes(Some(window_attributes()));
 
-    let mut app = App::new(template, display_builder);
-    event_loop.run_app(&mut app)?;
+    let exit_state = Rc::new(RefCell::new(Ok(())));
+    let app = App::new(template, display_builder, exit_state.clone());
+    event_loop.run_app(app)?;
 
-    app.exit_state
+    exit_state.replace(Ok(()))
 }
 
 impl ApplicationHandler for App {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+    fn can_create_surfaces(&mut self, event_loop: &dyn ActiveEventLoop) {
         let (window, gl_config) = match &self.gl_display {
             // We just created the event loop, so initialize the display, pick the config, and
             // create the context.
@@ -62,7 +65,7 @@ impl ApplicationHandler for App {
                 ) {
                     Ok((window, gl_config)) => (window.unwrap(), gl_config),
                     Err(err) => {
-                        self.exit_state = Err(err);
+                        *self.exit_state.borrow_mut() = Err(err);
                         event_loop.exit();
                         return;
                     },
@@ -77,18 +80,18 @@ impl ApplicationHandler for App {
 
                 // Create gl context.
                 self.gl_context =
-                    Some(create_gl_context(&window, &gl_config).treat_as_possibly_current());
+                    Some(create_gl_context(&*window, &gl_config).treat_as_possibly_current());
 
                 (window, gl_config)
             },
             GlDisplayCreationState::Init => {
-                println!("Recreating window in `resumed`");
+                println!("Recreating window in `can_create_surfaces`");
                 // Pick the config which we already use for the context.
                 let gl_config = self.gl_context.as_ref().unwrap().config();
                 match glutin_winit::finalize_window(event_loop, window_attributes(), &gl_config) {
                     Ok(window) => (window, gl_config),
                     Err(err) => {
-                        self.exit_state = Err(err.into());
+                        *self.exit_state.borrow_mut() = Err(err.into());
                         event_loop.exit();
                         return;
                     },
@@ -120,7 +123,7 @@ impl ApplicationHandler for App {
         assert!(self.state.replace(AppState { gl_surface, window }).is_none());
     }
 
-    fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
+    fn destroy_surfaces(&mut self, _event_loop: &dyn ActiveEventLoop) {
         // This event is only raised on Android, where the backing NativeWindow
         // for a GL Surface can appear and disappear at any moment.
         println!("Android window removed");
@@ -137,12 +140,12 @@ impl ApplicationHandler for App {
 
     fn window_event(
         &mut self,
-        event_loop: &ActiveEventLoop,
+        event_loop: &dyn ActiveEventLoop,
         _window_id: winit::window::WindowId,
         event: WindowEvent,
     ) {
         match event {
-            WindowEvent::Resized(size) if size.width != 0 && size.height != 0 => {
+            WindowEvent::SurfaceResized(size) if size.width != 0 && size.height != 0 => {
                 // Some platforms like EGL require resizing GL surface to update
                 // the size Notable platforms here are Wayland
                 // and macOS, other don't require it
@@ -169,24 +172,7 @@ impl ApplicationHandler for App {
         }
     }
 
-    fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
-        // NOTE: The handling below is only needed due to nvidia on Wayland to
-        // not crash on exit due to nvidia driver touching the Wayland
-        // display from on `exit` hook.
-        let _gl_display = self.gl_context.take().unwrap().display();
-
-        // Clear the window.
-        self.state = None;
-        #[cfg(egl_backend)]
-        #[allow(irrefutable_let_patterns)]
-        if let glutin::display::Display::Egl(display) = _gl_display {
-            unsafe {
-                display.terminate();
-            }
-        }
-    }
-
-    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+    fn about_to_wait(&mut self, _event_loop: &dyn ActiveEventLoop) {
         if let Some(AppState { gl_surface, window }) = self.state.as_ref() {
             let gl_context = self.gl_context.as_ref().unwrap();
             let renderer = self.renderer.as_ref().unwrap();
@@ -198,7 +184,7 @@ impl ApplicationHandler for App {
     }
 }
 
-fn create_gl_context(window: &Window, gl_config: &Config) -> NotCurrentContext {
+fn create_gl_context(window: &dyn Window, gl_config: &Config) -> NotCurrentContext {
     let raw_window_handle = window.window_handle().ok().map(|wh| wh.as_raw());
 
     // The context creation part.
@@ -216,9 +202,9 @@ fn create_gl_context(window: &Window, gl_config: &Config) -> NotCurrentContext {
         .with_context_api(ContextApi::OpenGl(Some(Version::new(2, 1))))
         .build(raw_window_handle);
 
-    // Reuse the uncurrented context from a suspended() call if it exists,
-    // otherwise this is the first time resumed() is called, where the
-    // context still has to be created.
+    // Reuse the uncurrented context from a destroy_surfaces() call if it
+    // exists, otherwise this is the first time can_create_surfaces() is
+    // called, where the context still has to be created.
     let gl_display = gl_config.display();
 
     unsafe {
@@ -235,7 +221,7 @@ fn create_gl_context(window: &Window, gl_config: &Config) -> NotCurrentContext {
 }
 
 fn window_attributes() -> WindowAttributes {
-    Window::default_attributes()
+    WindowAttributes::default()
         .with_transparent(true)
         .with_title("Glutin triangle gradient example (press Escape to exit)")
 }
@@ -254,18 +240,43 @@ struct App {
     state: Option<AppState>,
     gl_context: Option<PossiblyCurrentContext>,
     gl_display: GlDisplayCreationState,
-    exit_state: Result<(), Box<dyn Error>>,
+    exit_state: Rc<RefCell<Result<(), Box<dyn Error>>>>,
 }
 
 impl App {
-    fn new(template: ConfigTemplateBuilder, display_builder: DisplayBuilder) -> Self {
+    fn new(
+        template: ConfigTemplateBuilder,
+        display_builder: DisplayBuilder,
+        exit_state: Rc<RefCell<Result<(), Box<dyn Error>>>>,
+    ) -> Self {
         Self {
             template,
             gl_display: GlDisplayCreationState::Builder(Box::new(display_builder)),
-            exit_state: Ok(()),
+            exit_state,
             gl_context: None,
             state: None,
             renderer: None,
+        }
+    }
+}
+
+impl Drop for App {
+    fn drop(&mut self) {
+        // NOTE: The handling below is only needed due to nvidia on Wayland to
+        // not crash on exit due to nvidia driver touching the Wayland
+        // display from on `exit` hook.
+        let Some(_gl_display) = self.gl_context.take().map(|context| context.display()) else {
+            return;
+        };
+
+        // Clear the window.
+        self.state = None;
+        #[cfg(egl_backend)]
+        #[allow(irrefutable_let_patterns)]
+        if let glutin::display::Display::Egl(display) = _gl_display {
+            unsafe {
+                display.terminate();
+            }
         }
     }
 }
@@ -274,7 +285,7 @@ struct AppState {
     gl_surface: Surface<WindowSurface>,
     // NOTE: Window should be dropped after all resources created using its
     // raw-window-handle.
-    window: Window,
+    window: Box<dyn Window>,
 }
 
 // Find the config with the maximum number of samples, so our triangle will be

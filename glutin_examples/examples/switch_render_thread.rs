@@ -1,5 +1,7 @@
+use std::cell::RefCell;
 use std::error::Error;
 use std::num::NonZeroU32;
+use std::rc::Rc;
 use std::sync::mpsc::{self, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -17,36 +19,40 @@ use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::{ElementState, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy};
-use winit::window::Window;
+use winit::window::{Window, WindowAttributes};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let event_loop = EventLoop::<PlatformThreadEvent>::with_user_event().build().unwrap();
+    let event_loop = EventLoop::new().unwrap();
 
-    // `EventLoopProxy` allows you to dispatch custom events to the main Winit
-    // event loop from any thread.
+    // `EventLoopProxy` allows you to wake up the main Winit event loop from any
+    // thread.
     let event_loop_proxy = event_loop.create_proxy();
 
-    let mut app = App::new(event_loop_proxy);
+    let exit_state = Rc::new(RefCell::new(Ok(())));
+    let app = App::new(event_loop_proxy, exit_state.clone());
 
-    event_loop.run_app(&mut app)?;
+    event_loop.run_app(app)?;
 
-    app.exit_state
+    exit_state.replace(Ok(()))
 }
 
 struct App {
-    event_loop_proxy: EventLoopProxy<PlatformThreadEvent>,
-    exit_state: Result<(), Box<dyn Error>>,
+    event_loop_proxy: EventLoopProxy,
+    exit_state: Rc<RefCell<Result<(), Box<dyn Error>>>>,
     state: Option<AppState>,
 }
 
 impl App {
-    fn new(event_loop_proxy: EventLoopProxy<PlatformThreadEvent>) -> Self {
-        Self { event_loop_proxy, exit_state: Ok(()), state: None }
+    fn new(
+        event_loop_proxy: EventLoopProxy,
+        exit_state: Rc<RefCell<Result<(), Box<dyn Error>>>>,
+    ) -> Self {
+        Self { event_loop_proxy, exit_state, state: None }
     }
 }
 
-impl ApplicationHandler<PlatformThreadEvent> for App {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+impl ApplicationHandler for App {
+    fn can_create_surfaces(&mut self, event_loop: &dyn ActiveEventLoop) {
         if self.state.is_some() {
             return;
         }
@@ -54,7 +60,7 @@ impl ApplicationHandler<PlatformThreadEvent> for App {
         let (window, render_context) = match create_window_with_render_context(event_loop) {
             Ok(ok) => ok,
             Err(e) => {
-                self.exit_state = Err(e);
+                *self.exit_state.borrow_mut() = Err(e);
                 event_loop.exit();
                 return;
             },
@@ -76,13 +82,13 @@ impl ApplicationHandler<PlatformThreadEvent> for App {
 
     fn window_event(
         &mut self,
-        event_loop: &ActiveEventLoop,
+        event_loop: &dyn ActiveEventLoop,
         _window_id: winit::window::WindowId,
         event: WindowEvent,
     ) {
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
-            WindowEvent::Resized(size) if size.width != 0 && size.height != 0 => {
+            WindowEvent::SurfaceResized(size) if size.width != 0 && size.height != 0 => {
                 self.state.as_ref().unwrap().send_event_to_current_render_thread(
                     RenderThreadEvent::Resize(PhysicalSize {
                         width: NonZeroU32::new(size.width).unwrap(),
@@ -96,15 +102,21 @@ impl ApplicationHandler<PlatformThreadEvent> for App {
                     .unwrap()
                     .send_event_to_current_render_thread(RenderThreadEvent::Draw);
             },
-            WindowEvent::MouseInput { state: ElementState::Pressed, .. } => {
+            WindowEvent::PointerButton { state: ElementState::Pressed, .. } => {
                 self.state.as_mut().unwrap().start_render_thread_switch();
             },
             _ => (),
         }
     }
 
-    fn user_event(&mut self, _event_loop: &ActiveEventLoop, _event: PlatformThreadEvent) {
-        self.state.as_mut().unwrap().complete_render_thread_switch();
+    fn proxy_wake_up(&mut self, _event_loop: &dyn ActiveEventLoop) {
+        // The only reason for render threads to wake up the event loop is to
+        // signal that the context is no longer current on them.
+        if let Some(state) = self.state.as_mut() {
+            if state.thread_switch_in_progress {
+                state.complete_render_thread_switch();
+            }
+        }
     }
 }
 
@@ -112,7 +124,7 @@ struct AppState {
     render_thread_senders: Vec<Sender<RenderThreadEvent>>,
     render_thread_index: usize,
     thread_switch_in_progress: bool,
-    _window: Window,
+    _window: Box<dyn Window>,
 }
 
 impl AppState {
@@ -186,9 +198,9 @@ impl RenderContext {
 }
 
 fn create_window_with_render_context(
-    event_loop: &ActiveEventLoop,
-) -> Result<(Window, RenderContext), Box<dyn Error>> {
-    let window_attributes = Window::default_attributes().with_transparent(true);
+    event_loop: &dyn ActiveEventLoop,
+) -> Result<(Box<dyn Window>, RenderContext), Box<dyn Error>> {
+    let window_attributes = WindowAttributes::default().with_transparent(true);
 
     let template = ConfigTemplateBuilder::new().with_alpha_size(8);
 
@@ -235,7 +247,7 @@ fn create_window_with_render_context(
 
 fn spawn_render_threads(
     render_context: Arc<Mutex<RenderContext>>,
-    event_loop_proxy: EventLoopProxy<PlatformThreadEvent>,
+    event_loop_proxy: EventLoopProxy,
 ) -> (Vec<RenderThread>, Vec<Sender<RenderThreadEvent>>) {
     let mut senders = Vec::new();
     let mut render_threads = Vec::new();
@@ -282,11 +294,6 @@ enum RenderThreadEvent {
     Resize(PhysicalSize<NonZeroU32>),
 }
 
-#[derive(Debug, Clone, Copy)]
-enum PlatformThreadEvent {
-    ContextNotCurrent,
-}
-
 struct RenderThread {
     id: i32,
     color: Color,
@@ -299,10 +306,7 @@ impl RenderThread {
         Self { id, color, render_context }
     }
 
-    fn spawn(
-        &self,
-        event_loop_proxy: EventLoopProxy<PlatformThreadEvent>,
-    ) -> Sender<RenderThreadEvent> {
+    fn spawn(&self, event_loop_proxy: EventLoopProxy) -> Sender<RenderThreadEvent> {
         let (tx, rx) = mpsc::channel();
 
         let (id, color, render_context) = (self.id, self.color, self.render_context.clone());
@@ -325,9 +329,9 @@ impl RenderThread {
                     RenderThreadEvent::MakeNotCurrent => {
                         println!("thread {}: make not current", id);
                         render_context_guard.make_not_current().expect("make not current failed");
-                        event_loop_proxy
-                            .send_event(PlatformThreadEvent::ContextNotCurrent)
-                            .expect("sending context-not-current event failed");
+                        // Notify the event loop that the context is not current
+                        // anymore.
+                        event_loop_proxy.wake_up();
                     },
                     RenderThreadEvent::Resize(size) => {
                         render_context_guard.resize(size);
