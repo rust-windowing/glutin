@@ -169,8 +169,8 @@ impl<T: SurfaceTypeTrait> Surface<T> {
     unsafe fn raw_attribute(&self, attr: c_int) -> c_uint {
         unsafe {
             let mut value = 0;
-            // This shouldn't generate any errors given that we know that the surface is
-            // valid.
+            // This shouldn't generate any errors given that we know that the
+            // surface is valid.
             self.display.inner.glx.QueryDrawable(
                 self.display.inner.raw.cast(),
                 self.raw,
@@ -252,7 +252,8 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
         // Apply the `EXT` first since it's per window.
         if !applied && self.display.inner.client_extensions.contains("GLX_EXT_swap_control") {
             super::last_glx_error(|| unsafe {
-                // Check for error explicitly here, other apis do have indication for failure.
+                // Check for error explicitly here, other apis do have
+                // indication for failure.
                 extra.SwapIntervalEXT(self.display.inner.raw.cast(), self.raw, interval as _);
                 applied = true;
             })?;

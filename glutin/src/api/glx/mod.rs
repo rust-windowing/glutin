@@ -193,8 +193,8 @@ fn last_glx_error<T, F: FnOnce() -> T>(callback: F) -> Result<T> {
     // Execute the user routine that may produce GLX error.
     let result = callback();
 
-    // XXX We might want to XSync here in addition, because what mesa is doing might
-    // not be common, but I'd assume that what mesa doing is common.
+    // XXX We might want to XSync here in addition, because what mesa is doing
+    // might not be common, but I'd assume that what mesa doing is common.
 
     // Reset and report last error.
     let result = match LAST_GLX_ERROR.lock().unwrap().take() {

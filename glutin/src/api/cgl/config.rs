@@ -43,8 +43,8 @@ impl Display {
         match template.color_buffer_type {
             ColorBufferType::Rgb { r_size, g_size, b_size } => {
                 attrs.push(NSOpenGLPFAColorSize);
-                // We can't specify particular color, so we provide the sum, and also requires
-                // an alpha.
+                // We can't specify particular color, so we provide the sum, and
+                // also requires an alpha.
                 attrs.push((r_size + g_size + b_size + template.alpha_size) as u32);
             },
             _ => {
@@ -167,9 +167,9 @@ impl Config {
 #[allow(deprecated)]
 impl GlConfig for Config {
     fn color_buffer_type(&self) -> Option<ColorBufferType> {
-        // On macos all color formats divide by 3 without reminder, except for the RGB
-        // 565. So we can convert it in a hopefully reliable way. Also we should remove
-        // alpha.
+        // On macos all color formats divide by 3 without reminder, except for
+        // the RGB 565. So we can convert it in a hopefully reliable
+        // way. Also we should remove alpha.
         let color = self.raw_attribute(NSOpenGLPFAColorSize) - self.alpha_size() as i32;
         let r_size = (color / 3) as u8;
         let b_size = (color / 3) as u8;

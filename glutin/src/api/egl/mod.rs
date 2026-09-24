@@ -66,9 +66,11 @@ impl SymLoading for egl::Egl {
                     sym.into_raw()
                 });
 
-                // The symbol was not available in the library, so ask eglGetProcAddress for it.
-                // Note that eglGetProcAddress was only able to look up extension
-                // functions prior to EGL 1.5, hence this two-part dance.
+                // The symbol was not available in the library, so ask
+                // eglGetProcAddress for it.
+                // Note that eglGetProcAddress was only able to look up
+                // extension functions prior to EGL 1.5, hence
+                // this two-part dance.
                 (egl_proc_address)(sym_name.as_bytes_with_nul().as_ptr() as *const ffi::c_void)
             }
         };

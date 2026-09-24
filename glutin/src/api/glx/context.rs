@@ -89,8 +89,9 @@ impl Display {
                     GlProfile::Compatibility => glx_extra::CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
                 };
 
-                // Surfaceless contexts are supported with the GLX_ARB_create_context extension
-                // when using OpenGL 3.0 or greater.
+                // Surfaceless contexts are supported with the
+                // GLX_ARB_create_context extension when using
+                // OpenGL 3.0 or greater.
                 let supports_surfaceless = version >= Version::new(3, 0);
 
                 (Some(profile), Some(version), supports_surfaceless)
