@@ -13,12 +13,12 @@ pub trait GlWindow {
     /// Build the surface attributes suitable to create a window surface.
     ///
     /// # Panics
-    /// Panics if either window inner dimension is zero.
+    /// Panics if either window surface dimension is zero.
     ///
     /// # Example
     /// ```no_run
     /// use glutin_winit::GlWindow;
-    /// # let winit_window: winit::window::Window = unimplemented!();
+    /// # let winit_window: Box<dyn winit::window::Window> = unimplemented!();
     ///
     /// let attrs = winit_window.build_surface_attributes(<_>::default());
     /// ```
@@ -27,7 +27,7 @@ pub trait GlWindow {
         builder: SurfaceAttributesBuilder<WindowSurface>,
     ) -> Result<SurfaceAttributes<WindowSurface>, HandleError>;
 
-    /// Resize the surface to the window inner size.
+    /// Resize the surface to the window surface size.
     ///
     /// No-op if either window size is zero.
     ///
@@ -35,7 +35,7 @@ pub trait GlWindow {
     /// ```no_run
     /// use glutin_winit::GlWindow;
     /// # use glutin::surface::{Surface, WindowSurface};
-    /// # let winit_window: winit::window::Window = unimplemented!();
+    /// # let winit_window: Box<dyn winit::window::Window> = unimplemented!();
     /// # let (gl_surface, gl_context): (Surface<WindowSurface>, _) = unimplemented!();
     ///
     /// winit_window.resize_surface(&gl_surface, &gl_context);
@@ -47,12 +47,12 @@ pub trait GlWindow {
     );
 }
 
-impl GlWindow for Window {
+impl GlWindow for dyn Window + '_ {
     fn build_surface_attributes(
         &self,
         builder: SurfaceAttributesBuilder<WindowSurface>,
     ) -> Result<SurfaceAttributes<WindowSurface>, HandleError> {
-        let (w, h) = self.inner_size().non_zero().expect("invalid zero inner size");
+        let (w, h) = self.surface_size().non_zero().expect("invalid zero surface size");
         let handle = self.window_handle()?.as_raw();
         Ok(builder.build(handle, w, h))
     }
@@ -62,7 +62,7 @@ impl GlWindow for Window {
         surface: &Surface<impl SurfaceTypeTrait + ResizeableSurface>,
         context: &PossiblyCurrentContext,
     ) {
-        if let Some((w, h)) = self.inner_size().non_zero() {
+        if let Some((w, h)) = self.surface_size().non_zero() {
             surface.resize(context, w, h)
         }
     }

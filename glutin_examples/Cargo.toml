@@ -23,11 +23,11 @@ glutin = { path = "../glutin", default-features = false }
 glutin-winit = { path = "../glutin-winit", default-features = false }
 png = { version = "0.18.1", optional = true }
 raw-window-handle = "0.6"
-winit = { version = "0.30.0", default-features = false, features = ["rwh_06"] }
+winit = { version = "0.31.0-beta.3", default-features = false }
 drm = { version = "0.15", optional = true }
 
 [target.'cfg(target_os = "android")'.dependencies]
-winit = { version = "0.30.0", default-features = false, features = ["android-native-activity", "rwh_06"] }
+winit = { version = "0.31.0-beta.3", default-features = false, features = ["android-native-activity"] }
 
 [build-dependencies]
 gl_generator = "0.14"
