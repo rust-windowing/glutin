@@ -49,7 +49,7 @@ impl Display {
             .filter(|_| self.inner.client_extensions.contains("WGL_ARB_pbuffer"))
             .ok_or(ErrorKind::NotSupported("pbuffer extensions are not supported"))?;
 
-        let hdc = config.inner.hdc;
+        let hdc = config.inner.hdc.0;
         let width = surface_attributes.width.unwrap().get() as c_int;
         let height = surface_attributes.height.unwrap().get() as c_int;
         let mut attrs = [0; 3];

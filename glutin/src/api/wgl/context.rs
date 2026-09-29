@@ -37,7 +37,7 @@ impl Display {
                 let _ = config.apply_on_native_window(handle.unwrap());
                 gdi::GetDC(window.hwnd.get() as _)
             },
-            _ => config.inner.hdc,
+            _ => config.inner.hdc.0,
         };
 
         let share_ctx = match context_attributes.shared_context {
