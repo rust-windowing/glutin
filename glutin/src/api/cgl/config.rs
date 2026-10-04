@@ -95,34 +95,42 @@ impl Display {
             attrs.push(NSOpenGLPFAStereo);
         }
 
-        attrs.push(NSOpenGLPFAOpenGLProfile);
+        let base_len = attrs.len();
 
-        // Stash profile pos for latter insert.
-        let profile_attr_pos = attrs.len();
-        // Add place holder for the GL profile.
-        attrs.push(NSOpenGLProfileVersion4_1Core);
+        // When `Api::OPENGL` isn't requested, skip profile selection entirely
+        // (None only). Otherwise try each profile in order, falling
+        // back to no profile on failure.
+        let profiles: &[Option<NSOpenGLPixelFormatAttribute>] =
+            if template.api.is_some_and(|api| api.contains(Api::OPENGL)) {
+                &[
+                    Some(NSOpenGLProfileVersion4_1Core),
+                    Some(NSOpenGLProfileVersion3_2Core),
+                    Some(NSOpenGLProfileVersionLegacy),
+                    None,
+                ]
+            } else {
+                &[None]
+            };
 
-        // Terminate attrs with zero.
-        attrs.push(0);
-
-        // Automatically pick the latest profile.
-        let raw = [
-            NSOpenGLProfileVersion4_1Core,
-            NSOpenGLProfileVersion3_2Core,
-            NSOpenGLProfileVersionLegacy,
-        ]
-        .into_iter()
-        .find_map(|profile| {
-            attrs[profile_attr_pos] = profile;
-            // initWithAttributes returns None if the attributes were invalid
-            unsafe {
-                NSOpenGLPixelFormat::initWithAttributes(
-                    <NSOpenGLPixelFormat as AllocAnyThread>::alloc(),
-                    NonNull::new(attrs.as_ptr().cast_mut()).unwrap(),
-                )
-            }
-        })
-        .ok_or(ErrorKind::BadConfig)?;
+        let raw = profiles
+            .iter()
+            .find_map(|profile| {
+                attrs.truncate(base_len);
+                if let Some(profile) = profile {
+                    attrs.push(NSOpenGLPFAOpenGLProfile);
+                    attrs.push(*profile);
+                }
+                attrs.push(0); // null terminator
+                // initWithAttributes returns None if the attributes were
+                // invalid
+                unsafe {
+                    NSOpenGLPixelFormat::initWithAttributes(
+                        <NSOpenGLPixelFormat as AllocAnyThread>::alloc(),
+                        NonNull::new(attrs.as_ptr().cast_mut()).unwrap(),
+                    )
+                }
+            })
+            .ok_or(ErrorKind::BadConfig)?;
 
         let inner = Arc::new(ConfigInner {
             display: self.clone(),
