@@ -21,7 +21,7 @@ wayland = ["glutin/wayland", "winit/wayland"]
 [dependencies]
 glutin = { version = "0.32.0", path = "../glutin", default-features = false }
 raw-window-handle = "0.6"
-winit = { version = "=0.31.0-beta.3", default-features = false }
+winit = { version = "=0.31.0-beta.3", git = "https://github.com/rust-windowing/winit", rev = "d559b0567d85404bc8d949089aa8e60ed46b5dcf", default-features = false }
 
 [build-dependencies]
 cfg_aliases = "0.2.1"
