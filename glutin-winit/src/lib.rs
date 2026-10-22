@@ -191,6 +191,8 @@ pub fn finalize_window(
     gl_config: &Config,
 ) -> Result<Box<dyn Window>, RequestError> {
     // Disable transparency if the end config doesn't support it.
+    // On affected Windows GL paths, transparency can work despite the config reporting otherwise.
+    #[cfg(not(target_os = "windows"))]
     if gl_config.supports_transparency() == Some(false) {
         attributes = attributes.with_transparent(false);
     }
