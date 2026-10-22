@@ -1,5 +1,6 @@
 # Unreleased
 
+- **Breaking:** `ErrorKind::NotFound` now carries a `&'static str` describing what was not found.
 - **Breaking:** Added `make_current_surfaceless(self)` for `{Possibly,Not}CurrentGlContext`.
 - **Breaking:** CGL (macOS) no longer requests an `NSOpenGLProfile` unless `Api::OPENGL` was
   requested via `ConfigTemplateBuilder::with_api`.

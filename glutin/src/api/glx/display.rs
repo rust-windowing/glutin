@@ -57,7 +57,7 @@ impl Display {
 
         let glx = match GLX.as_ref() {
             Some(glx) => glx,
-            None => return Err(ErrorKind::NotFound.into()),
+            None => return Err(ErrorKind::NotFound("failed to load the GLX library").into()),
         };
 
         // Set the base for errors coming from GLX.
