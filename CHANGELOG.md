@@ -9,6 +9,8 @@
 - Fixed EGL's robustness detection without extension, but on EGL 1.5.
 - Fixed building docs on docs.rs.
 - Fixed WGL's unreliable TRANSPARENT_ARB false negatives by returning None
+- Fixed a crash in GLX `set_swap_interval` on Mesa before 21 with the software rasterizer by
+  preferring `glXSwapIntervalMESA` when the surface is current.
 
 # Version 0.32.3
 

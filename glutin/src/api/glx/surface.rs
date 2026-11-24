@@ -230,7 +230,7 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
         })
     }
 
-    fn set_swap_interval(&self, _context: &Self::Context, interval: SwapInterval) -> Result<()> {
+    fn set_swap_interval(&self, context: &Self::Context, interval: SwapInterval) -> Result<()> {
         let extra = match self.display.inner.glx_extra {
             Some(extra) if self.display.inner.features.contains(DisplayFeatures::SWAP_CONTROL) => {
                 extra
@@ -248,6 +248,21 @@ impl<T: SurfaceTypeTrait> GlSurface<T> for Surface<T> {
         };
 
         let mut applied = false;
+
+        // On Mesa, prefer its own extension when this surface is the current
+        // draw drawable, which `glXSwapIntervalMESA` applies to. Mesa routes
+        // the `EXT` and `SGI` entry points to the same driver hook, but before
+        // Mesa 21 `glXSwapIntervalEXT` calls it without checking that the
+        // driver has one, which crashes with the software rasterizer.
+        // `glXSwapIntervalMESA` returns an error instead.
+        if self.display.inner.client_extensions.contains("GLX_MESA_swap_control")
+            && self.is_current_draw(context)
+        {
+            unsafe {
+                applied = extra.SwapIntervalMESA(interval as _) != glx::BAD_CONTEXT as _;
+            }
+            return if applied { Ok(()) } else { Err(ErrorKind::BadContext.into()) };
+        }
 
         // Apply the `EXT` first since it's per window.
         if !applied && self.display.inner.client_extensions.contains("GLX_EXT_swap_control") {
