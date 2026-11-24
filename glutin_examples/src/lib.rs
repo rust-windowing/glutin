@@ -55,8 +55,8 @@ pub fn main(event_loop: winit::event_loop::EventLoop) -> Result<(), Box<dyn Erro
 impl ApplicationHandler for App {
     fn can_create_surfaces(&mut self, event_loop: &dyn ActiveEventLoop) {
         let (window, gl_config) = match &self.gl_display {
-            // We just created the event loop, so initialize the display, pick the config, and
-            // create the context.
+            // We just created the event loop, so initialize the display, pick
+            // the config, and create the context.
             GlDisplayCreationState::Builder(display_builder) => {
                 let (window, gl_config) = match display_builder.clone().build(
                     event_loop,
@@ -236,7 +236,8 @@ enum GlDisplayCreationState {
 struct App {
     template: ConfigTemplateBuilder,
     renderer: Option<Renderer>,
-    // NOTE: `AppState` carries the `Window`, thus it should be dropped after everything else.
+    // NOTE: `AppState` carries the `Window`, thus it should be dropped after
+    // everything else.
     state: Option<AppState>,
     gl_context: Option<PossiblyCurrentContext>,
     gl_display: GlDisplayCreationState,
