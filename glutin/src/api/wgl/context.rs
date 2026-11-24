@@ -191,8 +191,8 @@ impl Display {
             match context_attributes.release_behavior {
                 // This is the default behavior in specification.
                 //
-                // XXX even though we check for extensions don't pass it because it could cause
-                // issues.
+                // XXX even though we check for extensions don't pass it because
+                // it could cause issues.
                 ReleaseBehavior::Flush => (),
                 ReleaseBehavior::None => {
                     attrs.push(wgl_extra::CONTEXT_RELEASE_BEHAVIOR_ARB as c_int);

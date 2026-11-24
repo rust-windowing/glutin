@@ -526,9 +526,10 @@ impl Display {
         };
 
         let display = match display {
-            // `eglGetPlatformDisplay` and `GetPlatformDisplayEXT` aren't really differentiated,
-            // we must check if the version of the initialized display is not sensible for the
-            // EglDisplay type and downgrade it if so.
+            // `eglGetPlatformDisplay` and `GetPlatformDisplayEXT` aren't really
+            // differentiated, we must check if the version of the initialized
+            // display is not sensible for the EglDisplay type and downgrade it
+            // if so.
             EglDisplay::Khr(display) if version <= Version { major: 1, minor: 4 } => {
                 let client_extensions = CLIENT_EXTENSIONS.get().unwrap();
                 if client_extensions.contains("EGL_EXT_platform_base")

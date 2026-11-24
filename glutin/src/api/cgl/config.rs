@@ -157,8 +157,8 @@ impl Config {
             self.inner.raw.getValues_forAttribute_forVirtualScreen(
                 NonNull::from(&mut value),
                 attrib,
-                // They do differ per monitor and require context. Which is kind of insane, but
-                // whatever. Zero is a primary monitor.
+                // They do differ per monitor and require context. Which is kind
+                // of insane, but whatever. Zero is a primary monitor.
                 0,
             );
             value

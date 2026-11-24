@@ -183,7 +183,8 @@ impl Display {
             match context_attributes.release_behavior {
                 // This is the default behavior in specification.
                 //
-                // XXX passing it explicitly causing issues with older mesa versions.
+                // XXX passing it explicitly causing issues with older mesa
+                // versions.
                 ReleaseBehavior::Flush => (),
                 ReleaseBehavior::None => {
                     attrs.push(glx_extra::CONTEXT_RELEASE_BEHAVIOR_ARB as c_int);
