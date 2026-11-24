@@ -61,7 +61,7 @@ impl Display {
             .unwrap_or_else(|_| Cow::Borrowed("opengl32.dll"));
         let name = OsStr::new(dll_name.as_ref()).encode_wide().chain(Some(0)).collect::<Vec<_>>();
         let lib_opengl32 = unsafe { dll_loader::LoadLibraryW(name.as_ptr()) };
-        if lib_opengl32 == 0 {
+        if lib_opengl32.is_null() {
             return Err(ErrorKind::NotFound.into());
         }
 
@@ -81,7 +81,12 @@ impl Display {
 
         let features = Self::extract_display_features(&client_extensions);
 
-        let inner = Arc::new(DisplayInner { lib_opengl32, wgl_extra, features, client_extensions });
+        let inner = Arc::new(DisplayInner {
+            lib_opengl32: OpenGlModule(lib_opengl32),
+            wgl_extra,
+            features,
+            client_extensions,
+        });
 
         Ok(Display { inner })
     }
@@ -186,7 +191,7 @@ impl GlDisplay for Display {
             if !fn_ptr.is_null() {
                 fn_ptr.cast()
             } else {
-                dll_loader::GetProcAddress(self.inner.lib_opengl32, addr.cast())
+                dll_loader::GetProcAddress(self.inner.lib_opengl32.0, addr.cast())
                     .map_or(std::ptr::null(), |fn_ptr| fn_ptr as *const _)
             }
         }
@@ -215,9 +220,15 @@ impl AsRawDisplay for Display {
 
 impl Sealed for Display {}
 
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct OpenGlModule(pub(crate) HMODULE);
+
+unsafe impl Send for OpenGlModule {}
+unsafe impl Sync for OpenGlModule {}
+
 pub(crate) struct DisplayInner {
     /// Client WGL extensions.
-    pub(crate) lib_opengl32: HMODULE,
+    pub(crate) lib_opengl32: OpenGlModule,
 
     /// Extra functions used by the impl.
     pub(crate) wgl_extra: Option<&'static WglExtra>,

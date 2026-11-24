@@ -102,14 +102,14 @@ unsafe fn load_extra_functions(
             wm::CW_USEDEFAULT,
             rect.right - rect.left,
             rect.bottom - rect.top,
-            0,
-            0,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
             instance,
             std::ptr::null_mut(),
         )
     };
 
-    if win == 0 {
+    if win.is_null() {
         return Err(IoError::last_os_error().into());
     }
 

@@ -30,7 +30,7 @@ glutin_egl_sys = { version = "0.7.1", path = "../glutin_egl_sys", optional = tru
 glutin_wgl_sys = { version = "0.6.1", path = "../glutin_wgl_sys", optional = true }
 
 [target.'cfg(windows)'.dependencies.windows-sys]
-version = "0.52"
+version = "0.61"
 features = [
     "Win32_Foundation",
     "Win32_Graphics_Gdi",
