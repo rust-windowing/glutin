@@ -17,7 +17,7 @@ egl = ["glutin_egl_sys", "libloading"]
 glx = ["x11", "glutin_glx_sys", "libloading"]
 wgl = ["glutin_wgl_sys", "windows-sys"]
 x11 = ["x11-dl"]
-wayland = ["wayland-sys", "egl"]
+wayland = ["dep:wayland-egl", "egl"]
 
 [dependencies]
 bitflags = "2.2.1"
@@ -46,9 +46,8 @@ glutin_egl_sys = { version = "0.7.1", path = "../glutin_egl_sys" }
 [target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "dragonfly", target_os = "netbsd", target_os = "openbsd"))'.dependencies]
 glutin_egl_sys = { version = "0.7.1", path = "../glutin_egl_sys", optional = true }
 glutin_glx_sys = { version = "0.6.1", path = "../glutin_glx_sys", optional = true }
-wayland-sys = { version = "0.31.1", default-features = false, features = [
-    "egl",
-    "client",
+# XXX Release
+wayland-egl = { git  = "https://github.com/smithay/wayland-rs", default-features = false, features = [
     "dlopen",
 ], optional = true }
 x11-dl = { version = "2.20.0", optional = true }
