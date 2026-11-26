@@ -90,7 +90,7 @@ impl Device {
             }
 
             // SAFETY: EGL has initialized the vector for the number of devices.
-            devices.set_len(device_count as usize);
+            devices.set_len(count as usize);
         }
 
         Ok(devices.into_iter().flat_map(|ptr| Device::from_ptr(egl, ptr)))

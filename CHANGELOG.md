@@ -9,6 +9,7 @@
 - Fixed EGL's robustness detection without extension, but on EGL 1.5.
 - Fixed building docs on docs.rs.
 - Fixed WGL's unreliable TRANSPARENT_ARB false negatives by returning None
+- Fixed potential soundness issue in EGL devices query `glutin::api::egl::device::Device::query_devices`.
 
 # Version 0.32.3
 
